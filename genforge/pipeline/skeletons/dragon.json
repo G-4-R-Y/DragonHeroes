@@ -1,0 +1,26 @@
+{
+  "name": "dragon",
+  "canvas": [208, 152],
+  "anchor": [98, 128],
+  "bones": [
+    {"name": "root", "parent": null, "attach": [0, 0], "rotation_deg": 0, "z": 0, "part": null},
+
+    {"name": "wing_far", "parent": "body", "attach": [-6, -20], "rotation_deg": -14, "z": 4, "part": "wing_far"},
+
+    {"name": "tail_2", "parent": "tail_1", "attach": [-28, 0], "rotation_deg": 6, "z": 18, "part": "tail_2"},
+    {"name": "tail_1", "parent": "body", "attach": [-36, 4], "rotation_deg": 8, "z": 20, "part": "tail_1"},
+
+    {"name": "body", "parent": "root", "attach": [-4, -52], "rotation_deg": 0, "z": 30, "part": "body"},
+
+    {"name": "neck", "parent": "body", "attach": [30, -14], "rotation_deg": 18, "z": 34, "part": "neck"},
+    {"name": "jaw", "parent": "head", "attach": [4, 5], "rotation_deg": 8, "z": 36, "part": "jaw"},
+    {"name": "head", "parent": "neck", "attach": [0, -28], "rotation_deg": -14, "z": 38, "part": "head"},
+
+    {"name": "leg_back", "parent": "body", "attach": [-20, 18], "rotation_deg": 0, "z": 56, "part": "leg_back"},
+    {"name": "leg_front", "parent": "body", "attach": [24, 16], "rotation_deg": 0, "z": 58, "part": "leg_front"},
+
+    {"name": "wing_near", "parent": "body", "attach": [2, -18], "rotation_deg": -6, "z": 62, "part": "wing_near"},
+
+    {"name": "vfx_breath", "parent": "head", "attach": [25, 9], "rotation_deg": 8, "z": 70, "part": "vfx_breath_0", "hidden": true}
+  ]
+}

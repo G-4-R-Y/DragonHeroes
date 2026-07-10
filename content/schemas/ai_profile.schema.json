@@ -1,0 +1,56 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "AI profile definition",
+  "description": "Designer-authored utility/BT hybrid (canon §9, docs/tech/25): utility scorers select behavior-tree fragments from the fixed C++ fragment library. RL never lives here — this is the tool for all normal creatures.",
+  "type": "object",
+  "required": ["id", "behaviors"],
+  "additionalProperties": false,
+  "properties": {
+    "id": { "type": "string", "pattern": "^[a-z0-9_]+\\.ai\\.[a-z0-9_]+$" },
+    "description": { "type": "string" },
+    "behaviors": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["fragment", "base_score"],
+        "additionalProperties": false,
+        "properties": {
+          "fragment": {
+            "enum": ["idle_wander", "approach", "strafe", "flank", "retreat", "pack_regroup", "use_skill", "guard_leader", "enrage"],
+            "description": "BT fragment from the fixed C++ library (new fragments are engine changes, never data patches)"
+          },
+          "base_score": { "type": "number" },
+          "skill": { "type": "string", "pattern": "^[a-z0-9_]+\\.skill\\.[a-z0-9_]+$", "description": "For fragment=use_skill" },
+          "scorers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["input", "weight"],
+              "additionalProperties": false,
+              "properties": {
+                "input": { "enum": ["distance_to_target", "own_hp_pct", "target_hp_pct", "skill_ready", "pack_alive_pct", "leader_alive", "time_in_combat_s"] },
+                "weight": { "type": "number" },
+                "curve": { "enum": ["linear", "inverse", "step", "smooth"], "default": "linear" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "phase_machine": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["at_hp_pct", "add_behaviors"],
+        "additionalProperties": false,
+        "properties": {
+          "at_hp_pct": { "type": "number", "minimum": 0, "maximum": 100 },
+          "add_behaviors": { "type": "array", "items": { "type": "integer" }, "description": "Indices into behaviors[] unlocked at this phase" },
+          "remove_behaviors": { "type": "array", "items": { "type": "integer" } }
+        }
+      },
+      "description": "Boss phases (scripted difficulty, docs/tech/25 §boss mechanics)"
+    }
+  }
+}

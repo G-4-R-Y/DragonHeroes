@@ -1,0 +1,21 @@
+{
+  "id": "core.skill.talon_dive",
+  "name": "Talon Dive",
+  "kind": "active",
+  "tags": [
+    "mobility",
+    "boss"
+  ],
+  "behavior": "dash",
+  "damage_type": "physical",
+  "numbers": {
+    "damage_coeff": 1.3,
+    "dash_range_m": 8,
+    "cooldown_s": 8,
+    "windup_ticks": 12
+  },
+  "telegraph": {
+    "shape": "line",
+    "duration_ticks": 12
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Biome definition",
+  "type": "object",
+  "required": ["id", "name", "palette_accent", "creature_set", "min_generator_version"],
+  "additionalProperties": false,
+  "properties": {
+    "id": { "type": "string", "pattern": "^[a-z0-9_]+\\.biome\\.[a-z0-9_]+$" },
+    "name": { "type": "string" },
+    "palette_accent": { "type": "string", "description": "Biome accent LUT id (docs/design/17: global dark base + per-biome accent)" },
+    "creature_set": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "pattern": "^[a-z0-9_]+\\.creature\\.[a-z0-9_]+$" }
+    },
+    "hazards": { "type": "array", "items": { "type": "string" } },
+    "danger_tier_range": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "min": { "type": "integer", "minimum": 0 },
+        "max": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "min_generator_version": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Biome generates only in chunks at/above this generator version — new biomes claim virgin space only (docs/tech/24 §5)"
+    },
+    "tags": { "type": "array", "items": { "type": "string" } }
+  }
+}

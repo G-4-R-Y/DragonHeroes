@@ -1,0 +1,34 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Skill definition",
+  "description": "Skills are data referencing shared behavior/animation primitives on the base rigs (canon §3). Used by classes, creatures, Bestial Skill drops, and pet skill pools.",
+  "type": "object",
+  "required": ["id", "name", "kind", "tags"],
+  "additionalProperties": false,
+  "properties": {
+    "id": { "type": "string", "pattern": "^[a-z0-9_]+\\.skill\\.[a-z0-9_]+$" },
+    "name": { "type": "string", "minLength": 1 },
+    "kind": { "enum": ["active", "passive"] },
+    "damage_type": { "type": "string", "description": "Must exist in core.registry.damage_types (validator-checked)" },
+    "behavior": {
+      "enum": ["melee_arc", "projectile", "dash", "aoe_field", "summon", "buff", "channel"],
+      "description": "Which sim behavior primitive executes this skill"
+    },
+    "numbers": {
+      "type": "object",
+      "additionalProperties": { "type": "number" },
+      "description": "Behavior-specific tunables (damage_coeff, reach_m, arc_deg, projectile_speed_mps, cooldown_s, windup_ticks, active_ticks, recovery_ticks, field_radius_m, field_duration_s...). Server-readable for hotfixes (canon §7)."
+    },
+    "applies_field": { "type": "string", "description": "Elemental field id this skill lays on the tile grid, if any (e.g. core.field.fire) — field combos per canon §4" },
+    "telegraph": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "shape": { "enum": ["arc", "line", "circle", "ring"] },
+        "duration_ticks": { "type": "integer", "minimum": 0 }
+      },
+      "description": "Readability contract: hard attacks telegraph clearly (boss canon)"
+    },
+    "tags": { "type": "array", "items": { "type": "string" } }
+  }
+}

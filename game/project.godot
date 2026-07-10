@@ -1,0 +1,36 @@
+; Dragon Heroes — Godot 4.6+ project (presentation only, canon §10 rule 2:
+; zero gameplay rules live here; the client renders replicated sim state).
+; Current flow is the M1 prototype slice (game/prototype/) — a clearly marked
+; placeholder until dh-sim arrives via GDExtension. Menu flow: Main Menu (offline
+; login) -> Haven (game menu) -> Hunt (prototype/main.tscn); the Session autoload
+; carries character state across scenes.
+; Renderer note: prototype uses gl_compatibility for maximum desktop robustness;
+; the shipping mobile-renderer decision lives in docs/design/17.
+
+config_version=5
+
+[application]
+
+config/name="Dragon Heroes"
+config/description="Fast-paced dark-fantasy pixel-art ARPG. This client is a thin presentation layer over the dh-sim GDExtension."
+run/main_scene="res://prototype/ui/main_menu.tscn"
+config/features=PackedStringArray("4.6")
+
+[autoload]
+
+Session="*res://prototype/ui/session.gd"
+
+[display]
+
+window/size/viewport_width=640
+window/size/viewport_height=360
+window/size/window_width_override=1280
+window/size/window_height_override=720
+window/stretch/mode="canvas_items"
+window/stretch/scale_mode="integer"
+
+[rendering]
+
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
+textures/canvas_textures/default_texture_filter=0

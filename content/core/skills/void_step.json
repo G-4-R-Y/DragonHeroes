@@ -1,0 +1,18 @@
+{
+  "id": "core.skill.void_step",
+  "name": "Void Step",
+  "kind": "active",
+  "tags": [
+    "mobility",
+    "umbral",
+    "abyssal",
+    "family_shared"
+  ],
+  "behavior": "dash",
+  "damage_type": "umbral",
+  "numbers": {
+    "dash_range_m": 6,
+    "cooldown_s": 10,
+    "windup_ticks": 4
+  }
+}

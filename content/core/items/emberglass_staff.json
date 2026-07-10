@@ -1,0 +1,21 @@
+{
+  "id": "core.item.emberglass_staff",
+  "name": "Emberglass Staff",
+  "slot": "weapon",
+  "weapon_class": "staff",
+  "level_req": 1,
+  "implicit_mods": [
+    {
+      "stat": "umbral_damage_pct",
+      "min": 4,
+      "max": 9
+    }
+  ],
+  "power_budget_cost": 14,
+  "bestial_sockets": 1,
+  "tags": [
+    "weapon",
+    "staff",
+    "umbral"
+  ]
+}

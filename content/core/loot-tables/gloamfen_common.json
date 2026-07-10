@@ -1,0 +1,39 @@
+{
+  "id": "core.loot.gloamfen_common",
+  "entries": [
+    {
+      "kind": "nothing",
+      "weight": 55
+    },
+    {
+      "kind": "gold",
+      "weight": 30,
+      "gold": {
+        "min": 4,
+        "max": 18
+      }
+    },
+    {
+      "kind": "item",
+      "tag_pool": "weapon",
+      "weight": 10,
+      "rarity_weights": {
+        "common": 70,
+        "uncommon": 22,
+        "rare": 7,
+        "epic": 0.9,
+        "legendary": 0.1
+      }
+    },
+    {
+      "kind": "bestial_skill",
+      "ref": "core.skill.shadow_rend",
+      "weight": 4
+    },
+    {
+      "kind": "spirit_essence",
+      "ref": "core.spirit.abyssal_remnant",
+      "weight": 1
+    }
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "id": "core.skill.cleave",
+  "name": "Cleave",
+  "kind": "active",
+  "tags": [
+    "melee",
+    "physical"
+  ],
+  "behavior": "melee_arc",
+  "damage_type": "physical",
+  "numbers": {
+    "damage_coeff": 1.2,
+    "reach_m": 2.2,
+    "arc_deg": 110,
+    "cooldown_s": 4,
+    "windup_ticks": 8,
+    "active_ticks": 3,
+    "recovery_ticks": 6
+  },
+  "telegraph": {
+    "shape": "arc",
+    "duration_ticks": 8
+  }
+}

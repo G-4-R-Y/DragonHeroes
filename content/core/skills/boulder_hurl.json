@@ -1,0 +1,21 @@
+{
+  "id": "core.skill.boulder_hurl",
+  "name": "Boulder Hurl",
+  "kind": "active",
+  "tags": [
+    "ranged",
+    "boss"
+  ],
+  "behavior": "projectile",
+  "damage_type": "physical",
+  "numbers": {
+    "damage_coeff": 1.4,
+    "projectile_speed_mps": 12,
+    "cooldown_s": 6,
+    "windup_ticks": 14
+  },
+  "telegraph": {
+    "shape": "line",
+    "duration_ticks": 14
+  }
+}

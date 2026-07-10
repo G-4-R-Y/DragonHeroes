@@ -1,0 +1,112 @@
+{
+  "skeleton": "dragon",
+  "animations": {
+    "fly": {
+      "fps": 8,
+      "loop": true,
+      "frames": [
+        {
+          "wing_near": {"rotation_deg": -48},
+          "wing_far": {"rotation_deg": -54},
+          "body": {"offset": [0, 4]},
+          "leg_front": {"rotation_deg": 22},
+          "leg_back": {"rotation_deg": 26},
+          "tail_1": {"rotation_deg": 8},
+          "tail_2": {"rotation_deg": 8},
+          "neck": {"rotation_deg": -3}
+        },
+        {
+          "wing_near": {"rotation_deg": -8},
+          "wing_far": {"rotation_deg": -12},
+          "leg_front": {"rotation_deg": 14},
+          "leg_back": {"rotation_deg": 16},
+          "tail_1": {"rotation_deg": 2},
+          "tail_2": {"rotation_deg": 0}
+        },
+        {
+          "wing_near": {"rotation_deg": 22},
+          "wing_far": {"rotation_deg": 16},
+          "body": {"offset": [0, -4]},
+          "leg_front": {"rotation_deg": 8},
+          "leg_back": {"rotation_deg": 10},
+          "tail_1": {"rotation_deg": -6},
+          "tail_2": {"rotation_deg": -8},
+          "neck": {"rotation_deg": 3}
+        }
+      ]
+    },
+    "breath": {
+      "fps": 6,
+      "loop": false,
+      "frames": [
+        {
+          "neck": {"rotation_deg": -14},
+          "head": {"rotation_deg": -8},
+          "jaw": {"rotation_deg": 2},
+          "body": {"offset": [-2, 1], "rotation_deg": -3},
+          "wing_near": {"rotation_deg": -24},
+          "wing_far": {"rotation_deg": -28},
+          "tail_1": {"rotation_deg": 6}
+        },
+        {
+          "neck": {"rotation_deg": 8},
+          "head": {"rotation_deg": 6},
+          "jaw": {"rotation_deg": 26},
+          "body": {"offset": [1, 0]},
+          "wing_near": {"rotation_deg": -34},
+          "wing_far": {"rotation_deg": -38},
+          "tail_1": {"rotation_deg": -4},
+          "vfx_breath": {"hidden": false, "part": "vfx_breath_0"}
+        },
+        {
+          "neck": {"rotation_deg": 10},
+          "head": {"rotation_deg": 8},
+          "jaw": {"rotation_deg": 30},
+          "body": {"offset": [2, 0]},
+          "wing_near": {"rotation_deg": -36},
+          "wing_far": {"rotation_deg": -40},
+          "tail_1": {"rotation_deg": -6},
+          "vfx_breath": {"hidden": false, "part": "vfx_breath_2"}
+        }
+      ]
+    },
+    "walk": {
+      "fps": 6,
+      "loop": true,
+      "frames": [
+        {
+          "leg_front": {"rotation_deg": -16},
+          "leg_back": {"rotation_deg": 16},
+          "body": {"offset": [0, -1], "rotation_deg": 1},
+          "wing_near": {"rotation_deg": -4},
+          "wing_far": {"rotation_deg": -6},
+          "tail_1": {"rotation_deg": 4},
+          "tail_2": {"rotation_deg": 4},
+          "neck": {"rotation_deg": -2}
+        },
+        {
+          "leg_front": {"rotation_deg": -4},
+          "leg_back": {"rotation_deg": 4},
+          "tail_1": {"rotation_deg": 1},
+          "tail_2": {"rotation_deg": 2}
+        },
+        {
+          "leg_front": {"rotation_deg": 16},
+          "leg_back": {"rotation_deg": -16},
+          "body": {"offset": [0, -1], "rotation_deg": -1},
+          "wing_near": {"rotation_deg": -4},
+          "wing_far": {"rotation_deg": -6},
+          "tail_1": {"rotation_deg": -2},
+          "tail_2": {"rotation_deg": -4},
+          "neck": {"rotation_deg": 2}
+        },
+        {
+          "leg_front": {"rotation_deg": 4},
+          "leg_back": {"rotation_deg": -4},
+          "tail_1": {"rotation_deg": 1},
+          "tail_2": {"rotation_deg": 0}
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "id": "core.affix.stalwart",
+  "name": "Stalwart",
+  "kind": "prefix",
+  "tiers": [
+    {
+      "tier": 1,
+      "stat": "armor",
+      "min": 10,
+      "max": 20,
+      "min_item_level": 1
+    },
+    {
+      "tier": 2,
+      "stat": "armor",
+      "min": 21,
+      "max": 38,
+      "min_item_level": 20
+    }
+  ],
+  "spawn_weights": {
+    "chest": 100,
+    "helm": 80,
+    "boots": 60,
+    "weapon": 0
+  }
+}

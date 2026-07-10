@@ -1,0 +1,25 @@
+{
+  "id": "core.pet_family.abyssal",
+  "name": "Abyssal",
+  "lore": "Creatures touched by the Abyss share fragments of its hunger: a few abyssal techniques flow through every bloodline, while each species keeps its own signature. That shared story is why their skills can mix on a bonded pet.",
+  "family_shared_skills": [
+    "core.skill.abyssal_maw",
+    "core.skill.void_step"
+  ],
+  "species": [
+    {
+      "creature": "core.creature.gloamfen_stalker",
+      "signature_skills": [
+        "core.skill.shadow_rend"
+      ]
+    }
+  ],
+  "roll_rules": {
+    "skill_slots": 3,
+    "family_skill_chance": 0.25,
+    "attribute_roll_range": {
+      "min_pct": 70,
+      "max_pct": 110
+    }
+  }
+}

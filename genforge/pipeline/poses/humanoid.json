@@ -1,0 +1,128 @@
+{
+  "skeleton": "humanoid",
+  "animations": {
+    "idle": {
+      "fps": 2,
+      "loop": true,
+      "frames": [
+        {},
+        {
+          "torso": {"offset": [0, -1]},
+          "arm_upper_l": {"rotation_deg": -3},
+          "arm_upper_r": {"rotation_deg": 3},
+          "cape": {"rotation_deg": 2}
+        }
+      ]
+    },
+    "walk": {
+      "fps": 6,
+      "loop": true,
+      "frames": [
+        {
+          "leg_l": {"rotation_deg": -18},
+          "leg_r": {"rotation_deg": 18},
+          "arm_upper_l": {"rotation_deg": 14},
+          "arm_upper_r": {"rotation_deg": -14},
+          "arm_fore_l": {"rotation_deg": 6},
+          "arm_fore_r": {"rotation_deg": -6},
+          "torso": {"offset": [0, -1], "rotation_deg": 2},
+          "cape": {"rotation_deg": -8}
+        },
+        {
+          "leg_l": {"rotation_deg": -4},
+          "leg_r": {"rotation_deg": 4},
+          "arm_upper_l": {"rotation_deg": 4},
+          "arm_upper_r": {"rotation_deg": -4},
+          "cape": {"rotation_deg": -3}
+        },
+        {
+          "leg_l": {"rotation_deg": 18},
+          "leg_r": {"rotation_deg": -18},
+          "arm_upper_l": {"rotation_deg": -14},
+          "arm_upper_r": {"rotation_deg": 14},
+          "arm_fore_l": {"rotation_deg": -6},
+          "arm_fore_r": {"rotation_deg": 6},
+          "torso": {"offset": [0, -1], "rotation_deg": -2},
+          "cape": {"rotation_deg": -8}
+        },
+        {
+          "leg_l": {"rotation_deg": 4},
+          "leg_r": {"rotation_deg": -4},
+          "arm_upper_l": {"rotation_deg": -4},
+          "arm_upper_r": {"rotation_deg": 4},
+          "cape": {"rotation_deg": -3}
+        }
+      ]
+    },
+    "attack": {
+      "fps": 8,
+      "loop": false,
+      "frames": [
+        {
+          "arm_upper_r": {"rotation_deg": -70},
+          "arm_fore_r": {"rotation_deg": -25},
+          "torso": {"rotation_deg": -6, "offset": [-2, 0]},
+          "weapon": {"rotation_deg": -12},
+          "cape": {"rotation_deg": 6},
+          "head": {"rotation_deg": 4}
+        },
+        {
+          "arm_upper_r": {"rotation_deg": 55},
+          "arm_fore_r": {"rotation_deg": 30},
+          "torso": {"rotation_deg": 10, "offset": [3, 0]},
+          "weapon": {"rotation_deg": 24},
+          "cape": {"rotation_deg": -14},
+          "head": {"rotation_deg": -4},
+          "leg_l": {"rotation_deg": -8},
+          "leg_r": {"rotation_deg": 8}
+        },
+        {
+          "arm_upper_r": {"rotation_deg": 38},
+          "arm_fore_r": {"rotation_deg": 18},
+          "torso": {"rotation_deg": 6, "offset": [2, 0]},
+          "weapon": {"rotation_deg": 14},
+          "cape": {"rotation_deg": -6},
+          "leg_l": {"rotation_deg": -4},
+          "leg_r": {"rotation_deg": 4}
+        }
+      ]
+    },
+    "cast": {
+      "fps": 6,
+      "loop": false,
+      "frames": [
+        {
+          "arm_upper_r": {"rotation_deg": -60},
+          "arm_fore_r": {"rotation_deg": -55},
+          "weapon": {"rotation_deg": 110},
+          "arm_upper_l": {"rotation_deg": -28},
+          "arm_fore_l": {"rotation_deg": -20},
+          "head": {"rotation_deg": -4},
+          "cape": {"rotation_deg": -6},
+          "torso": {"rotation_deg": -3}
+        },
+        {
+          "arm_upper_r": {"rotation_deg": -60},
+          "arm_fore_r": {"rotation_deg": -55},
+          "weapon": {"rotation_deg": 110},
+          "arm_upper_l": {"rotation_deg": -34},
+          "arm_fore_l": {"rotation_deg": -26},
+          "head": {"rotation_deg": -6},
+          "cape": {"rotation_deg": -10},
+          "torso": {"rotation_deg": -3, "offset": [0, -1]},
+          "vfx_cast": {"hidden": false, "part": "vfx_cast_0"}
+        },
+        {
+          "arm_upper_r": {"rotation_deg": -30},
+          "arm_fore_r": {"rotation_deg": -40},
+          "weapon": {"rotation_deg": 74},
+          "arm_upper_l": {"rotation_deg": -12},
+          "arm_fore_l": {"rotation_deg": -8},
+          "cape": {"rotation_deg": -14},
+          "torso": {"rotation_deg": 2},
+          "vfx_cast": {"hidden": false, "part": "vfx_cast_2"}
+        }
+      ]
+    }
+  }
+}

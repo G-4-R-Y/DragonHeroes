@@ -1,0 +1,13 @@
+{
+  "id": "season.2026.s1",
+  "name": "Season of the First Hunt",
+  "weeks": 12,
+  "themes": ["abyssal_awakening", "the_fen_brightens"],
+  "narrative": "The Gloamfen glows brighter than any elder remembers. The Abyssal bloodlines are stirring — and the Guilds are paying premium for their spirits.",
+  "featured_families": ["abyssal", "mireborn"],
+  "featured_biomes": ["core.biome.gloamfen"],
+  "palette_bias": {"accent": "bioluminescent_cyan_green", "note": "corruption beautifies — more glow, never browner"},
+  "commissioned_slots": ["weapon", "amulet"],
+  "tournament_flavor": "The Gloamcrown — champions' ghosts wear a crown of fen-light",
+  "drop_cadence": {"items_skills_creatures": "weekly", "biome_expansion": "week 5"}
+}

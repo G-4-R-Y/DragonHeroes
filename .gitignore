@@ -1,0 +1,36 @@
+# C++ / CMake
+sim/build/
+*.o
+*.a
+
+# Godot
+game/.godot/
+game/export/
+*.import
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Go
+backend/economy-core/economy-core
+
+# ML artifacts
+ml/**/runs/
+ml/**/checkpoints/
+*.onnx
+
+# GenForge candidates — generated bundles are quarantined output, never
+# committed (candidate contract, docs/tech/28 §6). Keep the directory.
+genforge/candidates/*
+!genforge/candidates/.gitkeep
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+
+# Secrets — never commit credentials
+.env
+*.secret.*

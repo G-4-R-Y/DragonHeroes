@@ -1,0 +1,19 @@
+{
+  "id": "core.item.palecrown_signet",
+  "name": "Palecrown Signet",
+  "slot": "ring",
+  "level_req": 30,
+  "implicit_mods": [
+    {
+      "stat": "frost_res",
+      "min": 8,
+      "max": 15
+    }
+  ],
+  "power_budget_cost": 10,
+  "bestial_sockets": 0,
+  "tags": [
+    "ring",
+    "frost"
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "id": "core.skill.wing_gust",
+  "name": "Wing Gust",
+  "kind": "active",
+  "tags": [
+    "storm",
+    "control",
+    "boss"
+  ],
+  "behavior": "aoe_field",
+  "damage_type": "storm",
+  "numbers": {
+    "damage_coeff": 0.4,
+    "field_radius_m": 5,
+    "knockback_m": 4,
+    "cooldown_s": 10,
+    "windup_ticks": 15
+  },
+  "telegraph": {
+    "shape": "circle",
+    "duration_ticks": 15
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "id": "core.loot.emberwing_elite",
+  "entries": [
+    {
+      "kind": "gold",
+      "weight": 30,
+      "gold": {
+        "min": 80,
+        "max": 260
+      }
+    },
+    {
+      "kind": "item",
+      "ref": "core.item.emberfang_blade",
+      "weight": 6,
+      "rarity_weights": {
+        "common": 0,
+        "uncommon": 40,
+        "rare": 40,
+        "epic": 17,
+        "legendary": 3
+      }
+    },
+    {
+      "kind": "item",
+      "tag_pool": "ring",
+      "weight": 10,
+      "rarity_weights": {
+        "common": 20,
+        "uncommon": 45,
+        "rare": 27,
+        "epic": 7,
+        "legendary": 1
+      }
+    },
+    {
+      "kind": "spirit_essence",
+      "ref": "core.spirit.abyssal_remnant",
+      "weight": 4
+    }
+  ]
+}

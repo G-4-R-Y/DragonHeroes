@@ -1,0 +1,34 @@
+{
+  "id": "core.creature.terravore_colossus",
+  "name": "Terravore Colossus",
+  "archetype": "giant",
+  "family": "earthbound",
+  "tier": "legendary",
+  "rarity": "epic",
+  "palette": "core.palette.umbral",
+  "stats": {
+    "hp": 22000,
+    "damage": 110,
+    "move_speed": 3.2,
+    "radius": 2.8
+  },
+  "skills": [
+    "core.skill.stone_upheaval",
+    "core.skill.seismic_slam",
+    "core.skill.boulder_hurl",
+    "core.skill.cleave",
+    "core.skill.ember_screech"
+  ],
+  "ai_profile": "core.ai.boss_emberwing",
+  "loot_table": "core.loot.emberwing_elite",
+  "duo_partners": [
+    "core.creature.pyre_sovereign"
+  ],
+  "capturable": false,
+  "tags": [
+    "umbral_depths",
+    "earthbound",
+    "boss",
+    "legendary"
+  ]
+}

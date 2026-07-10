@@ -1,0 +1,27 @@
+{
+  "id": "core.affix.brutal",
+  "name": "Brutal",
+  "kind": "prefix",
+  "tiers": [
+    {
+      "tier": 1,
+      "stat": "damage",
+      "min": 3,
+      "max": 7,
+      "min_item_level": 1
+    },
+    {
+      "tier": 2,
+      "stat": "damage",
+      "min": 8,
+      "max": 14,
+      "min_item_level": 20
+    }
+  ],
+  "spawn_weights": {
+    "weapon": 100,
+    "ring": 25,
+    "amulet": 40,
+    "chest": 0
+  }
+}

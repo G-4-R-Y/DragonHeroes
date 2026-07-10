@@ -1,0 +1,112 @@
+{
+  "id": "core.registry.effects",
+  "note": "The living registry of every status, condition, mechanic, enchantment, affix and field effect (Ricardo 2026-07-10). Source of truth for the in-game CODEX (synced to game/prototype/data/effects.json). Extend by ADDING entries — weekly content never requires engine work (canon).",
+  "groups": [
+    {
+      "name": "Damage types (canon §4)",
+      "entries": [
+        {"key": "physical", "name": "Physical", "desc": "mitigated by armor: reduction = armor/(armor+150)", "status": "live"},
+        {"key": "fire", "name": "Fire", "desc": "resist-mitigated; fuels Ignite and fire fields", "status": "live"},
+        {"key": "frost", "name": "Frost", "desc": "resist-mitigated; frost bolts apply Chill", "status": "live"},
+        {"key": "storm", "name": "Storm", "desc": "resist-mitigated; shock/chain themes", "status": "planned"},
+        {"key": "venom", "name": "Venom", "desc": "resist-mitigated; stacking DoT themes", "status": "planned"},
+        {"key": "umbral", "name": "Umbral", "desc": "resist-mitigated; the Gloom's own element (Shadow Rend, wisp bolts)", "status": "live"},
+        {"key": "blood", "name": "Blood", "desc": "resist-mitigated; leech/sacrifice themes (blood_price keystone leeches)", "status": "live"}
+      ]
+    },
+    {
+      "name": "Statuses & conditions",
+      "entries": [
+        {"key": "ignite", "name": "Ignite", "desc": "fire DoT, 0.5 s ticks; refreshed on re-application (Rune of Cinders: 3/s for 3 s)", "status": "live"},
+        {"key": "chill", "name": "Chill", "desc": "-35% move speed for 1.2 s (frost wisp bolts); icy tint on the hero", "status": "live"},
+        {"key": "enrage", "name": "Enrage", "desc": "+30% move speed 5 s on a resisted Soul Snare; red tint", "status": "live"},
+        {"key": "knockback", "name": "Knockback", "desc": "impulse displacement on the hero (boss Wing Gust)", "status": "live"},
+        {"key": "shove", "name": "Shove", "desc": "instant displacement on creatures (Rune of the Gale burst)", "status": "live"},
+        {"key": "hitstop", "name": "Hitstop", "desc": "45 ms global 0.15x time-scale punch on melee connect", "status": "live"},
+        {"key": "dodge_displacement", "name": "Dodge displacement", "desc": "4 m dash, 3 charges, 1.5 s refill each, NO i-frames — position is the defense", "status": "live"},
+        {"key": "pet_rest", "name": "Pet Rest", "desc": "pets at 0 HP rest 15 s then return — they never die; they respawn with the hunter", "status": "live"},
+        {"key": "death_penalty", "name": "Death penalty", "desc": "lose 25% of carried gold on death (full owner rules: design/12)", "status": "live"}
+      ]
+    },
+    {
+      "name": "Rune effects (canon §4 — one socket per skill)",
+      "entries": [
+        {"key": "rune_of_echoes", "name": "Rune of Echoes", "desc": "the skill repeats at 40% damage 0.25 s later", "status": "live"},
+        {"key": "rune_of_cinders", "name": "Rune of Cinders", "desc": "hits Ignite (3/s scaled by Intellect, 3 s) and scorch the ground", "status": "live"},
+        {"key": "rune_of_the_gale", "name": "Rune of the Gale", "desc": "dodging leaves a wind burst: 10 damage + shove within 1.5 m", "status": "live"}
+      ]
+    },
+    {
+      "name": "Enchantments (Spirit Essences)",
+      "entries": [
+        {"key": "umbral_edge", "name": "Umbral Edge", "desc": "Abyssal Remnant on weapon/amulet: +4-10% umbral damage (rolled); REPLACES the previous enchant", "status": "live"},
+        {"key": "enchant_backlash", "name": "Essence Backlash", "desc": "enchanting a +4/+5 item: 25% chance the item is DESTROYED", "status": "live"}
+      ]
+    },
+    {
+      "name": "Elite affixes (pack leaders)",
+      "entries": [
+        {"key": "brutal", "name": "Brutal", "desc": "+50% damage; red-tinted", "status": "live"},
+        {"key": "swift", "name": "Swift", "desc": "+40% move speed, -25% attack cooldown; cyan-tinted", "status": "live"},
+        {"key": "fiery", "name": "Fiery", "desc": "strikes add a +50% fire packet; ember-tinted", "status": "live"},
+        {"key": "bulwark", "name": "Bulwark", "desc": "+80% max HP; gold-tinted", "status": "live"}
+      ]
+    },
+    {
+      "name": "Creature archetypes & variants",
+      "entries": [
+        {"key": "stalker", "name": "Gloamfen Stalker", "desc": "baseline pack melee; capturable (Abyssal family)", "status": "live"},
+        {"key": "lunger", "name": "Lunger", "desc": "fast and frail: +45% speed, -35% HP, quick bites", "status": "live"},
+        {"key": "brute", "name": "Brute", "desc": "slow wall: +90% HP, +70% damage, heavy telegraphs, double gold", "status": "live"},
+        {"key": "wisp_umbral", "name": "Gloamfen Wisp (umbral)", "desc": "kiting caster, violet bolts", "status": "live"},
+        {"key": "wisp_ember", "name": "Ember Wisp", "desc": "hotter bolts (fire, 12 damage)", "status": "live"},
+        {"key": "wisp_frost", "name": "Frost Wisp", "desc": "weaker bolts (8) that Chill the hero", "status": "live"},
+        {"key": "emberwing_matriarch", "name": "Emberwing Matriarch", "desc": "5-skill Elite boss: Ember Bolt, Talon Dive, Wing Gust, Ember Screech (60%), Magma Breath fields (30%)", "status": "live"},
+        {"key": "legendary_duo", "name": "Pyre Sovereign + Terravore Colossus", "desc": "Legendary duo hunt with lava-tile Duologue (content exists; fight pending)", "status": "planned"}
+      ]
+    },
+    {
+      "name": "Fields & ground effects (tile interaction system)",
+      "entries": [
+        {"key": "fire_field", "name": "Fire field", "desc": "burning ground, DoT ticks every 0.25 s; glows and telegraphs on landing", "status": "live"},
+        {"key": "scorch", "name": "Scorch", "desc": "brief ground decal from Cinders hits (visual)", "status": "live"},
+        {"key": "lava_combo", "name": "Lava (field combo)", "desc": "fire field + earth field → lava tiles (registries/fields.json)", "status": "planned"}
+      ]
+    },
+    {
+      "name": "Skill tree — Reaver (1 point per level)",
+      "entries": [
+        {"key": "root_cleave", "name": "Cleave (root)", "desc": "the class active; learned from the start", "status": "live"},
+        {"key": "brutal_edge", "name": "Brutal Edge", "desc": "passive: +5% crit chance", "status": "live"},
+        {"key": "cleave_rampage", "name": "Cleave Rampage", "desc": "modifier: +8% attack speed", "status": "live"},
+        {"key": "blood_price", "name": "Blood Price (keystone)", "desc": "+10% blood leech on melee, -15 armor — a real tradeoff", "status": "live"}
+      ]
+    },
+    {
+      "name": "Mounts (walking + flying)",
+      "entries": [
+        {"key": "gloam_strider", "name": "Gloam Strider", "desc": "walking mount, x1.6 speed; sold by the Haven vendor (400 g)", "status": "live"},
+        {"key": "emberwing_drakeling", "name": "Emberwing Drakeling", "desc": "FLYING mount, x1.9 speed, crosses water/rock; bonds when the Matriarch falls", "status": "live"},
+        {"key": "mount_rules", "name": "Saddle rules", "desc": "M mounts/dismounts; no combat from the saddle; damage knocks you off; flyers must land on solid ground", "status": "live"}
+      ]
+    },
+    {
+      "name": "Pets & bonds",
+      "entries": [
+        {"key": "capture", "name": "Soul Snare capture", "desc": "F on a <35% HP stalker within 3 m; chance 0.25 + 0.6 x missing-HP", "status": "live"},
+        {"key": "instance_roll", "name": "Instance roll", "desc": "2-3 skills from the family pool (~70:30 signature:shared) + 70-110% attribute roll", "status": "live"},
+        {"key": "stables", "name": "Stables", "desc": "overflow captures stable the OLDEST bond — pets are never abandoned; swap in CHARACTER → Pets", "status": "live"},
+        {"key": "pet_trade", "name": "Pet marketplace", "desc": "pets fully tradable; perfect rolls are chase assets (web-only marketplace)", "status": "planned"}
+      ]
+    },
+    {
+      "name": "Forge & economy",
+      "entries": [
+        {"key": "forge_upgrade", "name": "Forge upgrade", "desc": "+10% to all affix values per tier, max +5; cost 50 x 2^tier gold", "status": "live"},
+        {"key": "forge_fail", "name": "Forge fail risk", "desc": "attempts into +4/+5 fail 25%/40% — gold burns, the item survives", "status": "live"},
+        {"key": "vendor_sell", "name": "Vendor sell", "desc": "price scales with rarity and tier (gold sink)", "status": "live"},
+        {"key": "marketplace", "name": "Player marketplace", "desc": "real-money player-to-player trade via Pix — WEB-ONLY, never in mobile apps (hard rule)", "status": "planned"}
+      ]
+    }
+  ]
+}

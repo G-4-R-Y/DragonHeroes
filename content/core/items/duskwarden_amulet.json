@@ -1,0 +1,19 @@
+{
+  "id": "core.item.duskwarden_amulet",
+  "name": "Duskwarden Amulet",
+  "slot": "amulet",
+  "level_req": 1,
+  "implicit_mods": [
+    {
+      "stat": "hp",
+      "min": 10,
+      "max": 20
+    }
+  ],
+  "power_budget_cost": 10,
+  "bestial_sockets": 0,
+  "tags": [
+    "amulet",
+    "umbral"
+  ]
+}

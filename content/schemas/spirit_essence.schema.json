@@ -1,0 +1,40 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Spirit Essence definition",
+  "description": "Spirits of slain creatures — enchantment materials by creature family (canon §3).",
+  "type": "object",
+  "required": ["id", "name", "source_family", "enchant"],
+  "additionalProperties": false,
+  "properties": {
+    "id": { "type": "string", "pattern": "^[a-z0-9_]+\\.spirit\\.[a-z0-9_]+$" },
+    "name": { "type": "string" },
+    "source_family": { "type": "string", "description": "Creature family whose kills can drop this essence" },
+    "enchant": {
+      "type": "object",
+      "required": ["applicable_slots", "stat_mods"],
+      "additionalProperties": false,
+      "properties": {
+        "applicable_slots": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "enum": ["weapon", "offhand", "helm", "chest", "gloves", "boots", "amulet", "ring", "relic"] }
+        },
+        "stat_mods": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["stat", "min", "max"],
+            "additionalProperties": false,
+            "properties": {
+              "stat": { "type": "string" },
+              "min": { "type": "number" },
+              "max": { "type": "number" }
+            }
+          }
+        },
+        "risk": { "type": "number", "minimum": 0, "maximum": 1, "description": "Enchant-failure chance — an item sink (docs/design/14); gameplay RNG only, never paid" }
+      }
+    }
+  }
+}

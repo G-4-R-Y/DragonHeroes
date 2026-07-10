@@ -1,0 +1,19 @@
+{
+  "id": "core.item.mirebound_boots",
+  "name": "Mirebound Boots",
+  "slot": "boots",
+  "level_req": 1,
+  "implicit_mods": [
+    {
+      "stat": "move_speed",
+      "min": 4,
+      "max": 8
+    }
+  ],
+  "power_budget_cost": 8,
+  "bestial_sockets": 0,
+  "tags": [
+    "boots",
+    "leather"
+  ]
+}

@@ -1,0 +1,30 @@
+{
+  "id": "core.creature.emberwing_matriarch",
+  "name": "Emberwing Matriarch",
+  "archetype": "avian",
+  "family": "emberkin",
+  "tier": "elite",
+  "rarity": "epic",
+  "palette": "core.palette.cinder",
+  "stats": {
+    "hp": 4200,
+    "damage": 45,
+    "move_speed": 5.5,
+    "radius": 1.4
+  },
+  "skills": [
+    "core.skill.ember_bolt",
+    "core.skill.talon_dive",
+    "core.skill.wing_gust",
+    "core.skill.ember_screech",
+    "core.skill.magma_breath"
+  ],
+  "ai_profile": "core.ai.boss_emberwing",
+  "loot_table": "core.loot.emberwing_elite",
+  "capturable": false,
+  "tags": [
+    "cinderwastes",
+    "emberkin",
+    "boss"
+  ]
+}

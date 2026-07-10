@@ -1,0 +1,67 @@
+{
+  "id": "core.ai.pack_skirmisher",
+  "description": "Default pack creature: circles, commits when the pack has numbers, regroups when thinned.",
+  "behaviors": [
+    {
+      "fragment": "approach",
+      "base_score": 1.0,
+      "scorers": [
+        {
+          "input": "distance_to_target",
+          "weight": 0.5,
+          "curve": "linear"
+        }
+      ]
+    },
+    {
+      "fragment": "strafe",
+      "base_score": 0.8,
+      "scorers": [
+        {
+          "input": "skill_ready",
+          "weight": -0.6,
+          "curve": "step"
+        }
+      ]
+    },
+    {
+      "fragment": "use_skill",
+      "base_score": 1.2,
+      "skill": "core.skill.shadow_rend",
+      "scorers": [
+        {
+          "input": "distance_to_target",
+          "weight": -0.8,
+          "curve": "inverse"
+        },
+        {
+          "input": "skill_ready",
+          "weight": 1.0,
+          "curve": "step"
+        }
+      ]
+    },
+    {
+      "fragment": "pack_regroup",
+      "base_score": 0.5,
+      "scorers": [
+        {
+          "input": "pack_alive_pct",
+          "weight": -1.0,
+          "curve": "inverse"
+        }
+      ]
+    },
+    {
+      "fragment": "retreat",
+      "base_score": 0.3,
+      "scorers": [
+        {
+          "input": "own_hp_pct",
+          "weight": -1.2,
+          "curve": "inverse"
+        }
+      ]
+    }
+  ]
+}

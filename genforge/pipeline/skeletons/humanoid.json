@@ -1,0 +1,27 @@
+{
+  "name": "humanoid",
+  "canvas": [128, 128],
+  "anchor": [64, 106],
+  "bones": [
+    {"name": "root", "parent": null, "attach": [0, 0], "rotation_deg": 0, "z": 0, "part": null},
+
+    {"name": "cape", "parent": "torso", "attach": [0, -16], "rotation_deg": 0, "z": 4, "part": "cape"},
+
+    {"name": "leg_l", "parent": "root", "attach": [-7, -25], "rotation_deg": 0, "z": 10, "part": "leg"},
+    {"name": "leg_r", "parent": "root", "attach": [7, -25], "rotation_deg": 0, "z": 12, "part": "leg"},
+
+    {"name": "arm_upper_l", "parent": "torso", "attach": [-13, -14], "rotation_deg": -8, "z": 20, "part": "arm_upper"},
+    {"name": "arm_fore_l", "parent": "arm_upper_l", "attach": [0, 14], "rotation_deg": 0, "z": 21, "part": "arm_fore"},
+
+    {"name": "torso", "parent": "root", "attach": [0, -38], "rotation_deg": 0, "z": 30, "part": "torso"},
+
+    {"name": "arm_upper_r", "parent": "torso", "attach": [13, -14], "rotation_deg": 8, "z": 40, "part": "arm_upper"},
+    {"name": "arm_fore_r", "parent": "arm_upper_r", "attach": [0, 14], "rotation_deg": 0, "z": 41, "part": "arm_fore"},
+
+    {"name": "head", "parent": "torso", "attach": [0, -20], "rotation_deg": 0, "z": 45, "part": "head"},
+
+    {"name": "weapon", "parent": "arm_fore_r", "attach": [0, 13], "rotation_deg": 0, "z": 50, "part": "weapon"},
+
+    {"name": "vfx_cast", "parent": "weapon", "attach": [0, -34], "rotation_deg": 0, "z": 60, "part": "vfx_cast_0", "hidden": true}
+  ]
+}

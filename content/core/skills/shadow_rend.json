@@ -1,0 +1,25 @@
+{
+  "id": "core.skill.shadow_rend",
+  "name": "Shadow Rend",
+  "kind": "active",
+  "tags": [
+    "melee",
+    "umbral",
+    "abyssal"
+  ],
+  "behavior": "melee_arc",
+  "damage_type": "umbral",
+  "numbers": {
+    "damage_coeff": 1.1,
+    "reach_m": 1.8,
+    "arc_deg": 90,
+    "cooldown_s": 5,
+    "windup_ticks": 6,
+    "active_ticks": 2,
+    "recovery_ticks": 5
+  },
+  "telegraph": {
+    "shape": "arc",
+    "duration_ticks": 6
+  }
+}

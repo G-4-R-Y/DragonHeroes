@@ -1,0 +1,28 @@
+{
+  "id": "core.affix.of_keenness",
+  "name": "of Keenness",
+  "kind": "suffix",
+  "tiers": [
+    {
+      "tier": 1,
+      "stat": "crit_chance",
+      "min": 2,
+      "max": 5,
+      "min_item_level": 1
+    },
+    {
+      "tier": 2,
+      "stat": "crit_chance",
+      "min": 6,
+      "max": 9,
+      "min_item_level": 20
+    }
+  ],
+  "spawn_weights": {
+    "weapon": 80,
+    "ring": 60,
+    "amulet": 60,
+    "helm": 30,
+    "boots": 0
+  }
+}

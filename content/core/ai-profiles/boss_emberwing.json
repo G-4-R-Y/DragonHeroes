@@ -1,0 +1,94 @@
+{
+  "id": "core.ai.boss_emberwing",
+  "description": "Elite boss pattern: ranged pokes into dive-punish windows; enrage + field control below half health (docs/design/13 boss principles).",
+  "behaviors": [
+    {
+      "fragment": "strafe",
+      "base_score": 1.0
+    },
+    {
+      "fragment": "use_skill",
+      "base_score": 1.3,
+      "skill": "core.skill.ember_bolt",
+      "scorers": [
+        {
+          "input": "skill_ready",
+          "weight": 1.0,
+          "curve": "step"
+        }
+      ]
+    },
+    {
+      "fragment": "use_skill",
+      "base_score": 1.1,
+      "skill": "core.skill.talon_dive",
+      "scorers": [
+        {
+          "input": "distance_to_target",
+          "weight": 0.9,
+          "curve": "linear"
+        },
+        {
+          "input": "skill_ready",
+          "weight": 1.0,
+          "curve": "step"
+        }
+      ]
+    },
+    {
+      "fragment": "use_skill",
+      "base_score": 0.9,
+      "skill": "core.skill.wing_gust",
+      "scorers": [
+        {
+          "input": "distance_to_target",
+          "weight": -1.0,
+          "curve": "inverse"
+        },
+        {
+          "input": "skill_ready",
+          "weight": 1.0,
+          "curve": "step"
+        }
+      ]
+    },
+    {
+      "fragment": "use_skill",
+      "base_score": 0.0,
+      "skill": "core.skill.ember_screech",
+      "scorers": [
+        {
+          "input": "skill_ready",
+          "weight": 1.0,
+          "curve": "step"
+        }
+      ]
+    },
+    {
+      "fragment": "use_skill",
+      "base_score": 0.0,
+      "skill": "core.skill.magma_breath",
+      "scorers": [
+        {
+          "input": "skill_ready",
+          "weight": 1.0,
+          "curve": "step"
+        }
+      ]
+    }
+  ],
+  "phase_machine": [
+    {
+      "at_hp_pct": 60,
+      "add_behaviors": [
+        4
+      ]
+    },
+    {
+      "at_hp_pct": 30,
+      "add_behaviors": [
+        5
+      ]
+    }
+  ]
+}

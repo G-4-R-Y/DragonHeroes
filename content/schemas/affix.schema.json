@@ -1,0 +1,33 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Affix definition",
+  "type": "object",
+  "required": ["id", "name", "kind", "tiers", "spawn_weights"],
+  "additionalProperties": false,
+  "properties": {
+    "id": { "type": "string", "pattern": "^[a-z0-9_]+\\.affix\\.[a-z0-9_]+$" },
+    "name": { "type": "string", "description": "Display template, e.g. 'of Embers'" },
+    "kind": { "enum": ["prefix", "suffix"] },
+    "tiers": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["tier", "stat", "min", "max"],
+        "additionalProperties": false,
+        "properties": {
+          "tier": { "type": "integer", "minimum": 1, "maximum": 5 },
+          "stat": { "type": "string", "description": "Must exist in core.registry.stats (validator-checked)" },
+          "min": { "type": "number" },
+          "max": { "type": "number" },
+          "min_item_level": { "type": "integer", "minimum": 1, "maximum": 60 }
+        }
+      }
+    },
+    "spawn_weights": {
+      "type": "object",
+      "additionalProperties": { "type": "number", "minimum": 0 },
+      "description": "item-tag → weight; 0 excludes the affix on that tag (PoE pattern, docs/tech/23)"
+    }
+  }
+}

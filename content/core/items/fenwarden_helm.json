@@ -1,0 +1,19 @@
+{
+  "id": "core.item.fenwarden_helm",
+  "name": "Fenwarden Helm",
+  "slot": "helm",
+  "level_req": 1,
+  "implicit_mods": [
+    {
+      "stat": "armor",
+      "min": 3,
+      "max": 8
+    }
+  ],
+  "power_budget_cost": 8,
+  "bestial_sockets": 0,
+  "tags": [
+    "helm",
+    "leather"
+  ]
+}

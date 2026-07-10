@@ -1,0 +1,21 @@
+{
+  "id": "core.item.emberfang_blade",
+  "name": "Emberfang Blade",
+  "slot": "weapon",
+  "weapon_class": "sword",
+  "level_req": 24,
+  "implicit_mods": [
+    {
+      "stat": "fire_damage_pct",
+      "min": 5,
+      "max": 12
+    }
+  ],
+  "power_budget_cost": 18,
+  "bestial_sockets": 1,
+  "tags": [
+    "weapon",
+    "sword",
+    "fire"
+  ]
+}

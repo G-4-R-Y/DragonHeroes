@@ -1,0 +1,25 @@
+{
+  "id": "core.skill.abyssal_maw",
+  "name": "Abyssal Maw",
+  "kind": "active",
+  "tags": [
+    "melee",
+    "umbral",
+    "abyssal",
+    "family_shared"
+  ],
+  "behavior": "melee_arc",
+  "damage_type": "umbral",
+  "numbers": {
+    "damage_coeff": 1.5,
+    "reach_m": 1.5,
+    "arc_deg": 60,
+    "blood_leech_pct": 20,
+    "cooldown_s": 8,
+    "windup_ticks": 10
+  },
+  "telegraph": {
+    "shape": "arc",
+    "duration_ticks": 10
+  }
+}

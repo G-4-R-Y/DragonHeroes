@@ -1,0 +1,24 @@
+{
+  "id": "proto.registry.runes",
+  "note": "PROTOTYPE-ONLY (proposal) — runes are canon (docs/00-canon.md §4, added 2026-07-08) but have no content/schemas type yet; this file defines the prototype set until a rune schema lands.",
+  "runes": [
+    {
+      "key": "rune_of_echoes",
+      "name": "Rune of Echoes",
+      "effect": "echo",
+      "desc": "The socketed skill repeats once at 40% damage 0.25 s later (attack skills only)."
+    },
+    {
+      "key": "rune_of_cinders",
+      "name": "Rune of Cinders",
+      "effect": "ignite",
+      "desc": "Hits from the socketed skill ignite: 3 damage/s for 3 s, plus a brief ground scorch."
+    },
+    {
+      "key": "rune_of_the_gale",
+      "name": "Rune of the Gale",
+      "effect": "gale",
+      "desc": "The socketed dodge leaves a wind burst behind, dealing 10 knockback damage."
+    }
+  ]
+}

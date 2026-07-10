@@ -1,0 +1,29 @@
+{
+  "id": "core.affix.vigorous",
+  "name": "Vigorous",
+  "kind": "prefix",
+  "tiers": [
+    {
+      "tier": 1,
+      "stat": "hp",
+      "min": 8,
+      "max": 18,
+      "min_item_level": 1
+    },
+    {
+      "tier": 2,
+      "stat": "hp",
+      "min": 19,
+      "max": 34,
+      "min_item_level": 20
+    }
+  ],
+  "spawn_weights": {
+    "chest": 100,
+    "helm": 80,
+    "boots": 60,
+    "amulet": 80,
+    "ring": 50,
+    "weapon": 0
+  }
+}

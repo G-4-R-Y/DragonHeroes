@@ -1,0 +1,25 @@
+{
+  "id": "core.creature.gloamfen_stalker",
+  "name": "Gloamfen Stalker",
+  "archetype": "quadruped",
+  "family": "abyssal",
+  "tier": "normal",
+  "rarity": "common",
+  "palette": "core.palette.gloamfen",
+  "stats": {
+    "hp": 120,
+    "damage": 14,
+    "move_speed": 4.5,
+    "radius": 0.6
+  },
+  "skills": [
+    "core.skill.shadow_rend"
+  ],
+  "ai_profile": "core.ai.pack_skirmisher",
+  "loot_table": "core.loot.gloamfen_common",
+  "capturable": true,
+  "tags": [
+    "gloamfen",
+    "abyssal"
+  ]
+}

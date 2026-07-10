@@ -1,0 +1,12 @@
+{
+  "id": "core.registry.damage_types",
+  "values": [
+    "physical",
+    "fire",
+    "frost",
+    "storm",
+    "venom",
+    "umbral",
+    "blood"
+  ]
+}

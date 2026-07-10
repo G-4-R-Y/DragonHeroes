@@ -1,0 +1,22 @@
+{
+  "id": "core.biome.gloamfen",
+  "name": "Gloamfen",
+  "palette_accent": "core.palette.gloamfen",
+  "creature_set": [
+    "core.creature.gloamfen_stalker",
+    "core.creature.emberwing_matriarch"
+  ],
+  "hazards": [
+    "deep_mire",
+    "spore_clouds"
+  ],
+  "danger_tier_range": {
+    "min": 1,
+    "max": 4
+  },
+  "min_generator_version": 1,
+  "tags": [
+    "swamp",
+    "launch"
+  ]
+}

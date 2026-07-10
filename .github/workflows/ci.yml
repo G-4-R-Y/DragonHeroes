@@ -1,0 +1,26 @@
+name: CI
+on:
+  push:
+  pull_request:
+
+jobs:
+  content:
+    name: Content validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install jsonschema
+      - run: python3 tools/validate_content.py
+
+  sim:
+    name: Sim workspace (C++)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: cmake -S sim -B sim/build -DCMAKE_BUILD_TYPE=Release
+      - run: cmake --build sim/build -j"$(nproc)"
+      - run: ctest --test-dir sim/build --output-on-failure
+      - name: M0 benchmark harness (informational)
+        run: ./sim/build/libs/dh-server/dh-server --entities 2000 --ticks 3000

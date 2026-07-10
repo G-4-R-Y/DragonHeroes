@@ -1,0 +1,56 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "GenForge parts-sheet manifest",
+  "description": "Maps named parts of a single generated parts-sheet PNG to sheet regions. rect is [x,y,w,h] in sheet pixels; pivot is [px,py] in pixels LOCAL to the rect (the bone attachment point); angle_hint is the angle in degrees (clockwise-positive, y-down) the part is pre-drawn at on the sheet — the baker subtracts it before applying bone rotation.",
+  "type": "object",
+  "required": ["schema_version", "entity", "archetype", "sheet", "sheet_size", "parts"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "const": 1 },
+    "entity": { "type": "string", "minLength": 1 },
+    "archetype": {
+      "enum": ["quadruped", "humanoid", "winged_beast", "avian", "dragon", "giant", "serpent", "spirit", "arachnid", "amorphous"]
+    },
+    "sheet": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Path of the parts-sheet PNG, relative to this manifest file"
+    },
+    "sheet_size": {
+      "type": "array",
+      "items": { "type": "integer", "minimum": 1 },
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "parts": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "object",
+        "required": ["rect", "pivot"],
+        "additionalProperties": false,
+        "properties": {
+          "rect": {
+            "type": "array",
+            "items": { "type": "integer" },
+            "minItems": 4,
+            "maxItems": 4,
+            "description": "[x, y, w, h] on the sheet, pixels"
+          },
+          "pivot": {
+            "type": "array",
+            "items": { "type": "number" },
+            "minItems": 2,
+            "maxItems": 2,
+            "description": "[px, py] attachment point, pixels, local to rect"
+          },
+          "angle_hint": {
+            "type": "number",
+            "default": 0,
+            "description": "Degrees (cw-positive) the part is pre-drawn at"
+          }
+        }
+      }
+    }
+  }
+}

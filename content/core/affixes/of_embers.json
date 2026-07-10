@@ -1,0 +1,33 @@
+{
+  "id": "core.affix.of_embers",
+  "name": "of Embers",
+  "kind": "suffix",
+  "tiers": [
+    {
+      "tier": 1,
+      "stat": "fire_damage_pct",
+      "min": 3,
+      "max": 6,
+      "min_item_level": 1
+    },
+    {
+      "tier": 2,
+      "stat": "fire_damage_pct",
+      "min": 7,
+      "max": 11,
+      "min_item_level": 18
+    },
+    {
+      "tier": 3,
+      "stat": "fire_damage_pct",
+      "min": 12,
+      "max": 16,
+      "min_item_level": 36
+    }
+  ],
+  "spawn_weights": {
+    "weapon": 100,
+    "ring": 40,
+    "frost": 0
+  }
+}

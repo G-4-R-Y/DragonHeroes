@@ -1,0 +1,62 @@
+{
+  "id": "core.class.reaver",
+  "name": "Reaver",
+  "role": "melee_damage",
+  "resource": {
+    "name": "Fury",
+    "max": 100,
+    "regen_per_s": -4
+  },
+  "skill_tree": [
+    {
+      "node": "root_cleave",
+      "kind": "active",
+      "grants_skill": "core.skill.cleave",
+      "requires": []
+    },
+    {
+      "node": "brutal_edge",
+      "kind": "passive",
+      "requires": [
+        "root_cleave"
+      ],
+      "stat_mods": [
+        {
+          "stat": "crit_chance",
+          "value": 5
+        }
+      ]
+    },
+    {
+      "node": "cleave_rampage",
+      "kind": "modifier",
+      "modifies": "root_cleave",
+      "requires": [
+        "brutal_edge"
+      ],
+      "stat_mods": [
+        {
+          "stat": "attack_speed",
+          "value": 8
+        }
+      ]
+    },
+    {
+      "node": "blood_price",
+      "kind": "keystone",
+      "requires": [
+        "cleave_rampage"
+      ],
+      "stat_mods": [
+        {
+          "stat": "blood_leech_pct",
+          "value": 10
+        },
+        {
+          "stat": "armor",
+          "value": -15
+        }
+      ]
+    }
+  ]
+}

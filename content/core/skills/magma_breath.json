@@ -1,0 +1,24 @@
+{
+  "id": "core.skill.magma_breath",
+  "name": "Magma Breath",
+  "kind": "active",
+  "tags": [
+    "fire",
+    "field",
+    "boss"
+  ],
+  "behavior": "aoe_field",
+  "damage_type": "fire",
+  "numbers": {
+    "damage_coeff": 0.6,
+    "field_radius_m": 4,
+    "field_duration_s": 6,
+    "cooldown_s": 12,
+    "windup_ticks": 20
+  },
+  "applies_field": "core.field.fire",
+  "telegraph": {
+    "shape": "circle",
+    "duration_ticks": 20
+  }
+}

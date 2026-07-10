@@ -1,0 +1,24 @@
+{
+  "id": "core.skill.stone_upheaval",
+  "name": "Stone Upheaval",
+  "kind": "active",
+  "tags": [
+    "earth",
+    "field",
+    "boss"
+  ],
+  "behavior": "aoe_field",
+  "damage_type": "physical",
+  "numbers": {
+    "damage_coeff": 1.0,
+    "field_radius_m": 5,
+    "field_duration_s": 8,
+    "cooldown_s": 14,
+    "windup_ticks": 24
+  },
+  "applies_field": "core.field.earth",
+  "telegraph": {
+    "shape": "ring",
+    "duration_ticks": 24
+  }
+}

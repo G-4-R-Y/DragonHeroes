@@ -1,0 +1,18 @@
+{
+  "id": "core.registry.fields",
+  "values": [
+    "core.field.fire",
+    "core.field.earth",
+    "core.field.lava",
+    "core.field.ice",
+    "core.field.poison_mist"
+  ],
+  "combos": [
+    {
+      "a": "core.field.fire",
+      "b": "core.field.earth",
+      "result": "core.field.lava",
+      "note": "Canonical Legendary duo combo: fire dragon + earth colossus (canon \u00a74)"
+    }
+  ]
+}

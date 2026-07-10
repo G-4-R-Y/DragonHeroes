@@ -1,0 +1,19 @@
+{
+  "id": "core.item.gloamhide_vest",
+  "name": "Gloamhide Vest",
+  "slot": "chest",
+  "level_req": 1,
+  "implicit_mods": [
+    {
+      "stat": "armor",
+      "min": 6,
+      "max": 12
+    }
+  ],
+  "power_budget_cost": 12,
+  "bestial_sockets": 0,
+  "tags": [
+    "chest",
+    "leather"
+  ]
+}

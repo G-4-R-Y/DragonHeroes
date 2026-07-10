@@ -1,0 +1,35 @@
+{
+  "id": "core.creature.pyre_sovereign",
+  "name": "Pyre Sovereign",
+  "archetype": "dragon",
+  "family": "emberkin",
+  "tier": "legendary",
+  "rarity": "legendary",
+  "palette": "core.palette.cinder",
+  "stats": {
+    "hp": 18000,
+    "damage": 90,
+    "move_speed": 6.0,
+    "radius": 2.2
+  },
+  "skills": [
+    "core.skill.ember_bolt",
+    "core.skill.magma_breath",
+    "core.skill.talon_dive",
+    "core.skill.wing_gust",
+    "core.skill.ember_screech",
+    "core.skill.cleave"
+  ],
+  "ai_profile": "core.ai.boss_emberwing",
+  "loot_table": "core.loot.emberwing_elite",
+  "duo_partners": [
+    "core.creature.terravore_colossus"
+  ],
+  "capturable": false,
+  "tags": [
+    "cinderwastes",
+    "emberkin",
+    "boss",
+    "legendary"
+  ]
+}

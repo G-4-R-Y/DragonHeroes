@@ -1,0 +1,31 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Item base definition",
+  "description": "PoE-style indirection (docs/tech/23): bases, affixes, and stats are separate tables; a dropped item = base + rolled affixes. Rarity affix-counts and the power budget are enforced at roll time in the sim, and linted here.",
+  "type": "object",
+  "required": ["id", "name", "slot", "tags", "level_req"],
+  "additionalProperties": false,
+  "properties": {
+    "id": { "type": "string", "pattern": "^[a-z0-9_]+\\.item\\.[a-z0-9_]+$" },
+    "name": { "type": "string", "minLength": 1 },
+    "slot": { "enum": ["weapon", "offhand", "helm", "chest", "gloves", "boots", "amulet", "ring", "relic"] },
+    "weapon_class": { "type": "string", "description": "For slot=weapon: sword, spear, bow, staff, etc. (see docs/design/14)" },
+    "level_req": { "type": "integer", "minimum": 1, "maximum": 60 },
+    "implicit_mods": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["stat", "min", "max"],
+        "additionalProperties": false,
+        "properties": {
+          "stat": { "type": "string", "description": "Must exist in core.registry.stats (validator-checked)" },
+          "min": { "type": "number" },
+          "max": { "type": "number" }
+        }
+      }
+    },
+    "power_budget_cost": { "type": "number", "minimum": 0, "description": "Per-slot power budget accounting (canon §4, ranked budget in docs/design/16)" },
+    "bestial_sockets": { "type": "integer", "minimum": 0, "maximum": 3, "description": "Sockets accepting Bestial Skill stones" },
+    "tags": { "type": "array", "items": { "type": "string" }, "description": "Drive affix spawn weights (tag-based, PoE pattern)" }
+  }
+}

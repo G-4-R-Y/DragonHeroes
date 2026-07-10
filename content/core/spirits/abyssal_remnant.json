@@ -1,0 +1,19 @@
+{
+  "id": "core.spirit.abyssal_remnant",
+  "name": "Abyssal Remnant",
+  "source_family": "abyssal",
+  "enchant": {
+    "applicable_slots": [
+      "weapon",
+      "amulet"
+    ],
+    "stat_mods": [
+      {
+        "stat": "umbral_damage_pct",
+        "min": 4,
+        "max": 10
+      }
+    ],
+    "risk": 0.25
+  }
+}

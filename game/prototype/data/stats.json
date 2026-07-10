@@ -1,0 +1,30 @@
+{
+  "id": "core.registry.stats",
+  "values": [
+    "hp",
+    "damage",
+    "move_speed",
+    "radius",
+    "might",
+    "agility",
+    "intellect",
+    "vitality",
+    "willpower",
+    "armor",
+    "crit_chance",
+    "crit_damage",
+    "attack_speed",
+    "cooldown_reduction",
+    "fire_damage_pct",
+    "frost_damage_pct",
+    "storm_damage_pct",
+    "venom_damage_pct",
+    "umbral_damage_pct",
+    "blood_leech_pct",
+    "fire_res",
+    "frost_res",
+    "storm_res",
+    "venom_res",
+    "umbral_res"
+  ]
+}

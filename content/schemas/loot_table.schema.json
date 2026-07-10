@@ -1,0 +1,46 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Loot table definition",
+  "description": "Weighted drop entries. Tables compile to the publishable probability page (legal requirement, canon §8 / docs/tech/23). NEVER attached to any paid mechanic (canon §2: no paid randomness).",
+  "type": "object",
+  "required": ["id", "entries"],
+  "additionalProperties": false,
+  "properties": {
+    "id": { "type": "string", "pattern": "^[a-z0-9_]+\\.loot\\.[a-z0-9_]+$" },
+    "entries": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["kind", "weight"],
+        "additionalProperties": false,
+        "properties": {
+          "kind": { "enum": ["item", "bestial_skill", "spirit_essence", "gold", "nothing"] },
+          "ref": { "type": "string", "description": "Content id for kind=item/bestial_skill/spirit_essence; omit for gold/nothing" },
+          "tag_pool": { "type": "string", "description": "Alternative to ref: roll any definition carrying this tag" },
+          "weight": { "type": "number", "exclusiveMinimum": 0 },
+          "rarity_weights": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "common": { "type": "number", "minimum": 0 },
+              "uncommon": { "type": "number", "minimum": 0 },
+              "rare": { "type": "number", "minimum": 0 },
+              "epic": { "type": "number", "minimum": 0 },
+              "legendary": { "type": "number", "minimum": 0 }
+            }
+          },
+          "gold": {
+            "type": "object",
+            "required": ["min", "max"],
+            "additionalProperties": false,
+            "properties": {
+              "min": { "type": "integer", "minimum": 0 },
+              "max": { "type": "integer", "minimum": 0 }
+            }
+          }
+        }
+      }
+    }
+  }
+}
