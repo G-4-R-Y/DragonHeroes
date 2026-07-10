@@ -500,6 +500,18 @@ func _show_vendor() -> void:
 	if Session.inventory.is_empty():
 		_line("the bag is empty.", DIM)
 		return
+	# one-click junk clear (Ricardo: "shop selling made easier")
+	var commons: Array = []
+	var common_total := 0
+	for it in Session.inventory:
+		if str(it.get("rarity", "")) == "common" \
+				and ProtoItems.GEAR_SLOTS.has(str(it.get("slot", ""))):
+			commons.append(int(it.get("uid", -1)))
+			common_total += ProtoItems.sell_price(it)
+	if not commons.is_empty():
+		var sa := _btn(_panel_body, "SELL ALL COMMON GEAR (%d items) — %d gold" % [
+				commons.size(), common_total], _sell_all.bind(commons))
+		sa.add_theme_color_override("font_color", GOLD)
 	for it in Session.inventory:
 		var b := _btn(_panel_body, "sell %s — %d gold" % [_iname(it),
 				ProtoItems.sell_price(it)], _vendor_sell.bind(int(it.get("uid", -1))))
@@ -536,6 +548,21 @@ func _show_codex() -> void:
 			var live := str(e.get("status", "live")) == "live"
 			_line("- %s — %s%s" % [str(e.get("name", "?")), str(e.get("desc", "")),
 					"" if live else "  [planned]"], PALE if live else DIM, 10)
+
+func _sell_all(uids: Array) -> void:
+	var got := 0
+	var n := 0
+	for uid in uids:
+		var it := Session.find_item(int(uid))
+		if it.is_empty():
+			continue
+		got += ProtoItems.sell_price(it)
+		n += 1
+		Session.remove_item(int(uid))
+	Session.gold += got
+	_vendor_msg = "sold %d items for %d gold." % [n, got]
+	_refresh_stats()
+	_show_vendor()
 
 func _vendor_sell(uid: int) -> void:
 	var it := Session.find_item(uid)

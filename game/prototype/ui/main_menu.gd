@@ -9,6 +9,19 @@ const PALE := Color("d9d4c7")
 const DIM := Color(0.55, 0.54, 0.5)
 
 var _name_edit: LineEdit
+var _class_pick := "core.class.reaver"
+var _class_btns := {}
+var _class_desc: Label
+
+# class-lite roster (proposal): shared kit, distinct casts. Full kits: design/10.
+const CLASSES := {
+	"core.class.reaver": {"name": "Reaver",
+			"desc": "the balanced blade — umbral Shadow Rend, no tradeoffs"},
+	"core.class.emberkin": {"name": "Emberkin",
+			"desc": "+12% fire on every hit, 20% chance to Ignite — but -10% HP"},
+	"core.class.frostbinder": {"name": "Frostbinder",
+			"desc": "+15% HP and every hit Chills the enemy — but -8% damage"},
+}
 
 func _ready() -> void:
 	theme = ProtoTheme.get_theme()
@@ -48,6 +61,29 @@ func _ready() -> void:
 
 	_name_edit = _edit(vb, "hunter name", false)
 	_edit(vb, "password", true)
+
+	vb.add_child(_spacer(4.0))
+
+	# class selection (new characters; existing saves keep their class)
+	var class_row := HBoxContainer.new()
+	class_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	class_row.add_theme_constant_override("separation", 6)
+	vb.add_child(class_row)
+	for cid in CLASSES:
+		var cb := Button.new()
+		cb.text = str(CLASSES[cid]["name"])
+		cb.toggle_mode = true
+		cb.focus_mode = Control.FOCUS_NONE
+		cb.custom_minimum_size = Vector2(84, 0)
+		cb.pressed.connect(_pick_class.bind(str(cid)))
+		class_row.add_child(cb)
+		_class_btns[cid] = cb
+	_class_desc = Label.new()
+	_class_desc.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_class_desc.add_theme_font_size_override("font_size", 9)
+	_class_desc.add_theme_color_override("font_color", DIM)
+	vb.add_child(_class_desc)
+	_update_class_ui()
 
 	vb.add_child(_spacer(4.0))
 
@@ -126,8 +162,19 @@ func _add_embers() -> void:
 	add_child(p)
 	p.emitting = true
 
+func _pick_class(cid: String) -> void:
+	_class_pick = cid
+	_update_class_ui()
+
+func _update_class_ui() -> void:
+	for cid in _class_btns:
+		_class_btns[cid].button_pressed = cid == _class_pick
+	_class_desc.text = str(CLASSES[_class_pick]["desc"])
+
 func _enter() -> void:
 	var pname := _name_edit.text.strip_edges()
-	# login loads the saved character if the name exists, else claims the slot
+	Session.class_id = _class_pick
+	# login loads the saved character if the name exists (keeps its class),
+	# else claims the slot with the picked class
 	Session.login(pname if pname != "" else "Hunter")
 	get_tree().change_scene_to_file("res://prototype/ui/haven.tscn")

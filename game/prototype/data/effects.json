@@ -56,8 +56,8 @@
       "name": "Creature archetypes & variants",
       "entries": [
         {"key": "stalker", "name": "Gloamfen Stalker", "desc": "baseline pack melee; capturable (Abyssal family)", "status": "live"},
-        {"key": "lunger", "name": "Lunger", "desc": "fast and frail: +45% speed, -35% HP, quick bites", "status": "live"},
-        {"key": "brute", "name": "Brute", "desc": "slow wall: +90% HP, +70% damage, heavy telegraphs, double gold", "status": "live"},
+        {"key": "lunger", "name": "Lunger", "desc": "fast and frail: +45% speed, -35% HP; POUNCES 3 m onto you from mid-range (sidestep the flash)", "status": "live"},
+        {"key": "brute", "name": "Brute", "desc": "slow wall: +90% HP, +70% damage, double gold; radial ground SLAM with a telegraph circle — dodge OUT", "status": "live"},
         {"key": "wisp_umbral", "name": "Gloamfen Wisp (umbral)", "desc": "kiting caster, violet bolts", "status": "live"},
         {"key": "wisp_ember", "name": "Ember Wisp", "desc": "hotter bolts (fire, 12 damage)", "status": "live"},
         {"key": "wisp_frost", "name": "Frost Wisp", "desc": "weaker bolts (8) that Chill the hero", "status": "live"},
@@ -77,9 +77,19 @@
       "name": "Skill tree — Reaver (1 point per level)",
       "entries": [
         {"key": "root_cleave", "name": "Cleave (root)", "desc": "the class active; learned from the start", "status": "live"},
+        {"key": "whirlwind", "name": "Whirlwind (E)", "desc": "class active: full-circle strike at 0.8x melee + shove, 4 s cooldown", "status": "live"},
         {"key": "brutal_edge", "name": "Brutal Edge", "desc": "passive: +5% crit chance", "status": "live"},
         {"key": "cleave_rampage", "name": "Cleave Rampage", "desc": "modifier: +8% attack speed", "status": "live"},
         {"key": "blood_price", "name": "Blood Price (keystone)", "desc": "+10% blood leech on melee, -15 armor — a real tradeoff", "status": "live"}
+      ]
+    },
+    {
+      "name": "Classes (class-lite pass; full kits in design/10)",
+      "entries": [
+        {"key": "class_reaver", "name": "Reaver", "desc": "the balanced blade — umbral Shadow Rend, no tradeoffs", "status": "live"},
+        {"key": "class_emberkin", "name": "Emberkin", "desc": "+12% fire on every hit and 20% Ignite chance — but -10% max HP", "status": "live"},
+        {"key": "class_frostbinder", "name": "Frostbinder", "desc": "+15% max HP and every hit Chills — but -8% damage", "status": "live"},
+        {"key": "classes_full", "name": "Six launch classes", "desc": "full distinct kits, trees and resources (docs/design/10)", "status": "planned"}
       ]
     },
     {

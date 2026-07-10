@@ -52,11 +52,28 @@ static func compute(sess: Node, equipment: Dictionary = {}) -> Dictionary:
 			var st := str(m.get("stat", ""))
 			node_mods[st] = float(node_mods.get(st, 0.0)) + float(m.get("value", 0.0))
 	var armor := float(totals.get("armor", 0.0)) + float(node_mods.get("armor", 0.0))
+	# class-lite modifiers (proposal): Emberkin trades HP for fire + Ignite-on-hit;
+	# Frostbinder trades damage for bulk + Chill-on-hit. Full kits: docs/design/10.
+	var class_hp := 1.0
+	var class_dmg := 1.0
+	var class_fire := 0.0
+	var class_fx := ""
+	match str(sess.class_id):
+		"core.class.emberkin":
+			class_hp = 0.9
+			class_fire = 12.0
+			class_fx = "ignite"
+		"core.class.frostbinder":
+			class_hp = 1.15
+			class_dmg = 0.92
+			class_fx = "chill"
 	return {
-		"max_hp": BASE_HP + 6.0 * pts.vitality + float(totals.get("hp", 0.0)),
+		"max_hp": (BASE_HP + 6.0 * pts.vitality + float(totals.get("hp", 0.0))) \
+				* class_hp,
+		"class_fx": class_fx,
 		"melee_damage": (BASE_MELEE + float(totals.get("damage", 0.0))) \
-				* (1.0 + 0.02 * pts.might) \
-				* (1.0 + float(totals.get("fire_damage_pct", 0.0)) / 100.0),
+				* (1.0 + 0.02 * pts.might) * class_dmg \
+				* (1.0 + (float(totals.get("fire_damage_pct", 0.0)) + class_fire) / 100.0),
 		"rend_damage": BASE_REND * (1.0 + 0.02 * pts.intellect) \
 				* (1.0 + float(totals.get("umbral_damage_pct", 0.0)) / 100.0),
 		"skill_damage_mult": 1.0 + 0.02 * pts.intellect,

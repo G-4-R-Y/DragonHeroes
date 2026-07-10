@@ -27,7 +27,7 @@ const DAY_CYCLE_S := 180.0
 const PIP_ON := Color("59d6e6")
 const PIP_OFF := Color(0.16, 0.28, 0.33, 0.7)
 
-const KILLS_PER_LEVEL := 20      # (proposal) prototype XP: every 20 kills = +1 level
+const LEVEL_CAP := 100           # (proposal) fast 1→100: quick dings all the way
 const POINTS_PER_LEVEL := 5      # (proposal) attribute points per level-up
 const ELITE_AFFIXES := ["Brutal", "Swift", "Fiery", "Bulwark"]   # effects registry
 const ARCHETYPES := ["stalker", "stalker", "lunger", "brute"]     # spawn weights
@@ -132,13 +132,14 @@ func _unhandled_input(event: InputEvent) -> void:
 		_confirm.visible = not _confirm.visible
 
 func _spawn_packs() -> void:
-	# Packs of 3-8 led by an Elite/Legendary (canon §4). Prototype: 6 stalker packs,
-	# three of them backed by 1-2 kiting Gloamfen Wisps, the farthest led by the
-	# Matriarch. The first pack guarantees a Bestial Skill stone drop (discovery).
-	for i in 6:
+	# HORDES (Ricardo: "only 3 or so and the whole map is empty"): 14 packs of 3-7
+	# spread across the map, half backed by 1-2 kiting wisps, leaders from pack 3
+	# on are affixed elites, the farthest nests the Matriarch. The first pack
+	# guarantees a Bestial Skill stone drop (discovery).
+	for i in 14:
 		var anchor := world.random_walkable_in_ring(player.global_position,
-				(14.0 + i * 4.0) * TILE, (20.0 + i * 5.0) * TILE)
-		var n := randi_range(3, 6)
+				(10.0 + i * 3.0) * TILE, (16.0 + i * 3.5) * TILE)
+		var n := randi_range(3, 7)
 		for j in n:
 			var c := CreatureScene.new()
 			# spawn-table variety: mixed archetypes; packs 3+ are led by an
@@ -150,7 +151,7 @@ func _spawn_packs() -> void:
 			if i == 0 and j == 0:
 				c.guaranteed_stone = true   # players must find the Q skill
 			add_child(c)
-		if i == 1 or i == 3 or i == 4:
+		if i % 2 == 1:
 			for _w in randi_range(1, 2):
 				var wisp := WispScene.new()
 				wisp.element = WISP_ELEMENTS.pick_random()
@@ -158,7 +159,7 @@ func _spawn_packs() -> void:
 						anchor, 2.0 * TILE, 4.0 * TILE)
 				wisp.pack_anchor = anchor
 				add_child(wisp)
-		if i == 5:
+		if i == 13:
 			boss = BossScene.new()
 			boss.global_position = world.random_walkable_in_ring(anchor, 0.0, 2.0 * TILE)
 			boss.pack_anchor = anchor
@@ -521,9 +522,34 @@ func _maybe_drop_rune(at: Vector2) -> void:
 			pool.append(str(def.get("key", "")))
 	_drop_item(ProtoItems.make_rune(pool.pick_random()), at)
 
-# XP taste (proposal): every 20 kills = +1 level with fanfare + 5 attribute points.
+# Fast 1→100 curve (Ricardo loved the 1-10 pace): level n needs 10 + n/2 kills,
+# ~3.5k kills to cap. Early dings every ~10 kills, endgame ~60.
+func _kills_for_level(lvl: int) -> int:
+	return 10 + int(lvl * 0.5)
+
+func _level_for_kills(k: int) -> int:
+	var lvl := 1
+	var need := 0
+	while lvl < LEVEL_CAP:
+		need += _kills_for_level(lvl)
+		if k < need:
+			break
+		lvl += 1
+	return lvl
+
+func _level_progress(k: int) -> float:
+	var lvl := 1
+	var need := 0
+	while lvl < LEVEL_CAP:
+		var prev := need
+		need += _kills_for_level(lvl)
+		if k < need:
+			return float(k - prev) / float(need - prev)
+		lvl += 1
+	return 1.0
+
 func _grant_level_ups() -> void:
-	var new_level := 1 + int(float(kills) / float(KILLS_PER_LEVEL))
+	var new_level := _level_for_kills(kills)
 	if new_level <= Session.level:
 		return
 	var levels := new_level - Session.level
@@ -624,7 +650,7 @@ func on_player_death() -> void:
 
 # ---- HUD --------------------------------------------------------------------
 
-const HINT_TEXT := "WASD move · mouse aim · LMB/Space cleave · Shift/RMB dodge x3 · F snare-capture · M mount · C character · K keybinds · Esc haven"
+const HINT_TEXT := "LMB cleave · Shift dodge x3 · Q rend · E whirlwind · Z mount · F bond · C character · K keys · Esc haven"
 
 func _hint_text() -> String:
 	var t := HINT_TEXT
@@ -688,6 +714,22 @@ func _build_hud() -> void:
 	q_bar.position = Vector2(2, 1)
 	q_bar.size = Vector2(32, 4)
 	q_bg.add_child(q_bar)
+	# Whirlwind (E) gauge — same treatment, steel-blue
+	var e_label := Label.new()
+	e_label.text = "E"
+	e_label.position = Vector2(110, 22)
+	e_label.add_theme_font_size_override("font_size", 10)
+	canvas.add_child(e_label)
+	var e_bg := ColorRect.new()
+	e_bg.color = Color(0, 0, 0, 0.55)
+	e_bg.position = Vector2(122, 29)
+	e_bg.size = Vector2(36, 6)
+	canvas.add_child(e_bg)
+	var e_bar := ColorRect.new()
+	e_bar.color = Color("6fb7ff")
+	e_bar.position = Vector2(2, 1)
+	e_bar.size = Vector2(32, 4)
+	e_bg.add_child(e_bar)
 	var stats := Label.new()
 	stats.position = Vector2(12, 40)
 	canvas.add_child(stats)
@@ -718,7 +760,7 @@ func _build_hud() -> void:
 	boss_bar_bg.add_child(boss_name)
 	_hud = {"hp_bar": hp_bar, "stats": stats, "hint": hint, "pips": pips,
 			"q_label": q_label, "q_bar": q_bar, "xp_bar": xp_bar,
-			"pet_chips": pet_chips,
+			"e_bar": e_bar, "pet_chips": pet_chips,
 			"boss_bar_bg": boss_bar_bg, "boss_bar": boss_bar}
 
 func refresh_hud() -> void:
@@ -733,8 +775,7 @@ func refresh_hud() -> void:
 func _update_gauges(delta: float) -> void:
 	_pip_flash = maxf(_pip_flash - delta * 3.0, 0.0)
 	_q_flash = maxf(_q_flash - delta * 3.0, 0.0)
-	_hud.xp_bar.size.x = 90.0 * fmod(float(kills), float(KILLS_PER_LEVEL)) \
-			/ float(KILLS_PER_LEVEL)
+	_hud.xp_bar.size.x = 90.0 * _level_progress(kills)
 	_chip_t -= delta
 	if _chip_t <= 0.0:   # pet chips refresh at 4 Hz — cheap
 		_chip_t = 0.25
@@ -759,6 +800,12 @@ func _update_gauges(delta: float) -> void:
 		else:
 			pip.size.x = 10.0
 			pip.color = PIP_OFF
+	# Whirlwind (E): always owned — fill + soft glow when ready
+	var ep: float = player.whirl_progress()
+	var eready := ep >= 1.0
+	_hud.e_bar.size.x = 32.0 * ep
+	_hud.e_bar.color = Color("6fb7ff") if not eready \
+			else Color("9fd4ff").lerp(Color(0.95, 1.0, 1.0), 0.45 * pulse)
 	# Shadow Rend (Q): dim until a stone is owned; fills, then glows when ready
 	var owned := stones >= 1
 	_hud.q_bar.get_parent().visible = owned
@@ -815,9 +862,10 @@ func _build_keybinds() -> void:
 		"mouse           aim",
 		"LMB / Space     cleave",
 		"Shift / RMB     dodge (3 charges)",
-		"Q               Shadow Rend",
+		"Q               Shadow Rend (stone)",
+		"E               Whirlwind",
 		"F               bond pet (Soul Snare)",
-		"M               mount / dismount",
+		"Z               mount / dismount",
 		"C / Tab         character panel",
 		"K               this card",
 		"Esc             return to Haven",

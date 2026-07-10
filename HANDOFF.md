@@ -1,4 +1,27 @@
-# Handoff — v4 state (2026-07-08, written by Fable at session end)
+# Handoff — running state (updated 2026-07-10, v7)
+
+## v7 delta (2026-07-10 evening)
+Fresh world EVERY hunt (live dh-server dump, random seed); 14-pack hordes;
+creature archetypes (stalker/lunger/brute w/ slam+pounce actives) + elite
+affixes; wisp elements; fast 1→100 curve; classes-lite (Reaver/Emberkin/
+Frostbinder); Whirlwind (E); mounts on Z (drake sprite rebuilt); character
+saves incl. class/mounts/stables/skill tree; UI: bag filter/sort, sell-all,
+skill cards + socket chips, stable cards, class picker; effects registry +
+in-game CODEX. Git: v0.1 tag = pre-v7 snapshot.
+
+## Top backlog (Ricardo's asks not yet landed)
+1. **More bosses**: Pyre Sovereign + Terravore Colossus legendary duo (content
+   JSONs exist — build the fight: meteors/earthquake/lava Duologue); Fenwitch
+   Hag + Mireborn Croaker as mid-bosses.
+2. **The real "100x modern visuals"**: replace procedural sprites with the
+   GenForge art pipeline output (style-locked gen-AI parts sheets → skeleton
+   bakes). Procedural GDScript pixels are at their ceiling. Also: Vulkan HDR
+   glow path (opt-in only — a Vulkan window once crashed Ricardo's X session),
+   paper-doll equipment on the hero.
+3. **Full class kits** (design/10): six classes with distinct trees/resources.
+4. Message log; R bestial slot; player-made field combos decision (canon opens).
+
+# Prior handoff — v4 state (2026-07-08, written by Fable at session end)
 
 Read `CLAUDE.md` + `docs/00-canon.md` first. This file is the delta: exactly where
 v4 stopped and what's next. Delete it once absorbed into the roadmap.

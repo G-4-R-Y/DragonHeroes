@@ -406,3 +406,13 @@ Still open:
 15. **Docs discipline (standing):** docs/ stays current as the single source of
    truth — architecture decisions to marketing material draw from it. Every
    feature/decision lands with its docs/canon update in the same change.
+16. **v7 world/UX pass (2026-07-10, Ricardo):** fast 1→100 leveling (level n needs
+   10 + n/2 kills — the beloved 1-10 pace all the way up); 14 packs per hunt
+   (map must never feel empty); class-lite roster at login (Reaver / Emberkin /
+   Frostbinder — shared kit, distinct casts; full six-class kits stay design/10);
+   Whirlwind (E) as a universal class active; monster actives (brute radial slam
+   w/ telegraph, lunger pounce); mount hotkey Z (reachable from WASD); UI: bag
+   filter+sort, one-click junk selling, skill cards with rune-socket chips,
+   stable cards. Sprite fidelity raised via procedural outline/shading kit —
+   the real "modern-day pixel art" ceiling is the GenForge art pipeline (§7),
+   which replaces procedural placeholders entirely.

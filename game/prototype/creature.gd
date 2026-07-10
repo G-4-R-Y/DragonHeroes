@@ -41,6 +41,8 @@ var _state := "idle"            # idle | chase | windup | recover
 var _timer := 0.0
 var _cd := 0.0
 var _enrage_t := 0.0            # failed snare: +30% speed while > 0
+var _slow_t := 0.0              # Chill (Frostbinder hits): -30% speed while > 0
+var _pounce_target := Vector2.ZERO   # lunger pounce landing point
 var _burn_t := 0.0              # Rune of Cinders ignite: 3 dmg/s while > 0
 var _burn_tick := 0.0
 var _burn_dps := 0.0
@@ -135,7 +137,10 @@ func _physics_process(delta: float) -> void:
 		return
 	_cd = maxf(_cd - delta, 0.0)
 	_flash = maxf(_flash - delta * 5.0, 0.0)
+	_slow_t = maxf(_slow_t - delta, 0.0)
 	var base_tint := Color(1, 1, 1) if _burn_t <= 0.0 else Color(1.5, 0.95, 0.6)
+	if _slow_t > 0.0:
+		base_tint *= Color(0.7, 0.9, 1.25)   # chilled: icy cast
 	sprite.modulate = base_tint.lerp(Color(3, 3, 3), _flash)
 	if _burn_t > 0.0:   # ignite DoT (Rune of Cinders): 0.5 s ticks
 		_burn_t -= delta
@@ -198,6 +203,13 @@ func _chase(delta: float, player: Node2D) -> void:
 	if player == null:
 		return
 	var to_player := player.global_position - global_position
+	# lunger pounce (monster active, effects registry): leaps 3 m onto you from
+	# mid-range — the windup flash IS the tell, sidestep during it
+	if archetype == "lunger" and _cd <= 0.0 \
+			and to_player.length() >= 2.5 * TILE and to_player.length() <= 5.5 * TILE:
+		_pounce_target = player.global_position
+		_begin_windup(to_player.normalized())
+		return
 	if to_player.length() <= attack_reach * 0.9 and _cd <= 0.0:
 		_begin_windup(to_player.normalized())
 		return
@@ -207,7 +219,13 @@ func _chase(delta: float, player: Node2D) -> void:
 		_state = "idle"
 
 func _speed() -> float:
-	return move_speed * (1.3 if _enrage_t > 0.0 else 1.0)
+	return move_speed * (1.3 if _enrage_t > 0.0 else 1.0) \
+			* (0.7 if _slow_t > 0.0 else 1.0)
+
+# Chill (effects registry): Frostbinder hits and frost effects slow creatures.
+func apply_slow(duration: float) -> void:
+	if not dead:
+		_slow_t = maxf(_slow_t, duration)
 
 func enrage(duration: float) -> void:
 	_enrage_t = duration
@@ -224,11 +242,42 @@ func _begin_windup(dir: Vector2) -> void:
 	sprite.flip_h = dir.x < 0.0
 	sprite.play("lunge")
 	sprite.frame = 0
+	if archetype == "brute":   # slam is radial — telegraph the landing circle
+		var tg := ProtoTelegraph.new()
+		tg.radius = 2.2 * TILE
+		tg.duration = windup_time
+		tg.position = global_position
+		get_parent().add_child(tg)
 
 func _strike(player: Node2D) -> void:
 	_state = "recover"
 	_timer = 0.4
 	_cd = attack_cd
+	var main := get_tree().get_first_node_in_group("main")
+	if archetype == "brute":   # ground slam: radial AoE — dodge OUT, not around
+		if main:
+			main.shake(5.0)
+			main.fx.debris(global_position)
+			main.play_sfx("hit", global_position, -6.0)
+		if player != null and not player.dead and global_position.distance_to(
+				player.global_position) <= 2.2 * TILE + player.body_radius:
+			player.take_damage(damage, (player.global_position
+					- global_position).normalized())
+		for pet in get_tree().get_nodes_in_group("pet"):
+			if pet.hp > 0.0 and global_position.distance_to(
+					pet.global_position) <= 2.2 * TILE + pet.body_radius:
+				pet.take_damage(damage, (pet.global_position
+						- global_position).normalized())
+		return
+	if archetype == "lunger" and _pounce_target != Vector2.ZERO:
+		var dash: Vector2 = (_pounce_target - global_position).limit_length(3.0 * TILE)
+		for _i in 6:   # stepped so walkability still gates the leap
+			_move(dash / 6.0)
+		_pounce_target = Vector2.ZERO
+		if main:
+			main.fx.burst(global_position, {"amount": 6, "lifetime": 0.25,
+					"v_min": 30.0, "v_max": 90.0, "s_min": 0.6, "s_max": 1.2,
+					"color": Color(0.7, 0.85, 0.9, 0.6)})
 	var cos_half := cos(deg_to_rad(attack_arc_deg * 0.5))
 	if player != null and not player.dead:
 		var to_player := player.global_position - global_position

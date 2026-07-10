@@ -24,9 +24,13 @@ const ATTR_FX := {
 }
 const SKILL_SOCKETS := ["cleave", "rend", "dodge"]
 
+const RARITY_ORDER := {"common": 0, "uncommon": 1, "rare": 2, "epic": 3, "legendary": 4}
+
 var _boxes := {}          # tab name -> VBoxContainer
 var _sel_uid := -1        # selected bag item uid
 var _sel_slot := ""       # selected equipment slot
+var _bag_filter := "all"  # all | gear | rune | material
+var _socket_for := ""     # skill whose rune chooser is open
 
 func _ready() -> void:
 	layer = 4
@@ -169,7 +173,8 @@ func _apply_live() -> void:
 func _refresh_gear() -> void:
 	var vb: VBoxContainer = _boxes["Gear"]
 	_clear(vb)
-	_line(vb, "%s — Reaver, level %d" % [Session.player_name, Session.level], EMBER, 12)
+	_line(vb, "%s — %s, level %d" % [Session.player_name, Session.class_display(),
+			Session.level], EMBER, 12)
 	var s := ProtoStats.compute(Session)
 	for sl in ProtoStats.summary_lines(s):
 		_line(vb, sl, DIM, 9)
@@ -225,12 +230,39 @@ func _refresh_bag() -> void:
 	if Session.inventory.is_empty():
 		_line(vb, "empty — creatures drop gear, essences and (from Elites) runes.", DIM)
 		return
+	# toolbar: filter chips + one-click sorts (bag organization — Ricardo)
+	var bar := HBoxContainer.new()
+	bar.add_theme_constant_override("separation", 4)
+	vb.add_child(bar)
+	for f in [["all", "All"], ["gear", "Gear"], ["rune", "Runes"], ["material", "Mats"]]:
+		var fb := Button.new()
+		fb.text = str(f[1])
+		fb.focus_mode = Control.FOCUS_NONE
+		fb.add_theme_font_size_override("font_size", 9)
+		if _bag_filter == str(f[0]):
+			fb.add_theme_color_override("font_color", GOLD)
+		fb.pressed.connect(_set_bag_filter.bind(str(f[0])))
+		bar.add_child(fb)
+	var gap := Control.new()
+	gap.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	bar.add_child(gap)
+	for srt in [["rarity", "rarity"], ["power", "power"], ["slot", "slot"]]:
+		var sb2 := Button.new()
+		sb2.text = str(srt[1])
+		sb2.focus_mode = Control.FOCUS_NONE
+		sb2.tooltip_text = "sort the bag by %s" % str(srt[0])
+		sb2.add_theme_font_size_override("font_size", 9)
+		sb2.add_theme_color_override("font_color", DIM)
+		sb2.pressed.connect(_sort_bag.bind(str(srt[0])))
+		bar.add_child(sb2)
 	var grid := GridContainer.new()
 	grid.columns = 8
 	grid.add_theme_constant_override("h_separation", 3)
 	grid.add_theme_constant_override("v_separation", 3)
 	vb.add_child(grid)
 	for it in Session.inventory:
+		if not _bag_match(it):
+			continue
 		var uid := int(it.get("uid", -1))
 		var b := Button.new()
 		b.focus_mode = Control.FOCUS_NONE
@@ -254,6 +286,31 @@ func _refresh_bag() -> void:
 
 func _select_bag(uid: int) -> void:
 	_sel_uid = -1 if _sel_uid == uid else uid
+	_refresh_bag()
+
+func _set_bag_filter(f: String) -> void:
+	_bag_filter = f
+	_refresh_bag()
+
+func _bag_match(it: Dictionary) -> bool:
+	match _bag_filter:
+		"gear":
+			return ProtoItems.GEAR_SLOTS.has(str(it.get("slot", "")))
+		"rune", "material":
+			return str(it.get("slot", "")) == _bag_filter
+	return true
+
+# In-place sort of the real inventory (persists): rarity/power desc, slot alpha.
+func _sort_bag(key: String) -> void:
+	Session.inventory.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		match key:
+			"rarity":
+				return int(RARITY_ORDER.get(str(a.get("rarity", "common")), 0)) \
+						> int(RARITY_ORDER.get(str(b.get("rarity", "common")), 0))
+			"power":
+				return ProtoItems.power(a) > ProtoItems.power(b)
+		return str(a.get("slot", "")) < str(b.get("slot", "")))
+	Session.request_save()
 	_refresh_bag()
 
 # Inspect popup: affixes, enchant, vs-equipped stat diff, equip/sell actions.
@@ -400,20 +457,26 @@ func _refresh_skills() -> void:
 	var vb: VBoxContainer = _boxes["Skills"]
 	_clear(vb)
 	var s := ProtoStats.compute(Session)
-	_line(vb, "Skills", EMBER, 12)
-	_line(vb, "Cleave — %d dmg · 0.4 s cd · 110 deg · 2.2 m · crit %d%%" % [
-			int(round(s.melee_damage)), int(s.crit_chance * 100.0)], PALE, 10)
-	_line(vb, "Dodge — 4 m displacement · 3 charges · %.2f s recharge each" % [
-			s.dodge_recharge_s], PALE, 10)
 	var m := _main()
 	var owns_rend: bool = Session.stones >= 1 or (m != null and m.stones >= 1)
-	if owns_rend:
-		_line(vb, "Shadow Rend (Q, bestial) — %d dmg · 5.0 s cd · 130 deg · 2.2 m" % [
-				int(round(s.rend_damage))], VIOLET, 10)
-	else:
-		_line(vb, "Bestial slot (Q) — locked: claim a Bestial Skill stone to awaken Shadow Rend.",
+	_line(vb, "Skills — %s" % Session.class_display(), EMBER, 12)
+	_skill_card(vb, "cleave", "Cleave  (LMB)", PALE,
+			"%d dmg · %.2f s cd · 110 deg · 2.2 m · crit %d%%" % [
+			int(round(s.melee_damage)), 0.4 / s.attack_speed_mult,
+			int(s.crit_chance * 100.0)])
+	_skill_card(vb, "", "Whirlwind  (E)", Color("9fd4ff"),
+			"%d dmg · 4 s cd · full circle · 2.6 m + shove" % [
+			int(round(s.melee_damage * 0.8))])
+	_skill_card(vb, "rend", "Shadow Rend  (Q)", VIOLET,
+			"%d dmg · 5 s cd · 130 deg · 2.2 m — umbral" % int(round(s.rend_damage)),
+			not owns_rend)
+	_skill_card(vb, "dodge", "Dodge  (Shift)", CYAN,
+			"4 m dash · 3 charges · %.2f s recharge — no i-frames" % s.dodge_recharge_s)
+	if not owns_rend:
+		_line(vb, "Shadow Rend awakens with a Bestial Skill stone (the first pack drops one).",
 				DIM, 9)
-	_line(vb, "Position is the defense: dodging displaces you, no i-frames.", DIM, 9)
+	if _socket_for != "":
+		_socket_chooser(vb)
 	# ---- the Reaver tree: REAL progression (1 point per level, proposal) --------
 	_line(vb, "Reaver tree — skill points: %d (1 per level)" % Session.skill_points,
 			EMBER, 11)
@@ -452,37 +515,81 @@ func _refresh_skills() -> void:
 			var lock := "" if reqs_met else "  (needs %s)" % ", ".join(
 					PackedStringArray(reqs))
 			_line(vb, "○ %s%s" % [desc, lock], DIM, 10)
-	_line(vb, "Rune sockets — one per skill (canon §4; Elites drop runes)", EMBER, 11)
-	for skill in SKILL_SOCKETS:
-		var r: Dictionary = Session.skill_runes[skill]
+	_line(vb, "Runes drop from Elites — click a skill's socket chip to slot one.",
+			DIM, 9)
+
+# One skill = one card: name + live numbers + the rune-socket chip on the right.
+func _skill_card(vb: Container, skill_key: String, title: String, color: Color,
+		numbers: String, locked := false) -> void:
+	var card := PanelContainer.new()
+	vb.add_child(card)
+	var hb := HBoxContainer.new()
+	hb.add_theme_constant_override("separation", 8)
+	card.add_child(hb)
+	var left := VBoxContainer.new()
+	left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	left.add_theme_constant_override("separation", 1)
+	hb.add_child(left)
+	var t := Label.new()
+	t.text = title + ("   [locked]" if locked else "")
+	t.add_theme_font_size_override("font_size", 11)
+	t.add_theme_color_override("font_color", DIM if locked else color)
+	left.add_child(t)
+	var nums := Label.new()
+	nums.text = numbers
+	nums.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	nums.add_theme_font_size_override("font_size", 9)
+	nums.add_theme_color_override("font_color", DIM)
+	left.add_child(nums)
+	if skill_key != "" and not locked:
+		var r: Dictionary = Session.skill_runes.get(skill_key, {})
+		var sb := Button.new()
+		sb.focus_mode = Control.FOCUS_NONE
+		sb.add_theme_font_size_override("font_size", 9)
+		sb.custom_minimum_size = Vector2(96, 0)
 		if r.is_empty():
-			_line(vb, "%s — empty socket" % str(skill).capitalize(), DIM, 10)
+			sb.text = "◇ socket rune"
+			sb.add_theme_color_override("font_color", DIM)
 		else:
-			var hb := HBoxContainer.new()
-			hb.add_theme_constant_override("separation", 6)
-			vb.add_child(hb)
-			var nl := Label.new()
-			nl.text = "%s ◆ %s" % [str(skill).capitalize(), str(r.get("name", "?"))]
-			nl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			nl.add_theme_font_size_override("font_size", 10)
-			nl.add_theme_color_override("font_color", VIOLET)
-			hb.add_child(nl)
-			_btn(hb, "Unsocket", _do_unsocket.bind(str(skill)))
-			_line(vb, "  " + str(ProtoItems.rune_def(
-					str(r.get("rune_key", ""))).get("desc", "")), DIM, 9)
-	var bag_runes: Array = []
+			sb.text = "◆ %s" % str(r.get("name", "?")).replace("Rune of ", "").replace("the ", "")
+			sb.add_theme_color_override("font_color", VIOLET)
+			sb.tooltip_text = str(ProtoItems.rune_def(
+					str(r.get("rune_key", ""))).get("desc", ""))
+		sb.pressed.connect(_open_socket_chooser.bind(skill_key))
+		hb.add_child(sb)
+
+# Chooser: opened from a card's socket chip; lists bag runes + remove option.
+func _socket_chooser(vb: VBoxContainer) -> void:
+	var r: Dictionary = Session.skill_runes.get(_socket_for, {})
+	_line(vb, "— socket on %s —" % _socket_for.capitalize(), VIOLET, 10)
+	if not r.is_empty():
+		_btn(vb, "remove ◆ %s" % str(r.get("name", "?")), _do_unsocket_pick, RED)
+	var any := false
 	for it in Session.inventory:
-		if str(it.get("slot", "")) == "rune":
-			bag_runes.append(it)
-	for rune in bag_runes:
-		_line(vb, "%s (in bag) — %s" % [str(rune.get("name", "?")), str(ProtoItems.rune_def(
-				str(rune.get("rune_key", ""))).get("desc", ""))], VIOLET, 9)
-		var hb := HBoxContainer.new()
-		hb.add_theme_constant_override("separation", 4)
-		vb.add_child(hb)
-		for skill in SKILL_SOCKETS:
-			_btn(hb, "socket: %s" % skill, _do_socket.bind(str(skill),
-					int(rune.get("uid", -1))))
+		if str(it.get("slot", "")) != "rune":
+			continue
+		any = true
+		_btn(vb, "◆ %s — %s" % [str(it.get("name", "?")), str(ProtoItems.rune_def(
+				str(it.get("rune_key", ""))).get("desc", ""))],
+				_do_socket_pick.bind(int(it.get("uid", -1))), VIOLET)
+	if not any and r.is_empty():
+		_line(vb, "no runes in the bag — Elites drop them.", DIM, 9)
+
+func _open_socket_chooser(skill: String) -> void:
+	_socket_for = "" if _socket_for == skill else skill
+	_refresh_skills()
+
+func _do_socket_pick(uid: int) -> void:
+	if Session.socket_rune(_socket_for, uid):
+		_apply_live()
+	_socket_for = ""
+	refresh()
+
+func _do_unsocket_pick() -> void:
+	if Session.unsocket_rune(_socket_for):
+		_apply_live()
+	_socket_for = ""
+	refresh()
 
 func _do_learn(node: String) -> void:
 	if Session.learn_node(node):   # spends the point + saves; effects are live
@@ -509,47 +616,64 @@ func _refresh_pets() -> void:
 		_line(vb, "none bonded — weaken a Gloamfen Stalker below 35% HP and press F " +
 				"with a Soul Snare (stalkers drop them)", DIM)
 	for pet in Session.pets:
-		var state := ""
+		var resting := false
 		for n in get_tree().get_nodes_in_group("pet"):
 			if n.uid == int(pet.get("uid", 0)):
-				state = "  · RESTING" if n.resting() else "  · on the hunt"
+				resting = n.resting()
+		var card := PanelContainer.new()
+		vb.add_child(card)
+		var cv := VBoxContainer.new()
+		cv.add_theme_constant_override("separation", 1)
+		card.add_child(cv)
 		var hb := HBoxContainer.new()
 		hb.add_theme_constant_override("separation", 6)
-		vb.add_child(hb)
+		cv.add_child(hb)
 		var nl := Label.new()
-		nl.text = str(pet.get("name", "?")) + state
+		nl.text = "%s   %s" % [str(pet.get("name", "?")),
+				"· resting" if resting else "· on the hunt"]
 		nl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		nl.add_theme_font_size_override("font_size", 11)
-		nl.add_theme_color_override("font_color", CYAN)
+		nl.add_theme_color_override("font_color",
+				Color("ff8a7a") if resting else CYAN)
 		hb.add_child(nl)
 		_btn(hb, "→ stables", _do_stable.bind(int(pet.get("uid", 0))))
-		_line(vb, "  attribute roll %d%%  ·  %s" % [int(pet.get("roll_pct", 100)),
-				str(pet.get("species", ""))], PALE, 9)
+		var skills: Array[String] = []
 		for sk in pet.get("skills", []):
-			_line(vb, "  - %s  (%s)" % [_pretty_id(str(sk)), str(sk)], VIOLET, 9)
+			skills.append(_pretty_id(str(sk)))
+		var det := Label.new()
+		det.text = "roll %d%%  ·  %s" % [int(pet.get("roll_pct", 100)),
+				" · ".join(skills)]
+		det.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		det.add_theme_font_size_override("font_size", 9)
+		det.add_theme_color_override("font_color", PALE)
+		cv.add_child(det)
 	# The stables (Ricardo: pets are NEVER abandoned) — overflow captures land here.
 	if not Session.stables.is_empty():
-		_line(vb, "— Stables (%d) —" % Session.stables.size(), EMBER, 11)
+		_line(vb, "STABLES — %d resting" % Session.stables.size(), EMBER, 11)
 		var room := Session.pets.size() < Session.MAX_PETS
 		for pet in Session.stables:
+			var card := PanelContainer.new()
+			vb.add_child(card)
 			var hb := HBoxContainer.new()
 			hb.add_theme_constant_override("separation", 6)
-			vb.add_child(hb)
+			card.add_child(hb)
+			var skills: Array[String] = []
+			for sk in pet.get("skills", []):
+				skills.append(_pretty_id(str(sk)))
 			var nl := Label.new()
-			nl.text = "%s  ·  roll %d%%  ·  %d skills" % [str(pet.get("name", "?")),
-					int(pet.get("roll_pct", 100)), (pet.get("skills", []) as Array).size()]
+			nl.text = "%s\nroll %d%%  ·  %s" % [str(pet.get("name", "?")),
+					int(pet.get("roll_pct", 100)), " · ".join(skills)]
+			nl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 			nl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			nl.add_theme_font_size_override("font_size", 10)
+			nl.add_theme_font_size_override("font_size", 9)
 			nl.add_theme_color_override("font_color", PALE)
 			hb.add_child(nl)
 			var b := _btn(hb, "make active", _do_activate.bind(int(pet.get("uid", 0))), CYAN)
 			b.disabled = not room
-		if not room:
-			_line(vb, "active slots full — send one to the stables first", DIM, 9)
-	_line(vb, "All bonded pets hunt together (%d active slots). Capturing with full " % Session.MAX_PETS +
-			"slots asks for an F-again confirm and STABLES the oldest bond — pets are " +
-			"never abandoned. They rest 15 s when their HP empties and reset with you " +
-			"on death — they never die.", DIM, 9)
+			if not room:
+				b.tooltip_text = "active pack is full — stable one first"
+	_line(vb, "Overflow captures STABLE the oldest bond — pets are never abandoned " +
+			"and never die (they rest 15 s, and respawn with you).", DIM, 9)
 
 func _do_stable(uid: int) -> void:
 	for pet in Session.pets:

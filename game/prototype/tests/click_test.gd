@@ -83,6 +83,7 @@ func _run() -> void:
 	if learn == null:
 		_fail("no learnable node button on the Skills tab")
 	else:
+		await _scroll_to(learn)   # the tree sits below the fold since the v7 cards
 		await _click(learn.get_global_rect().get_center())
 		if Session.node_learned("brutal_edge"):
 			print("CLICKTEST OK: skill node learned via click (brutal_edge)")
@@ -158,6 +159,16 @@ func _click(pos: Vector2) -> void:
 		Input.parse_input_event(ev)
 	await get_tree().process_frame
 	await get_tree().process_frame
+
+# Injected clicks miss controls scrolled out of view — bring them on screen first.
+func _scroll_to(ctl: Control) -> void:
+	var p: Node = ctl.get_parent()
+	while p != null and not (p is ScrollContainer):
+		p = p.get_parent()
+	if p is ScrollContainer:
+		(p as ScrollContainer).ensure_control_visible(ctl)
+		await get_tree().process_frame
+		await get_tree().process_frame
 
 func _key(code: Key) -> void:
 	for pressed in [true, false]:

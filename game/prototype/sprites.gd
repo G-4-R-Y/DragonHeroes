@@ -65,6 +65,24 @@ static func _outline(img: Image, c: Color = OUT) -> void:
 					img.set_pixel(x, y, c)
 					break
 
+# Darkens opaque pixels whose lower or left neighbour is transparent — a cheap
+# bottom-left form shadow so chunky silhouettes read as lit volumes. Call BEFORE
+# _outline; stamp glow pixels afterwards so they stay pure.
+static func _edge_shade(img: Image, amount: float) -> void:
+	var w := img.get_width()
+	var h := img.get_height()
+	var src := Image.new()
+	src.copy_from(img)
+	for y in h:
+		for x in w:
+			var c := src.get_pixel(x, y)
+			if c.a <= 0.55:
+				continue
+			var below := y + 1 >= h or src.get_pixel(x, y + 1).a <= 0.55
+			var left := x == 0 or src.get_pixel(x - 1, y).a <= 0.55
+			if below or left:
+				img.set_pixel(x, y, c.darkened(amount))
+
 static func _anim(sf: SpriteFrames, anim_name: String, fps: float, loops: bool, frames: Array) -> void:
 	sf.add_animation(anim_name)
 	sf.set_animation_speed(anim_name, fps)
@@ -78,46 +96,68 @@ static func make_tile_atlas() -> ImageTexture:
 	if _tex_cache.has("tile_atlas"):
 		return _tex_cache["tile_atlas"]
 	var img := _img(TILE * 16, TILE)
-	var bases := [Color("123037"), Color("2c4a33"), Color("223a2b"), Color("3a3f49")]
-	var accents := [Color("1d4b56"), Color("3d6242"), Color("2e5138"), Color("4a5160")]
+	var bases := [Color("0e242c"), Color("24402c"), Color("18291e"), Color("31353e")]
+	var accents := [Color("17414d"), Color("35563b"), Color("243f2c"), Color("434a57")]
 	for t in 4:
 		for v in 4:
 			var col := t * 4 + v
 			var base: Color = bases[t]
 			if t == 0:
-				base = base.lerp(accents[0], 0.12 * v)   # variants: slightly lighter water
+				base = base.lightened(0.035 * v)         # variants: brightness steps
 			elif t == 2:
 				base = base.darkened(0.05 * v)           # variants: deeper forest
 			for y in TILE:
 				for x in TILE:
+					var ax := x + col * TILE
 					var c := base
-					var s := _speck(x + col * TILE, y, 7 + col)
+					var s := _speck(ax, y, 7 + col)
+					var dither := (x + y) & 1
 					match t:
-						0:  # water — deep teal, occasional glint
-							if s > 0.9:
-								c = accents[0]
+						0:  # water — dithered ripple bands phased per variant, rare glint
+							if (y + v * 2) % 6 == 0 and dither == 0:
+								c = base.lerp(accents[0], 0.8)
+							elif (y + v * 2) % 6 == 1 and dither == 1:
+								c = base.lerp(accents[0], 0.35)
+							if s < 0.05:
+								c = Color("0a1b21")
 							if s > 0.972 - 0.004 * v:
-								c = Color("2e6b76")
+								c = Color("245a66")
 							if v >= 2 and s > 0.996:
 								c = base.lerp(Color("59d6e6"), 0.55)  # rare bright glint
-						1:  # grass — speckle density per variant, rare luminous fleck
-							if s > 0.88 - 0.025 * v:
-								c = accents[1]
-							if s > 0.995:
-								c = base.lerp(Color("57ff9a"), 0.45)
-						2:  # forest — darker, bioluminescent moss flecks
-							if s > 0.84 - 0.02 * v:
+						1:  # grass — dithered tone patches, 2 px blades, luminous fleck
+							if dither == 0 and _speck(ax >> 2, y >> 2, 51) > 0.55:
+								c = base.lerp(accents[1], 0.4)
+							var bl := 0.952 - 0.01 * v
+							if s > bl:
+								c = Color("3a5a3c")                   # blade root
+							if y < TILE - 1 and _speck(ax, y + 1, 7 + col) > bl:
+								c = Color("4d7a4a")                   # blade tip above root
+							if s > 0.996:
+								c = base.lerp(Color("57ff9a"), 0.5)
+						2:  # forest — blocky dark mottle, bioluminescent moss flecks
+							var m := _speck(ax >> 2, y >> 2, 33)
+							if m > 0.62:
+								c = base.darkened(0.22)
+							elif m < 0.2 and dither == 0:
+								c = base.lerp(accents[2], 0.5)
+							if s > 0.9 - 0.02 * v:
 								c = accents[2]
-							if s > 0.93:
-								c = base.lerp(Color("57ff9a"), 0.28)
-						3:  # rock — cracks + highlight variance
-							if s > 0.86 - 0.03 * v:
-								c = accents[3]
-							if v >= 2 and (x + y * 2 + v * 7) % 19 == 0 and s > 0.35:
-								c = Color("23262d")
-							if s > 0.985 - 0.01 * v:
+							if s > 0.958:
+								c = base.lerp(Color("57ff9a"), 0.3)
+						3:  # rock — top-lit shading, cracks, moss-capped stones
+							c = base.darkened(0.12 * float(y) / TILE)
+							if dither == 0 and s > 0.6:
+								c = c.lerp(accents[3], 0.3)
+							if (x + y * 2 + v * 7) % 19 == 0 and s > 0.3:
+								c = Color("1e2127")
+							var b := _speck(ax >> 2, y >> 2, 87)
+							if b > 0.84:                              # embedded stones
+								c = Color("4c5260") if (y & 3) < 2 else Color("3b414c")
+								if v >= 1 and (y & 3) == 0 and s > 0.5:
+									c = Color("31543a")               # moss caps the stone
+							if s > 0.988 - 0.008 * v:
 								c = Color("5a6170")
-					img.set_pixel(x + col * TILE, y, c)
+					img.set_pixel(ax, y, c)
 	var tex := _tex(img)
 	_tex_cache["tile_atlas"] = tex
 	return tex
@@ -141,7 +181,9 @@ static func _hero_tex(pose: String, f: int) -> ImageTexture:
 	var img := _img(26, 26)
 	var hood := Color("1d4b56")
 	var hood_d := Color("143741")
+	var hood_hi := Color("2a6274")
 	var face := Color("e8d2b0")
+	var face_sh := Color("cfb28c")
 	var eye := Color("14262c")
 	var leg := Color("10262c")
 	var boot := Color("0b1a1f")
@@ -167,21 +209,22 @@ static func _hero_tex(pose: String, f: int) -> ImageTexture:
 		_rect(img, 9, 22, 2, 2, boot)
 		_rect(img, 12, 18, 2, 5, leg)
 		_rect(img, 12, 22, 2, 2, boot)
-	# hooded dark-teal cloak body
+	# hooded dark-teal cloak body (3-tone: hood_hi / hood / hood_d)
 	_rect(img, 8, 10 + bob, 6, 3, hood)
 	_rect(img, 7, 13 + bob, 8, 3, hood)
 	_rect(img, 7, 16 + bob, 8, 2, hood_d)
 	_rect(img, 7, 13 + bob, 2, 3, hood_d)
-	# faint cyan chest sigil (luminous accent)
-	_px(img, 12, 12 + bob, Color("6fe3ff"))
-	_px(img, 12, 13 + bob, Color("2e6b76"))
+	_px(img, 13, 10 + bob, hood_hi)          # sword-shoulder rim light
+	_px(img, 13, 13 + bob, hood_hi)
 	# hooded head with pale face pixels
 	_rect(img, 9, 3 + bob, 4, 1, hood)
 	_rect(img, 8, 4 + bob, 6, 1, hood)
 	_rect(img, 8, 5 + bob, 6, 4, hood)
 	_rect(img, 9, 9 + bob, 4, 1, hood_d)
 	_rect(img, 8, 5 + bob, 2, 4, hood_d)
+	_hline(img, 10, 12, 3 + bob, hood_hi)    # moon-lit crown of the hood
 	_rect(img, 11, 5 + bob, 3, 3, face)
+	_px(img, 11, 7 + bob, face_sh)           # chin in hood shadow
 	_px(img, 12, 6 + bob, eye)
 	_px(img, 13, 4 + bob, hood_d)
 	# sword arm
@@ -206,6 +249,10 @@ static func _hero_tex(pose: String, f: int) -> ImageTexture:
 		_px(img, 17, 15 + bob, blade)
 		_px(img, 18, 16 + bob, blade)
 		_px(img, 19, 17 + bob, blade)
+	_edge_shade(img, 0.16)
+	# faint cyan chest sigil (luminous accent — stamped after shading, stays pure)
+	_px(img, 12, 12 + bob, Color("6fe3ff"))
+	_px(img, 12, 13 + bob, Color("2e6b76"))
 	_outline(img)
 	# swing arc streak, added after outlining so it stays a pure light smear
 	if pose == "attack" and f == 1:
@@ -237,8 +284,10 @@ static func _stalker_tex(pose: String, f: int) -> ImageTexture:
 	var img := _img(24, 14)
 	var body := Color("372c4e")
 	var hi := Color("4b3d68")
+	var mid := Color("2e2542")
 	var dark := Color("241c33")
-	var eye := Color("c07bff")
+	var eye := Color("cf9dff")
+	var brow := hi.lerp(eye, 0.45)   # violet glow bleeding onto the brow
 	if pose == "lunge" and f == 1:
 		# fully stretched pounce
 		_hline(img, 0, 3, 6, dark)                       # tail whips straight
@@ -248,8 +297,12 @@ static func _stalker_tex(pose: String, f: int) -> ImageTexture:
 		_rect(img, 17, 4, 6, 3, body)                     # head thrown forward
 		_hline(img, 18, 23, 6, body)
 		_hline(img, 18, 22, 7, dark)                      # open jaw
+		_px(img, 19, 5, mid)
+		_edge_shade(img, 0.18)
 		_px(img, 19, 4, eye)
 		_px(img, 21, 4, eye)
+		_px(img, 19, 3, brow)
+		_px(img, 21, 3, brow)
 		_rect(img, 7, 10, 1, 2, dark)                     # legs tucked back
 		_rect(img, 9, 10, 1, 2, dark)
 		_rect(img, 14, 10, 1, 2, dark)
@@ -267,9 +320,10 @@ static func _stalker_tex(pose: String, f: int) -> ImageTexture:
 	_px(img, 2, 5 + yo, dark)
 	_px(img, 3, 5 + yo, dark)
 	_px(img, 4, 6 + yo, dark)
-	# low body with ridge spines
+	# low body with ridge spines (3-tone: hi spine / body / mid flank / dark belly)
 	_hline(img, 6, 15, 4 + yo, hi)
 	_rect(img, 5, 5 + yo, 12, 4, body)
+	_hline(img, 6, 15, 8 + yo, mid)
 	_hline(img, 6, 15, 9 + yo, dark)
 	_px(img, 8, 3 + yo, dark)
 	_px(img, 12, 3 + yo, dark)
@@ -278,9 +332,12 @@ static func _stalker_tex(pose: String, f: int) -> ImageTexture:
 	_rect(img, 16, 4 + yo, 6, 3, body)
 	_hline(img, 17, 22, 6 + yo, body)
 	_hline(img, 17, 21, 7 + yo, dark)
-	# two glowing violet eyes (bright — no outline swallows them)
+	_edge_shade(img, 0.18)
+	# two glowing violet eyes + brow glow (bright — stamped after shading)
 	_px(img, 18, 4 + yo, eye)
 	_px(img, 20, 4 + yo, eye)
+	_px(img, 18, 3 + yo, brow)
+	_px(img, 20, 3 + yo, brow)
 	# 4 legs, 2-pose alternation on walk
 	var legs: Array = [[6, 0], [9, 0], [13, 0], [16, 0]]
 	if pose == "walk" and f == 0:
@@ -324,6 +381,10 @@ static func _wisp_tex(f: int, flare: bool) -> ImageTexture:
 	_ellipse(img, cx, cy, r, r * 0.9, edge)
 	_ellipse(img, cx, cy, r * 0.66, r * 0.6, mid)
 	_ellipse(img, cx - 0.6, cy - 0.8, r * 0.34, r * 0.3, core)
+	# two dim eye motes — a spirit "face" hollowed out of the glow
+	var eye_c := Color("241245") if flare else Color("3a2470")
+	_px(img, 10, 6, eye_c)
+	_px(img, 12, 6, eye_c)
 	# cyan glints — the cyan-violet mix that reads "spirit" at night
 	_px(img, int(cx) - 1, int(cy) - 2, Color("7fe7ff"))
 	_px(img, int(cx) + 1, int(cy) + 1, Color("59d6e6") if f == 0 else Color("7fe7ff"))
@@ -386,9 +447,10 @@ static func _boss_tex(anim_name: String, f: int) -> ImageTexture:
 	for dy in range(-2, 3):
 		_hline(img, 12 + absi(dy) * 2, 18, 22 + dy, wing)
 	_px(img, 12, 22, wedge)
-	# body
+	# body (3-tone ramp + hot rim light along the back)
 	_ellipse(img, 26.0, 22.0, 9.5, 6.0, body)
 	_ellipse(img, 26.0, 20.0, 7.5, 3.5, hi)
+	_ellipse(img, 25.0, 18.8, 5.5, 1.4, Color("e88a45"))
 	_ellipse(img, 26.0, 25.5, 6.5, 2.2, dark)
 	# neck + head
 	_ellipse(img, 32.0 + head_dx, 19.0, 3.5, 3.0, body)
@@ -411,6 +473,7 @@ static func _boss_tex(anim_name: String, f: int) -> ImageTexture:
 		_px(img, 44, 18, beak_d)
 	_px(img, 36 + head_dx, 15, Color("2a1206"))
 	_px(img, 37 + head_dx, 15, eye)
+	_px(img, 37 + head_dx, 14, hi.lerp(eye, 0.5))   # glow bleeding onto the brow
 	# near wing (front)
 	if attack:
 		var k := 1 if f == 1 else 0   # frame 1 folds tighter
@@ -438,6 +501,7 @@ static func _boss_tex(anim_name: String, f: int) -> ImageTexture:
 			if x0 <= x1:
 				_hline(img, x0, x1, 17 + i, wing)
 				_px(img, x0, 17 + i, wedge)
+	_edge_shade(img, 0.14)
 	_outline(img, Color("160a04"))
 	# flickering ember pixels — positions differ per frame
 	var embers := [Vector2i(20, 27), Vector2i(31, 24), Vector2i(24, 14),
@@ -445,6 +509,196 @@ static func _boss_tex(anim_name: String, f: int) -> ImageTexture:
 	for e in 3:
 		var p: Vector2i = embers[(f * 2 + e * 2 + (1 if attack else 0)) % embers.size()]
 		_px(img, p.x, p.y, Color("ffcf6a") if e == 0 else Color("ff8a33"))
+	return _tex(img)
+
+# ---- EMBER DRAKE (rideable adult mount — long horned head, jagged wings, saddle) -
+# 56x44 centered frames, drawn facing right like every other creature.
+# Rider contract: player.gd draws the hero as a separate sprite ~13 px above this
+# frame's center (mount at y=-14, hero at y=-27 in player space), so the saddle
+# seat is fixed on canvas rows 14-16 (x 22..30) and the BODY NEVER BOBS between
+# frames — only wings, tail, head and embers animate, keeping the rider seated.
+
+static func drake_frames() -> SpriteFrames:
+	if _frames_cache.has("drake"):
+		return _frames_cache["drake"]
+	var fly: Array = []
+	for f in 4:
+		fly.append(_drake_tex("fly", f))
+	var idle: Array = []
+	for f in 3:
+		idle.append(_drake_tex("idle", f))
+	var sf := SpriteFrames.new()
+	_anim(sf, "fly", 7.0, true, fly)
+	_anim(sf, "walk", 7.0, true, fly)    # alias: generic creature anim code
+	_anim(sf, "idle", 3.0, true, idle)
+	_frames_cache["drake"] = sf
+	return sf
+
+static func _drake_tex(pose: String, f: int) -> ImageTexture:
+	var img := _img(56, 44)
+	var mid := Color("b34f16")      # ember-orange scales
+	var hi := Color("e07a30")
+	var dark := Color("77270a")     # dark red shade
+	var deep := Color("531806")
+	var belly := Color("c68d52")
+	var belly_d := Color("96602e")
+	var memb := Color("7c250b")     # near wing membrane
+	var memb_d := Color("511605")   # far wing / membrane shade
+	var bone := Color("d06828")     # wing arm along the leading edge
+	var horn := Color("e8d9c0")
+	var horn_d := Color("a8906c")
+	var leather := Color("3a2413")
+	var leather_hi := Color("6e4526")
+	var eye := Color("ffd166")
+	# fly = up/mid/down/mid wingbeat; idle hovers on mid with a lazy half-flap
+	var wing := 1
+	var sway := 0                   # tail-tip vertical sway per frame
+	var wlow := 0                   # idle: whole mid wing settles 1 px lower
+	if pose == "fly":
+		wing = [0, 1, 2, 1][f]
+		sway = [0, 1, 0, -1][f]
+	else:
+		sway = [0, 1, 0][f]
+		wlow = [0, 1, 0][f]
+	# far wing (behind everything, darker)
+	if wing == 0:
+		for i in 9:
+			_hline(img, 23, 27 + int(i * 0.6), 14 - i, memb_d)
+	elif wing == 1:
+		for i in 3:
+			_hline(img, 25 + i * 2, 33, 12 + i + wlow, memb_d)
+	else:
+		for i in 5:
+			_hline(img, 31, 36 - i, 16 + i, memb_d)
+	# tail — thick at the hips, whip-thin at the swaying spade tip
+	_hline(img, 10, 17, 20, mid)
+	_hline(img, 8, 17, 21, mid)
+	_hline(img, 8, 16, 22, dark)
+	_hline(img, 10, 14, 23, deep)
+	_hline(img, 5, 9, 20 + sway, mid)
+	_hline(img, 6, 9, 21 + sway, dark)
+	_px(img, 4, 19 + sway, mid)
+	_px(img, 3, 18 + sway, hi)      # spade tip
+	_px(img, 2, 17 + sway, hi)
+	_px(img, 3, 20 + sway, dark)    # lower barb
+	_px(img, 12, 19, dark)          # tail ridge spikes
+	_px(img, 15, 18, dark)
+	# tucked legs + rear haunch
+	_ellipse(img, 20.0, 25.0, 4.0, 3.2, dark)
+	_ellipse(img, 19.5, 24.0, 2.6, 1.8, mid)
+	_rect(img, 18, 28, 2, 3, dark)
+	_px(img, 17, 31, horn_d)
+	_px(img, 19, 31, horn_d)
+	_rect(img, 31, 28, 2, 3, dark)
+	_px(img, 30, 31, horn_d)
+	_px(img, 32, 31, horn_d)
+	# body barrel + chest, lit along the back
+	_ellipse(img, 26.0, 22.0, 11.0, 6.2, mid)
+	_ellipse(img, 33.5, 23.0, 4.5, 5.4, mid)
+	_ellipse(img, 25.0, 19.5, 9.0, 3.0, hi)
+	_ellipse(img, 27.0, 26.5, 8.5, 2.5, belly)
+	for k in 5:
+		_px(img, 20 + k * 3, 27, belly_d)   # belly plate seams
+	_hline(img, 21, 33, 25, belly_d)
+	# dorsal ridge spines bracket the saddle
+	_px(img, 17, 16, dark)
+	_px(img, 19, 15, dark)
+	_px(img, 32, 15, dark)
+	# neck rises in front of the saddle
+	_ellipse(img, 34.0, 17.0, 3.2, 3.6, mid)
+	_ellipse(img, 37.0, 13.0, 2.8, 3.0, mid)
+	_ellipse(img, 39.0, 11.0, 2.4, 2.4, mid)
+	_ellipse(img, 34.0, 15.0, 1.8, 1.6, hi)
+	_px(img, 37, 16, belly_d)               # throat
+	_px(img, 39, 13, belly_d)
+	_px(img, 34, 12, dark)                  # neck spines
+	_px(img, 36, 10, dark)
+	# long horned head: heavy skull, tapered snout, closed jaw with an overbite fang
+	_rect(img, 39, 7, 6, 5, mid)
+	_hline(img, 39, 44, 6, hi)              # brow ridge
+	_rect(img, 45, 8, 6, 2, mid)
+	_hline(img, 45, 52, 9, mid)
+	_px(img, 51, 8, mid)
+	_hline(img, 41, 44, 7, dark)            # scowl shadow under the brow
+	_hline(img, 44, 51, 10, dark)           # mouth line
+	_hline(img, 44, 49, 11, dark)           # lower jaw
+	_px(img, 49, 11, horn)                  # fangs
+	_px(img, 46, 11, horn)
+	_px(img, 52, 8, deep)                   # nostril
+	# swept-back horns — the intimidation silhouette
+	_px(img, 40, 6, horn_d)
+	_px(img, 39, 5, horn)
+	_px(img, 38, 4, horn)
+	_px(img, 37, 3, horn)
+	_px(img, 36, 2, horn_d)
+	_px(img, 43, 6, horn_d)
+	_px(img, 42, 5, horn)
+	_px(img, 41, 4, horn)
+	_px(img, 40, 3, horn_d)
+	_px(img, 44, 12, horn_d)                # jaw spike
+	# saddle: rim + seat pad, cantle behind, pommel horn in front, girth strap
+	_rect(img, 22, 15, 9, 2, leather)
+	_hline(img, 22, 30, 14, leather_hi)
+	_px(img, 21, 14, leather_hi)
+	_px(img, 21, 15, leather)
+	_px(img, 31, 14, leather_hi)
+	_px(img, 31, 15, leather)
+	_hline(img, 21, 31, 17, Color("1d4b56"))   # saddle blanket — hero-cloak teal
+	_rect(img, 26, 18, 1, 9, leather)
+	_px(img, 26, 26, Color("c8a441"))          # buckle glint
+	# near wing, rooted behind the cantle so the seat stays clear
+	if wing == 0:      # raised — tall jagged sail
+		for i in 14:
+			var y := 15 - i
+			var x1 := 21 - int(i * 0.35)
+			var x0 := maxi(18 - int(i * 1.05), 6)
+			if i % 3 == 2:
+				x0 = maxi(x0 - 2, 4)
+			_hline(img, x0, x1, y, memb)
+			_px(img, x0, y, memb_d)
+		for j in 13:
+			_px(img, 21 - int(j * 0.35), 15 - j, bone)
+		for j in 6:
+			_px(img, 14 - j, 12 - j, memb_d)   # finger shadow
+		_px(img, 17, 1, horn)                  # wrist claw
+	elif wing == 1:    # level — broad blade swept back, scalloped trailing edge
+		for i in 6:
+			var y := 11 + i + wlow
+			var x0 := 3 + i * 3
+			_hline(img, x0, 20, y, memb)
+			_px(img, x0, y, memb_d)
+			if i % 2 == 1:
+				_px(img, x0 - 1, y, memb_d)
+		_hline(img, 3, 14, 10 + wlow, bone)
+		_hline(img, 14, 20, 11 + wlow, bone)
+		_px(img, 2, 9 + wlow, horn)            # wrist claw
+	else:              # swept down past the flank
+		for i in 11:
+			var y := 16 + i
+			var x1 := 19 - int(i * 0.35)
+			var x0 := maxi(x1 - (9 - int(i * 0.7)), 3)
+			if i % 3 == 1:
+				x0 = maxi(x0 - 1, 3)
+			_hline(img, x0, x1, y, memb)
+			_px(img, x0, y, memb_d)
+		for j in 10:
+			_px(img, 19 - int(j * 0.35), 16 + j, bone)
+		for j in 4:
+			_px(img, 15 - j, 18 + j * 2, memb_d)   # membrane fold
+		_px(img, 15, 27, horn)                 # wrist claw
+	_edge_shade(img, 0.15)
+	# glow accents stamped after shading so they stay hot
+	_px(img, 42, 8, Color("2a1206"))           # eye socket
+	_px(img, 43, 8, eye)
+	_px(img, 43, 7, hi.lerp(eye, 0.55))        # glow bleeding onto the brow
+	_px(img, 50, 10, Color("ff8a33"))          # smolder between the jaws
+	_px(img, 38, 15, Color("ff8a33"))          # throat ember
+	var embers := [Vector2i(24, 20), Vector2i(30, 22), Vector2i(35, 20),
+			Vector2i(21, 23), Vector2i(28, 26), Vector2i(33, 25), Vector2i(37, 12)]
+	for e in 3:
+		var p: Vector2i = embers[(f * 3 + e * 2 + (0 if pose == "fly" else 1)) % embers.size()]
+		_px(img, p.x, p.y, Color("ffcf6a") if e == 0 else Color("ff8a33"))
+	_outline(img, Color("160a04"))
 	return _tex(img)
 
 # ---- PROPS (plain textures; scattered by world_gen, visual only) ---------------
@@ -461,6 +715,12 @@ static func prop_tex(kind: String) -> ImageTexture:
 			img = _tree_img(true)
 		"rock":
 			img = _rock_img()
+		"dead_tree":
+			img = _dead_tree_img()
+		"ruin":
+			img = _ruin_img()
+		"bone":
+			img = _bone_img()
 		_:
 			img = _shroom_img()
 	var tex := _tex(img)
@@ -516,6 +776,97 @@ static func _rock_img() -> Image:
 	_px(img, 6, 4, rd)
 	_px(img, 6, 5, rd)
 	_px(img, 7, 6, rd)
+	_outline(img)
+	return img
+
+static func _dead_tree_img() -> Image:
+	var img := _img(16, 28)
+	var bark := Color("2e241a")
+	var bark_d := Color("1c1610")
+	var bark_h := Color("463828")
+	# gnarled trunk with a root flare
+	_rect(img, 7, 10, 3, 17, bark)
+	_rect(img, 7, 10, 1, 17, bark_d)
+	_hline(img, 6, 10, 27, bark_d)
+	_rect(img, 6, 8, 3, 3, bark)
+	_rect(img, 8, 5, 2, 4, bark)
+	# clawing bare branches
+	for j in 5:
+		_px(img, 7 - j, 7 - j, bark)
+	_px(img, 3, 2, bark_d)
+	for j in 4:
+		_px(img, 10 + j, 6 - j, bark)
+	_px(img, 14, 2, bark_d)
+	_px(img, 11, 12, bark)                  # snapped stub
+	_px(img, 12, 13, bark_d)
+	_px(img, 9, 4, bark_h)                  # moon-lit bark
+	_px(img, 8, 9, bark_h)
+	_px(img, 9, 14, bark_h)
+	# one gloam-lit fungus shelf
+	_px(img, 10, 18, Color("39d8e8"))
+	_px(img, 11, 18, Color("1899a8"))
+	_edge_shade(img, 0.2)
+	_outline(img)
+	return img
+
+static func _ruin_img() -> Image:
+	var img := _img(18, 18)
+	var st := Color("4a515f")
+	var st_d := Color("2f333c")
+	var st_h := Color("636b7a")
+	var moss := Color("2e5138")
+	# broken column, sheared diagonally at the fracture
+	_rect(img, 4, 6, 5, 11, st)
+	_rect(img, 4, 6, 1, 11, st_d)
+	_rect(img, 7, 6, 2, 11, st_h)           # moon-lit face
+	_px(img, 4, 5, st)
+	_rect(img, 5, 4, 2, 2, st)
+	_px(img, 7, 3, st_h)
+	_px(img, 8, 4, st_h)
+	_px(img, 8, 5, st)
+	# block seams + a vertical crack
+	_hline(img, 4, 8, 9, st_d)
+	_hline(img, 4, 8, 13, st_d)
+	_px(img, 6, 10, st_d)
+	_px(img, 6, 11, st_d)
+	_px(img, 5, 12, st_d)
+	# fallen capstone shard, lit on top
+	_rect(img, 11, 13, 5, 3, st)
+	_hline(img, 11, 15, 13, st_h)
+	_hline(img, 11, 15, 15, st_d)
+	# creeping moss + one luminous fleck
+	_px(img, 5, 16, moss)
+	_px(img, 6, 15, moss)
+	_px(img, 8, 16, moss)
+	_px(img, 11, 14, moss)
+	_px(img, 4, 6, moss)
+	_px(img, 5, 9, Color("57ff9a"))
+	_edge_shade(img, 0.18)
+	_outline(img)
+	return img
+
+static func _bone_img() -> Image:
+	var img := _img(16, 10)
+	var b := Color("cbc3ad")
+	var bd := Color("8f866d")
+	# half-buried ribcage — curved ribs of uneven height sinking into the ground
+	var ribs := [[7, 2], [10, 1], [13, 3]]
+	for r in ribs:
+		var x: int = r[0]
+		var top: int = r[1]
+		_px(img, x + 1, top, bd)
+		_px(img, x, top + 1, b)
+		_px(img, x, top + 2, b)
+		_px(img, x - 1, top + 3, b)
+		_px(img, x - 1, top + 4, bd)
+	_hline(img, 5, 14, 8, bd)               # buried spine line
+	# skull, hollow eye socket toward the viewer
+	_ellipse(img, 3.0, 5.0, 2.8, 2.4, b)
+	_px(img, 2, 5, Color("14100a"))
+	_px(img, 4, 5, Color("14100a"))
+	_hline(img, 2, 4, 7, bd)                # jaw
+	_px(img, 3, 3, Color("ffffff"))         # crown glint
+	_edge_shade(img, 0.15)
 	_outline(img)
 	return img
 

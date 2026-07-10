@@ -31,6 +31,10 @@ var resist_pct := 0.0
 var status_resist_pct := 0.0
 var attack_speed_mult := 1.0     # Reaver tree (cleave_rampage)
 var leech_pct := 0.0             # blood_price keystone: heal % of melee damage dealt
+var whirl_cd_s := 4.0            # Whirlwind (E): full-circle strike (proposal)
+var _whirl_cd := 0.0
+var _whirl_t := 0.0
+var _class_fx := ""              # Emberkin ignite / Frostbinder chill on hit
 
 # Mounts (Ricardo, proposals): M rides the active mount. Walking respects
 # terrain; FLYING crosses water/rock. Combat or damage dismounts.
@@ -83,6 +87,11 @@ func _ready() -> void:
 	sprite.position.y = -12.0
 	sprite.play("idle")
 	add_child(sprite)
+	match str(Session.class_id):   # class cast (full class art: design/10/17)
+		"core.class.emberkin":
+			sprite.self_modulate = Color(1.15, 0.9, 0.8)
+		"core.class.frostbinder":
+			sprite.self_modulate = Color(0.85, 0.95, 1.15)
 	apply_stats()
 
 # Reads the real StatBlock (attributes + gear + enchants) and the rune sockets.
@@ -101,6 +110,7 @@ func apply_stats() -> void:
 	attack_speed_mult = s.attack_speed_mult
 	attack_cd_s = 0.4 / maxf(attack_speed_mult, 0.1)
 	leech_pct = s.leech_pct
+	_class_fx = str(s.get("class_fx", ""))
 	phys_reduction = s.phys_reduction
 	resist_pct = s.resist_pct
 	status_resist_pct = s.status_resist_pct
@@ -114,6 +124,8 @@ func _physics_process(delta: float) -> void:
 		return
 	_attack_cd = maxf(_attack_cd - delta, 0.0)
 	_rend_cd = maxf(_rend_cd - delta, 0.0)
+	_whirl_cd = maxf(_whirl_cd - delta, 0.0)
+	_whirl_t = maxf(_whirl_t - delta * 4.0, 0.0)
 	_swing = maxf(_swing - delta * 6.0, 0.0)
 	_rend_swing = maxf(_rend_swing - delta * 5.0, 0.0)
 	_gale_t = maxf(_gale_t - delta * 4.0, 0.0)
@@ -171,6 +183,8 @@ func _physics_process(delta: float) -> void:
 				_wind_burst(main)
 		if not mounted and Input.is_action_pressed("attack") and _attack_cd <= 0.0:
 			_attack()
+		if not mounted and Input.is_action_just_pressed("skill2") and _whirl_cd <= 0.0:
+			_whirlwind()
 		if not mounted and Input.is_action_just_pressed("bestial") and _rend_cd <= 0.0:
 			var main := get_tree().get_first_node_in_group("main")
 			if main and main.stones >= 1:   # owning a stone unlocks the bestial slot
@@ -233,6 +247,10 @@ func _arc_hit(dir: Vector2, reach: float, arc_deg: float, dmg: float,
 				and to_c.normalized().dot(dir) >= cos_half:
 			c.take_damage(dmg, dir, spark)
 			hit_any = true
+			if _class_fx == "ignite" and randf() < 0.2:   # Emberkin cast
+				c.ignite(2.0 * _skill_mult, 2.0)
+			elif _class_fx == "chill":                    # Frostbinder cast
+				c.apply_slow(1.0)
 			if crit and main:
 				main.damage_number(c.global_position + Vector2(0, -30), 0,
 						Color("ffd166"), "CRIT!")
@@ -290,7 +308,44 @@ func _shadow_rend(main: Node) -> void:
 		main.hitstop()
 		main.shake(3.0)
 
-# ---- mounts (M) -------------------------------------------------------------------
+# Whirlwind (E, class active — proposal): full-circle strike at 0.8x melee with
+# a small shove, 4 s cooldown. Every class owns it from the start.
+func _whirlwind() -> void:
+	_whirl_cd = whirl_cd_s
+	_whirl_t = 1.0
+	var main := get_tree().get_first_node_in_group("main")
+	var dmg := attack_damage * 0.8
+	if randf() < crit_chance:
+		dmg *= crit_mult
+	var hit_any := false
+	for c in get_tree().get_nodes_in_group("creatures"):
+		if c.dead:
+			continue
+		var to_c: Vector2 = c.global_position - global_position
+		if to_c.length() <= 2.6 * TILE + c.body_radius:
+			c.take_damage(dmg, to_c.normalized(), Color(0.85, 0.95, 1.0))
+			c.shove(to_c.normalized(), 8.0)
+			hit_any = true
+			if _class_fx == "ignite" and randf() < 0.2:
+				c.ignite(2.0 * _skill_mult, 2.0)
+			elif _class_fx == "chill":
+				c.apply_slow(1.0)
+	if hit_any and leech_pct > 0.0:
+		hp = minf(hp + dmg * leech_pct, max_hp)
+	sprite.play("attack")
+	sprite.frame = 0
+	if main:
+		main.play_sfx("swing", global_position, -6.0)
+		main.fx.tornado(global_position)
+		if hit_any:
+			main.hitstop()
+			main.shake(3.0)
+			main.refresh_hud()
+
+func whirl_progress() -> float:
+	return clampf(1.0 - _whirl_cd / whirl_cd_s, 0.0, 1.0)
+
+# ---- mounts (Z) -------------------------------------------------------------------
 
 func toggle_mount() -> void:
 	if dead:
@@ -311,10 +366,12 @@ func toggle_mount() -> void:
 	_fly_t = 0.0
 	var flying: bool = str(m.get("kind", "")) == "fly"
 	_mount_sprite = AnimatedSprite2D.new()
-	_mount_sprite.sprite_frames = ProtoSprites.boss_frames() if flying \
+	# the drake is authored at final size in its own ember palette — no tint/scale
+	_mount_sprite.sprite_frames = ProtoSprites.drake_frames() if flying \
 			else ProtoSprites.stalker_frames()
-	_mount_sprite.scale = Vector2.ONE * (0.5 if flying else 1.2)
-	_mount_sprite.modulate = Color(str(m.get("tint", "ffffff")))
+	_mount_sprite.scale = Vector2.ONE * (1.0 if flying else 1.2)
+	if not flying:
+		_mount_sprite.modulate = Color(str(m.get("tint", "ffffff")))
 	add_child(_mount_sprite)
 	move_child(_mount_sprite, 1)   # between shadow and hero — the hero rides on top
 	_mount_sprite.play("fly" if flying else "walk")
@@ -442,6 +499,12 @@ func _draw() -> void:
 				Color(0.72, 0.45, 1.0, _rend_swing * 0.85), 4.0)
 		draw_arc(Vector2(0, -body_radius), rend_reach * 0.7, rang - rhalf, rang + rhalf, 20,
 				Color(0.5, 0.3, 0.8, _rend_swing * 0.5), 2.0)
+	if _whirl_t > 0.0:   # Whirlwind: expanding double ring
+		var wr := 2.6 * TILE * (1.15 - _whirl_t * 0.15)
+		draw_arc(Vector2(0, -body_radius), wr, 0, TAU, 32,
+				Color(0.85, 0.95, 1.0, _whirl_t * 0.7), 3.0)
+		draw_arc(Vector2(0, -body_radius), wr * 0.7, 0, TAU, 24,
+				Color(0.7, 0.85, 1.0, _whirl_t * 0.4), 2.0)
 	if _gale_t > 0.0:   # Rune of the Gale: expanding wind ring at the launch point
 		var at := _gale_pos - global_position
 		var r := 1.5 * TILE * (1.4 - _gale_t * 0.4)

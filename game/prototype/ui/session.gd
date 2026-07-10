@@ -10,6 +10,11 @@ const MAX_PETS := 3            # (proposal) all bonded pets hunt together
 
 var player_name := "Hunter"
 var class_id := "core.class.reaver"
+const CLASS_NAMES := {"core.class.reaver": "Reaver",
+		"core.class.emberkin": "Emberkin", "core.class.frostbinder": "Frostbinder"}
+
+func class_display() -> String:
+	return str(CLASS_NAMES.get(class_id, "Reaver"))
 var level := 1
 var gold := 0
 var stones := 0
@@ -73,7 +78,8 @@ func setup_input() -> void:
 		"move_left": [KEY_A, KEY_LEFT], "move_right": [KEY_D, KEY_RIGHT],
 		"move_up": [KEY_W, KEY_UP], "move_down": [KEY_S, KEY_DOWN],
 		"attack": [KEY_SPACE], "dodge": [KEY_SHIFT],
-		"capture": [KEY_F], "bestial": [KEY_Q], "mount": [KEY_M],
+		"capture": [KEY_F], "bestial": [KEY_Q], "skill2": [KEY_E],
+		"mount": [KEY_Z],   # Z: reachable without leaving WASD (was M — Ricardo)
 		"toggle_character": [KEY_C, KEY_TAB], "toggle_keybinds": [KEY_K],
 	}
 	for action in bindings:
@@ -121,6 +127,7 @@ func save() -> void:
 		push_warning("Session.save: cannot write " + save_path())
 		return
 	f.store_string(JSON.stringify({"version": 1, "player_name": player_name,
+			"class_id": class_id,
 			"level": level, "gold": gold, "stones": stones, "snares": snares,
 			"kills": kills, "has_blade": has_blade, "rune_granted": rune_granted,
 			"attribute_points": attribute_points, "attributes": attributes,
@@ -135,6 +142,7 @@ func _load_state() -> void:
 		push_warning("Session: corrupt save " + save_path() + " — starting fresh")
 		return
 	var d: Dictionary = parsed
+	class_id = str(d.get("class_id", class_id))
 	level = int(d.get("level", 1))
 	gold = int(d.get("gold", 0))
 	stones = int(d.get("stones", 0))
