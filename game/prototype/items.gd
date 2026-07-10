@@ -247,9 +247,9 @@ static func can_enchant(item: Dictionary) -> bool:
 	return str(item.get("slot", "")) in slots
 
 # Destroy risk (docs/design/14 §7 mirror): only attempts on tier>=4 items risk it.
-static func enchant_destroy_risk(item: Dictionary) -> float:
-	if int(item.get("upgrade_tier", 0)) >= 4:
-		return float(essence_info().get("risk", 0.25))
+# Ricardo 2026-07-10: enchanting NEVER destroys gear — the essence is the only
+# cost. Kept for API compatibility; always 0.
+static func enchant_destroy_risk(_item: Dictionary) -> float:
 	return 0.0
 
 static func roll_enchant() -> Dictionary:

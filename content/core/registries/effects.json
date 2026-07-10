@@ -40,7 +40,7 @@
       "name": "Enchantments (Spirit Essences)",
       "entries": [
         {"key": "umbral_edge", "name": "Umbral Edge", "desc": "Abyssal Remnant on weapon/amulet: +4-10% umbral damage (rolled); REPLACES the previous enchant", "status": "live"},
-        {"key": "enchant_backlash", "name": "Essence Backlash", "desc": "enchanting a +4/+5 item: 25% chance the item is DESTROYED", "status": "live"}
+        {"key": "enchant_safe", "name": "Safe enchanting", "desc": "enchanting NEVER destroys gear (Ricardo 2026-07-10) — the essence is the only cost", "status": "live"}
       ]
     },
     {
@@ -114,7 +114,9 @@
       "entries": [
         {"key": "forge_upgrade", "name": "Forge upgrade", "desc": "+10% to all affix values per tier, max +5; cost 50 x 2^tier gold", "status": "live"},
         {"key": "forge_fail", "name": "Forge fail risk", "desc": "attempts into +4/+5 fail 25%/40% — gold burns, the item survives", "status": "live"},
-        {"key": "vendor_sell", "name": "Vendor sell", "desc": "price scales with rarity and tier (gold sink)", "status": "live"},
+        {"key": "vendor_sell", "name": "Vendor sell", "desc": "price scales with rarity and tier (gold sink); per-rarity sell-all chips clear junk in one click", "status": "live"},
+        {"key": "haven_chest", "name": "Haven chest", "desc": "120-slot stash at the Haven; bag <-> chest moves are free, stacks travel whole", "status": "live"},
+        {"key": "stacking", "name": "Item stacking", "desc": "materials (Spirit Essences) stack into one slot with a qty badge; consuming/selling is stack-aware", "status": "live"},
         {"key": "marketplace", "name": "Player marketplace", "desc": "real-money player-to-player trade via Pix — WEB-ONLY, never in mobile apps (hard rule)", "status": "planned"}
       ]
     }

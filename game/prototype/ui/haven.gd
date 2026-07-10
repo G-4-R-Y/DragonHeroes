@@ -79,6 +79,7 @@ func _ready() -> void:
 	_btn(buttons, "FORGE", _show_forge)
 	_btn(buttons, "ENCHANTER", _show_enchant)
 	_btn(buttons, "VENDOR", _show_vendor)
+	_btn(buttons, "CHEST", _show_chest)
 	_btn(buttons, "CODEX", _show_codex)
 	var gap := Control.new()
 	gap.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -400,11 +401,13 @@ func _show_enchant() -> void:
 		if str(it.get("slot", "")) == "material":
 			essences.append(it)
 	_line("Apply an Abyssal Remnant to a weapon or amulet: adds or REPLACES its " +
-			"enchant with +4-10% umbral damage (rolled). On +4/+5 items the attempt " +
-			"has a 25% chance to DESTROY the item — a soft mirror of docs/design/14.",
-			DIM)
+			"enchant with +4-10% umbral damage (rolled). The essence is the only " +
+			"cost — enchanting never destroys gear.", DIM)
+	var ess_count := 0
+	for e in essences:
+		ess_count += int(e.get("qty", 1))
 	_line("Essences in bag: %d  (Abyssal Remnants drop from abyssal kills — 8%%)" %
-			essences.size(), CYAN, 11)
+			ess_count, CYAN, 11)
 	if _ench_msg != "":
 		_line(_ench_msg, EMBER, 11)
 	if essences.is_empty():
@@ -437,10 +440,6 @@ func _show_enchant() -> void:
 				ProtoItems.stat_name(str(en.get("stat", "?")))], PALE, 11)
 	else:
 		_line("no enchant yet.", PALE, 11)
-	var risk := ProtoItems.enchant_destroy_risk(item)
-	if risk > 0.0:
-		_line("WARNING: tier +%d item — %d%% chance the attempt DESTROYS it." % [
-				int(item.get("upgrade_tier", 0)), int(round(risk * 100.0))], RED, 11)
 	var b2 := _btn(_panel_body, "APPLY ESSENCE (+4-10% umbral)", _ench_do)
 	b2.add_theme_color_override("font_color", CYAN)
 
@@ -460,19 +459,22 @@ func _ench_do() -> void:
 			break
 	if essence.is_empty():
 		return
-	Session.remove_item(int(essence.get("uid", -1)))   # consumed either way
-	if randf() < ProtoItems.enchant_destroy_risk(item):
-		_ench_msg = "the essence BACKLASHED — %s was destroyed." % _iname(item)
-		Session.destroy_item(int(item.get("uid", -1)))
-		_ench_uid = -1
-	else:
-		var en := ProtoItems.roll_enchant()
-		item.enchant = en
-		item.power = ProtoItems.power(item)
-		_ench_msg = "enchanted %s: +%d %s." % [_iname(item), int(en.value),
-				ProtoItems.stat_name(str(en.stat))]
+	_consume_essence(essence)   # the only cost — gear is never destroyed (Ricardo)
+	var en := ProtoItems.roll_enchant()
+	item.enchant = en
+	item.power = ProtoItems.power(item)
+	_ench_msg = "enchanted %s: +%d %s." % [_iname(item), int(en.value),
+			ProtoItems.stat_name(str(en.stat))]
 	_refresh_stats()
 	_show_enchant()
+
+# Materials stack (qty); consuming takes one off the stack.
+func _consume_essence(essence: Dictionary) -> void:
+	if int(essence.get("qty", 1)) > 1:
+		essence.qty = int(essence.qty) - 1
+		Session.request_save()
+	else:
+		Session.remove_item(int(essence.get("uid", -1)))
 
 # ---- VENDOR: sell for gold (stub sink — the real marketplace is docs/design/15) ----
 
@@ -482,8 +484,8 @@ func _show_vendor() -> void:
 			"trade is the WEB-ONLY marketplace later (docs/design/15) — never in " +
 			"the mobile apps.", DIM)
 	_line("Gold: %d" % Session.gold, GOLD, 11)
-	if _vendor_msg != "":
-		_line(_vendor_msg, EMBER, 11)
+	# message line ALWAYS renders so rows never shift under the cursor mid-spree
+	_line(_vendor_msg if _vendor_msg != "" else " ", EMBER, 11)
 	_header("Stable-master — mounts (proposal)")
 	if Session.owns_mount("gloam_strider"):
 		_line("Gloam Strider owned — manage mounts in CHARACTER → Mounts; ride with M.",
@@ -500,21 +502,29 @@ func _show_vendor() -> void:
 	if Session.inventory.is_empty():
 		_line("the bag is empty.", DIM)
 		return
-	# one-click junk clear (Ricardo: "shop selling made easier")
-	var commons: Array = []
-	var common_total := 0
+	# one-click clears per rarity — non-equipped bag gear only (Ricardo)
+	var chips := HBoxContainer.new()
+	chips.add_theme_constant_override("separation", 6)
+	_panel_body.add_child(chips)
+	for rar in ["common", "uncommon", "rare", "epic"]:
+		var uids: Array = []
+		var total := 0
+		for it in Session.inventory:
+			if str(it.get("rarity", "")) == rar \
+					and ProtoItems.GEAR_SLOTS.has(str(it.get("slot", ""))):
+				uids.append(int(it.get("uid", -1)))
+				total += ProtoItems.sell_price(it)
+		if uids.is_empty():
+			continue
+		var sa := _btn(chips, "all %s (%d) — %dg" % [rar, uids.size(), total],
+				_sell_all.bind(uids))
+		sa.add_theme_font_size_override("font_size", 9)
+		sa.add_theme_color_override("font_color", ProtoItems.rarity_color(rar))
 	for it in Session.inventory:
-		if str(it.get("rarity", "")) == "common" \
-				and ProtoItems.GEAR_SLOTS.has(str(it.get("slot", ""))):
-			commons.append(int(it.get("uid", -1)))
-			common_total += ProtoItems.sell_price(it)
-	if not commons.is_empty():
-		var sa := _btn(_panel_body, "SELL ALL COMMON GEAR (%d items) — %d gold" % [
-				commons.size(), common_total], _sell_all.bind(commons))
-		sa.add_theme_color_override("font_color", GOLD)
-	for it in Session.inventory:
-		var b := _btn(_panel_body, "sell %s — %d gold" % [_iname(it),
-				ProtoItems.sell_price(it)], _vendor_sell.bind(int(it.get("uid", -1))))
+		var qty := int(it.get("qty", 1))
+		var b := _btn(_panel_body, "sell %s%s — %d gold" % [_iname(it),
+				" x%d" % qty if qty > 1 else "", ProtoItems.sell_price(it) * qty],
+				_vendor_sell.bind(int(it.get("uid", -1))))
 		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		b.icon = ProtoSprites.item_icon(str(it.get("sprite_key", "sword")),
 				str(it.get("rarity", "common")))
@@ -532,6 +542,45 @@ func _buy_strider() -> void:
 	_vendor_msg = "the Gloam Strider is yours — press M on the hunt to ride."
 	_refresh_stats()
 	_show_vendor()
+
+# ---- CHEST: the Haven stash (Ricardo) — bag <-> chest, big capacity ---------------
+
+func _show_chest() -> void:
+	_open("Chest — %d/%d stored  ·  bag %d/%d" % [Session.stash.size(),
+			Session.STASH_CAP, Session.inventory.size(), ProtoItems.INVENTORY_CAP])
+	_line("Store loot between hunts — enchants, tiers and stacks travel whole. " +
+			"The chest lives at the Haven (proposal).", DIM)
+	_header("Bag → store")
+	if Session.inventory.is_empty():
+		_line("the bag is empty.", DIM)
+	for it in Session.inventory:
+		_chest_row(it, "store %s%s", _chest_store)
+	_header("Chest → take")
+	if Session.stash.is_empty():
+		_line("the chest is empty.", DIM)
+	for it in Session.stash:
+		_chest_row(it, "take %s%s", _chest_take)
+
+func _chest_row(it: Dictionary, fmt: String, cb: Callable) -> void:
+	var qty := int(it.get("qty", 1))
+	var b := _btn(_panel_body, fmt % [_iname(it), " x%d" % qty if qty > 1 else ""],
+			cb.bind(int(it.get("uid", -1))))
+	b.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	b.icon = ProtoSprites.item_icon(str(it.get("sprite_key", "sword")),
+			str(it.get("rarity", "common")))
+	b.add_theme_font_size_override("font_size", 10)
+	b.add_theme_color_override("font_color",
+			ProtoItems.rarity_color(str(it.get("rarity", "common"))))
+
+func _chest_store(uid: int) -> void:
+	if Session.stash_item(uid):
+		_refresh_stats()
+	_show_chest()
+
+func _chest_take(uid: int) -> void:
+	if Session.unstash_item(uid):
+		_refresh_stats()
+	_show_chest()
 
 # CODEX — the living registry of every effect/mechanic (effects.json, synced
 # from content/core/registries/). Expandable data, never engine work (canon).
@@ -569,7 +618,7 @@ func _vendor_sell(uid: int) -> void:
 	if it.is_empty():
 		return
 	Session.remove_item(uid)
-	var price := ProtoItems.sell_price(it)
+	var price := ProtoItems.sell_price(it) * int(it.get("qty", 1))
 	Session.gold += price
 	_vendor_msg = "sold %s for %d gold." % [_iname(it), price]
 	_refresh_stats()

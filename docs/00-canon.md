@@ -416,3 +416,9 @@ Still open:
    stable cards. Sprite fidelity raised via procedural outline/shading kit —
    the real "modern-day pixel art" ceiling is the GenForge art pipeline (§7),
    which replaces procedural placeholders entirely.
+17. **Economy QoL (2026-07-10, Ricardo):** enchanting NEVER destroys equipment —
+   the destroy risk is removed everywhere; the essence is the only cost. Vendor
+   gets per-rarity one-click sell-alls (non-equipped bag gear) and a stable
+   layout (rows never shift under the cursor mid-spree). The Haven gains a
+   120-slot CHEST (bag <-> chest, free moves). Materials STACK (qty on one
+   slot, stack-aware consume/sell). Design/14 updated accordingly.

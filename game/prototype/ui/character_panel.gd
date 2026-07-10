@@ -269,7 +269,11 @@ func _refresh_bag() -> void:
 		b.custom_minimum_size = Vector2(30, 30)
 		b.icon = _icon(it)
 		b.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		b.tooltip_text = _iname(it) + "\n" \
+		var qty := int(it.get("qty", 1))
+		if qty > 1:   # stacked materials show their count on the tile
+			b.text = "x%d" % qty
+			b.add_theme_font_size_override("font_size", 8)
+		b.tooltip_text = _iname(it) + ("" if qty <= 1 else " x%d" % qty) + "\n" \
 				+ "\n".join(PackedStringArray(ProtoItems.describe(it)))
 		var selected := uid == _sel_uid
 		var sb := StyleBoxFlat.new()
@@ -380,7 +384,7 @@ func _bag_detail(vb: VBoxContainer, item: Dictionary) -> void:
 	vb.add_child(hb)
 	if ProtoItems.GEAR_SLOTS.has(slot):
 		_btn(hb, "Equip", _do_equip.bind(int(item.get("uid", -1))), GOLD)
-	_btn(hb, "Sell %d g" % ProtoItems.sell_price(item),
+	_btn(hb, "Sell %d g" % (ProtoItems.sell_price(item) * int(item.get("qty", 1))),
 			_do_sell.bind(int(item.get("uid", -1))))
 
 func _do_equip(uid: int) -> void:
@@ -394,7 +398,7 @@ func _do_sell(uid: int) -> void:
 	if item.is_empty():
 		return
 	Session.remove_item(uid)
-	_add_gold(ProtoItems.sell_price(item))
+	_add_gold(ProtoItems.sell_price(item) * int(item.get("qty", 1)))
 	_sel_uid = -1
 	var m := _main()
 	if m:

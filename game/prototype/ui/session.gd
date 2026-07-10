@@ -36,6 +36,9 @@ var attributes := {
 # equipment holds one item (or {}) per gear slot; skill_runes holds the rune
 # item socketed per skill (canon §4 runes proposal) — {} when empty.
 var inventory: Array = []
+# Haven chest (Ricardo): big stash at town; bag <-> chest moves are free.
+const STASH_CAP := 120
+var stash: Array = []
 var equipment := {"weapon": {}, "chest": {}, "helm": {}, "boots": {},
 		"amulet": {}, "ring": {}}
 var skill_runes := {"cleave": {}, "rend": {}, "dodge": {}}
@@ -134,7 +137,8 @@ func save() -> void:
 			"inventory": inventory, "equipment": equipment,
 			"skill_runes": skill_runes, "pets": pets, "stables": stables,
 			"skill_points": skill_points, "learned_nodes": learned_nodes,
-			"mounts": mounts, "active_mount": active_mount}, "\t"))
+			"mounts": mounts, "active_mount": active_mount,
+			"stash": stash}, "\t"))
 
 func _load_state() -> void:
 	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(save_path()))
@@ -167,6 +171,7 @@ func _load_state() -> void:
 	learned_nodes = d.get("learned_nodes", ["root_cleave"])
 	mounts = d.get("mounts", [])
 	active_mount = int(d.get("active_mount", -1))
+	stash = d.get("stash", [])
 	# JSON round-trips numbers as floats — normalize the int fields and make
 	# sure freshly rolled uids never collide with loaded ones.
 	var top := 0
@@ -189,6 +194,7 @@ func _all_item_dicts() -> Array:
 	out.append_array(pets)
 	out.append_array(stables)
 	out.append_array(mounts)
+	out.append_array(stash)
 	return out
 
 # Menu helper: every saved hunter as {name, level} (newest login continues it).
@@ -210,6 +216,14 @@ func list_saves() -> Array:
 # ---- inventory / equipment ------------------------------------------------------
 
 func add_item(item: Dictionary) -> bool:
+	# repetitive stuff STACKS (Ricardo): materials merge into a qty on one slot
+	if str(item.get("slot", "")) == "material":
+		for it in inventory:
+			if str(it.get("slot", "")) == "material" \
+					and str(it.get("name", "")) == str(item.get("name", "")):
+				it.qty = int(it.get("qty", 1)) + int(item.get("qty", 1))
+				request_save()
+				return true
 	if inventory.size() >= ProtoItems.INVENTORY_CAP:
 		return false
 	inventory.append(item)
@@ -265,6 +279,30 @@ func destroy_item(uid: int) -> void:
 		if int((skill_runes[skill] as Dictionary).get("uid", -1)) == uid:
 			skill_runes[skill] = {}
 	request_save()
+
+# ---- Haven chest (stash) -----------------------------------------------------------
+
+func stash_item(uid: int) -> bool:
+	if stash.size() >= STASH_CAP:
+		return false
+	var it := find_item(uid)
+	if it.is_empty():
+		return false
+	inventory.erase(it)
+	stash.append(it)
+	request_save()
+	return true
+
+func unstash_item(uid: int) -> bool:
+	if inventory.size() >= ProtoItems.INVENTORY_CAP:
+		return false
+	for it in stash:
+		if int(it.get("uid", -1)) == uid:
+			stash.erase(it)
+			inventory.append(it)
+			request_save()
+			return true
+	return false
 
 # ---- rune sockets (one per skill, canon §4 proposal) ------------------------------
 
