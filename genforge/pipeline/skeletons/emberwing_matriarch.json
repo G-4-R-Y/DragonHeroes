@@ -16,7 +16,7 @@
     {"name": "body", "parent": "root", "attach": [-2, -29], "rotation_deg": 0, "z": 30, "part": "body"},
 
     {"name": "neck", "parent": "body", "attach": [16, -8], "rotation_deg": 18, "z": 34, "part": "neck"},
-    {"name": "jaw", "parent": "head", "attach": [11, 12], "rotation_deg": 4, "z": 36, "part": "jaw"},
+    {"name": "jaw", "parent": "head", "attach": [8, 4], "rotation_deg": 4, "z": 36, "part": "jaw"},
     {"name": "head", "parent": "neck", "attach": [0, -15], "rotation_deg": -18, "z": 38, "part": "head"},
 
     {"name": "leg_back", "parent": "body", "attach": [-12, 12], "rotation_deg": 0, "z": 44, "part": "leg_back"},

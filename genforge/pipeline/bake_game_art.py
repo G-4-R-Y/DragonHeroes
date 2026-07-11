@@ -26,12 +26,23 @@ from typing import Dict, List, Optional
 
 from PIL import Image
 
-from .actor_art import ACTOR_BUILDERS
-from .assemble import Assembler
-from .manifest import PartsManifest
-from .poses import PoseLibrary
-from .skeletons import Skeleton
-from .stub_provider import GenerationRequest, StubPartsProvider
+try:
+    from .actor_art import ACTOR_BUILDERS
+    from .assemble import Assembler
+    from .manifest import PartsManifest
+    from .poses import PoseLibrary
+    from .skeletons import Skeleton
+    from .stub_provider import GenerationRequest, StubPartsProvider
+except ImportError:  # invoked as a plain script path, not as a module
+    import sys
+
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+    from genforge.pipeline.actor_art import ACTOR_BUILDERS
+    from genforge.pipeline.assemble import Assembler
+    from genforge.pipeline.manifest import PartsManifest
+    from genforge.pipeline.poses import PoseLibrary
+    from genforge.pipeline.skeletons import Skeleton
+    from genforge.pipeline.stub_provider import GenerationRequest, StubPartsProvider
 
 GENFORGE_ROOT = Path(__file__).resolve().parents[1]
 REPO_ROOT = GENFORGE_ROOT.parent

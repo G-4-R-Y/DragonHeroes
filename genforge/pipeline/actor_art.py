@@ -727,14 +727,17 @@ def build_drake_parts() -> Dict[str, Part]:
         d.ellipse(_box((0, 4, 21, 26), o), fill=fill)                 # haunch
         d.polygon(_pts([(4, 8), (7, 2), (10, 8)], o), fill=fill)      # spines
         d.polygon(_pts([(50, 8), (53, 3), (56, 9)], o), fill=fill)
+        # shoulder ridge: fills the back line between saddle and neck
+        d.polygon(_pts([(42, 10), (47, 5), (52, 10)], o), fill=fill)
 
     def body_detail(d):
         for i, col in enumerate(pal["belly"]):
             d.ellipse((6 - i, 22 - i, 58, 32), fill=col + (255,))
         for x in range(10, 56, 7):
             d.line([(x, 28), (x + 5, 27)], fill=pal["belly"][0] + (255,), width=1)
-        d.ellipse((3, 8, 17, 20), fill=pal["scale"][2] + (255,))      # haunch core
-        d.ellipse((5, 9, 13, 15), fill=pal["scale"][3] + (255,))
+        # haunch muscle: curved highlight arcs, not a flat disk
+        d.arc((3, 8, 18, 22), 150, 320, fill=pal["scale"][3] + (255,), width=2)
+        d.arc((6, 11, 15, 19), 160, 300, fill=pal["scale"][2] + (255,), width=1)
 
     body_img = _shaded((64, 34), body, pal["scale"], outline=out,
                        detail=body_detail)
@@ -753,9 +756,12 @@ def build_drake_parts() -> Dict[str, Part]:
     d.point((1, 0), fill=pal["leather_hi"] + (255,))
     d.rectangle((21, 0, 23, 6), fill=pal["leather"] + (255,))         # pommel
     d.point((22, 0), fill=pal["leather_hi"] + (255,))
-    d.rectangle((1, 7, 22, 8), fill=pal["blanket"] + (255,))          # blanket
+    d.rectangle((1, 7, 22, 10), fill=pal["blanket"] + (255,))         # blanket drape
     d.line([(1, 7), (22, 7)], fill=pal["blanket_hi"] + (255,), width=1)
-    d.rectangle((11, 9, 12, 29), fill=pal["leather"] + (255,))        # girth strap
+    d.point((2, 11), fill=pal["blanket"] + (255,))                    # drape tips
+    d.point((11, 11), fill=pal["blanket"] + (255,))
+    d.point((21, 11), fill=pal["blanket"] + (255,))
+    d.rectangle((11, 11, 12, 29), fill=pal["leather"] + (255,))       # girth strap
     d.point((11, 28), fill=pal["buckle"] + (255,))                    # buckle glint
     saddle = _outline_ext(saddle, out)
     parts["saddle"] = (saddle, (12.0, 2.0), 0.0)
@@ -776,30 +782,34 @@ def build_drake_parts() -> Dict[str, Part]:
     _px(neck_img, 12, 14, pal["ember"])                               # throat ember
     parts["neck"] = (neck_img, (8.0, 22.0), 0.0)
 
-    # -- head: long horned skull, heavy brow, closed jaw with fangs ------------
+    # -- head: horned skull (horns IN the silhouette), heavy brow, fanged muzzle
+    horn1 = [(10, 10), (1, 2), (4, 0), (14, 8)]
+    horn2 = [(14, 9), (8, 4), (10, 2), (17, 8)]
+
     def head(d, fill, o):
-        d.polygon(_pts([(4, 4), (16, 3), (18, 7), (33, 10), (33, 14),
-                        (18, 16), (5, 15)], o), fill=fill)
-        d.polygon(_pts([(6, 5), (10, 2), (13, 6)], o), fill=fill)     # brow
+        d.polygon(_pts(horn1, o), fill=fill)                          # swept horns
+        d.polygon(_pts(horn2, o), fill=fill)
+        d.ellipse(_box((3, 8, 19, 20), o), fill=fill)                 # cranium
+        d.polygon(_pts([(15, 10), (31, 12), (31, 16), (15, 19)], o), fill=fill)
+        d.polygon(_pts([(6, 9), (11, 6), (14, 11)], o), fill=fill)    # brow
 
     def head_detail(d):
-        # swept-back horns
-        d.polygon([(8, 5), (1, -1), (4, -2), (12, 3)], fill=pal["horn"][1] + (255,))
-        d.polygon([(12, 4), (7, 0), (9, -1), (15, 3)], fill=pal["horn"][2] + (255,))
-        d.line([(9, 3), (16, 4)], fill=pal["rim"] + (255,), width=1)  # brow ridge
-        d.line([(17, 14), (32, 12)], fill=pal["scale"][0] + (255,), width=1)  # mouth
-        d.point((24, 13), fill=pal["horn"][2] + (255,))               # fangs
-        d.point((29, 12), fill=pal["horn"][2] + (255,))
-        d.point((31, 11), fill=(20, 8, 3, 255))                       # nostril
+        d.polygon(horn1, fill=pal["horn"][1] + (255,))                # horn tones
+        d.polygon(horn2, fill=pal["horn"][2] + (255,))
+        d.line([(16, 18), (30, 15)], fill=pal["scale"][0] + (255,), width=1)  # mouth
+        d.point((23, 16), fill=pal["horn"][2] + (255,))               # fangs
+        d.point((27, 15), fill=pal["horn"][2] + (255,))
+        d.point((29, 13), fill=(20, 8, 3, 255))                       # nostril
 
-    head_img = _shaded((34, 20), head, pal["scale"], outline=out,
+    head_img = _shaded((32, 22), head, pal["scale"], outline=out,
                        detail=head_detail)
-    _px(head_img, 12, 7, (26, 10, 4))                                 # eye socket
-    _px(head_img, 13, 7, pal["eye"])
-    _px(head_img, 14, 7, pal["eye"])
-    _px(head_img, 13, 6, (232, 150, 70))                              # brow bleed
-    _px(head_img, 27, 13, pal["ember"])                               # jaw smolder
-    parts["head"] = (head_img, (6.0, 11.0), 0.0)
+    _rim(head_img, pal["rim"], x_range=(12, 29), y_max=13)
+    _px(head_img, 11, 12, (26, 10, 4))                                # eye socket
+    _px(head_img, 12, 12, pal["eye"])
+    _px(head_img, 13, 12, pal["eye"])
+    _px(head_img, 12, 11, (232, 150, 70))                             # brow bleed
+    _px(head_img, 25, 16, pal["ember"])                               # jaw smolder
+    parts["head"] = (head_img, (7.0, 14.0), 0.0)
 
     # -- tail: two segments, spade tip ------------------------------------------
     def tail1(d, fill, o):

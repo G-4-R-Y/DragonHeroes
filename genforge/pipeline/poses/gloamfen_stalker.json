@@ -65,8 +65,8 @@
           "leg_bf": {"rotation_deg": 24}
         },
         {
-          "body": {"offset": [6, -4], "rotation_deg": -8},
-          "head": {"offset": [2, 0], "rotation_deg": -5},
+          "body": {"offset": [3, -4], "rotation_deg": -8},
+          "head": {"offset": [0, 0], "rotation_deg": -5},
           "jaw": {"rotation_deg": 24},
           "tail": {"rotation_deg": 12},
           "leg_fn": {"rotation_deg": 36},

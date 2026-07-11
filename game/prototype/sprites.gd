@@ -83,6 +83,16 @@ static func _edge_shade(img: Image, amount: float) -> void:
 			if below or left:
 				img.set_pixel(x, y, c.darkened(amount))
 
+# GenForge bundle hook: the five key actors render from the baked hi-fi
+# bundles (game/prototype/art/<actor>/, loaded by ProtoBundleArt) whenever
+# they exist on disk; the procedural pixels below stay as the graceful
+# fallback so a bare checkout still runs. Missing animations are aliased.
+static func _bundle_frames(actor: String, required: Array) -> SpriteFrames:
+	var sf := ProtoBundleArt.frames_for(actor)
+	if sf != null:
+		ProtoBundleArt.ensure_animations(sf, required)
+	return sf
+
 static func _anim(sf: SpriteFrames, anim_name: String, fps: float, loops: bool, frames: Array) -> void:
 	sf.add_animation(anim_name)
 	sf.set_animation_speed(anim_name, fps)
@@ -167,6 +177,10 @@ static func make_tile_atlas() -> ImageTexture:
 static func hero_frames() -> SpriteFrames:
 	if _frames_cache.has("hero"):
 		return _frames_cache["hero"]
+	var bundled := _bundle_frames("hero", ["idle", "walk", "attack"])
+	if bundled != null:
+		_frames_cache["hero"] = bundled
+		return bundled
 	var sf := SpriteFrames.new()
 	_anim(sf, "idle", 2.2, true, [_hero_tex("idle", 0), _hero_tex("idle", 1)])
 	var walk: Array = []
@@ -270,6 +284,10 @@ static func _hero_tex(pose: String, f: int) -> ImageTexture:
 static func stalker_frames() -> SpriteFrames:
 	if _frames_cache.has("stalker"):
 		return _frames_cache["stalker"]
+	var bundled := _bundle_frames("gloamfen_stalker", ["idle", "walk", "lunge"])
+	if bundled != null:
+		_frames_cache["stalker"] = bundled
+		return bundled
 	var sf := SpriteFrames.new()
 	_anim(sf, "idle", 2.5, true, [_stalker_tex("idle", 0), _stalker_tex("idle", 1)])
 	var walk: Array = []
@@ -355,6 +373,10 @@ static func _stalker_tex(pose: String, f: int) -> ImageTexture:
 static func wisp_frames() -> SpriteFrames:
 	if _frames_cache.has("wisp"):
 		return _frames_cache["wisp"]
+	var bundled := _bundle_frames("gloamfen_wisp", ["idle", "walk", "lunge"])
+	if bundled != null:
+		_frames_cache["wisp"] = bundled
+		return bundled
 	var a := _wisp_tex(0, false)
 	var b := _wisp_tex(1, false)
 	var fa := _wisp_tex(0, true)
@@ -403,6 +425,11 @@ static func _wisp_tex(f: int, flare: bool) -> ImageTexture:
 static func boss_frames() -> SpriteFrames:
 	if _frames_cache.has("boss"):
 		return _frames_cache["boss"]
+	var bundled := _bundle_frames("emberwing_matriarch",
+			["idle", "fly", "walk", "attack", "lunge"])
+	if bundled != null:
+		_frames_cache["boss"] = bundled
+		return bundled
 	var up := _boss_tex("fly", 0)
 	var mid := _boss_tex("fly", 1)
 	var down := _boss_tex("fly", 2)
@@ -521,6 +548,10 @@ static func _boss_tex(anim_name: String, f: int) -> ImageTexture:
 static func drake_frames() -> SpriteFrames:
 	if _frames_cache.has("drake"):
 		return _frames_cache["drake"]
+	var bundled := _bundle_frames("ember_drake", ["fly", "walk", "idle"])
+	if bundled != null:
+		_frames_cache["drake"] = bundled
+		return bundled
 	var fly: Array = []
 	for f in 4:
 		fly.append(_drake_tex("fly", f))

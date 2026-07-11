@@ -15,10 +15,10 @@
 
     {"name": "body", "parent": "root", "attach": [-4, -40], "rotation_deg": 0, "z": 30, "part": "body"},
 
-    {"name": "neck", "parent": "body", "attach": [22, -9], "rotation_deg": 24, "z": 34, "part": "neck"},
+    {"name": "neck", "parent": "body", "attach": [22, -7], "rotation_deg": 24, "z": 34, "part": "neck"},
     {"name": "head", "parent": "neck", "attach": [0, -19], "rotation_deg": -24, "z": 38, "part": "head"},
 
-    {"name": "saddle", "parent": "body", "attach": [0, -16], "rotation_deg": 0, "z": 40, "part": "saddle"},
+    {"name": "saddle", "parent": "body", "attach": [0, -14], "rotation_deg": 0, "z": 40, "part": "saddle"},
 
     {"name": "leg_back", "parent": "body", "attach": [-14, 12], "rotation_deg": 0, "z": 44, "part": "leg_back"},
     {"name": "leg_front", "parent": "body", "attach": [14, 12], "rotation_deg": 0, "z": 46, "part": "leg_front"},
