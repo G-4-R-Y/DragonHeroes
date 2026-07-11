@@ -1,0 +1,41 @@
+{
+  "entity": "gloamfen_stalker",
+  "archetype": "quadruped",
+  "skeleton": "gloamfen_stalker",
+  "frame_size": [
+    56,
+    36
+  ],
+  "anchor": [
+    28,
+    31
+  ],
+  "combined_sheet": "sheet.png",
+  "animations": {
+    "idle": {
+      "frames": 2,
+      "fps": 2.5,
+      "loop": true,
+      "strip": "strips/idle.png",
+      "row": 0
+    },
+    "walk": {
+      "frames": 4,
+      "fps": 9.0,
+      "loop": true,
+      "strip": "strips/walk.png",
+      "row": 1
+    },
+    "lunge": {
+      "frames": 3,
+      "fps": 8.0,
+      "loop": false,
+      "strip": "strips/lunge.png",
+      "row": 2
+    }
+  },
+  "logical_size": [
+    28,
+    18
+  ]
+}

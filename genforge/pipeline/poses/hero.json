@@ -1,0 +1,92 @@
+{
+  "skeleton": "hero",
+  "animations": {
+    "idle": {
+      "fps": 2.2,
+      "loop": true,
+      "frames": [
+        {},
+        {
+          "torso": {"offset": [0, 1]},
+          "head": {"rotation_deg": -2},
+          "arm_l": {"rotation_deg": -3},
+          "arm_r": {"rotation_deg": 3},
+          "cape": {"rotation_deg": 3}
+        }
+      ]
+    },
+    "walk": {
+      "fps": 8,
+      "loop": true,
+      "frames": [
+        {
+          "leg_l": {"rotation_deg": -24},
+          "leg_r": {"rotation_deg": 22},
+          "arm_l": {"rotation_deg": 16},
+          "arm_r": {"rotation_deg": -14},
+          "torso": {"offset": [0, -1], "rotation_deg": 2},
+          "head": {"rotation_deg": -1},
+          "cape": {"rotation_deg": -10}
+        },
+        {
+          "leg_l": {"rotation_deg": -6},
+          "leg_r": {"rotation_deg": 6},
+          "arm_l": {"rotation_deg": 5},
+          "arm_r": {"rotation_deg": -5},
+          "cape": {"rotation_deg": -4}
+        },
+        {
+          "leg_l": {"rotation_deg": 22},
+          "leg_r": {"rotation_deg": -24},
+          "arm_l": {"rotation_deg": -14},
+          "arm_r": {"rotation_deg": 16},
+          "torso": {"offset": [0, -1], "rotation_deg": -2},
+          "head": {"rotation_deg": 1},
+          "cape": {"rotation_deg": -10}
+        },
+        {
+          "leg_l": {"rotation_deg": 6},
+          "leg_r": {"rotation_deg": -6},
+          "arm_l": {"rotation_deg": -5},
+          "arm_r": {"rotation_deg": 5},
+          "cape": {"rotation_deg": -4}
+        }
+      ]
+    },
+    "attack": {
+      "fps": 12,
+      "loop": false,
+      "frames": [
+        {
+          "arm_r": {"rotation_deg": -120},
+          "weapon": {"rotation_deg": 0},
+          "arm_l": {"rotation_deg": -10},
+          "torso": {"rotation_deg": -6, "offset": [-2, 0]},
+          "head": {"rotation_deg": -4},
+          "cape": {"rotation_deg": 8},
+          "leg_l": {"rotation_deg": -6},
+          "leg_r": {"rotation_deg": 6}
+        },
+        {
+          "arm_r": {"rotation_deg": -58},
+          "weapon": {"rotation_deg": 20},
+          "arm_l": {"rotation_deg": -14},
+          "torso": {"rotation_deg": 8, "offset": [3, 0]},
+          "head": {"rotation_deg": 3},
+          "cape": {"rotation_deg": -16},
+          "leg_l": {"rotation_deg": -10},
+          "leg_r": {"rotation_deg": 10}
+        },
+        {
+          "arm_r": {"rotation_deg": -30},
+          "weapon": {"rotation_deg": 32},
+          "arm_l": {"rotation_deg": -6},
+          "torso": {"rotation_deg": 5, "offset": [2, 0]},
+          "cape": {"rotation_deg": -8},
+          "leg_l": {"rotation_deg": -6},
+          "leg_r": {"rotation_deg": 6}
+        }
+      ]
+    }
+  }
+}

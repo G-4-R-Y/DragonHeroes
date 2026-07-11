@@ -422,3 +422,13 @@ Still open:
    layout (rows never shift under the cursor mid-spree). The Haven gains a
    120-slot CHEST (bag <-> chest, free moves). Materials STACK (qty on one
    slot, stack-aware consume/sell). Design/14 updated accordingly.
+18. **Three boss hunts per map (2026-07-11):** the difficulty ladder is live —
+   Fenwitch Hag (Elite mid-boss, pack 8: Hex Bolt volley, Blink, Wispling Call,
+   Creeping Mire slow fields, Shrieking Curse enrage), the Pyre Sovereign +
+   Terravore Colossus LEGENDARY DUO (pack 11: meteors, cinder breath,
+   earthshatter, stone spikes; survivor enrages) with the first playable
+   **Duologue** — while both live, fire fields over earth fields fuse into LAVA
+   (14 dps, 10 s, strongest glow) per registries/fields.json — and the Emberwing
+   Matriarch (pack 13). The field system is generalized to kinds
+   (fire/earth/mire/lava) with per-kind visuals and slow. Vulkan HDR glow is
+   opt-in via tools/run_vulkan.sh only (gl_compatibility stays the default).

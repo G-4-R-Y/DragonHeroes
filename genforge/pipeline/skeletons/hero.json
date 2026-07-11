@@ -1,0 +1,23 @@
+{
+  "name": "hero",
+  "canvas": [52, 52],
+  "anchor": [26, 49],
+  "bones": [
+    {"name": "root", "parent": null, "attach": [0, 0], "rotation_deg": 0, "z": 0, "part": null},
+
+    {"name": "cape", "parent": "torso", "attach": [-3, -7], "rotation_deg": 3, "z": 4, "part": "cape"},
+
+    {"name": "arm_l", "parent": "torso", "attach": [-7, -6], "rotation_deg": -6, "z": 6, "part": "arm_far"},
+
+    {"name": "leg_l", "parent": "root", "attach": [-5, -13], "rotation_deg": 0, "z": 10, "part": "leg"},
+    {"name": "leg_r", "parent": "root", "attach": [5, -13], "rotation_deg": 0, "z": 12, "part": "leg"},
+
+    {"name": "torso", "parent": "root", "attach": [0, -22], "rotation_deg": 0, "z": 30, "part": "torso"},
+
+    {"name": "arm_r", "parent": "torso", "attach": [7, -5], "rotation_deg": 8, "z": 40, "part": "arm"},
+
+    {"name": "head", "parent": "torso", "attach": [1, -9], "rotation_deg": 0, "z": 45, "part": "head"},
+
+    {"name": "weapon", "parent": "arm_r", "attach": [0, 9], "rotation_deg": -45, "z": 50, "part": "sword"}
+  ]
+}

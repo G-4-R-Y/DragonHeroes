@@ -1,0 +1,55 @@
+{
+  "entity": "emberwing_matriarch",
+  "archetype": "dragon",
+  "skeleton": "emberwing_matriarch",
+  "frame_size": [
+    96,
+    80
+  ],
+  "anchor": [
+    46,
+    70
+  ],
+  "combined_sheet": "sheet.png",
+  "animations": {
+    "idle": {
+      "frames": 4,
+      "fps": 6.0,
+      "loop": true,
+      "strip": "strips/idle.png",
+      "row": 0
+    },
+    "fly": {
+      "frames": 4,
+      "fps": 7.0,
+      "loop": true,
+      "strip": "strips/fly.png",
+      "row": 1
+    },
+    "walk": {
+      "frames": 4,
+      "fps": 7.0,
+      "loop": true,
+      "strip": "strips/walk.png",
+      "row": 2
+    },
+    "attack": {
+      "frames": 3,
+      "fps": 8.0,
+      "loop": false,
+      "strip": "strips/attack.png",
+      "row": 3
+    },
+    "lunge": {
+      "frames": 3,
+      "fps": 8.0,
+      "loop": false,
+      "strip": "strips/lunge.png",
+      "row": 4
+    }
+  },
+  "logical_size": [
+    48,
+    40
+  ]
+}

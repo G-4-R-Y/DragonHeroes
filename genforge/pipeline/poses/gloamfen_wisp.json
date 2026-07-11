@@ -1,0 +1,68 @@
+{
+  "skeleton": "gloamfen_wisp",
+  "animations": {
+    "idle": {
+      "fps": 3,
+      "loop": true,
+      "frames": [
+        {
+          "core": {"part": "core_0"},
+          "mote_1": {"offset": [0, 0]},
+          "mote_2": {"offset": [0, 0]}
+        },
+        {
+          "core": {"part": "core_1", "offset": [0, -2]},
+          "mote_1": {"offset": [-1, 2]},
+          "mote_2": {"offset": [1, 1]}
+        },
+        {
+          "core": {"part": "core_2", "offset": [0, -1]},
+          "mote_1": {"offset": [1, 1]},
+          "mote_2": {"offset": [-1, 2]}
+        }
+      ]
+    },
+    "walk": {
+      "fps": 4,
+      "loop": true,
+      "frames": [
+        {
+          "core": {"part": "core_1", "rotation_deg": -6},
+          "mote_1": {"offset": [-2, 1]},
+          "mote_2": {"offset": [-3, 0]}
+        },
+        {
+          "core": {"part": "core_2", "rotation_deg": -6, "offset": [1, -2]},
+          "mote_1": {"offset": [-4, 2]},
+          "mote_2": {"offset": [-5, 1]}
+        },
+        {
+          "core": {"part": "core_1", "rotation_deg": -6, "offset": [0, -1]},
+          "mote_1": {"offset": [-3, 3]},
+          "mote_2": {"offset": [-2, 2]}
+        }
+      ]
+    },
+    "lunge": {
+      "fps": 10,
+      "loop": false,
+      "frames": [
+        {
+          "core": {"part": "flare_0"},
+          "mote_1": {"offset": [-1, 1]},
+          "mote_2": {"offset": [-2, 1]}
+        },
+        {
+          "core": {"part": "flare_1", "offset": [1, -1]},
+          "mote_1": {"offset": [-3, 2]},
+          "mote_2": {"offset": [-4, 2]}
+        },
+        {
+          "core": {"part": "flare_2", "offset": [2, -1]},
+          "mote_1": {"offset": [-5, 3]},
+          "mote_2": {"offset": [-6, 3]}
+        }
+      ]
+    }
+  }
+}

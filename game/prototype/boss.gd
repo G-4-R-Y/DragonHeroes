@@ -10,6 +10,9 @@ extends ProtoCreature
 const EmberProjectile := preload("res://prototype/projectile.gd")
 const Telegraph := preload("res://prototype/telegraph.gd")
 
+var display_name := "EMBERWING MATRIARCH — Elite"   # boss bar (main._update_boss_bar)
+var bar_color := Color("ff7a33")
+
 var _skill_cd := {"bolt": 0.0, "dive": 0.0, "gust": 0.0, "screech": 0.0, "breath": 0.0}
 var _enraged := false
 var _cd_scale := 1.0

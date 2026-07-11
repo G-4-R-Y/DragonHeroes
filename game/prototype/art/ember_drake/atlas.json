@@ -1,0 +1,41 @@
+{
+  "entity": "ember_drake",
+  "archetype": "dragon",
+  "skeleton": "ember_drake",
+  "frame_size": [
+    112,
+    88
+  ],
+  "anchor": [
+    56,
+    84
+  ],
+  "combined_sheet": "sheet.png",
+  "animations": {
+    "fly": {
+      "frames": 4,
+      "fps": 7.0,
+      "loop": true,
+      "strip": "strips/fly.png",
+      "row": 0
+    },
+    "idle": {
+      "frames": 3,
+      "fps": 3.0,
+      "loop": true,
+      "strip": "strips/idle.png",
+      "row": 1
+    },
+    "walk": {
+      "frames": 4,
+      "fps": 7.0,
+      "loop": true,
+      "strip": "strips/walk.png",
+      "row": 2
+    }
+  },
+  "logical_size": [
+    56,
+    44
+  ]
+}

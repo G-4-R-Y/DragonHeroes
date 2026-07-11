@@ -1,0 +1,248 @@
+{
+  "skeleton": "emberwing_matriarch",
+  "animations": {
+    "idle": {
+      "fps": 6,
+      "loop": true,
+      "frames": [
+        {
+          "wing_near": {"part": "wing_near_mid", "rotation_deg": -6},
+          "wing_far": {"part": "wing_far_mid", "rotation_deg": -6},
+          "leg_front": {"rotation_deg": 16},
+          "leg_back": {"rotation_deg": 20},
+          "leg_ffar": {"rotation_deg": 14},
+          "leg_bfar": {"rotation_deg": 18},
+          "tail_1": {"rotation_deg": 3},
+          "tail_2": {"rotation_deg": 3}
+        },
+        {
+          "wing_near": {"part": "wing_near_up", "rotation_deg": -4},
+          "wing_far": {"part": "wing_far_up", "rotation_deg": -6},
+          "body": {"offset": [0, 2]},
+          "leg_front": {"rotation_deg": 18},
+          "leg_back": {"rotation_deg": 22},
+          "leg_ffar": {"rotation_deg": 16},
+          "leg_bfar": {"rotation_deg": 20},
+          "tail_1": {"rotation_deg": 6},
+          "tail_2": {"rotation_deg": 5},
+          "neck": {"rotation_deg": -2}
+        },
+        {
+          "wing_near": {"part": "wing_near_mid", "rotation_deg": 4},
+          "wing_far": {"part": "wing_far_mid", "rotation_deg": 2},
+          "leg_front": {"rotation_deg": 16},
+          "leg_back": {"rotation_deg": 20},
+          "leg_ffar": {"rotation_deg": 14},
+          "leg_bfar": {"rotation_deg": 18},
+          "tail_1": {"rotation_deg": 0},
+          "tail_2": {"rotation_deg": -2}
+        },
+        {
+          "wing_near": {"part": "wing_near_down", "rotation_deg": 0},
+          "wing_far": {"part": "wing_far_down", "rotation_deg": 2},
+          "body": {"offset": [0, -2]},
+          "leg_front": {"rotation_deg": 14},
+          "leg_back": {"rotation_deg": 18},
+          "leg_ffar": {"rotation_deg": 12},
+          "leg_bfar": {"rotation_deg": 16},
+          "tail_1": {"rotation_deg": -4},
+          "tail_2": {"rotation_deg": -4},
+          "neck": {"rotation_deg": 2}
+        }
+      ]
+    },
+    "fly": {
+      "fps": 7,
+      "loop": true,
+      "frames": [
+        {
+          "wing_near": {"part": "wing_near_up", "rotation_deg": -8},
+          "wing_far": {"part": "wing_far_up", "rotation_deg": -10},
+          "body": {"offset": [0, 3]},
+          "leg_front": {"rotation_deg": 22},
+          "leg_back": {"rotation_deg": 26},
+          "leg_ffar": {"rotation_deg": 20},
+          "leg_bfar": {"rotation_deg": 24},
+          "tail_1": {"rotation_deg": 8},
+          "tail_2": {"rotation_deg": 7},
+          "neck": {"rotation_deg": -3}
+        },
+        {
+          "wing_near": {"part": "wing_near_mid", "rotation_deg": -2},
+          "wing_far": {"part": "wing_far_mid", "rotation_deg": -4},
+          "leg_front": {"rotation_deg": 18},
+          "leg_back": {"rotation_deg": 22},
+          "leg_ffar": {"rotation_deg": 16},
+          "leg_bfar": {"rotation_deg": 20},
+          "tail_1": {"rotation_deg": 2},
+          "tail_2": {"rotation_deg": 2}
+        },
+        {
+          "wing_near": {"part": "wing_near_down", "rotation_deg": 2},
+          "wing_far": {"part": "wing_far_down", "rotation_deg": 4},
+          "body": {"offset": [0, -3]},
+          "leg_front": {"rotation_deg": 14},
+          "leg_back": {"rotation_deg": 18},
+          "leg_ffar": {"rotation_deg": 12},
+          "leg_bfar": {"rotation_deg": 16},
+          "tail_1": {"rotation_deg": -6},
+          "tail_2": {"rotation_deg": -6},
+          "neck": {"rotation_deg": 3}
+        },
+        {
+          "wing_near": {"part": "wing_near_mid", "rotation_deg": -6},
+          "wing_far": {"part": "wing_far_mid", "rotation_deg": -8},
+          "body": {"offset": [0, -1]},
+          "leg_front": {"rotation_deg": 16},
+          "leg_back": {"rotation_deg": 20},
+          "leg_ffar": {"rotation_deg": 14},
+          "leg_bfar": {"rotation_deg": 18},
+          "tail_1": {"rotation_deg": -2},
+          "tail_2": {"rotation_deg": 0}
+        }
+      ]
+    },
+    "walk": {
+      "fps": 7,
+      "loop": true,
+      "frames": [
+        {
+          "wing_near": {"part": "wing_near_mid", "rotation_deg": -16, "offset": [4, 2]},
+          "wing_far": {"part": "wing_far_mid", "rotation_deg": -18, "offset": [2, 2]},
+          "leg_front": {"rotation_deg": -18},
+          "leg_back": {"rotation_deg": 16},
+          "leg_ffar": {"rotation_deg": 16},
+          "leg_bfar": {"rotation_deg": -14},
+          "body": {"offset": [0, -1], "rotation_deg": 1},
+          "tail_1": {"rotation_deg": 4},
+          "tail_2": {"rotation_deg": 4},
+          "neck": {"rotation_deg": -2}
+        },
+        {
+          "wing_near": {"part": "wing_near_mid", "rotation_deg": -16, "offset": [4, 2]},
+          "wing_far": {"part": "wing_far_mid", "rotation_deg": -18, "offset": [2, 2]},
+          "leg_front": {"rotation_deg": -5},
+          "leg_back": {"rotation_deg": 5},
+          "leg_ffar": {"rotation_deg": 5},
+          "leg_bfar": {"rotation_deg": -5},
+          "tail_1": {"rotation_deg": 1},
+          "tail_2": {"rotation_deg": 2}
+        },
+        {
+          "wing_near": {"part": "wing_near_mid", "rotation_deg": -16, "offset": [4, 2]},
+          "wing_far": {"part": "wing_far_mid", "rotation_deg": -18, "offset": [2, 2]},
+          "leg_front": {"rotation_deg": 16},
+          "leg_back": {"rotation_deg": -18},
+          "leg_ffar": {"rotation_deg": -14},
+          "leg_bfar": {"rotation_deg": 16},
+          "body": {"offset": [0, -1], "rotation_deg": -1},
+          "tail_1": {"rotation_deg": -2},
+          "tail_2": {"rotation_deg": -3},
+          "neck": {"rotation_deg": 2}
+        },
+        {
+          "wing_near": {"part": "wing_near_mid", "rotation_deg": -16, "offset": [4, 2]},
+          "wing_far": {"part": "wing_far_mid", "rotation_deg": -18, "offset": [2, 2]},
+          "leg_front": {"rotation_deg": 5},
+          "leg_back": {"rotation_deg": -5},
+          "leg_ffar": {"rotation_deg": -5},
+          "leg_bfar": {"rotation_deg": 5},
+          "tail_1": {"rotation_deg": 1},
+          "tail_2": {"rotation_deg": 0}
+        }
+      ]
+    },
+    "attack": {
+      "fps": 8,
+      "loop": false,
+      "frames": [
+        {
+          "neck": {"rotation_deg": -14},
+          "head": {"rotation_deg": -8},
+          "jaw": {"rotation_deg": 3},
+          "body": {"offset": [-2, 1], "rotation_deg": -3},
+          "wing_near": {"part": "wing_near_up", "rotation_deg": -6},
+          "wing_far": {"part": "wing_far_up", "rotation_deg": -8},
+          "leg_front": {"rotation_deg": 18},
+          "leg_back": {"rotation_deg": 22},
+          "leg_ffar": {"rotation_deg": 16},
+          "leg_bfar": {"rotation_deg": 20},
+          "tail_1": {"rotation_deg": 6}
+        },
+        {
+          "neck": {"rotation_deg": 8},
+          "head": {"rotation_deg": 6},
+          "jaw": {"rotation_deg": 26},
+          "body": {"offset": [1, 0]},
+          "wing_near": {"part": "wing_near_down", "rotation_deg": 0},
+          "wing_far": {"part": "wing_far_down", "rotation_deg": 2},
+          "leg_front": {"rotation_deg": 16},
+          "leg_back": {"rotation_deg": 20},
+          "leg_ffar": {"rotation_deg": 14},
+          "leg_bfar": {"rotation_deg": 18},
+          "tail_1": {"rotation_deg": -4},
+          "vfx_breath": {"hidden": false, "part": "vfx_breath_0"}
+        },
+        {
+          "neck": {"rotation_deg": 10},
+          "head": {"rotation_deg": 8},
+          "jaw": {"rotation_deg": 30},
+          "body": {"offset": [2, 0]},
+          "wing_near": {"part": "wing_near_down", "rotation_deg": 4},
+          "wing_far": {"part": "wing_far_down", "rotation_deg": 6},
+          "leg_front": {"rotation_deg": 14},
+          "leg_back": {"rotation_deg": 18},
+          "leg_ffar": {"rotation_deg": 12},
+          "leg_bfar": {"rotation_deg": 16},
+          "tail_1": {"rotation_deg": -6},
+          "vfx_breath": {"hidden": false, "part": "vfx_breath_2"}
+        }
+      ]
+    },
+    "lunge": {
+      "fps": 8,
+      "loop": false,
+      "frames": [
+        {
+          "body": {"rotation_deg": -10, "offset": [-3, -2]},
+          "neck": {"rotation_deg": -8},
+          "head": {"rotation_deg": -4},
+          "wing_near": {"part": "wing_near_up", "rotation_deg": -10},
+          "wing_far": {"part": "wing_far_up", "rotation_deg": -12},
+          "leg_front": {"rotation_deg": -16},
+          "leg_back": {"rotation_deg": 24},
+          "leg_ffar": {"rotation_deg": -12},
+          "leg_bfar": {"rotation_deg": 20},
+          "tail_1": {"rotation_deg": 8},
+          "tail_2": {"rotation_deg": 6}
+        },
+        {
+          "body": {"rotation_deg": 12, "offset": [6, 3]},
+          "neck": {"rotation_deg": 6},
+          "head": {"rotation_deg": 4},
+          "jaw": {"rotation_deg": 14},
+          "wing_near": {"part": "wing_near_up", "rotation_deg": 6},
+          "wing_far": {"part": "wing_far_up", "rotation_deg": 8},
+          "leg_front": {"rotation_deg": 34},
+          "leg_back": {"rotation_deg": -20},
+          "leg_ffar": {"rotation_deg": 30},
+          "leg_bfar": {"rotation_deg": -16},
+          "tail_1": {"rotation_deg": -8},
+          "tail_2": {"rotation_deg": -6}
+        },
+        {
+          "body": {"rotation_deg": 6, "offset": [3, 1]},
+          "neck": {"rotation_deg": 2},
+          "jaw": {"rotation_deg": 6},
+          "wing_near": {"part": "wing_near_mid", "rotation_deg": 0},
+          "wing_far": {"part": "wing_far_mid", "rotation_deg": 2},
+          "leg_front": {"rotation_deg": 18},
+          "leg_back": {"rotation_deg": -8},
+          "leg_ffar": {"rotation_deg": 14},
+          "leg_bfar": {"rotation_deg": -4},
+          "tail_1": {"rotation_deg": -3}
+        }
+      ]
+    }
+  }
+}

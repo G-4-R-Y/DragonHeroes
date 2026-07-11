@@ -1,0 +1,19 @@
+{
+  "id": "core.skill.wispling_call",
+  "name": "Wispling Call",
+  "kind": "active",
+  "tags": [
+    "summon",
+    "umbral",
+    "boss"
+  ],
+  "behavior": "summon",
+  "damage_type": "umbral",
+  "numbers": {
+    "summon_count": 2,
+    "summon_cap": 2,
+    "summon_lifetime_s": 12,
+    "cooldown_s": 12,
+    "windup_ticks": 18
+  }
+}

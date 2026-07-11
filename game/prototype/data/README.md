@@ -16,3 +16,7 @@ must stay green.
   abyssal kills)
 - `runes.json` — PROTOTYPE-ONLY registry (runes are canon §4 but have no
   content schema yet; all rune numbers are proposals)
+- boss creature snapshots (hag.gd / duo prototype numbers are these at
+  prototype scale): `fenwitch_hag.json` (Elite mid-boss, 5-skill kit),
+  `pyre_sovereign.json` · `terravore_colossus.json` (the Legendary duo whose
+  fire + earth fields fuse into LAVA — the Duologue, canon §4)

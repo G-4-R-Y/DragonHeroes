@@ -1,0 +1,23 @@
+{
+  "id": "core.skill.stone_spikes",
+  "name": "Stone Spikes",
+  "kind": "active",
+  "tags": [
+    "earth",
+    "line",
+    "boss"
+  ],
+  "behavior": "aoe_field",
+  "damage_type": "physical",
+  "numbers": {
+    "damage_coeff": 1.3,
+    "line_length_m": 8,
+    "line_width_m": 2.5,
+    "cooldown_s": 8,
+    "windup_ticks": 20
+  },
+  "telegraph": {
+    "shape": "line",
+    "duration_ticks": 20
+  }
+}

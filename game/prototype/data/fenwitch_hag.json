@@ -1,0 +1,30 @@
+{
+  "id": "core.creature.fenwitch_hag",
+  "name": "Fenwitch Hag",
+  "archetype": "humanoid",
+  "family": "gloamfen",
+  "tier": "elite",
+  "rarity": "rare",
+  "palette": "core.palette.gloamfen",
+  "stats": {
+    "hp": 2600,
+    "damage": 32,
+    "move_speed": 4.2,
+    "radius": 0.8
+  },
+  "skills": [
+    "core.skill.hex_bolt",
+    "core.skill.void_step",
+    "core.skill.wispling_call",
+    "core.skill.creeping_mire",
+    "core.skill.shrieking_curse"
+  ],
+  "ai_profile": "core.ai.boss_emberwing",
+  "loot_table": "core.loot.emberwing_elite",
+  "capturable": false,
+  "tags": [
+    "gloamfen",
+    "boss",
+    "witch"
+  ]
+}

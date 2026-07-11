@@ -1,12 +1,15 @@
 # PROTOTYPE HARNESS — orchestrator for the playable slice.
 # World: real dh-procgen output (chunks.json) under a ~3-minute day/night cycle.
-# Creatures: 6 packs — Gloamfen Stalkers (melee rush) with Gloamfen Wisps (kiting
-# casters) mixed into three of them, plus the Emberwing Matriarch (Elite, 5-skill
-# kit). Kills now roll REAL item drops (items.gd), grant level-ups (20 kills =
-# +1 level, +5 attribute points — proposal), shed Spirit Essences from abyssal
-# prey, and Elites drop runes (canon §4). Pet capture (Soul Snares, F) fills up
-# to 3 pet slots that all hunt together. This whole layer is the placeholder for
-# dh-sim + dh-godot (docs/tech/21-22) — it exists to make the game feel real today.
+# Creatures: 14 packs — Gloamfen Stalkers (melee rush) with Gloamfen Wisps
+# (kiting casters) mixed in, and THREE boss hunts up the difficulty ladder:
+# the Fenwitch Hag (Elite mid-boss, pack 8), the Pyre Sovereign + Terravore
+# Colossus LEGENDARY DUO (pack 11) whose fire + earth fields fuse into LAVA
+# while both live (the Duologue — canon §4 field-combo system, spawn_field),
+# and the Emberwing Matriarch (pack 13). Kills roll REAL item drops (items.gd),
+# grant level-ups, shed Spirit Essences from abyssal prey, and Elites drop
+# runes (canon §4). Pet capture (Soul Snares, F) fills up to 3 pet slots that
+# all hunt together. This whole layer is the placeholder for dh-sim + dh-godot
+# (docs/tech/21-22) — it exists to make the game feel real today.
 extends Node2D
 
 const TILE := 16.0
@@ -15,6 +18,9 @@ const PlayerScene := preload("res://prototype/player.gd")
 const CreatureScene := preload("res://prototype/creature.gd")
 const WispScene := preload("res://prototype/wisp.gd")
 const BossScene := preload("res://prototype/boss.gd")
+const HagScene := preload("res://prototype/hag.gd")
+const PyreScene := preload("res://prototype/pyre_sovereign.gd")
+const ColossusScene := preload("res://prototype/terravore_colossus.gd")
 const PetScene := preload("res://prototype/pet.gd")
 const PickupScene := preload("res://prototype/pickup.gd")
 const MinimapScene := preload("res://prototype/minimap.gd")
@@ -35,6 +41,31 @@ const WISP_ELEMENTS := ["umbral", "umbral", "ember", "frost"]
 const ESSENCE_CHANCE := 0.08     # (proposal) Spirit Essence from abyssal kills
 const RUNE_CHANCE_ELITE := 0.05  # (proposal) rune from Elite+ kills after the first
 
+# Elemental fields (canon §4 tile field-interaction system, prototype stand-in).
+# Per-kind visuals + slow; dps is per-spawn. Lava is the Duologue payoff: while
+# BOTH duo bosses live, fire over earth (either order) fuses into lava —
+# registries/fields.json combo table made playable. All numbers (proposal).
+const FIELD_KINDS := {
+	"fire": {"glow": Color(1.0, 0.45, 0.12), "glow_r": 1.5, "glow_a": 0.4,
+			"pulse": 5.0, "amp": 0.3, "fill": Color(1.0, 0.35, 0.1, 0.22),
+			"edge": Color(1.0, 0.5, 0.15, 0.6), "tele": Color(1.0, 0.55, 0.15, 0.35),
+			"slow": 0.0},
+	"earth": {"glow": Color(0.85, 0.6, 0.28), "glow_r": 1.2, "glow_a": 0.2,
+			"pulse": 3.0, "amp": 0.15, "fill": Color(0.6, 0.44, 0.22, 0.24),
+			"edge": Color(0.82, 0.6, 0.3, 0.6), "tele": Color(0.85, 0.6, 0.3, 0.35),
+			"slow": 0.0},
+	"mire": {"glow": Color(0.4, 0.85, 0.35), "glow_r": 1.3, "glow_a": 0.25,
+			"pulse": 2.5, "amp": 0.2, "fill": Color(0.22, 0.45, 0.18, 0.28),
+			"edge": Color(0.45, 0.8, 0.3, 0.6), "tele": Color(0.5, 0.85, 0.3, 0.35),
+			"slow": 0.5},   # Creeping Mire: re-applied every tick while inside
+	"lava": {"glow": Color(1.0, 0.32, 0.05), "glow_r": 1.8, "glow_a": 0.55,
+			"pulse": 6.0, "amp": 0.35, "fill": Color(1.0, 0.22, 0.04, 0.32),
+			"edge": Color(1.0, 0.65, 0.12, 0.85), "tele": Color(1.0, 0.4, 0.08, 0.4),
+			"slow": 0.0},   # strongest glow of any field — it should read HOT
+}
+const LAVA_DPS := 14.0           # (proposal) hotter than fire (6-7) + earth (5)
+const LAVA_DURATION := 10.0      # (proposal) outlasts both parent fields
+
 var gold := 0
 var kills := 0
 var stones := 0
@@ -42,11 +73,12 @@ var snares := 0
 
 var world: ProtoWorld
 var player: ProtoPlayer
-var boss: ProtoBoss
+var boss: ProtoBoss              # the Matriarch (minimap marker keys off this)
 var camera: Camera2D
 var fx: ProtoFx                  # pooled elemental VFX (fx.gd): bursts/lightning
+var _bosses: Array = []          # every boss node: hag, duo pair, Matriarch
 var _shake := 0.0
-var _fields: Array = []          # {pos, radius, until, dps, tick}
+var _fields: Array = []          # {pos, radius, until, dps, tick, kind, glow}
 var _scorches: Array = []        # {pos, until} — Rune of Cinders decals (visual)
 var _fields_node: Node2D
 var _hud := {}
@@ -100,6 +132,23 @@ func _ready() -> void:
 	fx = ProtoFx.new()   # pooled one-shot emitters — nothing allocates mid-fight
 	add_child(fx)
 
+	# OPT-IN Vulkan/Metal HDR glow (canon §4): under forward_plus/mobile the
+	# additive "emissive" sprites feed a real WorldEnvironment bloom. Nothing
+	# changes on gl_compatibility (project.godot still ships it) — the only way
+	# into this path is tools/run_vulkan.sh.
+	if RenderingServer.get_current_rendering_method() != "gl_compatibility":
+		var env := Environment.new()
+		env.background_mode = Environment.BG_CANVAS
+		env.glow_enabled = true
+		env.glow_hdr_threshold = 1.0   # only the hottest pixels bloom (tasteful)
+		env.glow_intensity = 0.55
+		env.glow_strength = 1.0
+		env.glow_bloom = 0.04
+		env.glow_blend_mode = Environment.GLOW_BLEND_MODE_SOFTLIGHT   # soft, no smear
+		var we := WorldEnvironment.new()
+		we.environment = env
+		add_child(we)
+
 	# day/night: CanvasModulate tints the world canvas only — HUD CanvasLayers escape it
 	_cycle = CanvasModulate.new()
 	_cycle.color = Color(1, 1, 1)
@@ -134,8 +183,10 @@ func _unhandled_input(event: InputEvent) -> void:
 func _spawn_packs() -> void:
 	# HORDES (Ricardo: "only 3 or so and the whole map is empty"): 14 packs of 3-7
 	# spread across the map, half backed by 1-2 kiting wisps, leaders from pack 3
-	# on are affixed elites, the farthest nests the Matriarch. The first pack
-	# guarantees a Bestial Skill stone drop (discovery).
+	# on are affixed elites. Boss ladder by distance: pack 8 nests the Fenwitch
+	# Hag (Elite mid-boss), pack 11 the Legendary DUO (both together — canon §4),
+	# the farthest the Matriarch. The first pack guarantees a Bestial Skill
+	# stone drop (discovery).
 	for i in 14:
 		var anchor := world.random_walkable_in_ring(player.global_position,
 				(10.0 + i * 3.0) * TILE, (16.0 + i * 3.5) * TILE)
@@ -159,11 +210,32 @@ func _spawn_packs() -> void:
 						anchor, 2.0 * TILE, 4.0 * TILE)
 				wisp.pack_anchor = anchor
 				add_child(wisp)
+		if i == 8:
+			var hag: ProtoHag = HagScene.new()
+			hag.global_position = world.random_walkable_in_ring(anchor, 0.0, 2.0 * TILE)
+			hag.pack_anchor = anchor
+			add_child(hag)
+			_bosses.append(hag)
+		if i == 11:   # the Legendary duo nests TOGETHER — they hunt as one
+			var pyre: ProtoPyreSovereign = PyreScene.new()
+			var colossus: ProtoTerravoreColossus = ColossusScene.new()
+			pyre.partner = colossus
+			colossus.partner = pyre
+			pyre.global_position = world.random_walkable_in_ring(anchor, 0.0, 2.0 * TILE)
+			colossus.global_position = world.random_walkable_in_ring(
+					anchor, 2.0 * TILE, 4.0 * TILE)
+			pyre.pack_anchor = anchor
+			colossus.pack_anchor = anchor
+			add_child(pyre)
+			add_child(colossus)
+			_bosses.append(pyre)
+			_bosses.append(colossus)
 		if i == 13:
 			boss = BossScene.new()
 			boss.global_position = world.random_walkable_in_ring(anchor, 0.0, 2.0 * TILE)
 			boss.pack_anchor = anchor
 			add_child(boss)
+			_bosses.append(boss)
 
 func _physics_process(delta: float) -> void:
 	# Camera shake decay
@@ -176,7 +248,8 @@ func _physics_process(delta: float) -> void:
 	var night := 0.5 - 0.5 * cos(TAU * _day_t / DAY_CYCLE_S)
 	_cycle.color = Color(1, 1, 1).lerp(NIGHT_COLOR, night)
 	_update_gauges(delta)
-	# Fire fields: the elemental field system's prototype stand-in (docs/tech/21 §5)
+	# Elemental fields: the tile field-interaction system's prototype stand-in
+	# (docs/tech/21 §5) — per-kind dps ("status" packets) and slow (Creeping Mire).
 	var now := Time.get_ticks_msec() / 1000.0
 	var dirty := false
 	for f in _fields:
@@ -187,7 +260,11 @@ func _physics_process(delta: float) -> void:
 		if f.tick <= 0.0:
 			f.tick = 0.25
 			if not player.dead and player.global_position.distance_to(f.pos) < f.radius:
-				player.take_damage(f.dps * 0.25, Vector2.ZERO, "status")
+				var k: Dictionary = FIELD_KINDS[f.kind]
+				if f.dps > 0.0:
+					player.take_damage(f.dps * 0.25, Vector2.ZERO, "status")
+				if float(k.slow) > 0.0:
+					player.apply_slow(float(k.slow))
 	if dirty:
 		for f in _fields:
 			if now > f.until and is_instance_valid(f.get("glow")):
@@ -196,27 +273,71 @@ func _physics_process(delta: float) -> void:
 	if not _scorches.is_empty() and now > _scorches[0].until:
 		_scorches = _scorches.filter(func(s): return now <= s.until)
 	_fields_node.queue_redraw()
-	_hud.boss_bar_bg.visible = boss != null and is_instance_valid(boss) and not boss.dead \
-			and boss._state != "idle"
-	if _hud.boss_bar_bg.visible:
-		_hud.boss_bar.size.x = 300.0 * clampf(boss.hp / boss.max_hp, 0, 1)
+	_update_boss_bar()
 
+# Kept as the classic entry point (Matriarch's Magma Breath calls this).
 func spawn_fire_field(at: Vector2, radius: float, duration: float, dps: float) -> void:
-	# The field LIGHTS the arena: pulsing additive glow + landing telegraph ring
-	# + ignition flame burst (canon §4 fake-bloom on gl_compatibility).
-	var glow := ProtoGlow.make(Color(1.0, 0.45, 0.12), radius * 1.5, 0.4, 5.0, 0.3)
+	spawn_field(at, radius, duration, dps, "fire")
+
+# One field system, four kinds (fire/earth/mire/lava). The field LIGHTS the
+# arena: per-kind pulsing additive glow (lava strongest) + landing telegraph
+# ring + a per-kind ignition burst (canon §4 fake-bloom on gl_compatibility).
+func spawn_field(at: Vector2, radius: float, duration: float, dps: float,
+		kind := "fire") -> void:
+	# THE DUOLOGUE (canon §4 + registries/fields.json combo table): while BOTH
+	# duo bosses live, a fire field landing on an earth field (either order)
+	# consumes both and fuses into LAVA — hotter, brighter, longer.
+	var counter: String = {"fire": "earth", "earth": "fire"}.get(kind, "")
+	if counter != "" and _duo_combo_active():
+		var t_now := Time.get_ticks_msec() / 1000.0
+		for f in _fields:
+			if f.kind == counter and t_now <= f.until \
+					and f.pos.distance_to(at) < (f.radius + radius) * 0.75:
+				var mid: Vector2 = (f.pos + at) * 0.5
+				f.until = 0.0   # consumed by the fusion
+				if is_instance_valid(f.get("glow")):
+					f.glow.queue_free()
+				fx.explosion(mid, Color(1.0, 0.4, 0.08), true)
+				shake(4.0)
+				damage_number(mid + Vector2(0, -20), 0, Color("ff5a2e"), "LAVA!")
+				spawn_field(mid, maxf(f.radius, radius) * 1.05,
+						LAVA_DURATION, LAVA_DPS, "lava")
+				return
+	var k: Dictionary = FIELD_KINDS[kind]
+	var glow := ProtoGlow.make(k.glow, radius * float(k.glow_r), float(k.glow_a),
+			float(k.pulse), float(k.amp))
 	glow.position = at
 	glow.z_index = 2
 	add_child(glow)
 	var tg := ProtoTelegraph.new()
 	tg.radius = radius
 	tg.duration = 0.45
+	tg.color = k.tele
 	tg.position = at
 	add_child(tg)
-	fx.flame_cone(at, Vector2.UP)
+	match kind:
+		"fire":
+			fx.flame_cone(at, Vector2.UP)
+		"lava":
+			fx.flame_cone(at, Vector2.UP)
+			fx.debris(at, Color(0.35, 0.12, 0.05))
+		"earth":
+			fx.debris(at)
+		"mire":
+			fx.burst(at, {"amount": 10, "lifetime": 0.4, "v_min": 20.0, "v_max": 70.0,
+					"gravity": Vector2(0, -50), "s_min": 0.8, "s_max": 1.6,
+					"color": Color(0.5, 0.9, 0.4, 0.6)})
 	_fields.append({"pos": at, "radius": radius,
 			"until": Time.get_ticks_msec() / 1000.0 + duration, "dps": dps, "tick": 0.0,
-			"glow": glow})
+			"glow": glow, "kind": kind})
+
+# The Duologue is only live while BOTH Legendary duo bosses stand (canon §4).
+func _duo_combo_active() -> bool:
+	var alive := 0
+	for b in _bosses:
+		if is_instance_valid(b) and b is ProtoDuoBoss and not b.dead:
+			alive += 1
+	return alive >= 2
 
 # Rune of Cinders: brief ground scorch decal (visual only, proposal).
 func spawn_scorch(at: Vector2) -> void:
@@ -224,8 +345,9 @@ func spawn_scorch(at: Vector2) -> void:
 
 func _draw_fields() -> void:
 	for f in _fields:
-		_fields_node.draw_circle(f.pos, f.radius, Color(1.0, 0.35, 0.1, 0.22))
-		_fields_node.draw_arc(f.pos, f.radius, 0, TAU, 40, Color(1.0, 0.5, 0.15, 0.6), 2.0)
+		var k: Dictionary = FIELD_KINDS[f.kind]
+		_fields_node.draw_circle(f.pos, f.radius, k.fill)
+		_fields_node.draw_arc(f.pos, f.radius, 0, TAU, 40, k.edge, 2.0)
 	var now := Time.get_ticks_msec() / 1000.0
 	for s in _scorches:
 		var a := clampf((s.until - now) / 0.8, 0.0, 1.0)
@@ -506,6 +628,42 @@ func on_boss_died(b: ProtoBoss) -> void:
 				"MOUNT BONDED — Emberwing Drakeling (press M to FLY)")
 	_hud.hint.text = "Victory — the Emberfang Blade is yours. Forge/enchant/sell at the Haven (Esc)."
 
+# The Fenwitch Hag (Elite mid-boss): elite loot/rune rolls run in
+# on_creature_died; this adds the boss-kill flourish.
+func on_hag_died(h: Node2D) -> void:
+	hit_spark(h.global_position, Color("a06ce0"))
+	fx.explosion(h.global_position, Color(0.62, 0.42, 0.9), true)
+	play_ui("victory", -6.0)
+	shake(6.0)
+	damage_number(h.global_position + Vector2(0, -40), 0, Color("cf9dff"),
+			"THE FENWITCH FALLS!")
+
+# Legendary duo (canon §4): each boss guarantees an epic+ item (proposal: 25%
+# legendary). First death enrages the survivor; second is the real victory.
+func on_duo_boss_died(b: ProtoDuoBoss) -> void:
+	hit_spark(b.global_position, b.bar_color)
+	fx.explosion(b.global_position, b.bar_color, true)
+	fx.debris(b.global_position, Color(0.5, 0.32, 0.2))
+	shake(8.0)
+	var rarity := "legendary" if randf() < 0.25 else "epic"
+	_drop_item(ProtoItems.roll_item(ProtoItems.ALL_BASES.pick_random(), rarity),
+			b.global_position + Vector2(-12, 0))
+	# untyped on purpose: the partner may already be a freed instance, and
+	# assigning a freed object to a typed var is a runtime error
+	var mate: Variant = b.partner
+	if is_instance_valid(mate) and not mate.dead:
+		mate.avenge()   # the Duologue dies with the fallen; fury remains
+		damage_number(b.global_position + Vector2(0, -40), 0, Color("ffd166"),
+				"ONE FALLS — the other AVENGES!")
+		_hud.hint.text = "Half the duo is down — the survivor is enraged. Finish it."
+	else:
+		fx.lightning(b.global_position + Vector2(-22, 0))
+		fx.lightning(b.global_position + Vector2(26, -8))
+		play_ui("victory", -4.0)
+		damage_number(b.global_position + Vector2(0, -40), 0, Color("ffd166"),
+				"THE LEGENDARY DUO FALLS!")
+		_hud.hint.text = "Victory — Legendary spoils twice over. Forge/enchant/sell at the Haven (Esc)."
+
 # Runes (canon §4): guaranteed on the FIRST Elite kill, then 5% per Elite+ kill
 # (proposal). Prefers a rune the player doesn't own yet.
 func _maybe_drop_rune(at: Vector2) -> void:
@@ -656,7 +814,7 @@ func _hint_text() -> String:
 	var t := HINT_TEXT
 	if stones >= 1:
 		t += " · Q shadow rend"
-	return t + " — find the Emberwing Matriarch"
+	return t + " — hunt the Fenwitch Hag, the Legendary duo, the Matriarch"
 
 func _build_hud() -> void:
 	var canvas := CanvasLayer.new()
@@ -741,6 +899,8 @@ func _build_hud() -> void:
 	hint.add_theme_font_size_override("font_size", 10)
 	hint.modulate = Color(1, 1, 1, 0.75)
 	canvas.add_child(hint)
+	# Boss bar(s): the label names the nearest engaged boss; a Legendary duo
+	# stacks two thin bars (one per boss, each in its own color) under one label.
 	var boss_bar_bg := ColorRect.new()
 	boss_bar_bg.color = Color(0, 0, 0, 0.55)
 	boss_bar_bg.position = Vector2(170, 12)
@@ -753,15 +913,67 @@ func _build_hud() -> void:
 	boss_bar.size = Vector2(300, 8)
 	boss_bar_bg.add_child(boss_bar)
 	var boss_name := Label.new()
-	boss_name.text = "EMBERWING MATRIARCH — Elite"
+	boss_name.text = ""
 	boss_name.position = Vector2(2, -13)
 	boss_name.add_theme_font_size_override("font_size", 9)
 	boss_name.add_theme_color_override("font_color", Color("ff9a3c"))
 	boss_bar_bg.add_child(boss_name)
+	var boss_bar_bg2 := ColorRect.new()
+	boss_bar_bg2.color = Color(0, 0, 0, 0.55)
+	boss_bar_bg2.position = Vector2(170, 23)
+	boss_bar_bg2.size = Vector2(304, 9)
+	boss_bar_bg2.visible = false
+	canvas.add_child(boss_bar_bg2)
+	var boss_bar2 := ColorRect.new()
+	boss_bar2.color = Color("c9a05a")
+	boss_bar2.position = Vector2(2, 2)
+	boss_bar2.size = Vector2(300, 5)
+	boss_bar_bg2.add_child(boss_bar2)
 	_hud = {"hp_bar": hp_bar, "stats": stats, "hint": hint, "pips": pips,
 			"q_label": q_label, "q_bar": q_bar, "xp_bar": xp_bar,
 			"e_bar": e_bar, "pet_chips": pet_chips,
-			"boss_bar_bg": boss_bar_bg, "boss_bar": boss_bar}
+			"boss_bar_bg": boss_bar_bg, "boss_bar": boss_bar, "boss_name": boss_name,
+			"boss_bar_bg2": boss_bar_bg2, "boss_bar2": boss_bar2}
+
+# Nearest engaged boss owns the bar; if it is half of a living duo, both bosses
+# render as stacked thin bars under a combined label (task: keep it clean).
+func _update_boss_bar() -> void:
+	_bosses = _bosses.filter(func(b): return is_instance_valid(b))
+	var engaged: Array = []
+	for b in _bosses:
+		if not b.dead and b._state != "idle":
+			engaged.append(b)
+	if engaged.is_empty():
+		_hud.boss_bar_bg.visible = false
+		_hud.boss_bar_bg2.visible = false
+		return
+	engaged.sort_custom(func(a, b):
+		return a.global_position.distance_squared_to(player.global_position) \
+				< b.global_position.distance_squared_to(player.global_position))
+	var focus: Node2D = engaged[0]
+	var rows: Array = [focus]
+	if focus is ProtoDuoBoss:
+		# untyped: a fallen partner is a freed instance (see on_duo_boss_died)
+		var mate: Variant = focus.partner
+		if is_instance_valid(mate) and not mate.dead:
+			rows = [focus, mate]
+			rows.sort_custom(func(a, b): return a.display_name < b.display_name)
+	var duo := rows.size() == 2
+	_hud.boss_bar_bg.visible = true
+	_hud.boss_bar_bg.size.y = 9.0 if duo else 12.0
+	_hud.boss_bar.size.y = 5.0 if duo else 8.0
+	_hud.boss_bar.color = rows[0].bar_color
+	_hud.boss_bar.size.x = 300.0 * clampf(rows[0].hp / rows[0].max_hp, 0, 1)
+	if duo:
+		_hud.boss_name.text = "%s + %s — Legendary Duo" % [
+				str(rows[0].display_name).split(" — ")[0],
+				str(rows[1].display_name).split(" — ")[0]]
+	else:
+		_hud.boss_name.text = focus.display_name
+	_hud.boss_bar_bg2.visible = duo
+	if duo:
+		_hud.boss_bar2.color = rows[1].bar_color
+		_hud.boss_bar2.size.x = 300.0 * clampf(rows[1].hp / rows[1].max_hp, 0, 1)
 
 func refresh_hud() -> void:
 	_hud.hp_bar.size.x = 180.0 * clampf(player.hp / player.max_hp, 0, 1)

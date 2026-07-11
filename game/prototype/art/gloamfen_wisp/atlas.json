@@ -1,0 +1,41 @@
+{
+  "entity": "gloamfen_wisp",
+  "archetype": "spirit",
+  "skeleton": "gloamfen_wisp",
+  "frame_size": [
+    28,
+    36
+  ],
+  "anchor": [
+    14,
+    33
+  ],
+  "combined_sheet": "sheet.png",
+  "animations": {
+    "idle": {
+      "frames": 3,
+      "fps": 3.0,
+      "loop": true,
+      "strip": "strips/idle.png",
+      "row": 0
+    },
+    "walk": {
+      "frames": 3,
+      "fps": 4.0,
+      "loop": true,
+      "strip": "strips/walk.png",
+      "row": 1
+    },
+    "lunge": {
+      "frames": 3,
+      "fps": 10.0,
+      "loop": false,
+      "strip": "strips/lunge.png",
+      "row": 2
+    }
+  },
+  "logical_size": [
+    14,
+    18
+  ]
+}

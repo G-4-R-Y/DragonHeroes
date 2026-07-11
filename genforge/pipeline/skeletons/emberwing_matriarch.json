@@ -1,0 +1,29 @@
+{
+  "name": "emberwing_matriarch",
+  "canvas": [96, 80],
+  "anchor": [46, 70],
+  "bones": [
+    {"name": "root", "parent": null, "attach": [0, 0], "rotation_deg": 0, "z": 0, "part": null},
+
+    {"name": "wing_far", "parent": "body", "attach": [-6, -13], "rotation_deg": -8, "z": 4, "part": "wing_far_mid"},
+
+    {"name": "leg_bfar", "parent": "body", "attach": [-16, 9], "rotation_deg": 0, "z": 6, "part": "leg_far"},
+    {"name": "leg_ffar", "parent": "body", "attach": [8, 9], "rotation_deg": 0, "z": 7, "part": "leg_far"},
+
+    {"name": "tail_2", "parent": "tail_1", "attach": [-19, 0], "rotation_deg": 8, "z": 14, "part": "tail_2"},
+    {"name": "tail_1", "parent": "body", "attach": [-20, 2], "rotation_deg": 6, "z": 16, "part": "tail_1"},
+
+    {"name": "body", "parent": "root", "attach": [-2, -29], "rotation_deg": 0, "z": 30, "part": "body"},
+
+    {"name": "neck", "parent": "body", "attach": [16, -8], "rotation_deg": 18, "z": 34, "part": "neck"},
+    {"name": "jaw", "parent": "head", "attach": [11, 12], "rotation_deg": 4, "z": 36, "part": "jaw"},
+    {"name": "head", "parent": "neck", "attach": [0, -15], "rotation_deg": -18, "z": 38, "part": "head"},
+
+    {"name": "leg_back", "parent": "body", "attach": [-12, 12], "rotation_deg": 0, "z": 44, "part": "leg_back"},
+    {"name": "leg_front", "parent": "body", "attach": [12, 11], "rotation_deg": 0, "z": 46, "part": "leg_front"},
+
+    {"name": "wing_near", "parent": "body", "attach": [0, -12], "rotation_deg": 0, "z": 62, "part": "wing_near_mid"},
+
+    {"name": "vfx_breath", "parent": "head", "attach": [17, 3], "rotation_deg": 6, "z": 70, "part": "vfx_breath_0", "hidden": true}
+  ]
+}

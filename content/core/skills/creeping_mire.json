@@ -1,0 +1,26 @@
+{
+  "id": "core.skill.creeping_mire",
+  "name": "Creeping Mire",
+  "kind": "active",
+  "tags": [
+    "venom",
+    "field",
+    "slow",
+    "boss"
+  ],
+  "behavior": "aoe_field",
+  "damage_type": "venom",
+  "numbers": {
+    "damage_coeff": 0.2,
+    "field_radius_m": 3.5,
+    "field_duration_s": 7,
+    "slow_pct": 35,
+    "cooldown_s": 10,
+    "windup_ticks": 15
+  },
+  "applies_field": "core.field.poison_mist",
+  "telegraph": {
+    "shape": "circle",
+    "duration_ticks": 15
+  }
+}

@@ -62,15 +62,18 @@
         {"key": "wisp_ember", "name": "Ember Wisp", "desc": "hotter bolts (fire, 12 damage)", "status": "live"},
         {"key": "wisp_frost", "name": "Frost Wisp", "desc": "weaker bolts (8) that Chill the hero", "status": "live"},
         {"key": "emberwing_matriarch", "name": "Emberwing Matriarch", "desc": "5-skill Elite boss: Ember Bolt, Talon Dive, Wing Gust, Ember Screech (60%), Magma Breath fields (30%)", "status": "live"},
-        {"key": "legendary_duo", "name": "Pyre Sovereign + Terravore Colossus", "desc": "Legendary duo hunt with lava-tile Duologue (content exists; fight pending)", "status": "planned"}
+        {"key": "fenwitch_hag", "name": "Fenwitch Hag", "desc": "Elite mid-boss (pack 8): Hex Bolt volley, Blink, Wispling Call (summons), Creeping Mire slow fields, Shrieking Curse enrage below 40%", "status": "live"},
+        {"key": "legendary_duo", "name": "Pyre Sovereign + Terravore Colossus", "desc": "LEGENDARY duo (pack 11): Meteor Call, Cinder Breath, gusts + Earthshatter, Stone Spikes, earth fields; the survivor enrages when its partner falls; epic+ loot each", "status": "live"}
       ]
     },
     {
       "name": "Fields & ground effects (tile interaction system)",
       "entries": [
         {"key": "fire_field", "name": "Fire field", "desc": "burning ground, DoT ticks every 0.25 s; glows and telegraphs on landing", "status": "live"},
+        {"key": "earth_field", "name": "Earth field", "desc": "Terravore rubble ground — the fuel half of the lava combo", "status": "live"},
+        {"key": "mire_field", "name": "Creeping Mire", "desc": "Fenwitch slow-field: heavy Chill re-applied every tick while inside", "status": "live"},
         {"key": "scorch", "name": "Scorch", "desc": "brief ground decal from Cinders hits (visual)", "status": "live"},
-        {"key": "lava_combo", "name": "Lava (field combo)", "desc": "fire field + earth field → lava tiles (registries/fields.json)", "status": "planned"}
+        {"key": "lava_combo", "name": "Lava (Duologue)", "desc": "while BOTH duo bosses live, fire over earth fuses into LAVA — 14 dps, 10 s, the hottest glow in the game (registries/fields.json made playable)", "status": "live"}
       ]
     },
     {

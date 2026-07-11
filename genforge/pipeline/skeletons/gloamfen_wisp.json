@@ -1,0 +1,13 @@
+{
+  "name": "gloamfen_wisp",
+  "canvas": [28, 36],
+  "anchor": [14, 33],
+  "bones": [
+    {"name": "root", "parent": null, "attach": [0, 0], "rotation_deg": 0, "z": 0, "part": null},
+
+    {"name": "mote_2", "parent": "core", "attach": [-11, 11], "rotation_deg": 0, "z": 5, "part": "mote_b"},
+    {"name": "mote_1", "parent": "core", "attach": [-8, 5], "rotation_deg": 0, "z": 6, "part": "mote_a"},
+
+    {"name": "core", "parent": "root", "attach": [0, -19], "rotation_deg": 0, "z": 30, "part": "core_0"}
+  ]
+}

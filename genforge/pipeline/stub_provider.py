@@ -33,6 +33,7 @@ from typing import Callable, Dict, List, Optional, Protocol, Tuple
 
 from PIL import Image, ImageChops, ImageDraw, ImageFilter
 
+from .actor_art import ACTOR_BUILDERS
 from .manifest import PartRegion, PartsManifest
 
 Color = Tuple[int, int, int]
@@ -575,10 +576,17 @@ def pack_parts(
 
 
 class StubPartsProvider:
-    """Procedural Pillow-drawn parts sheets. First PartsProvider implementation."""
+    """Procedural Pillow-drawn parts sheets. First PartsProvider implementation.
+
+    Two tiers of art:
+      * generic archetype builders (humanoid mage / dragon) — palette-hinted
+      * hand-authored HIGH-FIDELITY actor builders (actor_art.py) — the five
+        style anchors (hero, gloamfen_stalker, gloamfen_wisp,
+        emberwing_matriarch, ember_drake), requested by actor name
+    """
 
     name = "stub_procedural"
-    version = "0.1.0"
+    version = "0.2.0"
 
     BUILDERS = {
         "humanoid": (build_humanoid_parts, lambda h: _pick_palette("humanoid", h)),
@@ -586,14 +594,24 @@ class StubPartsProvider:
     }
 
     def generate_parts(self, request: GenerationRequest, out_dir: Path) -> PartsBundle:
-        if request.archetype not in self.BUILDERS:
+        schema_archetype = request.archetype
+        if request.archetype in ACTOR_BUILDERS:
+            # hand-authored actor: fixed style-anchor palette, no hints
+            schema_archetype, actor_builder = ACTOR_BUILDERS[request.archetype]
+            parts = actor_builder()
+            palette_name = f"{request.archetype}_anchor"
+            if request.entity is None:
+                request.entity = request.archetype
+        elif request.archetype in self.BUILDERS:
+            builder, pick = self.BUILDERS[request.archetype]
+            palette_name, palette = pick(request.palette_hints)
+            parts = builder(palette)
+        else:
             raise ValueError(
-                f"stub provider supports archetypes {list(self.BUILDERS)}, "
+                f"stub provider supports archetypes "
+                f"{list(self.BUILDERS) + list(ACTOR_BUILDERS)}, "
                 f"got '{request.archetype}'"
             )
-        builder, pick = self.BUILDERS[request.archetype]
-        palette_name, palette = pick(request.palette_hints)
-        parts = builder(palette)
         sheet, regions = pack_parts(parts)
 
         out_dir = Path(out_dir)
@@ -603,7 +621,7 @@ class StubPartsProvider:
 
         manifest = PartsManifest(
             entity=request.entity_slug(),
-            archetype=request.archetype,
+            archetype=schema_archetype,
             sheet="parts.png",
             sheet_size=(sheet.width, sheet.height),
             parts=regions,
@@ -621,7 +639,11 @@ def main(argv: Optional[List[str]] = None) -> int:
         prog="python -m genforge.pipeline.stub_provider",
         description="Generate a procedural parts sheet (no image model needed).",
     )
-    ap.add_argument("--archetype", required=True, choices=["humanoid", "dragon"])
+    ap.add_argument(
+        "--archetype", required=True,
+        choices=["humanoid", "dragon"] + sorted(ACTOR_BUILDERS),
+        help="generic archetype (palette-hinted) or a hand-authored actor name",
+    )
     ap.add_argument("--out", required=True)
     ap.add_argument("--entity", default=None)
     ap.add_argument("--family", default="unnamed")

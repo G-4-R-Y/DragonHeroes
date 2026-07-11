@@ -1,0 +1,24 @@
+{
+  "id": "core.skill.hex_bolt",
+  "name": "Hex Bolt",
+  "kind": "active",
+  "tags": [
+    "ranged",
+    "umbral",
+    "boss"
+  ],
+  "behavior": "projectile",
+  "damage_type": "umbral",
+  "numbers": {
+    "damage_coeff": 0.7,
+    "projectile_speed_mps": 13,
+    "projectile_count": 3,
+    "spread_deg": 28,
+    "cooldown_s": 4,
+    "windup_ticks": 11
+  },
+  "telegraph": {
+    "shape": "line",
+    "duration_ticks": 11
+  }
+}

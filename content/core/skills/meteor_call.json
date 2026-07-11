@@ -1,0 +1,28 @@
+{
+  "id": "core.skill.meteor_call",
+  "name": "Meteor Call",
+  "kind": "active",
+  "tags": [
+    "fire",
+    "field",
+    "aoe",
+    "boss"
+  ],
+  "behavior": "aoe_field",
+  "damage_type": "fire",
+  "numbers": {
+    "damage_coeff": 1.2,
+    "meteor_count": 3,
+    "impact_radius_m": 2.2,
+    "impact_delay_ticks": 27,
+    "field_radius_m": 2.2,
+    "field_duration_s": 6,
+    "cooldown_s": 11,
+    "windup_ticks": 15
+  },
+  "applies_field": "core.field.fire",
+  "telegraph": {
+    "shape": "circle",
+    "duration_ticks": 27
+  }
+}

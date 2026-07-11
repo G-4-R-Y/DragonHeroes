@@ -1,0 +1,20 @@
+{
+  "id": "core.skill.shrieking_curse",
+  "name": "Shrieking Curse",
+  "kind": "active",
+  "tags": [
+    "buff",
+    "umbral",
+    "boss",
+    "enrage"
+  ],
+  "behavior": "buff",
+  "damage_type": "umbral",
+  "numbers": {
+    "cast_speed_pct": 35,
+    "attack_speed_pct": 25,
+    "trigger_below_hp_pct": 40,
+    "once_per_fight": 1,
+    "windup_ticks": 12
+  }
+}
