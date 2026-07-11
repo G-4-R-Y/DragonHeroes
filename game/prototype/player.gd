@@ -37,6 +37,16 @@ var _whirl_t := 0.0
 var _class_fx := ""              # Emberkin ignite / Frostbinder chill on hit
 var _kit := "melee"              # melee | mage | rogue — LMB and E reshape
 
+# Class skill tree (skill_trees.json): keys 1-4 cast the assigned actives via
+# ONE generic executor (use_skill) — skills are DATA, never per-skill methods.
+var skill_cds := {}              # node id -> seconds left
+var cdr_mult := 1.0              # tree cooldown_reduction passives (stats.gd)
+var charge_stacks := 0           # class charge: Veilblade Combo / Mage Attunement
+var charge_name := ""            # "" = this class has no charge mechanic
+var charge_max := 5
+var charge_per_stack := 0.25
+var _buffs: Array = []           # {until, mults:{attack_speed/move/damage/armor/leech}}
+
 # Mounts (Ricardo, proposals): M rides the active mount. Walking respects
 # terrain; FLYING crosses water/rock. Combat or damage dismounts.
 var mounted := false
@@ -131,6 +141,12 @@ func apply_stats() -> void:
 	resist_pct = s.resist_pct
 	status_resist_pct = s.status_resist_pct
 	_skill_mult = s.skill_damage_mult
+	cdr_mult = float(s.get("cdr_mult", 1.0))
+	# class charge mechanic (Attunement/Combo) — data from skill_trees.json
+	var ch: Dictionary = Session.class_charge()
+	charge_name = str(ch.get("name", ""))
+	charge_max = int(ch.get("max", 5))
+	charge_per_stack = float(ch.get("per_stack", 0.25))
 	_rune_cleave = Session.rune_effect("cleave")
 	_rune_rend = Session.rune_effect("rend")
 	_rune_dodge = Session.rune_effect("dodge")
@@ -147,6 +163,12 @@ func _physics_process(delta: float) -> void:
 	_gale_t = maxf(_gale_t - delta * 4.0, 0.0)
 	_flash = maxf(_flash - delta * 5.0, 0.0)
 	_slow_t = maxf(_slow_t - delta, 0.0)
+	# class-tree skill cooldowns + timed buffs (both tiny dicts/arrays)
+	for k in skill_cds:
+		skill_cds[k] = maxf(float(skill_cds[k]) - delta, 0.0)
+	if not _buffs.is_empty():
+		var now := Time.get_ticks_msec() / 1000.0
+		_buffs = _buffs.filter(func(b: Dictionary) -> bool: return now <= float(b.until))
 	var base_tint := Color(1, 1, 1) if _slow_t <= 0.0 else Color(0.72, 0.9, 1.2)
 	sprite.modulate = base_tint.lerp(Color(3, 1.5, 1.5), _flash)
 	if mounted and is_instance_valid(_mount_sprite):   # saddle bob (flying floats)
@@ -173,7 +195,7 @@ func _physics_process(delta: float) -> void:
 		step = _dodge_dir * (4.0 * TILE / 0.12) * delta
 	else:
 		var input := Input.get_vector("move_left", "move_right", "move_up", "move_down")
-		var spd := move_speed * (0.65 if _slow_t > 0.0 else 1.0)
+		var spd := move_speed * (0.65 if _slow_t > 0.0 else 1.0) * _buff_mult("move")
 		if mounted:
 			spd *= float(mount_data.get("speed_mult", 1.0))
 		step = input * spd * delta
@@ -211,6 +233,10 @@ func _physics_process(delta: float) -> void:
 			var main := get_tree().get_first_node_in_group("main")
 			if main and main.stones >= 1:   # owning a stone unlocks the bestial slot
 				_shadow_rend(main)
+		if not mounted:   # skill bar: 1-4 cast the assigned class-tree actives
+			for i in 4:
+				if Input.is_action_just_pressed("slot%d" % (i + 1)):
+					_cast_slot(i)
 	step += _knockback * delta * 8.0
 	_knockback = _knockback.lerp(Vector2.ZERO, delta * 10.0)
 	_try_move(step)
@@ -257,6 +283,7 @@ func _arc_hit(dir: Vector2, reach: float, arc_deg: float, dmg: float,
 		spark: Color, rune: String, allow_crit := true) -> bool:
 	var cos_half := cos(deg_to_rad(arc_deg * 0.5))
 	var main := get_tree().get_first_node_in_group("main")
+	dmg *= _buff_mult("damage")   # timed buffs (Blood Howl, The Long Burn, ...)
 	var crit := allow_crit and randf() < crit_chance
 	if crit:
 		dmg *= crit_mult
@@ -280,8 +307,9 @@ func _arc_hit(dir: Vector2, reach: float, arc_deg: float, dmg: float,
 				c.ignite(3.0 * _skill_mult, 3.0)
 				if main:
 					main.spawn_scorch(c.global_position)
-	if hit_any and leech_pct > 0.0 and not dead:   # blood_price: melee leeches
-		hp = minf(hp + dmg * leech_pct, max_hp)
+	var lp := leech_pct + _buff_add("leech")   # blood_price + Leech Fury
+	if hit_any and lp > 0.0 and not dead:
+		hp = minf(hp + dmg * lp, max_hp)
 		if main:
 			main.refresh_hud()
 	return hit_any
@@ -290,7 +318,7 @@ func _attack() -> void:
 	if _kit == "mage":   # the Mage's "swing" is a ranged Arcane Bolt
 		_cast_bolt()
 		return
-	_attack_cd = attack_cd_s
+	_attack_cd = attack_cd_s / _buff_mult("attack_speed")
 	_swing = 1.0
 	_swing_dir = (get_global_mouse_position() - global_position).normalized()
 	if _swing_dir.length() < 0.1:
@@ -342,7 +370,7 @@ func _whirlwind() -> void:
 	_whirl_cd = whirl_cd_s
 	_whirl_t = 1.0
 	var main := get_tree().get_first_node_in_group("main")
-	var dmg := attack_damage * 0.8
+	var dmg := attack_damage * 0.8 * _buff_mult("damage")
 	if randf() < crit_chance:
 		dmg *= crit_mult
 	var hit_any := false
@@ -358,8 +386,9 @@ func _whirlwind() -> void:
 				c.ignite(2.0 * _skill_mult, 2.0)
 			elif _class_fx == "chill":
 				c.apply_slow(1.0)
-	if hit_any and leech_pct > 0.0:
-		hp = minf(hp + dmg * leech_pct, max_hp)
+	var lp := leech_pct + _buff_add("leech")
+	if hit_any and lp > 0.0:
+		hp = minf(hp + dmg * lp, max_hp)
 	sprite.play("attack")
 	sprite.frame = 0
 	if main:
@@ -373,14 +402,14 @@ func _whirlwind() -> void:
 
 # Arcane Bolt (Gloam Mage LMB, proposal): ranged umbral projectile, 0.9x stat.
 func _cast_bolt() -> void:
-	_attack_cd = attack_cd_s
+	_attack_cd = attack_cd_s / _buff_mult("attack_speed")
 	_swing_dir = (get_global_mouse_position() - global_position).normalized()
 	if _swing_dir.length() < 0.1:
 		_swing_dir = Vector2.RIGHT
 	sprite.flip_h = _swing_dir.x < 0.0
 	sprite.play("attack")
 	sprite.frame = 0
-	var dmg := attack_damage * 0.9
+	var dmg := attack_damage * 0.9 * _buff_mult("damage")
 	if randf() < crit_chance:
 		dmg *= crit_mult
 	var p := ProtoProjectile.new()
@@ -405,7 +434,7 @@ func _frost_nova() -> void:
 	_whirl_cd = whirl_cd_s
 	_whirl_t = 1.0
 	var main := get_tree().get_first_node_in_group("main")
-	var dmg := attack_damage * 0.7 * _skill_mult
+	var dmg := attack_damage * 0.7 * _skill_mult * _buff_mult("damage")
 	var hit_any := false
 	for c in get_tree().get_nodes_in_group("creatures"):
 		if c.dead:
@@ -441,7 +470,7 @@ func _fan_of_knives() -> void:
 		var p := ProtoProjectile.new()
 		p.friendly = true
 		p.set_steel()
-		p.damage = attack_damage * 0.5
+		p.damage = attack_damage * 0.5 * _buff_mult("damage")
 		p.lifetime = 0.7
 		p.global_position = global_position + Vector2(0, -10)
 		p.velocity = aim.rotated(deg_to_rad(-28.0 + 14.0 * i)) * 15.0 * TILE
@@ -453,6 +482,349 @@ func _fan_of_knives() -> void:
 
 func whirl_progress() -> float:
 	return clampf(1.0 - _whirl_cd / whirl_cd_s, 0.0, 1.0)
+
+# ---- class skill tree: ONE generic executor (skill_trees.json) ---------------------
+# Every tree active is pure data — {kind, params, applies, bonus_vs, consumes,
+# spread, detonate, charge_gain/spend} — dispatched here. Kinds: projectile /
+# nova / cone / melee_arc / dash_strike / buff / field / chain. Adding a skill
+# is a JSON edit, never engine work (canon: extensibility is the product).
+
+const ELEMENT_COLORS := {"ember": Color("ff9a3c"), "frost": Color("7fd8ff"),
+		"arcane": Color("b48cff"), "steel": Color("cdd6dd"),
+		"violet": Color("b06cff")}
+# status application defaults (proposal — mirrored in the effects registry)
+const STATUS_DURATION := {"chill": 1.6, "ignite": 3.0, "bleed": 4.0,
+		"expose": 4.0, "stagger": 0.5}
+
+func _cast_slot(i: int) -> void:
+	var id := str(Session.skill_loadout[i]) if i < Session.skill_loadout.size() else ""
+	if id == "" or not Session.node_learned(id):
+		return
+	var def := Session.skill_def(id)
+	if not def.is_empty():
+		use_skill(def)
+
+func skill_cd_left(id: String) -> float:
+	return float(skill_cds.get(id, 0.0))
+
+func use_skill(def: Dictionary) -> bool:
+	if dead or mounted:
+		return false
+	var id := str(def.get("id", ""))
+	if float(skill_cds.get(id, 0.0)) > 0.0:
+		return false
+	var p: Dictionary = def.get("params", {})
+	var kind := str(def.get("kind", ""))
+	var aim := (get_global_mouse_position() - global_position).normalized()
+	if aim.length() < 0.1:
+		aim = Vector2.RIGHT
+	var main := get_tree().get_first_node_in_group("main")
+	var col: Color = ELEMENT_COLORS.get(str(p.get("element", "")), Color("cfd6ff"))
+	# melee kinds ride the weapon; casts add Intellect/class skill scaling
+	var dmg := attack_damage * float(p.get("mult", 1.0)) * _buff_mult("damage")
+	if not kind in ["melee_arc", "dash_strike"]:
+		dmg *= _skill_mult
+	# charge spenders (Combo/Attunement): +25%/stack (data), every stack spent
+	if bool(def.get("charge_spend", false)) and charge_stacks > 0:
+		dmg *= 1.0 + charge_per_stack * charge_stacks
+		charge_stacks = 0
+	var crit := randf() < crit_chance
+	if crit:
+		dmg *= crit_mult
+	sprite.flip_h = aim.x < 0.0
+	sprite.play("attack")
+	sprite.frame = 0
+	var hit_any := false
+	match kind:
+		"melee_arc":
+			hit_any = _exec_arc(def, p, aim, dmg, col, main, true)
+		"cone":
+			hit_any = _exec_arc(def, p, aim, dmg, col, main, false)
+		"nova":
+			hit_any = _exec_nova(def, p, dmg, col, main)
+		"projectile":
+			hit_any = true
+			_exec_projectile(def, p, aim, dmg, main)
+		"chain":
+			hit_any = _exec_chain(def, p, aim, dmg, col, main)
+		"dash_strike":
+			hit_any = _exec_dash(def, p, aim, dmg, col, main)
+		"buff":
+			hit_any = true
+			_exec_buff(def, p, main)
+		"field":
+			hit_any = true
+			_exec_field(p, main)
+		_:
+			return false
+	# charge builders (stab/arcane-tagged actives) build on the cast
+	if int(def.get("charge_gain", 0)) > 0 and charge_name != "":
+		charge_stacks = mini(charge_stacks + int(def.get("charge_gain", 0)), charge_max)
+	skill_cds[id] = float(p.get("cd", 6.0)) * cdr_mult
+	if crit and hit_any and main \
+			and kind in ["melee_arc", "cone", "nova", "chain", "dash_strike"]:
+		main.damage_number(global_position + Vector2(0, -34), 0, Color("ffd166"), "CRIT!")
+	return true
+
+# Shared per-target pipeline: bonus_vs multipliers, damage, applied/consumed
+# statuses, ignite spread/detonation. Everything a synergy needs, one place.
+func _skill_hit(c: Node2D, dmg: float, dir: Vector2, def: Dictionary, col: Color,
+		main: Node) -> void:
+	var out := dmg
+	var bonus: Dictionary = def.get("bonus_vs", {})
+	for k in bonus:
+		if c.has_status(str(k)):
+			out *= float(bonus[k])
+	c.take_damage(out, dir, col)
+	for st in def.get("applies", []):
+		c.apply_status(str(st), _status_power(str(st)),
+				float(STATUS_DURATION.get(str(st), 3.0)))
+	for st in def.get("consumes", []):
+		c.clear_status(str(st))
+	if def.has("spread"):   # Emberwake: the burn leaps to the pack
+		c.spread_ignite(float((def.spread as Dictionary).get("radius", 2.5)) * TILE)
+	if def.has("detonate"):   # Cinderburst: consume the burn, pop it as an AoE
+		var dt: Dictionary = def.detonate
+		var total: float = c.detonate_ignite() * float(dt.get("mult", 1.0))
+		if total > 0.0:
+			_detonate_pop(c.global_position, total,
+					float(dt.get("radius", 2.2)) * TILE, main)
+
+# Projectile skills call back here on impact (projectile.gd friendly path).
+func projectile_hit(c: Node2D, dmg: float, dir: Vector2, def: Dictionary,
+		col: Color) -> void:
+	_skill_hit(c, dmg, dir, def, col, get_tree().get_first_node_in_group("main"))
+
+# DoT strength defaults, skill-scaled (proposal — effects registry mirrors).
+func _status_power(st: String) -> float:
+	match st:
+		"ignite":
+			return 3.0 * _skill_mult
+		"bleed":
+			return maxf(attack_damage * 0.08, 1.0)   # per-stack dps
+	return 0.0
+
+func _detonate_pop(at: Vector2, total: float, radius: float, main: Node) -> void:
+	if main:
+		main.fx.explosion(at, Color(1.0, 0.5, 0.15))
+		main.fx.ring(at, Color(1.0, 0.55, 0.2, 0.85), radius)
+		main.play_sfx("hit", at, -6.0)
+	for n in get_tree().get_nodes_in_group("creatures"):
+		if n.dead:
+			continue
+		if n.global_position.distance_to(at) <= radius + n.body_radius:
+			n.take_damage(total, (n.global_position - at).normalized(), Color("ff9a3c"))
+
+func _targets_in_arc(dir: Vector2, reach: float, arc_deg: float) -> Array:
+	var cos_half := cos(deg_to_rad(arc_deg * 0.5))
+	var out: Array = []
+	for c in get_tree().get_nodes_in_group("creatures"):
+		if c.dead:
+			continue
+		var to_c: Vector2 = c.global_position - global_position
+		if to_c.length() <= reach + c.body_radius \
+				and to_c.normalized().dot(dir) >= cos_half:
+			out.append(c)
+	return out
+
+# melee_arc and cone share the arc hit; they differ in reach defaults + VFX.
+func _exec_arc(def: Dictionary, p: Dictionary, aim: Vector2, dmg: float,
+		col: Color, main: Node, melee: bool) -> bool:
+	var reach := float(p.get("reach", 2.2 if melee else 3.0)) * TILE
+	var hit := false
+	for c in _targets_in_arc(aim, reach, float(p.get("arc_deg", 90.0 if melee else 50.0))):
+		_skill_hit(c, dmg, aim, def, col, main)
+		hit = true
+	if main:
+		if melee:
+			main.play_sfx("swing", global_position, -8.0)
+			main.fx.arc_slash(global_position + aim * reach * 0.6, aim, col)
+		else:
+			main.play_sfx("bolt", global_position, -8.0)
+			if str(p.get("element", "ember")) == "ember":
+				main.fx.flame_cone(global_position + aim * 8.0, aim)
+			else:
+				main.fx.burst(global_position + aim * 10.0, {"amount": 22,
+						"lifetime": 0.5, "direction": aim,
+						"spread": float(p.get("arc_deg", 50.0)) * 0.5,
+						"v_min": 140.0, "v_max": 240.0, "gravity": Vector2.ZERO,
+						"s_min": 1.2, "s_max": 2.6, "color": col})
+	if hit:
+		if melee:
+			var lp := leech_pct + _buff_add("leech")
+			if lp > 0.0:
+				hp = minf(hp + dmg * lp, max_hp)
+		if main:
+			main.hitstop()
+			main.shake(2.5)
+			main.refresh_hud()
+	return hit
+
+func _exec_nova(def: Dictionary, p: Dictionary, dmg: float, col: Color,
+		main: Node) -> bool:
+	var radius := float(p.get("radius", 2.6)) * TILE
+	var hit := false
+	for c in get_tree().get_nodes_in_group("creatures"):
+		if c.dead:
+			continue
+		var to_c: Vector2 = c.global_position - global_position
+		if to_c.length() <= radius + c.body_radius:
+			_skill_hit(c, dmg, to_c.normalized(), def, col, main)
+			hit = true
+	if hit and bool(p.get("leech", false)):   # Red Harvest: the ring feeds you
+		var lp := maxf(leech_pct + _buff_add("leech"), 0.05)
+		hp = minf(hp + dmg * lp, max_hp)
+	if main:
+		main.play_sfx("bolt", global_position, -8.0)
+		main.fx.ring(global_position, Color(col.r, col.g, col.b, 0.9), radius)
+		main.fx.burst(global_position, {"amount": 24, "lifetime": 0.4,
+				"v_min": 60.0, "v_max": 190.0, "gravity": Vector2.ZERO,
+				"s_min": 0.8, "s_max": 1.8, "emission_radius": 10.0, "color": col})
+		if hit:
+			main.shake(2.5)
+			main.refresh_hud()
+	return hit
+
+func _exec_projectile(def: Dictionary, p: Dictionary, aim: Vector2, dmg: float,
+		main: Node) -> void:
+	var count := int(p.get("count", 1))
+	var spread := deg_to_rad(float(p.get("spread_deg", 0.0)))
+	for i in count:
+		var ang := 0.0
+		if count > 1:
+			ang = -spread * 0.5 + spread * float(i) / float(count - 1)
+		var b := ProtoProjectile.new()
+		b.friendly = true
+		match str(p.get("element", "ember")):
+			"frost":
+				b.set_frost()
+			"arcane":
+				b.set_arcane()
+			"steel":
+				b.set_steel()
+			"violet":
+				b.set_violet()
+		b.damage = dmg
+		b.skill_def = def
+		b.shooter = self
+		b.lifetime = float(p.get("lifetime", 1.2))
+		b.global_position = global_position + Vector2(0, -10) + aim * 8.0
+		b.velocity = aim.rotated(ang) * float(p.get("speed", 13.0)) * TILE
+		get_parent().add_child(b)
+	if main:
+		main.play_sfx("bolt", global_position, -10.0)
+
+func _nearest_creature(at: Vector2, max_d: float, exclude: Array) -> Node2D:
+	var best: Node2D = null
+	var best_d := max_d
+	for c in get_tree().get_nodes_in_group("creatures"):
+		if c.dead or exclude.has(c):
+			continue
+		var d: float = c.global_position.distance_to(at)
+		if d <= best_d:
+			best_d = d
+			best = c
+	return best
+
+# Chain: leaps creature to creature, -15% damage per hop, pooled arc links.
+func _exec_chain(def: Dictionary, p: Dictionary, aim: Vector2, dmg: float,
+		col: Color, main: Node) -> bool:
+	var range_px := float(p.get("range", 5.0)) * TILE
+	var jumps := int(p.get("jumps", 3))
+	var visited: Array = []
+	var from := global_position + Vector2(0, -10)
+	var seek := global_position + aim * range_px * 0.5
+	var falloff := dmg
+	var hit := false
+	for j in jumps:
+		var nxt := _nearest_creature(seek if j == 0 else from, range_px, visited)
+		if nxt == null and j == 0:   # nothing along the aim — try around the hero
+			nxt = _nearest_creature(global_position, range_px, visited)
+		if nxt == null:
+			break
+		visited.append(nxt)
+		if main:
+			main.fx.arc_link(from, nxt.global_position + Vector2(0, -8), col)
+		_skill_hit(nxt, falloff, (nxt.global_position - global_position).normalized(),
+				def, col, main)
+		from = nxt.global_position + Vector2(0, -8)
+		falloff *= 0.85
+		hit = true
+	if main and hit:
+		main.play_sfx("bolt", global_position, -8.0)
+		main.refresh_hud()
+	return hit
+
+# Dash strike: displacement along the aim (walkability-gated like the dodge),
+# damaging everything within ~1.2 m of the traveled line.
+func _exec_dash(def: Dictionary, p: Dictionary, aim: Vector2, dmg: float,
+		col: Color, main: Node) -> bool:
+	var start := global_position
+	var dist := float(p.get("dist", 4.5)) * TILE
+	for _i in 8:   # stepped so walls still gate the dash
+		_try_move(aim * dist / 8.0)
+	var seg := global_position - start
+	var hit := false
+	for c in get_tree().get_nodes_in_group("creatures"):
+		if c.dead:
+			continue
+		var t := 0.0
+		if seg.length_squared() > 0.0:
+			t = clampf((c.global_position - start).dot(seg) / seg.length_squared(),
+					0.0, 1.0)
+		if (start + seg * t).distance_to(c.global_position) <= 1.2 * TILE + c.body_radius:
+			_skill_hit(c, dmg, aim, def, col, main)
+			hit = true
+	if main:
+		main.play_sfx("swing", global_position, -8.0)
+		main.fx.burst(start, {"amount": 10, "lifetime": 0.3, "direction": -aim,
+				"spread": 20.0, "v_min": 60.0, "v_max": 160.0,
+				"gravity": Vector2.ZERO, "s_min": 0.6, "s_max": 1.4, "color": col})
+		main.fx.arc_slash(global_position, aim, col)
+	if hit:
+		var lp := leech_pct + _buff_add("leech")
+		if lp > 0.0:
+			hp = minf(hp + dmg * lp, max_hp)
+		if main:
+			main.shake(2.5)
+			main.refresh_hud()
+	return hit
+
+func _exec_buff(def: Dictionary, p: Dictionary, main: Node) -> void:
+	_buffs.append({"until": Time.get_ticks_msec() / 1000.0
+			+ float(p.get("duration", 5.0)), "mults": p.get("mults", {})})
+	if main:
+		main.play_ui("capture", -14.0)
+		main.fx.ring(global_position, Color(1.0, 0.85, 0.5, 0.8), 1.6 * TILE)
+		main.damage_number(global_position + Vector2(0, -30), 0, Color("ffd166"),
+				str(def.get("name", "?")).to_upper())
+
+# Ground effect at the cursor (range-clamped), FRIENDLY: ticks creatures, not
+# the hunter (main.gd spawn_field).
+func _exec_field(p: Dictionary, main: Node) -> void:
+	if main == null:
+		return
+	var range_px := float(p.get("range", 5.0)) * TILE
+	var at := get_global_mouse_position()
+	var to := at - global_position
+	if to.length() > range_px:
+		at = global_position + to.normalized() * range_px
+	main.spawn_field(at, float(p.get("radius", 2.5)) * TILE,
+			float(p.get("duration", 6.0)),
+			attack_damage * float(p.get("dps_mult", 0.4)) * _skill_mult
+			* _buff_mult("damage"), str(p.get("field_kind", "fire")), true)
+
+func _buff_mult(key: String) -> float:
+	var m := 1.0
+	for b in _buffs:
+		m *= float((b.mults as Dictionary).get(key, 1.0))
+	return m
+
+func _buff_add(key: String) -> float:
+	var v := 0.0
+	for b in _buffs:
+		v += float((b.mults as Dictionary).get(key, 0.0))
+	return v
 
 # ---- mounts (Z) -------------------------------------------------------------------
 
@@ -555,7 +927,7 @@ func take_damage(dmg: float, _from_dir: Vector2, dmg_type := "physical") -> void
 		_dismount(true)   # knocked out of the saddle
 	match dmg_type:
 		"physical":
-			dmg *= 1.0 - phys_reduction
+			dmg *= (1.0 - phys_reduction) / _buff_mult("armor")   # bulwark buffs
 		"status":
 			dmg *= (1.0 - resist_pct) * (1.0 - status_resist_pct)
 		_:

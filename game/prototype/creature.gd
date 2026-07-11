@@ -51,9 +51,19 @@ var _cd := 0.0
 var _enrage_t := 0.0            # failed snare: +30% speed while > 0
 var _slow_t := 0.0              # Chill (Frostbinder hits): -30% speed while > 0
 var _pounce_target := Vector2.ZERO   # lunger pounce landing point
-var _burn_t := 0.0              # Rune of Cinders ignite: 3 dmg/s while > 0
+var _burn_t := 0.0              # Ignite (runes + class skills): fire DoT while > 0
 var _burn_tick := 0.0
 var _burn_dps := 0.0
+# Class skill-tree statuses (skill_trees.json synergies, effects registry).
+# Plain timers, tint-only feedback — no nodes per status (60 FPS hard rule).
+const BLEED_MAX_STACKS := 5      # (proposal) stacking phys DoT cap
+const EXPOSE_MULT := 1.2         # (proposal) +20% damage taken from ALL sources
+var _bleed_t := 0.0              # Bleed: _bleed_dps per stack while > 0
+var _bleed_tick := 0.0
+var _bleed_dps := 0.0
+var _bleed_stacks := 0
+var _expose_t := 0.0             # Expose: take_damage x1.2 while > 0
+var _stagger_t := 0.0            # Stagger: brief stun — the state machine freezes
 var _wander := Vector2.ZERO
 var _wander_t := 0.0
 var _attack_dir := Vector2.RIGHT
@@ -244,18 +254,38 @@ func _physics_process(delta: float) -> void:
 	_cd = maxf(_cd - delta, 0.0)
 	_flash = maxf(_flash - delta * 5.0, 0.0)
 	_slow_t = maxf(_slow_t - delta, 0.0)
+	_expose_t = maxf(_expose_t - delta, 0.0)
 	var base_tint := Color(1, 1, 1) if _burn_t <= 0.0 else Color(1.5, 0.95, 0.6)
 	if _slow_t > 0.0:
 		base_tint *= Color(0.7, 0.9, 1.25)   # chilled: icy cast
+	if _bleed_t > 0.0:
+		base_tint *= Color(1.15, 0.72, 0.72)   # bleeding: raw-meat cast
+	if _expose_t > 0.0:
+		base_tint *= Color(1.1, 0.95, 1.2)     # exposed: pallid violet cast
 	sprite.modulate = base_tint.lerp(Color(3, 3, 3), _flash)
-	if _burn_t > 0.0:   # ignite DoT (Rune of Cinders): 0.5 s ticks
+	if _burn_t > 0.0:   # ignite DoT (Rune of Cinders + class skills): 0.5 s ticks
 		_burn_t -= delta
 		_burn_tick -= delta
 		if _burn_tick <= 0.0:
 			_burn_tick = 0.5
-			_burn_damage(_burn_dps * 0.5)
+			dot_damage(_burn_dps * 0.5)
 			if dead:
 				return
+	if _bleed_t > 0.0:   # Bleed: stacking phys DoT, dull-red ticks
+		_bleed_t -= delta
+		_bleed_tick -= delta
+		if _bleed_tick <= 0.0:
+			_bleed_tick = 0.5
+			dot_damage(_bleed_dps * _bleed_stacks * 0.5, Color("d05a5a"))
+			if dead:
+				return
+		if _bleed_t <= 0.0:
+			_bleed_stacks = 0
+	if _stagger_t > 0.0:   # staggered: DoTs keep ticking, the body does not move
+		_stagger_t -= delta
+		_update_anim()
+		queue_redraw()
+		return
 	if _enrage_t > 0.0:
 		_enrage_t -= delta
 		if _enrage_t <= 0.0:
@@ -417,7 +447,7 @@ func _separate(delta: float) -> void:
 		if d.length() < min_d and d.length() > 0.01:
 			_move(d.normalized() * (min_d - d.length()) * 4.0 * delta)
 
-# Rune of Cinders ignite: refreshes the burn each application.
+# Ignite (runes + class skills): refreshes the burn each application.
 func ignite(dps: float, duration: float) -> void:
 	if dead:
 		return
@@ -425,14 +455,86 @@ func ignite(dps: float, duration: float) -> void:
 	_burn_t = duration
 	threat = true
 
-# Lightweight DoT tick — no knockback/flash spam, small ember number.
-func _burn_damage(dmg: float) -> void:
+# Lightweight DoT tick (ignite/bleed/fields) — no knockback/flash spam.
+func dot_damage(dmg: float, num_color := Color("ff9a3c")) -> void:
+	if dead:
+		return
 	hp -= dmg
 	var main := get_tree().get_first_node_in_group("main")
 	if main:
-		main.damage_number(global_position + Vector2(0, -14), dmg, Color("ff9a3c"))
+		main.damage_number(global_position + Vector2(0, -14), dmg, num_color)
 	if hp <= 0.0:
 		_die()
+
+# ---- skill-tree statuses (data keys from skill_trees.json "applies") -----------
+# power = per-stack dps for DoTs (already skill-scaled by the caller).
+
+func apply_status(key: String, power: float, duration: float) -> void:
+	if dead:
+		return
+	threat = true
+	match key:
+		"chill":
+			apply_slow(duration)
+		"ignite":
+			ignite(power, duration)
+		"bleed":
+			_bleed_stacks = mini(_bleed_stacks + 1, BLEED_MAX_STACKS)
+			_bleed_dps = maxf(_bleed_dps, power)
+			_bleed_t = duration
+		"expose":
+			_expose_t = maxf(_expose_t, duration)
+		"stagger":
+			_stagger_t = maxf(_stagger_t, duration)
+
+# Accepts both the status key and the desc-friendly adjective ("chilled").
+func has_status(key: String) -> bool:
+	match key:
+		"chill", "chilled":
+			return _slow_t > 0.0
+		"ignite", "ignited":
+			return _burn_t > 0.0
+		"bleed", "bleeding":
+			return _bleed_t > 0.0
+		"expose", "exposed":
+			return _expose_t > 0.0
+		"stagger", "staggered":
+			return _stagger_t > 0.0
+	return false
+
+# Synergy consumers (Shatter, Exsanguinate, ...): the payoff spends the mark.
+func clear_status(key: String) -> void:
+	match key:
+		"chill", "chilled":
+			_slow_t = 0.0
+		"ignite", "ignited":
+			_burn_t = 0.0
+		"bleed", "bleeding":
+			_bleed_t = 0.0
+			_bleed_stacks = 0
+		"expose", "exposed":
+			_expose_t = 0.0
+		"stagger", "staggered":
+			_stagger_t = 0.0
+
+# Emberwake: this creature's burn leaps to packmates within radius (px).
+func spread_ignite(radius: float) -> void:
+	if dead or _burn_t <= 0.0:
+		return
+	for c in get_tree().get_nodes_in_group("creatures"):
+		if c == self or c.dead:
+			continue
+		if c.global_position.distance_to(global_position) <= radius + c.body_radius:
+			c.ignite(_burn_dps, maxf(_burn_t, 1.5))
+
+# Cinderburst: consumes the burn, returning the remaining DoT total to the
+# caller (player.gd deals it as an instant fire pop around this creature).
+func detonate_ignite() -> float:
+	if _burn_t <= 0.0:
+		return 0.0
+	var total := _burn_dps * _burn_t
+	_burn_t = 0.0
+	return total
 
 # Wind burst (Rune of the Gale) pushes creatures around.
 func shove(dir: Vector2, dist: float) -> void:
@@ -442,6 +544,8 @@ func shove(dir: Vector2, dist: float) -> void:
 func take_damage(dmg: float, from_dir: Vector2, spark_color := Color("cfd6ff")) -> void:
 	if dead:
 		return
+	if _expose_t > 0.0:   # Exposed: +20% from ALL sources (skill-tree synergy)
+		dmg *= EXPOSE_MULT
 	hp -= dmg
 	_flash = 1.0
 	threat = true

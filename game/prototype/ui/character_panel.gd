@@ -499,46 +499,148 @@ func _refresh_skills() -> void:
 				DIM, 9)
 	if _socket_for != "":
 		_socket_chooser(vb)
-	# ---- the Reaver tree: REAL progression (1 point per level, proposal) --------
-	_line(vb, "Reaver tree — skill points: %d (1 per level)" % Session.skill_points,
-			EMBER, 11)
-	var cls := Session.load_content("reaver")
-	for node in cls.get("skill_tree", []):
-		var id := str(node.get("node", ""))
-		var learned := Session.node_learned(id)
-		var reqs: Array = node.get("requires", [])
-		var reqs_met := true
-		for r in reqs:
-			if not Session.node_learned(str(r)):
-				reqs_met = false
-		var mods: Array[String] = []
-		for md in node.get("stat_mods", []):
-			mods.append("%s %+d" % [str(md.get("stat", "?")).replace("_", " "),
-					int(md.get("value", 0))])
-		if str(node.get("grants_skill", "")) != "":
-			mods.append("grants %s" % _pretty_id(str(node.get("grants_skill"))))
-		var desc := "%s [%s]%s" % [id.capitalize(), str(node.get("kind", "")),
-				"" if mods.is_empty() else " — " + ", ".join(mods)]
-		if learned:
-			_line(vb, "● " + desc, GOLD, 10)
-		elif reqs_met and Session.skill_points > 0:
-			var hb := HBoxContainer.new()
-			hb.add_theme_constant_override("separation", 6)
-			vb.add_child(hb)
-			var nl := Label.new()
-			nl.text = "○ " + desc
-			nl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-			nl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			nl.add_theme_font_size_override("font_size", 10)
-			nl.add_theme_color_override("font_color", PALE)
-			hb.add_child(nl)
-			_btn(hb, "Learn (1 pt)", _do_learn.bind(id), GOLD)
+	# ---- the class skill tree (skill_trees.json): learn + assign to keys 1-4 -----
+	_line(vb, "%s tree — skill points: %d (1 per level)" % [Session.class_display(),
+			Session.skill_points], EMBER, 11)
+	# hotbar chips: what 1-4 cast right now (click a filled chip to clear it)
+	var bar := HBoxContainer.new()
+	bar.add_theme_constant_override("separation", 4)
+	vb.add_child(bar)
+	for i in 4:
+		var d := Session.skill_def(str(Session.skill_loadout[i]))
+		var b := Button.new()
+		b.focus_mode = Control.FOCUS_NONE
+		b.add_theme_font_size_override("font_size", 9)
+		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		if d.is_empty():
+			b.text = "%d · —" % (i + 1)
+			b.add_theme_color_override("font_color", DIM)
+			b.tooltip_text = "empty — learn an active below, then tap its %d chip" % (i + 1)
 		else:
-			var lock := "" if reqs_met else "  (needs %s)" % ", ".join(
-					PackedStringArray(reqs))
-			_line(vb, "○ %s%s" % [desc, lock], DIM, 10)
-	_line(vb, "Runes drop from Elites — click a skill's socket chip to slot one.",
-			DIM, 9)
+			b.text = "%d · %s" % [i + 1, str(d.get("name", "?"))]
+			b.add_theme_color_override("font_color", GOLD)
+			b.tooltip_text = "casts on key %d — click to clear the slot" % (i + 1)
+			b.pressed.connect(_do_assign.bind(i, ""))
+		bar.add_child(b)
+	var charge := Session.class_charge()
+	if not charge.is_empty():
+		_line(vb, "◈ %s — %s" % [str(charge.get("name", "")),
+				str(charge.get("desc", ""))], VIOLET, 8)
+	for br in Session.class_branches():
+		var nodes: Array = br.get("nodes", [])
+		if nodes.size() == 1 and int(nodes[0].get("cost", 1)) <= 0:
+			continue   # the free root branch needs no rows
+		_line(vb, "— %s —" % str(br.get("name", "?")), EMBER, 10)
+		for node in nodes:
+			_tree_node_row(vb, node, s)
+	_line(vb, "◆ active (assign to 1-4) · ○ passive · ⟡ synergy — hover any node " +
+			"for numbers. Runes drop from Elites — click a socket chip to slot one.",
+			DIM, 8)
+
+# One tree node = one compact row: state glyph + name (tooltip carries desc,
+# synergy and live numbers — no text walls), then Learn or the 1-4 assign chips.
+func _tree_node_row(vb: Container, node: Dictionary, s: Dictionary) -> void:
+	var id := str(node.get("id", ""))
+	var cost := int(node.get("cost", 1))
+	if cost <= 0:
+		return   # free roots aren't rows
+	var learned := Session.def_learned(node)
+	var reqs_met := true
+	var req_names: Array[String] = []
+	for r in node.get("requires", []):
+		var rdef := Session.skill_def(str(r))
+		if not (Session.node_learned(str(r)) \
+				or (not rdef.is_empty() and Session.def_learned(rdef))):
+			reqs_met = false
+			req_names.append(str(rdef.get("name", r)))
+	var lvl_ok := Session.level >= int(node.get("min_level", 1))
+	var active := str(node.get("type", "")) == "active"
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 4)
+	vb.add_child(row)
+	var name_l := Label.new()
+	name_l.text = "%s %s%s" % ["◆" if active else "○", str(node.get("name", "?")),
+			"  ⟡" if node.has("synergy") else ""]
+	name_l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	name_l.add_theme_font_size_override("font_size", 10)
+	name_l.mouse_filter = Control.MOUSE_FILTER_STOP   # labels need this for tooltips
+	name_l.tooltip_text = _node_tooltip(node, s)
+	if learned:
+		name_l.add_theme_color_override("font_color", GOLD)
+	elif reqs_met and lvl_ok:
+		name_l.add_theme_color_override("font_color", PALE)
+	else:
+		name_l.add_theme_color_override("font_color", DIM)
+	row.add_child(name_l)
+	if learned and active:   # assign chips: 1-4, gold = currently in that slot
+		for i in 4:
+			var here := str(Session.skill_loadout[i]) == id
+			var ab := Button.new()
+			ab.text = str(i + 1)
+			ab.focus_mode = Control.FOCUS_NONE
+			ab.custom_minimum_size = Vector2(20, 0)
+			ab.add_theme_font_size_override("font_size", 8)
+			ab.add_theme_color_override("font_color", GOLD if here else DIM)
+			ab.tooltip_text = "assign %s to slot %d" % [str(node.get("name", "?")), i + 1]
+			ab.pressed.connect(_do_assign.bind(i, "" if here else id))
+			row.add_child(ab)
+	elif not learned:
+		if reqs_met and lvl_ok and Session.skill_points >= cost:
+			var lb := _btn(row, "Learn (%d pt)" % cost, _do_learn.bind(id, cost), GOLD)
+			lb.tooltip_text = "learn " + id
+		else:
+			var why := "%d pt" % cost
+			if not reqs_met:
+				why = "needs " + ", ".join(req_names)
+			elif not lvl_ok:
+				why = "level %d" % int(node.get("min_level", 1))
+			var lk := Label.new()
+			lk.text = why
+			lk.add_theme_font_size_override("font_size", 8)
+			lk.add_theme_color_override("font_color", DIM)
+			row.add_child(lk)
+
+# Tooltip: desc + synergy line + LIVE numbers (dmg from the current StatBlock).
+func _node_tooltip(node: Dictionary, s: Dictionary) -> String:
+	var lines: Array[String] = [str(node.get("desc", ""))]
+	if node.has("synergy"):
+		lines.append("⟡ " + str(node.get("synergy")))
+	var p: Dictionary = node.get("params", {})
+	var kind := str(node.get("kind", ""))
+	if str(node.get("type", "")) == "active":
+		var dmg: float = s.melee_damage * float(p.get("mult", 1.0))
+		if not kind in ["melee_arc", "dash_strike"]:
+			dmg *= s.skill_damage_mult
+		var bits: Array[String] = [kind.replace("_", " ")]
+		if not kind in ["buff", "field"]:
+			bits.append("~%d dmg" % int(round(dmg)))
+		if p.has("count"):
+			bits.append("x%d" % int(p.get("count")))
+		if p.has("jumps"):
+			bits.append("%d jumps" % int(p.get("jumps")))
+		if p.has("radius"):
+			bits.append("%.1f m" % float(p.get("radius")))
+		if p.has("reach"):
+			bits.append("%.1f m" % float(p.get("reach")))
+		if p.has("duration"):
+			bits.append("%.0f s" % float(p.get("duration")))
+		bits.append("%.1f s cd" % (float(p.get("cd", 6.0))
+				* float(s.get("cdr_mult", 1.0))))
+		lines.append(" · ".join(bits))
+	else:
+		var mods: Array[String] = []
+		for m in node.get("stat_mods", []):
+			mods.append("%s %+d" % [str(m.get("stat", "?")).replace("_", " "),
+					int(m.get("value", 0))])
+		if not mods.is_empty():
+			lines.append(" · ".join(mods))
+	lines.append("min level %d · cost %d pt" % [int(node.get("min_level", 1)),
+			int(node.get("cost", 1))])
+	return "\n".join(lines)
+
+func _do_assign(slot: int, id: String) -> void:
+	Session.assign_skill(slot, id)
+	_refresh_skills()
 
 # One skill = one card: name + live numbers + the rune-socket chip on the right.
 func _skill_card(vb: Container, skill_key: String, title: String, color: Color,
@@ -613,8 +715,8 @@ func _do_unsocket_pick() -> void:
 	_socket_for = ""
 	refresh()
 
-func _do_learn(node: String) -> void:
-	if Session.learn_node(node):   # spends the point + saves; effects are live
+func _do_learn(node: String, cost := 1) -> void:
+	if Session.learn_node(node, cost):   # spends the points + saves; effects are live
 		_apply_live()
 	refresh()
 

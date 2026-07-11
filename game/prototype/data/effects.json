@@ -19,6 +19,9 @@
       "entries": [
         {"key": "ignite", "name": "Ignite", "desc": "fire DoT, 0.5 s ticks; refreshed on re-application (Rune of Cinders: 3/s for 3 s)", "status": "live"},
         {"key": "chill", "name": "Chill", "desc": "-35% move speed for 1.2 s (frost wisp bolts); icy tint on the hero", "status": "live"},
+        {"key": "bleed", "name": "Bleed", "desc": "stacking physical DoT (max 5 stacks, ~8% melee dmg/stack/s, 4 s, 0.5 s ticks); refreshed on re-application — Reaver/Veilblade skill trees", "status": "live"},
+        {"key": "expose", "name": "Expose", "desc": "+20% damage taken from ALL sources for 4 s (Sunder Armor, Unravel, Mark the Vein); pallid tint", "status": "live"},
+        {"key": "stagger", "name": "Stagger", "desc": "0.5 s stun — the creature's state machine freezes; DoTs keep ticking (Bull Rush, Winter's Grip)", "status": "live"},
         {"key": "enrage", "name": "Enrage", "desc": "+30% move speed 5 s on a resisted Soul Snare; red tint", "status": "live"},
         {"key": "knockback", "name": "Knockback", "desc": "impulse displacement on the hero (boss Wing Gust)", "status": "live"},
         {"key": "shove", "name": "Shove", "desc": "instant displacement on creatures (Rune of the Gale burst)", "status": "live"},
@@ -90,12 +93,19 @@
       ]
     },
     {
-      "name": "Skill tree — Reaver (1 point per level)",
+      "name": "Skill trees (five classes — skill_trees.json, 1 point per level)",
       "entries": [
-        {"key": "root_cleave", "name": "Cleave (root)", "desc": "the class active; learned from the start", "status": "live"},
-        {"key": "whirlwind", "name": "Whirlwind (E)", "desc": "class active: full-circle strike at 0.8x melee + shove, 4 s cooldown", "status": "live"},
-        {"key": "brutal_edge", "name": "Brutal Edge", "desc": "passive: +5% crit chance", "status": "live"},
-        {"key": "cleave_rampage", "name": "Cleave Rampage", "desc": "modifier: +8% attack speed", "status": "live"},
+        {"key": "tree_scope", "name": "Tree scope", "desc": "every class: 20 actives + 8 passives (1 keystone w/ tradeoff) + free root = 29 nodes, 145 total; ONE generic executor runs all actives from data — weekly skills never require engine work", "status": "live"},
+        {"key": "skill_kinds", "name": "Active kinds", "desc": "projectile / nova / cone / melee_arc / dash_strike / buff / field / chain — param-driven (count, radius, element, duration, mults)", "status": "live"},
+        {"key": "skill_bar", "name": "Skill bar 1-4", "desc": "keys 1-4 cast learned class-tree actives assigned in CHARACTER -> Skills; loadout persists per character; cooldowns per node, scaled by cooldown_reduction passives", "status": "live"},
+        {"key": "bonus_vs", "name": "Status payoff", "desc": "skills declare bonus_vs {status: mult} — e.g. Shatter deals x2 to Chilled prey; consumes [status] spends the mark on hit", "status": "live"},
+        {"key": "ignite_spread", "name": "Ignite spread", "desc": "Emberwake: a struck creature's burn leaps to packmates within 2.5 m", "status": "live"},
+        {"key": "ignite_detonate", "name": "Ignite detonation", "desc": "Cinderburst / Heart of the Pyre: consumes the target's remaining burn and pops it as instant fire AoE (x1.2-1.5)", "status": "live"},
+        {"key": "attunement", "name": "Attunement (Gloam Mage)", "desc": "arcane builders +1 stack (max 5); release skills spend all stacks for +25% damage each", "status": "live"},
+        {"key": "combo", "name": "Combo (Veilblade)", "desc": "stab-tagged builders +1 stack (max 5); spender skills release all stacks for +25% damage each", "status": "live"},
+        {"key": "friendly_field", "name": "Friendly field", "desc": "player-cast ground effects (Earthsplitter, Scorched Earth, Mirefen Call) tick CREATURES, never the hunter, and never fuse into Duologue lava", "status": "live"},
+        {"key": "root_cleave", "name": "Cleave (root)", "desc": "the Reaver class active; learned from the start", "status": "live"},
+        {"key": "whirlwind", "name": "Whirlwind (E)", "desc": "Reaver signature: full-circle strike at 0.8x melee + shove, 4 s cooldown", "status": "live"},
         {"key": "blood_price", "name": "Blood Price (keystone)", "desc": "+10% blood leech on melee, -15 armor — a real tradeoff", "status": "live"}
       ]
     },

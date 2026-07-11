@@ -41,17 +41,20 @@ static func compute(sess: Node, equipment: Dictionary = {}) -> Dictionary:
 	for stat in totals:
 		if str(stat).ends_with("_res"):
 			res_pct += float(totals[stat]) / 100.0
-	# learned Reaver tree nodes (reaver.json): passive stat_mods stack in.
-	# blood_price's -15 armor is a REAL tradeoff — armor may go negative.
+	# learned class-tree passives (skill_trees.json): stat_mods stack in.
+	# Keystone tradeoffs are REAL (blood_price -15 armor; armor may go negative).
+	# Stats: hp, hp_pct, armor, damage_pct, skill_damage_pct, crit_chance,
+	# crit_damage, attack_speed, move_speed, cooldown_reduction,
+	# blood_leech_pct, resist_pct, status_resist_pct.
 	var node_mods := {}
-	var tree: Array = (sess.load_content("reaver") as Dictionary).get("skill_tree", [])
-	for n in tree:
-		if not sess.learned_nodes.has(str(n.get("node", ""))):
+	for n in sess.class_tree():
+		if not sess.def_learned(n):
 			continue
 		for m in n.get("stat_mods", []):
 			var st := str(m.get("stat", ""))
 			node_mods[st] = float(node_mods.get(st, 0.0)) + float(m.get("value", 0.0))
 	var armor := float(totals.get("armor", 0.0)) + float(node_mods.get("armor", 0.0))
+	res_pct += float(node_mods.get("resist_pct", 0.0)) / 100.0
 	# class-lite modifiers (proposal): Emberkin trades HP for fire + Ignite-on-hit;
 	# Frostbinder trades damage for bulk + Chill-on-hit. Full kits: docs/design/10.
 	var class_hp := 1.0
@@ -81,28 +84,35 @@ static func compute(sess: Node, equipment: Dictionary = {}) -> Dictionary:
 			class_move = 0.10
 			class_kit = "rogue"
 	return {
-		"max_hp": (BASE_HP + 6.0 * pts.vitality + float(totals.get("hp", 0.0))) \
-				* class_hp,
+		"max_hp": (BASE_HP + 6.0 * pts.vitality + float(totals.get("hp", 0.0)) \
+				+ float(node_mods.get("hp", 0.0))) * class_hp \
+				* (1.0 + float(node_mods.get("hp_pct", 0.0)) / 100.0),
 		"class_fx": class_fx,
 		"melee_damage": (BASE_MELEE + float(totals.get("damage", 0.0))) \
 				* (1.0 + 0.02 * pts.might) * class_dmg \
-				* (1.0 + (float(totals.get("fire_damage_pct", 0.0)) + class_fire) / 100.0),
+				* (1.0 + (float(totals.get("fire_damage_pct", 0.0)) + class_fire) / 100.0) \
+				* (1.0 + float(node_mods.get("damage_pct", 0.0)) / 100.0),
 		"rend_damage": BASE_REND * (1.0 + 0.02 * pts.intellect) \
 				* (1.0 + float(totals.get("umbral_damage_pct", 0.0)) / 100.0),
-		"skill_damage_mult": (1.0 + 0.02 * pts.intellect) * class_skill,
+		"skill_damage_mult": (1.0 + 0.02 * pts.intellect) * class_skill \
+				* (1.0 + float(node_mods.get("skill_damage_pct", 0.0)) / 100.0),
 		"class_kit": class_kit,
 		"move_speed_mult": 1.0 + 0.01 * pts.agility + class_move \
-				+ float(totals.get("move_speed", 0.0)) / 100.0,
+				+ (float(totals.get("move_speed", 0.0)) \
+				+ float(node_mods.get("move_speed", 0.0))) / 100.0,
 		"dodge_recharge_s": BASE_DODGE_RECHARGE / (1.0 + 0.02 * pts.agility),
 		"crit_chance": (BASE_CRIT + class_crit + float(totals.get("crit_chance", 0.0)) \
 				+ float(node_mods.get("crit_chance", 0.0))) / 100.0,
-		"crit_mult": CRIT_MULT,
+		"crit_mult": CRIT_MULT * (1.0 + float(node_mods.get("crit_damage", 0.0)) / 100.0),
 		"attack_speed_mult": 1.0 + float(node_mods.get("attack_speed", 0.0)) / 100.0,
 		"leech_pct": float(node_mods.get("blood_leech_pct", 0.0)) / 100.0,
+		# class-tree skill cooldowns divide by this (cooldown_reduction %)
+		"cdr_mult": 1.0 / (1.0 + float(node_mods.get("cooldown_reduction", 0.0)) / 100.0),
 		"armor": armor,
 		"phys_reduction": armor / (armor + 150.0),
 		"resist_pct": minf(res_pct, 0.75),
-		"status_resist_pct": minf(0.02 * pts.willpower, 0.75),
+		"status_resist_pct": minf(0.02 * pts.willpower \
+				+ float(node_mods.get("status_resist_pct", 0.0)) / 100.0, 0.75),
 		"totals": totals,
 	}
 

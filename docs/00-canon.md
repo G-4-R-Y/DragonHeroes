@@ -452,3 +452,14 @@ Still open:
    hunter's level (ilvl, +4% per level on every stat roll, ~x5 at 100) and
    boss/legendary kills are quality-floored to the upper roll band — no more
    level-1 rolls from legendary kills. All numbers (proposal).
+21. **Class skill trees (2026-07-11, Ricardo):** every class gets a real tree —
+   20 actives + 8 passives (one keystone with a tradeoff) + free root, 145
+   nodes total, ALL data (registries/skill_trees.json) run by ONE generic
+   executor (projectile/nova/cone/melee_arc/dash_strike/buff/field/chain) —
+   weekly skills never require engine work (directive 4). Synergies are
+   data-expressed: bonus_vs/consumes status payoffs, Emberkin Ignite
+   spread/detonate, Frostbinder Shatter, Gloam Mage Attunement and Veilblade
+   Combo charge stacks (max 5, +25%/stack spenders). New creature statuses:
+   Bleed (5 stacks), Expose (+20% taken), Stagger (0.5 s). Skill bar on 1-4,
+   assigned in CHARACTER -> Skills, loadout saved per character. Numbers
+   (proposal); full six-class kits with resources remain design/10 (planned).

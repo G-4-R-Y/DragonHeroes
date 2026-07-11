@@ -25,6 +25,11 @@
     "frost_res",
     "storm_res",
     "venom_res",
-    "umbral_res"
+    "umbral_res",
+    "hp_pct",
+    "damage_pct",
+    "skill_damage_pct",
+    "resist_pct",
+    "status_resist_pct"
   ]
 }

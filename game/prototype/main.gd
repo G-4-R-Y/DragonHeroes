@@ -386,8 +386,18 @@ func _physics_process(delta: float) -> void:
 		f.tick -= delta
 		if f.tick <= 0.0:
 			f.tick = 0.25
-			if not player.dead and player.global_position.distance_to(f.pos) < f.radius:
-				var k: Dictionary = FIELD_KINDS[f.kind]
+			var k: Dictionary = FIELD_KINDS[f.kind]
+			if f.get("friendly", false):
+				# player-cast fields (class skill tree): tick CREATURES instead
+				for c in get_tree().get_nodes_in_group("creatures"):
+					if c.dead:
+						continue
+					if c.global_position.distance_to(f.pos) < f.radius + c.body_radius:
+						if f.dps > 0.0:
+							c.dot_damage(f.dps * 0.25, k.edge)
+						if float(k.slow) > 0.0:
+							c.apply_slow(float(k.slow))
+			elif not player.dead and player.global_position.distance_to(f.pos) < f.radius:
 				if f.dps > 0.0:
 					player.take_damage(f.dps * 0.25, Vector2.ZERO, "status")
 				if float(k.slow) > 0.0:
@@ -410,12 +420,13 @@ func spawn_fire_field(at: Vector2, radius: float, duration: float, dps: float) -
 # arena: per-kind pulsing additive glow (lava strongest) + landing telegraph
 # ring + a per-kind ignition burst (canon §4 fake-bloom on gl_compatibility).
 func spawn_field(at: Vector2, radius: float, duration: float, dps: float,
-		kind := "fire") -> void:
+		kind := "fire", friendly := false) -> void:
 	# THE DUOLOGUE (canon §4 + registries/fields.json combo table): while BOTH
 	# duo bosses live, a fire field landing on an earth field (either order)
-	# consumes both and fuses into LAVA — hotter, brighter, longer.
+	# consumes both and fuses into LAVA — hotter, brighter, longer. Friendly
+	# (player-cast, skill tree) fields never fuse — no griefing yourself.
 	var counter: String = {"fire": "earth", "earth": "fire"}.get(kind, "")
-	if counter != "" and _duo_combo_active():
+	if counter != "" and not friendly and _duo_combo_active():
 		var t_now := Time.get_ticks_msec() / 1000.0
 		for f in _fields:
 			if f.kind == counter and t_now <= f.until \
@@ -456,7 +467,7 @@ func spawn_field(at: Vector2, radius: float, duration: float, dps: float,
 					"color": Color(0.5, 0.9, 0.4, 0.6)})
 	_fields.append({"pos": at, "radius": radius,
 			"until": Time.get_ticks_msec() / 1000.0 + duration, "dps": dps, "tick": 0.0,
-			"glow": glow, "kind": kind})
+			"glow": glow, "kind": kind, "friendly": friendly})
 
 # The Duologue is only live while BOTH Legendary duo bosses stand (canon §4).
 func _duo_combo_active() -> bool:
@@ -970,7 +981,7 @@ func on_player_death() -> void:
 
 # ---- HUD --------------------------------------------------------------------
 
-const HINT_TEXT := "LMB cleave · Shift dodge x3 · Q rend · E whirlwind · Z mount · F bond · C character · K keys · Esc haven"
+const HINT_TEXT := "LMB cleave · Shift dodge x3 · Q rend · E whirlwind · 1-4 skills · Z mount · F bond · C character · K keys · Esc haven"
 
 func _hint_text() -> String:
 	var t := HINT_TEXT
@@ -1053,8 +1064,40 @@ func _build_hud() -> void:
 	e_bar.position = Vector2(2, 1)
 	e_bar.size = Vector2(32, 4)
 	e_bg.add_child(e_bar)
+	# skill bar (1-4): class-tree actives — chips in the Q/E gauge style, one
+	# row below (cooldown fill + the assigned skill's leading name word)
+	var slots: Array = []
+	for i in 4:
+		var x := 56.0 + i * 52.0
+		var s_key := Label.new()
+		s_key.text = str(i + 1)
+		s_key.position = Vector2(x, 38)
+		s_key.add_theme_font_size_override("font_size", 10)
+		canvas.add_child(s_key)
+		var s_bg := ColorRect.new()
+		s_bg.color = Color(0, 0, 0, 0.55)
+		s_bg.position = Vector2(x + 10, 45)
+		s_bg.size = Vector2(36, 6)
+		canvas.add_child(s_bg)
+		var s_bar := ColorRect.new()
+		s_bar.color = Color("c9853c")
+		s_bar.position = Vector2(2, 1)
+		s_bar.size = Vector2(32, 4)
+		s_bg.add_child(s_bar)
+		var s_name := Label.new()
+		s_name.position = Vector2(x + 10, 52)
+		s_name.add_theme_font_size_override("font_size", 7)
+		s_name.modulate = Color(1, 1, 1, 0.6)
+		canvas.add_child(s_name)
+		slots.append({"key": s_key, "bar": s_bar, "name": s_name})
+	# class charge chip (Veilblade Combo / Gloam Mage Attunement)
+	var charge := Label.new()
+	charge.position = Vector2(268, 43)
+	charge.add_theme_font_size_override("font_size", 9)
+	charge.add_theme_color_override("font_color", Color("cf9dff"))
+	canvas.add_child(charge)
 	var stats := Label.new()
-	stats.position = Vector2(12, 40)
+	stats.position = Vector2(12, 60)
 	canvas.add_child(stats)
 	var hint := Label.new()
 	hint.text = _hint_text()
@@ -1096,7 +1139,7 @@ func _build_hud() -> void:
 	boss_bar_bg2.add_child(boss_bar2)
 	_hud = {"hp_bar": hp_bar, "stats": stats, "hint": hint, "pips": pips,
 			"q_label": q_label, "q_bar": q_bar, "xp_bar": xp_bar,
-			"e_bar": e_bar, "pet_chips": pet_chips,
+			"e_bar": e_bar, "pet_chips": pet_chips, "slots": slots, "charge": charge,
 			"boss_bar_bg": boss_bar_bg, "boss_bar": boss_bar, "boss_name": boss_name,
 			"boss_bar_bg2": boss_bar_bg2, "boss_bar2": boss_bar2}
 
@@ -1177,6 +1220,7 @@ func _update_gauges(delta: float) -> void:
 		else:
 			pip.size.x = 10.0
 			pip.color = PIP_OFF
+	_update_skill_slots(pulse)
 	# Whirlwind (E): always owned — fill + soft glow when ready
 	var ep: float = player.whirl_progress()
 	var eready := ep >= 1.0
@@ -1199,6 +1243,32 @@ func _update_gauges(delta: float) -> void:
 	var qcol := Color("8a5cff") if not ready \
 			else Color("b06cff").lerp(Color(0.95, 0.85, 1.0), 0.45 * pulse)
 	_hud.q_bar.color = qcol.lerp(Color.WHITE, _q_flash)
+
+# Skill bar chips (1-4): cooldown fill per assigned class-tree active + the
+# class charge counter (Combo/Attunement). Same treatment as the Q/E gauges.
+func _update_skill_slots(pulse: float) -> void:
+	for i in 4:
+		var chip: Dictionary = _hud.slots[i]
+		var id := str(Session.skill_loadout[i])
+		var def: Dictionary = Session.skill_def(id) if id != "" else {}
+		if def.is_empty() or not Session.node_learned(id):
+			chip.bar.size.x = 0.0
+			chip.name.text = "—"
+			chip.key.modulate = Color(1, 1, 1, 0.25)
+			continue
+		chip.key.modulate = Color(1, 1, 1, 0.9)
+		var total: float = float((def.get("params", {}) as Dictionary).get("cd", 6.0)) \
+				* player.cdr_mult
+		var left: float = player.skill_cd_left(id)
+		var prog := 1.0 if total <= 0.0 else clampf(1.0 - left / total, 0.0, 1.0)
+		chip.bar.size.x = 32.0 * prog
+		chip.bar.color = Color("c9853c") if prog < 1.0 \
+				else Color("ffb45c").lerp(Color(1.0, 0.95, 0.85), 0.45 * pulse)
+		chip.name.text = str(def.get("name", "?")).get_slice(" ", 0).left(8)
+	if player.charge_name == "" or player.charge_stacks <= 0:
+		_hud.charge.text = ""
+	else:
+		_hud.charge.text = "◈ %s x%d" % [player.charge_name, player.charge_stacks]
 
 func _update_pet_chips() -> void:
 	for i in _hud.pet_chips.size():
@@ -1241,6 +1311,7 @@ func _build_keybinds() -> void:
 		"Shift / RMB     dodge (3 charges)",
 		"Q               Shadow Rend (stone)",
 		"E               Whirlwind",
+		"1-4             class skills (learn/assign: C - Skills)",
 		"F               bond pet (Soul Snare)",
 		"Z               mount / dismount",
 		"C / Tab         character panel",

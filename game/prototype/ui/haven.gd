@@ -199,26 +199,35 @@ func _go_hunting() -> void:
 	get_tree().change_scene_to_file("res://prototype/main.tscn")
 
 func _show_skills() -> void:
-	_open("Skills — Reaver tree")
-	var cls := Session.load_content("reaver")
-	var res: Dictionary = cls.get("resource", {})
-	_line("Class: %s (%s)  ·  resource: %s, max %d, %+d/s" % [
-			str(cls.get("name", "Reaver")), str(cls.get("role", "")),
-			str(res.get("name", "Fury")), int(res.get("max", 0)),
-			int(res.get("regen_per_s", 0))], DIM)
-	for node in cls.get("skill_tree", []):
-		var txt := "%s  [%s]" % [str(node.get("node", "?")), str(node.get("kind", "?"))]
-		if str(node.get("grants_skill", "")) != "":
-			txt += " — grants %s" % _pretty_id(str(node.get("grants_skill")))
-		var mods: Array[String] = []
-		for m in node.get("stat_mods", []):
-			mods.append("%s %+d" % [str(m.get("stat", "?")), int(m.get("value", 0))])
-		if not mods.is_empty():
-			txt += " — " + ", ".join(mods)
-		if str(node.get("node", "")) == "root_cleave":
-			_line("* " + txt + "   — LEARNED", GOLD, 11)
-		else:
-			_line("- " + txt, PALE, 11)
+	_open("Skills — %s tree" % Session.class_display())
+	# class-tree summary (skill_trees.json): the real learn/assign UI lives in
+	# CHARACTER → Skills; this kiosk is the overview.
+	var actives := 0
+	var passives := 0
+	var learned := 0
+	for n in Session.class_tree():
+		if str(n.get("type", "")) == "active":
+			actives += 1
+		elif int(n.get("cost", 1)) > 0:
+			passives += 1
+		if int(n.get("cost", 1)) > 0 and Session.def_learned(n):
+			learned += 1
+	_line("Class: %s — %d actives + %d passives, requires-gated. %d learned, "
+			% [Session.class_display(), actives, passives, learned]
+			+ "%d skill points banked (1 per level)." % Session.skill_points, PALE, 11)
+	var charge: Dictionary = Session.class_charge()
+	if not charge.is_empty():
+		_line("◈ %s — %s" % [str(charge.get("name", "")),
+				str(charge.get("desc", ""))], VIOLET, 11)
+	for br in Session.class_branches():
+		var names: Array[String] = []
+		for n in br.get("nodes", []):
+			if int(n.get("cost", 1)) > 0:
+				names.append(str(n.get("name", "?")))
+		if not names.is_empty():
+			_line("- %s: %s" % [str(br.get("name", "?")), ", ".join(names)], DIM, 10)
+	_line("Learn nodes and assign actives to keys 1-4 in CHARACTER → Skills (C). " +
+			"Synergies are on the cards: Bleed, Ignite, Chill, Expose, Stagger.", PALE, 11)
 	var cleave := Session.load_content("cleave")
 	var n: Dictionary = cleave.get("numbers", {})
 	_header("Cleave (%s)" % str(cleave.get("id", "core.skill.cleave")))

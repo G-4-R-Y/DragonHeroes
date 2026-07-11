@@ -74,21 +74,93 @@ func _run() -> void:
 	else:
 		_fail("Equip click had no effect")
 
-	# ---- skill tree: learn a node through injected clicks ------------------------
-	Session.skill_points = 1
+	# ---- skill tree: learn a passive + an ACTIVE, assign it to slot 1 ------------
+	Session.level = 20   # min_level gates open (brutal_edge needs level 2)
+	Session.skill_points = 3
 	tabs.current_tab = 3   # Skills
 	cp.refresh()
 	await get_tree().process_frame
-	var learn := _btn_containing(cp, "Learn (1 pt)")
+	var learn := _btn_with_tooltip(cp, "learn brutal_edge")
 	if learn == null:
-		_fail("no learnable node button on the Skills tab")
+		_fail("no Learn button for brutal_edge on the Skills tab")
 	else:
 		await _scroll_to(learn)   # the tree sits below the fold since the v7 cards
 		await _click(learn.get_global_rect().get_center())
 		if Session.node_learned("brutal_edge"):
-			print("CLICKTEST OK: skill node learned via click (brutal_edge)")
+			print("CLICKTEST OK: passive node learned via click (brutal_edge)")
 		else:
-			_fail("Learn click had no effect")
+			_fail("Learn click had no effect (brutal_edge)")
+	var learn_act := _btn_with_tooltip(cp, "learn rv_gash")
+	if learn_act == null:
+		_fail("no Learn button for the rv_gash active")
+	else:
+		await _scroll_to(learn_act)
+		await _click(learn_act.get_global_rect().get_center())
+		if Session.node_learned("rv_gash"):
+			print("CLICKTEST OK: active skill learned via click (rv_gash)")
+		else:
+			_fail("Learn click had no effect (rv_gash)")
+	var assign := _btn_with_tooltip(cp, "assign Gash to slot 1")
+	if assign == null:
+		_fail("learned active shows no assign chip for slot 1")
+	else:
+		await _scroll_to(assign)
+		await _click(assign.get_global_rect().get_center())
+		if str(Session.skill_loadout[0]) == "rv_gash":
+			print("CLICKTEST OK: active assigned to skill-bar slot 1 via click")
+		else:
+			_fail("assign chip click had no effect (slot 1 = '%s')"
+					% str(Session.skill_loadout[0]))
+
+	# ---- executor: a REAL cast against a REAL creature (headless, no main) ------
+	var pl := ProtoPlayer.new()
+	add_child(pl)
+	var cr := ProtoCreature.new()
+	cr.global_position = pl.global_position + Vector2(24, 0)   # inside Gash reach
+	add_child(cr)
+	await get_tree().process_frame
+	var hp0: float = cr.hp
+	if pl.use_skill(Session.skill_def("rv_gash")) and cr.hp < hp0 \
+			and cr.has_status("bleeding") and pl.skill_cd_left("rv_gash") > 0.0:
+		print("CLICKTEST OK: generic executor — Gash dealt damage, applied Bleed, set cooldown")
+	else:
+		_fail("use_skill(rv_gash) failed (hp %.1f -> %.1f, bleeding %s, cd %.2f)" % [
+				hp0, cr.hp, str(cr.has_status("bleeding")), pl.skill_cd_left("rv_gash")])
+	# keys 1-4 path: learn a buff active, assign it to slot 2, cast it with KEY_2
+	var learn_buff := _btn_with_tooltip(cp, "learn rv_blood_howl")
+	if learn_buff == null:
+		_fail("no Learn button for rv_blood_howl")
+	else:
+		await _scroll_to(learn_buff)
+		await _click(learn_buff.get_global_rect().get_center())
+		var assign2 := _btn_with_tooltip(cp, "assign Blood Howl to slot 2")
+		if assign2 == null:
+			_fail("no assign chip for Blood Howl slot 2")
+		else:
+			await _scroll_to(assign2)
+			await _click(assign2.get_global_rect().get_center())
+			# slot path (KEY_2 in play): headless physics ticks don't align with
+			# injected-event flush frames, so drive the same code directly.
+			pl._cast_slot(1)
+			if pl.skill_cd_left("rv_blood_howl") > 0.0:
+				print("CLICKTEST OK: skill bar — slot 2 cast the assigned Blood Howl")
+			else:
+				_fail("slot 2 did not cast the assigned skill")
+
+	# class charge mechanic: the Gloam Mage builds Attunement and spends it
+	Session.class_id = "core.class.mage"
+	pl.apply_stats()
+	pl.use_skill(Session.skill_def("gm_gloambolt"))     # builder: +1 stack
+	var stacks_after_build: int = pl.charge_stacks
+	pl.use_skill(Session.skill_def("gm_gloomburst"))    # spender: consumes all
+	if pl.charge_name == "Attunement" and stacks_after_build == 1 \
+			and pl.charge_stacks == 0:
+		print("CLICKTEST OK: class charge — Attunement built by Gloambolt, spent by Gloomburst")
+	else:
+		_fail("charge mechanic broken (name '%s', built %d, after spend %d)" % [
+				pl.charge_name, stacks_after_build, pl.charge_stacks])
+	Session.class_id = "core.class.reaver"
+	pl.apply_stats()
 
 	# ---- panel close: × click, C toggle, Esc — the Haven-close bug regression ---
 	if not cp.visible:
@@ -126,15 +198,20 @@ func _run() -> void:
 	Session.stables = []
 	Session.mounts = []
 	Session.equipment["weapon"] = {}
+	Session.skill_loadout = ["", "", "", ""]
+	Session.learned_nodes = ["root_cleave"]
 	Session.login("clicktest")   # reload from disk
 	if Session.gold == 777 and Session.stables.size() == 1 \
 			and Session.mounts.size() == 1 and Session.owns_mount("gloam_strider") \
-			and str(Session.equipment["weapon"].get("name", "")) == weapon_name:
-		print("CLICKTEST OK: save round-trip (gold, stables, mounts, equipment)")
+			and str(Session.equipment["weapon"].get("name", "")) == weapon_name \
+			and str(Session.skill_loadout[0]) == "rv_gash" \
+			and Session.node_learned("rv_gash"):
+		print("CLICKTEST OK: save round-trip (gold, stables, mounts, equipment, skill loadout)")
 	else:
-		_fail("save round-trip mismatch: gold %d, stables %d, weapon '%s' vs '%s'" % [
+		_fail("save round-trip mismatch: gold %d, stables %d, weapon '%s' vs '%s', slot1 '%s'" % [
 				Session.gold, Session.stables.size(),
-				str(Session.equipment["weapon"].get("name", "")), weapon_name])
+				str(Session.equipment["weapon"].get("name", "")), weapon_name,
+				str(Session.skill_loadout[0])])
 	DirAccess.remove_absolute(
 			ProjectSettings.globalize_path("user://saves/clicktest.json"))
 	_done()

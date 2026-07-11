@@ -155,6 +155,26 @@ func arc_slash(at: Vector2, dir: Vector2, color: Color) -> void:
 			"v_min": 200.0, "v_max": 320.0, "s_min": 0.5, "s_max": 1.0,
 			"color": Color(1, 1, 1, 0.9)})
 
+# Jagged link between two points — chain skills (Cold Snap, Umbral Coil) hop
+# creature to creature on these. Same pooled Line2Ds as the sky bolts.
+func arc_link(from: Vector2, to: Vector2, color: Color) -> void:
+	var l: Line2D = _bolts[_bi]
+	_bi = (_bi + 1) % BOLT_POOL
+	var pts := PackedVector2Array()
+	var n := 5
+	for i in n + 1:
+		var p := from.lerp(to, float(i) / float(n))
+		if i > 0 and i < n:
+			p += Vector2(randf_range(-6.0, 6.0), randf_range(-6.0, 6.0))
+		pts.append(p)
+	l.points = pts
+	l.default_color = color
+	l.visible = true
+	l.modulate = Color(1, 1, 1, 1)
+	var tw := l.create_tween()
+	tw.tween_property(l, "modulate:a", 0.0, 0.18)
+	tw.tween_callback(func() -> void: l.visible = false)
+
 # Jagged white-blue strike from the sky — thunder SFX is the caller's business.
 func lightning(at: Vector2) -> void:
 	var l: Line2D = _bolts[_bi]

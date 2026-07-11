@@ -10,6 +10,10 @@ var dmg_type := "fire"   # resist-mitigated on the player (stats.gd)
 var radius := 4.0
 var lifetime := 3.0
 var friendly := false    # player-cast (Mage bolts, Rogue knives): hits creatures
+# Class-tree skill bolts: the hit routes through the caster's synergy pipeline
+# (applies/bonus_vs/consumes — player.gd projectile_hit) instead of raw damage.
+var skill_def := {}
+var shooter: Node2D = null
 # color parameters — ember by default; the wisp's umbral bolt sets violet
 var body_col := Color("ff7a33")
 var core_col := Color("ffd9a0")
@@ -91,7 +95,11 @@ func _physics_process(delta: float) -> void:
 						/ seg_f.length_squared(), 0.0, 1.0)
 			if (from + seg_f * t_f).distance_to(c.global_position) \
 					<= radius + c.body_radius:
-				c.take_damage(damage, velocity.normalized(), body_col)
+				if not skill_def.is_empty() and is_instance_valid(shooter):
+					shooter.projectile_hit(c, damage, velocity.normalized(),
+							skill_def, body_col)
+				else:
+					c.take_damage(damage, velocity.normalized(), body_col)
 				_impact()
 				return
 		return

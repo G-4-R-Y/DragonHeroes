@@ -46,10 +46,13 @@ var skill_runes := {"cleave": {}, "rend": {}, "dodge": {}}
 # Stabled pets (Ricardo: pets are NEVER abandoned) — overflow captures move the
 # oldest ACTIVE bond here; manage active/stabled in CHARACTER → Pets.
 var stables: Array = []
-# Skill progression (proposal): 1 point per level; the Reaver tree (reaver.json)
-# nodes are learned here and feed the StatBlock (stats.gd). Root is free.
+# Skill progression (proposal): 1 point per level; class-tree nodes
+# (skill_trees.json — 20 actives + 8 passives per class) are learned here and
+# feed the StatBlock (stats.gd). Roots are free (cost 0). skill_loadout maps
+# hotbar slots 1-4 to learned ACTIVE node ids ("" = empty).
 var skill_points := 0
 var learned_nodes: Array = ["root_cleave"]
+var skill_loadout: Array = ["", "", "", ""]
 # Mounts (Ricardo 2026-07-10, proposals): walking + flying. Owned instances:
 # {uid, key, name, kind: walk|fly, speed_mult, rarity, tint}. M rides the active.
 var mounts: Array = []
@@ -85,6 +88,8 @@ func setup_input() -> void:
 		"capture": [KEY_F], "bestial": [KEY_Q], "skill2": [KEY_E],
 		"mount": [KEY_Z],   # Z: reachable without leaving WASD (was M — Ricardo)
 		"toggle_character": [KEY_C, KEY_TAB], "toggle_keybinds": [KEY_K],
+		# skill bar: 1-4 cast the assigned class-tree actives (skill_loadout)
+		"slot1": [KEY_1], "slot2": [KEY_2], "slot3": [KEY_3], "slot4": [KEY_4],
 	}
 	for action in bindings:
 		if not InputMap.has_action(action):
@@ -138,6 +143,7 @@ func save() -> void:
 			"inventory": inventory, "equipment": equipment,
 			"skill_runes": skill_runes, "pets": pets, "stables": stables,
 			"skill_points": skill_points, "learned_nodes": learned_nodes,
+			"skill_loadout": skill_loadout,
 			"mounts": mounts, "active_mount": active_mount,
 			"stash": stash}, "\t"))
 
@@ -170,6 +176,10 @@ func _load_state() -> void:
 	stables = d.get("stables", [])
 	skill_points = int(d.get("skill_points", 0))
 	learned_nodes = d.get("learned_nodes", ["root_cleave"])
+	# skill bar loadout: missing in old saves — default to 4 empty slots
+	var lo: Array = d.get("skill_loadout", []) if d.get("skill_loadout", []) is Array else []
+	for i in 4:
+		skill_loadout[i] = str(lo[i]) if i < lo.size() else ""
 	mounts = d.get("mounts", [])
 	active_mount = int(d.get("active_mount", -1))
 	stash = d.get("stash", [])
@@ -351,18 +361,66 @@ func active_mount_data() -> Dictionary:
 			return m
 	return {}
 
-# ---- skill tree (reaver.json; 1 point per level-up, proposal) ----------------------
+# ---- class skill trees (skill_trees.json; 1 point per level-up, proposal) ----------
+# 20 actives + 8 passives per class, executed generically by player.use_skill.
+# The tree for the CURRENT class is flattened + indexed once and cached.
+
+var _tree_cache := {}      # class_id -> {branches, flat, by_id, charge}
+
+func _class_tree_data() -> Dictionary:
+	if _tree_cache.has(class_id):
+		return _tree_cache[class_id]
+	var reg := load_content("skill_trees")
+	var cls: Dictionary = (reg.get("classes", {}) as Dictionary).get(class_id, {})
+	var branches: Array = cls.get("branches", [])
+	var flat: Array = []
+	var by_id := {}
+	for b in branches:
+		for n in b.get("nodes", []):
+			flat.append(n)
+			by_id[str(n.get("id", ""))] = n
+	var data := {"branches": branches, "flat": flat, "by_id": by_id,
+			"charge": cls.get("charge", {})}
+	_tree_cache[class_id] = data
+	return data
+
+func class_branches() -> Array:
+	return _class_tree_data().branches
+
+func class_tree() -> Array:
+	return _class_tree_data().flat
+
+func skill_def(node: String) -> Dictionary:
+	return _class_tree_data().by_id.get(node, {})
+
+# Class charge mechanic (Gloam Mage Attunement, Veilblade Combo) — {} for none.
+func class_charge() -> Dictionary:
+	return _class_tree_data().charge
 
 func node_learned(node: String) -> bool:
 	return learned_nodes.has(node)
 
-func learn_node(node: String) -> bool:
-	if skill_points <= 0 or learned_nodes.has(node):
+# Roots cost 0 and are always "learned" — old saves only carry root_cleave.
+func def_learned(def: Dictionary) -> bool:
+	return int(def.get("cost", 1)) <= 0 or learned_nodes.has(str(def.get("id", "")))
+
+func learn_node(node: String, cost := 1) -> bool:
+	if skill_points < cost or cost <= 0 or learned_nodes.has(node):
 		return false
 	learned_nodes.append(node)
-	skill_points -= 1
+	skill_points -= cost
 	request_save()
 	return true
+
+# Assign a learned active to hotbar slot 0-3 ("" clears; one skill per slot).
+func assign_skill(slot: int, node: String) -> void:
+	if slot < 0 or slot >= skill_loadout.size():
+		return
+	for i in skill_loadout.size():   # a skill lives in at most one slot
+		if str(skill_loadout[i]) == node and node != "":
+			skill_loadout[i] = ""
+	skill_loadout[slot] = node
+	request_save()
 
 # Every rune key the player owns (bag + sockets) — drops prefer unowned runes.
 func owned_rune_keys() -> Array:

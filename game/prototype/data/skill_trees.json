@@ -1,0 +1,3162 @@
+{
+  "id": "core.registry.skill_trees",
+  "note": "Class skill trees (canon SS3/SS12.11 — proposal numbers): 20 actives + 8 passives per class, requires-gated, learned with skill points (1/level). Actives are PARAM-DRIVEN and executed by the one generic executor in game/prototype/player.gd (kinds: projectile/nova/cone/melee_arc/dash_strike/buff/field/chain). Synergies are data: applies/bonus_vs/consumes/spread/detonate + class charge (Attunement/Combo). Units: tiles (=m), seconds, mult vs melee damage. Snapshot: game/prototype/data/skill_trees.json.",
+  "statuses": {
+    "bleed": {
+      "name": "Bleed",
+      "desc": "stacking physical wound (max 5): each stack drips damage for 4 s"
+    },
+    "ignite": {
+      "name": "Ignite",
+      "desc": "fire over time, 3 s; refreshed on re-application"
+    },
+    "chill": {
+      "name": "Chill",
+      "desc": "-30% move speed, 1.6 s"
+    },
+    "expose": {
+      "name": "Expose",
+      "desc": "+20% damage taken from ALL sources, 4 s"
+    },
+    "stagger": {
+      "name": "Stagger",
+      "desc": "stunned in place, 0.5 s"
+    }
+  },
+  "classes": {
+    "core.class.reaver": {
+      "name": "Reaver",
+      "branches": [
+        {
+          "name": "Root",
+          "nodes": [
+            {
+              "id": "root_cleave",
+              "name": "Cleave",
+              "type": "passive",
+              "cost": 0,
+              "min_level": 1,
+              "requires": [],
+              "desc": "The Reaver's first answer to everything (LMB). The root every red road grows from.",
+              "stat_mods": []
+            }
+          ]
+        },
+        {
+          "name": "Butchery",
+          "nodes": [
+            {
+              "id": "rv_gash",
+              "name": "Gash",
+              "type": "active",
+              "cost": 1,
+              "min_level": 1,
+              "requires": [
+                "root_cleave"
+              ],
+              "desc": "A low, cruel crosscut that opens the vein — the wound keeps weeping. Applies Bleed.",
+              "kind": "melee_arc",
+              "params": {
+                "mult": 1.25,
+                "reach": 2.4,
+                "arc_deg": 100,
+                "cd": 4.0
+              },
+              "synergy": "applies Bleed",
+              "applies": [
+                "bleed"
+              ]
+            },
+            {
+              "id": "rv_hurled_cleaver",
+              "name": "Hurled Cleaver",
+              "type": "active",
+              "cost": 1,
+              "min_level": 3,
+              "requires": [
+                "rv_gash"
+              ],
+              "desc": "The cleaver leaves your hand before the thought finishes. Bites at range and leaves it Bleeding.",
+              "kind": "projectile",
+              "params": {
+                "count": 1,
+                "mult": 1.1,
+                "speed": 14,
+                "cd": 5.0,
+                "element": "steel"
+              },
+              "synergy": "applies Bleed",
+              "applies": [
+                "bleed"
+              ]
+            },
+            {
+              "id": "rv_ravage",
+              "name": "Ravage",
+              "type": "active",
+              "cost": 1,
+              "min_level": 6,
+              "requires": [
+                "rv_hurled_cleaver"
+              ],
+              "desc": "Tear at what is already torn. Deals +50% to Bleeding prey.",
+              "kind": "melee_arc",
+              "params": {
+                "mult": 1.6,
+                "reach": 2.4,
+                "arc_deg": 90,
+                "cd": 6.0
+              },
+              "synergy": "+50% vs Bleeding",
+              "bonus_vs": {
+                "bleeding": 1.5
+              }
+            },
+            {
+              "id": "rv_deep_wounds",
+              "name": "Deep Wounds",
+              "type": "passive",
+              "cost": 1,
+              "min_level": 8,
+              "requires": [
+                "rv_ravage"
+              ],
+              "desc": "Your edges remember the bone. +8% melee damage.",
+              "stat_mods": [
+                {
+                  "stat": "damage_pct",
+                  "value": 8
+                }
+              ]
+            },
+            {
+              "id": "rv_artery_storm",
+              "name": "Artery Storm",
+              "type": "active",
+              "cost": 1,
+              "min_level": 10,
+              "requires": [
+                "rv_deep_wounds"
+              ],
+              "desc": "One turn, every artery in reach. The circle around you Bleeds.",
+              "kind": "nova",
+              "params": {
+                "mult": 0.9,
+                "radius": 2.6,
+                "cd": 9.0,
+                "element": "steel"
+              },
+              "synergy": "applies Bleed",
+              "applies": [
+                "bleed"
+              ]
+            },
+            {
+              "id": "rv_exsanguinate",
+              "name": "Exsanguinate",
+              "type": "active",
+              "cost": 2,
+              "min_level": 15,
+              "requires": [
+                "rv_artery_storm"
+              ],
+              "desc": "Empty them out in one red instant: +100% to Bleeding prey, and the Bleed is spent with the blow.",
+              "kind": "melee_arc",
+              "params": {
+                "mult": 2.2,
+                "reach": 2.6,
+                "arc_deg": 110,
+                "cd": 12.0
+              },
+              "synergy": "+100% vs Bleeding, consumes it",
+              "bonus_vs": {
+                "bleeding": 2.0
+              },
+              "consumes": [
+                "bleed"
+              ]
+            }
+          ]
+        },
+        {
+          "name": "The Old Scars",
+          "nodes": [
+            {
+              "id": "brutal_edge",
+              "name": "Brutal Edge",
+              "type": "passive",
+              "cost": 1,
+              "min_level": 2,
+              "requires": [
+                "root_cleave"
+              ],
+              "desc": "The first scar taught you where the soft places are. +5% critical chance.",
+              "stat_mods": [
+                {
+                  "stat": "crit_chance",
+                  "value": 5
+                }
+              ]
+            },
+            {
+              "id": "cleave_rampage",
+              "name": "Cleave Rampage",
+              "type": "passive",
+              "cost": 1,
+              "min_level": 4,
+              "requires": [
+                "brutal_edge"
+              ],
+              "desc": "The swing that never quite stops swinging. +8% attack speed.",
+              "stat_mods": [
+                {
+                  "stat": "attack_speed",
+                  "value": 8
+                }
+              ]
+            },
+            {
+              "id": "blood_price",
+              "name": "Blood Price",
+              "type": "passive",
+              "cost": 1,
+              "min_level": 7,
+              "requires": [
+                "cleave_rampage"
+              ],
+              "desc": "KEYSTONE — pay in armor, drink in blood: melee heals 10% of damage dealt, -15 armor. The Gloom always collects.",
+              "stat_mods": [
+                {
+                  "stat": "blood_leech_pct",
+                  "value": 10
+                },
+                {
+                  "stat": "armor",
+                  "value": -15
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Bloodrite",
+          "nodes": [
+            {
+              "id": "rv_blood_howl",
+              "name": "Blood Howl",
+              "type": "active",
+              "cost": 1,
+              "min_level": 4,
+              "requires": [
+                "root_cleave"
+              ],
+              "desc": "A howl from the red place under thought. +25% damage for 8 s.",
+              "kind": "buff",
+              "params": {
+                "duration": 8.0,
+                "cd": 16.0,
+                "mults": {
+                  "damage": 1.25
+                }
+              }
+            },
+            {
+              "id": "rv_leech_fury",
+              "name": "Leech Fury",
+              "type": "active",
+              "cost": 1,
+              "min_level": 7,
+              "requires": [
+                "rv_blood_howl"
+              ],
+              "desc": "For six seconds every wound you give is a mouth you drink from: +15% melee leech.",
+              "kind": "buff",
+              "params": {
+                "duration": 6.0,
+                "cd": 14.0,
+                "mults": {
+                  "leech": 0.15
+                }
+              },
+              "synergy": "temporary blood leech"
+            },
+            {
+              "id": "rv_red_harvest",
+              "name": "Red Harvest",
+              "type": "active",
+              "cost": 1,
+              "min_level": 11,
+              "requires": [
+                "rv_leech_fury"
+              ],
+              "desc": "Reap the closest ring of the field. Every soul struck feeds you (melee leech applies).",
+              "kind": "nova",
+              "params": {
+                "mult": 1.2,
+                "radius": 2.4,
+                "cd": 10.0,
+                "leech": true,
+                "element": "ember"
+              },
+              "synergy": "nova that leeches"
+            },
+            {
+              "id": "rv_bonebreaker",
+              "name": "Bonebreaker",
+              "type": "passive",
+              "cost": 1,
+              "min_level": 12,
+              "requires": [
+                "rv_red_harvest"
+              ],
+              "desc": "Momentum is a habit. +6% attack speed.",
+              "stat_mods": [
+                {
+                  "stat": "attack_speed",
+                  "value": 6
+                }
+              ]
+            },
+            {
+              "id": "rv_crimson_pact",
+              "name": "Crimson Pact",
+              "type": "active",
+              "cost": 1,
+              "min_level": 13,
+              "requires": [
+                "rv_bonebreaker"
+              ],
+              "desc": "Promise the blade more, faster. +30% attack speed for 6 s.",
+              "kind": "buff",
+              "params": {
+                "duration": 6.0,
+                "cd": 18.0,
+                "mults": {
+                  "attack_speed": 1.3
+                }
+              }
+            },
+            {
+              "id": "rv_deathless_roar",
+              "name": "Deathless Roar",
+              "type": "active",
+              "cost": 2,
+              "min_level": 17,
+              "requires": [
+                "rv_crimson_pact"
+              ],
+              "desc": "A sound that makes the Gloom flinch first — everything near is Staggered.",
+              "kind": "nova",
+              "params": {
+                "mult": 0.5,
+                "radius": 2.8,
+                "cd": 14.0,
+                "element": "ember"
+              },
+              "synergy": "applies Stagger",
+              "applies": [
+                "stagger"
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Warpath",
+          "nodes": [
+            {
+              "id": "rv_bull_rush",
+              "name": "Bull Rush",
+              "type": "active",
+              "cost": 1,
+              "min_level": 2,
+              "requires": [
+                "root_cleave"
+              ],
+              "desc": "Four strides of bad news. Everything along the line is hit and Staggered.",
+              "kind": "dash_strike",
+              "params": {
+                "mult": 1.4,
+                "dist": 4.5,
+                "cd": 7.0
+              },
+              "synergy": "applies Stagger",
+              "applies": [
+                "stagger"
+              ]
+            },
+            {
+              "id": "rv_skullbreaker",
+              "name": "Skullbreaker",
+              "type": "active",
+              "cost": 1,
+              "min_level": 5,
+              "requires": [
+                "rv_bull_rush"
+              ],
+              "desc": "An overhand answer to a ringing head: +50% to Staggered prey.",
+              "kind": "melee_arc",
+              "params": {
+                "mult": 1.8,
+                "reach": 2.2,
+                "arc_deg": 60,
+                "cd": 8.0
+              },
+              "synergy": "+50% vs Staggered",
+              "bonus_vs": {
+                "staggered": 1.5
+              }
+            },
+            {
+              "id": "rv_warborn",
+              "name": "Warborn",
+              "type": "passive",
+              "cost": 1,
+              "min_level": 6,
+              "requires": [
+                "rv_skullbreaker"
+              ],
+              "desc": "You were built for exactly this. +25 max HP.",
+              "stat_mods": [
+                {
+                  "stat": "hp",
+                  "value": 25
+                }
+              ]
+            },
+            {
+              "id": "rv_rampage",
+              "name": "Rampage",
+              "type": "active",
+              "cost": 1,
+              "min_level": 9,
+              "requires": [
+                "rv_warborn"
+              ],
+              "desc": "Stop deciding, start arriving: +30% move, +15% attack speed for 5 s.",
+              "kind": "buff",
+              "params": {
+                "duration": 5.0,
+                "cd": 15.0,
+                "mults": {
+                  "move": 1.3,
+                  "attack_speed": 1.15
+                }
+              }
+            },
+            {
+              "id": "rv_earthsplitter",
+              "name": "Earthsplitter",
+              "type": "active",
+              "cost": 1,
+              "min_level": 12,
+              "requires": [
+                "rv_rampage"
+              ],
+              "desc": "Split the ground where you point; it seethes and grinds whatever stands there.",
+              "kind": "field",
+              "params": {
+                "field_kind": "earth",
+                "radius": 2.6,
+                "duration": 6.0,
+                "dps_mult": 0.35,
+                "range": 5.0,
+                "cd": 12.0
+              }
+            },
+            {
+              "id": "rv_executioner",
+              "name": "Executioner",
+              "type": "passive",
+              "cost": 1,
+              "min_level": 14,
+              "requires": [
+                "rv_earthsplitter"
+              ],
+              "desc": "You finish sentences. +20% critical damage.",
+              "stat_mods": [
+                {
+                  "stat": "crit_damage",
+                  "value": 20
+                }
+              ]
+            },
+            {
+              "id": "rv_warlords_descent",
+              "name": "Warlord's Descent",
+              "type": "active",
+              "cost": 2,
+              "min_level": 18,
+              "requires": [
+                "rv_executioner"
+              ],
+              "desc": "Arrive like a verdict. The line you cross is left Exposed (+20% damage from ALL sources).",
+              "kind": "dash_strike",
+              "params": {
+                "mult": 2.0,
+                "dist": 5.5,
+                "cd": 14.0
+              },
+              "synergy": "applies Expose",
+              "applies": [
+                "expose"
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Sunder",
+          "nodes": [
+            {
+              "id": "rv_sunder_armor",
+              "name": "Sunder Armor",
+              "type": "active",
+              "cost": 1,
+              "min_level": 3,
+              "requires": [
+                "root_cleave"
+              ],
+              "desc": "Peel the plate back from the meat. Exposed prey takes +20% damage from ALL sources for 4 s.",
+              "kind": "melee_arc",
+              "params": {
+                "mult": 1.0,
+                "reach": 2.4,
+                "arc_deg": 100,
+                "cd": 6.0
+              },
+              "synergy": "applies Expose",
+              "applies": [
+                "expose"
+              ]
+            },
+            {
+              "id": "rv_shatterstrike",
+              "name": "Shatterstrike",
+              "type": "active",
+              "cost": 1,
+              "min_level": 8,
+              "requires": [
+                "rv_sunder_armor"
+              ],
+              "desc": "Hit the crack you made: +50% to Exposed prey.",
+              "kind": "melee_arc",
+              "params": {
+                "mult": 1.7,
+                "reach": 2.4,
+                "arc_deg": 80,
+                "cd": 8.0
+              },
+              "synergy": "+50% vs Exposed",
+              "bonus_vs": {
+                "exposed": 1.5
+              }
+            },
+            {
+              "id": "rv_thick_skin",
+              "name": "Thick Skin",
+              "type": "passive",
+              "cost": 1,
+              "min_level": 5,
+              "requires": [
+                "rv_shatterstrike"
+              ],
+              "desc": "Scar tissue is armor you grew yourself. +20 armor.",
+              "stat_mods": [
+                {
+                  "stat": "armor",
+                  "value": 20
+                }
+              ]
+            },
+            {
+              "id": "rv_cull",
+              "name": "Cull",
+              "type": "active",
+              "cost": 1,
+              "min_level": 11,
+              "requires": [
+                "rv_thick_skin"
+              ],
+              "desc": "A wide, patient sweep for thinning the herd.",
+              "kind": "melee_arc",
+              "params": {
+                "mult": 1.5,
+                "reach": 2.6,
+                "arc_deg": 140,
+                "cd": 9.0
+              }
+            },
+            {
+              "id": "rv_whirling_ruin",
+              "name": "Whirling Ruin",
+              "type": "active",
+              "cost": 1,
+              "min_level": 14,
+              "requires": [
+                "rv_cull"
+              ],
+              "desc": "Become a wheel with edges. Everything in the circle learns why.",
+              "kind": "nova",
+              "params": {
+                "mult": 1.1,
+                "radius": 3.0,
+                "cd": 11.0,
+                "element": "steel"
+              }
+            },
+            {
+              "id": "rv_red_tide",
+              "name": "The Red Tide",
+              "type": "active",
+              "cost": 2,
+              "min_level": 20,
+              "requires": [
+                "rv_whirling_ruin"
+              ],
+              "desc": "The tide comes in, and it is not water. +75% to Bleeding prey, consuming every Bleed it touches.",
+              "kind": "nova",
+              "params": {
+                "mult": 2.5,
+                "radius": 3.2,
+                "cd": 20.0,
+                "element": "ember"
+              },
+              "synergy": "+75% vs Bleeding, consumes it",
+              "bonus_vs": {
+                "bleeding": 1.75
+              },
+              "consumes": [
+                "bleed"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "core.class.emberkin": {
+      "name": "Emberkin",
+      "branches": [
+        {
+          "name": "Root",
+          "nodes": [
+            {
+              "id": "em_root",
+              "name": "Emberbrand",
+              "type": "passive",
+              "cost": 0,
+              "min_level": 1,
+              "requires": [],
+              "desc": "The brand smoulders in the palm and never quite goes out — Emberkin strikes sear on hit (LMB).",
+              "stat_mods": []
+            }
+          ]
+        },
+        {
+          "name": "Kindling",
+          "nodes": [
+            {
+              "id": "em_emberlash",
+              "name": "Emberlash",
+              "type": "active",
+              "cost": 1,
+              "min_level": 1,
+              "requires": [
+                "em_root"
+              ],
+              "desc": "A whip of live flame. Sets Ignite burning — fire that eats over time.",
+              "kind": "cone",
+              "params": {
+                "mult": 1.0,
+                "reach": 3.0,
+                "arc_deg": 50,
+                "cd": 4.0,
+                "element": "ember"
+              },
+              "synergy": "applies Ignite",
+              "applies": [
+                "ignite"
+              ]
+            },
+            {
+              "id": "em_twin_suns",
+              "name": "Twin Suns",
+              "type": "active",
+              "cost": 1,
+              "min_level": 3,
+              "requires": [
+                "em_emberlash"
+              ],
+              "desc": "Two small suns, thrown like an argument. Both Ignite.",
+              "kind": "projectile",
+              "params": {
+                "count": 2,
+                "spread_deg": 14,
+                "mult": 0.9,
+                "speed": 13,
+                "cd": 5.0,
+                "element": "ember"
+              },
+              "synergy": "applies Ignite",
+              "applies": [
+                "ignite"
+              ]
+            },
+            {
+              "id": "em_dry_tinder",
+              "name": "Dry Tinder",
+              "type": "passive",
+              "cost": 1,
+              "min_level": 4,
+              "requires": [
+                "em_twin_suns"
+              ],
+              "desc": "Everything burns easier than it believes. +10% skill damage.",
+              "stat_mods": [
+                {
+                  "stat": "skill_damage_pct",
+                  "value": 10
+                }
+              ]
+            },
+            {
+              "id": "em_flame_fan",
+              "name": "Flame Fan",
+              "type": "active",
+              "cost": 1,
+              "min_level": 6,
+              "requires": [
+                "em_dry_tinder"
+              ],
+              "desc": "Open the hand; the fire chooses three. Each bolt Ignites.",
+              "kind": "projectile",
+              "params": {
+                "count": 3,
+                "spread_deg": 30,
+                "mult": 0.7,
+                "speed": 13,
+                "cd": 6.0,
+                "element": "ember"
+              },
+              "synergy": "applies Ignite",
+              "applies": [
+                "ignite"
+              ]
+            },
+            {
+              "id": "em_kindlers_rush",
+              "name": "Kindler's Rush",
+              "type": "active",
+              "cost": 1,
+              "min_level": 8,
+              "requires": [
+                "em_flame_fan"
+              ],
+              "desc": "Cross the room as a spark crosses tinder — everything on the line Ignites.",
+              "kind": "dash_strike",
+              "params": {
+                "mult": 1.2,
+                "dist": 4.0,
+                "cd": 8.0
+              },
+              "synergy": "applies Ignite",
+              "applies": [
+                "ignite"
+              ]
+            },
+            {
+              "id": "em_sunspite_lance",
+              "name": "Sunspite Lance",
+              "type": "active",
+              "cost": 1,
+              "min_level": 12,
+              "requires": [
+                "em_kindlers_rush"
+              ],
+              "desc": "Hate, distilled and given a point. Deals +50% to Ignited prey.",
+              "kind": "projectile",
+              "params": {
+                "count": 1,
+                "mult": 1.8,
+                "speed": 18,
+                "cd": 9.0,
+                "element": "ember"
+              },
+              "synergy": "+50% vs Ignited",
+              "bonus_vs": {
+                "ignited": 1.5
+              }
+            }
+          ]
+        },
+        {
+          "name": "Wildfire",
+          "nodes": [
+            {
+              "id": "em_emberwake",
+              "name": "Emberwake",
+              "type": "active",
+              "cost": 1,
+              "min_level": 4,
+              "requires": [
+                "em_root"
+              ],
+              "desc": "Strike, and the flame leaps hungry — Ignite SPREADS from struck prey to the pack around them.",
+              "kind": "melee_arc",
+              "params": {
+                "mult": 1.2,
+                "reach": 2.4,
+                "arc_deg": 100,
+                "cd": 6.0
+              },
+              "synergy": "spreads Ignite",
+              "spread": {
+                "status": "ignite",
+                "radius": 2.5
+              }
+            },
+            {
+              "id": "em_flamechain",
+              "name": "Flamechain",
+              "type": "active",
+              "cost": 1,
+              "min_level": 9,
+              "requires": [
+                "em_emberwake"
+              ],
+              "desc": "Fire that arcs from soul to soul, Igniting each in turn.",
+              "kind": "chain",
+              "params": {
+                "mult": 0.9,
+                "jumps": 3,
+                "range": 5.0,
+                "cd": 8.0,
+                "element": "ember"
+              },
+              "synergy": "applies Ignite",
+              "applies": [
+                "ignite"
+              ]
+            },
+            {
+              "id": "em_bellows",
+              "name": "Bellows",
+              "type": "passive",
+              "cost": 1,
+              "min_level": 7,
+              "requires": [
+                "em_flamechain"
+              ],
+              "desc": "Every breath feeds the forge. +6% attack speed.",
+              "stat_mods": [
+                {
+                  "stat": "attack_speed",
+                  "value": 6
+                }
+              ]
+            },
+            {
+              "id": "em_cinderburst",
+              "name": "Cinderburst",
+              "type": "active",
+              "cost": 1,
+              "min_level": 11,
+              "requires": [
+                "em_bellows"
+              ],
+              "desc": "The spark calls to the powder: Ignited prey DETONATE, burning the pack around them.",
+              "kind": "nova",
+              "params": {
+                "mult": 1.0,
+                "radius": 2.4,
+                "cd": 9.0,
+                "element": "ember"
+              },
+              "synergy": "detonates Ignite",
+              "detonate": {
+                "status": "ignite",
+                "radius": 2.2,
+                "mult": 1.2
+              }
+            },
+            {
+              "id": "em_backdraft",
+              "name": "Backdraft",
+              "type": "active",
+              "cost": 1,
+              "min_level": 14,
+              "requires": [
+                "em_cinderburst"
+              ],
+              "desc": "Pull the fire back out of them all at once: +75% to Ignited prey, consuming the burn.",
+              "kind": "nova",
+              "params": {
+                "mult": 1.4,
+                "radius": 2.6,
+                "cd": 11.0,
+                "element": "ember"
+              },
+              "synergy": "+75% vs Ignited, consumes it",
+              "bonus_vs": {
+                "ignited": 1.75
+              },
+              "consumes": [
+                "ignite"
+              ]
+            },
+            {
+              "id": "em_vesuvian_howl",
+              "name": "Vesuvian Howl",
+              "type": "active",
+              "cost": 2,
+              "min_level": 18,
+              "requires": [
+                "em_backdraft"
+              ],
+              "desc": "The mountain's opinion, borrowed. Ignites and Staggers everything in the throat of it.",
+              "kind": "cone",
+              "params": {
+                "mult": 2.0,
+                "reach": 3.4,
+                "arc_deg": 60,
+                "cd": 14.0,
+                "element": "ember"
+              },
+              "synergy": "applies Ignite + Stagger",
+              "applies": [
+                "ignite",
+                "stagger"
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Ashen Rite",
+          "nodes": [
+            {
+              "id": "em_marchfire",
+              "name": "Marchfire",
+              "type": "active",
+              "cost": 1,
+              "min_level": 2,
+              "requires": [
+                "em_root"
+              ],
+              "desc": "March wrapped in warm ash: +30% move speed for 5 s.",
+              "kind": "buff",
+              "params": {
+                "duration": 5.0,
+                "cd": 12.0,
+                "mults": {
+                  "move": 1.3
+                }
+              }
+            },
+            {
+              "id": "em_soot_mantle",
+              "name": "Soot Mantle",
+              "type": "passive",
+              "cost": 1,
+              "min_level": 5,
+              "requires": [
+                "em_marchfire"
+              ],
+              "desc": "What burned once shields twice. +15 armor.",
+              "stat_mods": [
+                {
+                  "stat": "armor",
+                  "value": 15
+                }
+              ]
+            },
+            {
+              "id": "em_ashen_veil",
+              "name": "Ashen Veil",
+              "type": "active",
+              "cost": 1,
+              "min_level": 7,
+              "requires": [
+                "em_soot_mantle"
+              ],
+              "desc": "Wear the fire's leavings. Physical damage taken is cut for 6 s.",
+              "kind": "buff",
+              "params": {
+                "duration": 6.0,
+                "cd": 15.0,
+                "mults": {
+                  "armor": 1.35
+                }
+              }
+            },
+            {
+              "id": "em_scorched_earth",
+              "name": "Scorched Earth",
+              "type": "active",
+              "cost": 1,
+              "min_level": 10,
+              "requires": [
+                "em_ashen_veil"
+              ],
+              "desc": "Name a patch of ground and disown it. A burning field holds it for you.",
+              "kind": "field",
+              "params": {
+                "field_kind": "fire",
+                "radius": 2.4,
+                "duration": 6.0,
+                "dps_mult": 0.4,
+                "range": 5.0,
+                "cd": 11.0
+              }
+            },
+            {
+              "id": "em_slow_fuse",
+              "name": "Slow Fuse",
+              "type": "passive",
+              "cost": 1,
+              "min_level": 11,
+              "requires": [
+                "em_scorched_earth"
+              ],
+              "desc": "Patience is also a kind of burning. +10% cooldown recovery.",
+              "stat_mods": [
+                {
+                  "stat": "cooldown_reduction",
+                  "value": 10
+                }
+              ]
+            },
+            {
+              "id": "em_the_long_burn",
+              "name": "The Long Burn",
+              "type": "active",
+              "cost": 1,
+              "min_level": 15,
+              "requires": [
+                "em_slow_fuse"
+              ],
+              "desc": "Not a flare — a promise. +20% damage for 10 s.",
+              "kind": "buff",
+              "params": {
+                "duration": 10.0,
+                "cd": 20.0,
+                "mults": {
+                  "damage": 1.2
+                }
+              }
+            },
+            {
+              "id": "em_pyroclasm",
+              "name": "Pyroclasm",
+              "type": "active",
+              "cost": 2,
+              "min_level": 17,
+              "requires": [
+                "em_the_long_burn"
+              ],
+              "desc": "The ground remembers being lava, loudly.",
+              "kind": "field",
+              "params": {
+                "field_kind": "fire",
+                "radius": 3.2,
+                "duration": 8.0,
+                "dps_mult": 0.6,
+                "range": 6.0,
+                "cd": 16.0
+              }
+            }
+          ]
+        },
+        {
+          "name": "Pyre",
+          "nodes": [
+            {
+              "id": "em_cinder_nova",
+              "name": "Cinder Nova",
+              "type": "active",
+              "cost": 1,
+              "min_level": 5,
+              "requires": [
+                "em_root"
+              ],
+              "desc": "A ring of hot argument. The circle around you Ignites.",
+              "kind": "nova",
+              "params": {
+                "mult": 1.0,
+                "radius": 2.4,
+                "cd": 7.0,
+                "element": "ember"
+              },
+              "synergy": "applies Ignite",
+              "applies": [
+                "ignite"
+              ]
+            },
+            {
+              "id": "em_first_spark",
+              "name": "First Spark",
+              "type": "passive",
+              "cost": 1,
+              "min_level": 6,
+              "requires": [
+                "em_cinder_nova"
+              ],
+              "desc": "You know where the fire wants to start. +5% critical chance.",
+              "stat_mods": [
+                {
+                  "stat": "crit_chance",
+                  "value": 5
+                }
+              ]
+            },
+            {
+              "id": "em_brand_of_ruin",
+              "name": "Brand of Ruin",
+              "type": "active",
+              "cost": 1,
+              "min_level": 9,
+              "requires": [
+                "em_first_spark"
+              ],
+              "desc": "Press the brand in and twist: Ignites, and deals +25% to prey already burning.",
+              "kind": "melee_arc",
+              "params": {
+                "mult": 1.4,
+                "reach": 2.4,
+                "arc_deg": 90,
+                "cd": 7.0
+              },
+              "synergy": "Ignite + 25% vs Ignited",
+              "applies": [
+                "ignite"
+              ],
+              "bonus_vs": {
+                "ignited": 1.25
+              }
+            },
+            {
+              "id": "em_warm_blood",
+              "name": "Warm Blood",
+              "type": "passive",
+              "cost": 1,
+              "min_level": 10,
+              "requires": [
+                "em_brand_of_ruin"
+              ],
+              "desc": "Fire recognizes family. +8% elemental resist.",
+              "stat_mods": [
+                {
+                  "stat": "resist_pct",
+                  "value": 8
+                }
+              ]
+            },
+            {
+              "id": "em_firebreak",
+              "name": "Firebreak",
+              "type": "active",
+              "cost": 1,
+              "min_level": 13,
+              "requires": [
+                "em_warm_blood"
+              ],
+              "desc": "A wall of flame that walks forward, Igniting what refuses to move.",
+              "kind": "cone",
+              "params": {
+                "mult": 1.5,
+                "reach": 3.6,
+                "arc_deg": 70,
+                "cd": 10.0,
+                "element": "ember"
+              },
+              "synergy": "applies Ignite",
+              "applies": [
+                "ignite"
+              ]
+            },
+            {
+              "id": "em_pyre_heart",
+              "name": "Pyre Heart",
+              "type": "passive",
+              "cost": 1,
+              "min_level": 15,
+              "requires": [
+                "em_firebreak"
+              ],
+              "desc": "The coal at your center glows brighter. +8% melee damage.",
+              "stat_mods": [
+                {
+                  "stat": "damage_pct",
+                  "value": 8
+                }
+              ]
+            },
+            {
+              "id": "em_emberfall",
+              "name": "Emberfall",
+              "type": "active",
+              "cost": 1,
+              "min_level": 16,
+              "requires": [
+                "em_pyre_heart"
+              ],
+              "desc": "Shake the sky's cinders loose — five falling embers, each one Igniting.",
+              "kind": "projectile",
+              "params": {
+                "count": 5,
+                "spread_deg": 60,
+                "mult": 0.6,
+                "speed": 12,
+                "cd": 12.0,
+                "element": "ember"
+              },
+              "synergy": "applies Ignite",
+              "applies": [
+                "ignite"
+              ]
+            },
+            {
+              "id": "em_cinder_price",
+              "name": "Cinder Price",
+              "type": "passive",
+              "cost": 1,
+              "min_level": 12,
+              "requires": [
+                "em_emberfall"
+              ],
+              "desc": "KEYSTONE — the pyre burns both ways: +15% skill damage, -8% elemental resist. Warmth was never free.",
+              "stat_mods": [
+                {
+                  "stat": "skill_damage_pct",
+                  "value": 15
+                },
+                {
+                  "stat": "resist_pct",
+                  "value": -8
+                }
+              ]
+            },
+            {
+              "id": "em_heart_of_the_pyre",
+              "name": "Heart of the Pyre",
+              "type": "active",
+              "cost": 2,
+              "min_level": 20,
+              "requires": [
+                "em_cinder_price"
+              ],
+              "desc": "Become, briefly, the place where things end. A huge nova — and every Ignited soul in it DETONATES.",
+              "kind": "nova",
+              "params": {
+                "mult": 2.4,
+                "radius": 3.4,
+                "cd": 20.0,
+                "element": "ember"
+              },
+              "synergy": "detonates Ignite",
+              "detonate": {
+                "status": "ignite",
+                "radius": 2.4,
+                "mult": 1.5
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "core.class.frostbinder": {
+      "name": "Frostbinder",
+      "branches": [
+        {
+          "name": "Root",
+          "nodes": [
+            {
+              "id": "fb_root",
+              "name": "Rimeward",
+              "type": "passive",
+              "cost": 0,
+              "min_level": 1,
+              "requires": [],
+              "desc": "Cold gathers at the edge of every blow — Frostbinder strikes Chill on hit (LMB).",
+              "stat_mods": []
+            }
+          ]
+        },
+        {
+          "name": "Rime",
+          "nodes": [
+            {
+              "id": "fb_frostbite",
+              "name": "Frostbite",
+              "type": "active",
+              "cost": 1,
+              "min_level": 1,
+              "requires": [
+                "fb_root"
+              ],
+              "desc": "Cold enters at the cut and stays. Applies Chill (slow).",
+              "kind": "melee_arc",
+              "params": {
+                "mult": 1.1,
+                "reach": 2.4,
+                "arc_deg": 100,
+                "cd": 4.0
+              },
+              "synergy": "applies Chill",
+              "applies": [
+                "chill"
+              ]
+            },
+            {
+              "id": "fb_icelance",
+              "name": "Icelance",
+              "type": "active",
+              "cost": 1,
+              "min_level": 3,
+              "requires": [
+                "fb_frostbite"
+              ],
+              "desc": "Winter, sharpened to a point. Chills on impact.",
+              "kind": "projectile",
+              "params": {
+                "count": 1,
+                "mult": 1.3,
+                "speed": 15,
+                "cd": 5.0,
+                "element": "frost"
+              },
+              "synergy": "applies Chill",
+              "applies": [
+                "chill"
+              ]
+            },
+            {
+              "id": "fb_biting_cold",
+              "name": "Biting Cold",
+              "type": "passive",
+              "cost": 1,
+              "min_level": 4,
+              "requires": [
+                "fb_icelance"
+              ],
+              "desc": "Your cold has teeth. +10% skill damage.",
+              "stat_mods": [
+                {
+                  "stat": "skill_damage_pct",
+                  "value": 10
+                }
+              ]
+            },
+            {
+              "id": "fb_glassing_volley",
+              "name": "Glassing Volley",
+              "type": "active",
+              "cost": 1,
+              "min_level": 7,
+              "requires": [
+                "fb_biting_cold"
+              ],
+              "desc": "Three shards of almost-ice. Each one Chills.",
+              "kind": "projectile",
+              "params": {
+                "count": 3,
+                "spread_deg": 26,
+                "mult": 0.7,
+                "speed": 14,
+                "cd": 7.0,
+                "element": "frost"
+              },
+              "synergy": "applies Chill",
+              "applies": [
+                "chill"
+              ]
+            },
+            {
+              "id": "fb_numbing_winds",
+              "name": "Numbing Winds",
+              "type": "active",
+              "cost": 1,
+              "min_level": 9,
+              "requires": [
+                "fb_glassing_volley"
+              ],
+              "desc": "A breath from the white distance. The cone Chills everything it touches.",
+              "kind": "cone",
+              "params": {
+                "mult": 1.1,
+                "reach": 3.2,
+                "arc_deg": 55,
+                "cd": 8.0,
+                "element": "frost"
+              },
+              "synergy": "applies Chill",
+              "applies": [
+                "chill"
+              ]
+            },
+            {
+              "id": "fb_hailfang",
+              "name": "Hailfang",
+              "type": "active",
+              "cost": 1,
+              "min_level": 15,
+              "requires": [
+                "fb_numbing_winds"
+              ],
+              "desc": "The storm's teeth, all at once. Five Chilling shards.",
+              "kind": "projectile",
+              "params": {
+                "count": 5,
+                "spread_deg": 44,
+                "mult": 0.6,
+                "speed": 15,
+                "cd": 10.0,
+                "element": "frost"
+              },
+              "synergy": "applies Chill",
+              "applies": [
+                "chill"
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Shatterwork",
+          "nodes": [
+            {
+              "id": "fb_shatter",
+              "name": "Shatter",
+              "type": "active",
+              "cost": 1,
+              "min_level": 5,
+              "requires": [
+                "fb_root"
+              ],
+              "desc": "What is frozen is already broken — it just hasn't been told. DOUBLE damage to Chilled prey, shattering the chill.",
+              "kind": "melee_arc",
+              "params": {
+                "mult": 1.8,
+                "reach": 2.4,
+                "arc_deg": 80,
+                "cd": 8.0
+              },
+              "synergy": "x2 vs Chilled, consumes it",
+              "bonus_vs": {
+                "chilled": 2.0
+              },
+              "consumes": [
+                "chill"
+              ]
+            },
+            {
+              "id": "fb_deepfreeze",
+              "name": "Deepfreeze",
+              "type": "active",
+              "cost": 1,
+              "min_level": 8,
+              "requires": [
+                "fb_shatter"
+              ],
+              "desc": "Cold enough to stop the thought mid-step: Staggers, and deals +40% to the Chilled.",
+              "kind": "melee_arc",
+              "params": {
+                "mult": 1.4,
+                "reach": 2.4,
+                "arc_deg": 80,
+                "cd": 8.0
+              },
+              "synergy": "Stagger + 40% vs Chilled",
+              "applies": [
+                "stagger"
+              ],
+              "bonus_vs": {
+                "chilled": 1.4
+              }
+            },
+            {
+              "id": "fb_splinter_edge",
+              "name": "Splinter Edge",
+              "type": "passive",
+              "cost": 1,
+              "min_level": 10,
+              "requires": [
+                "fb_deepfreeze"
+              ],
+              "desc": "Ice knows exactly where to crack. +5% critical chance.",
+              "stat_mods": [
+                {
+                  "stat": "crit_chance",
+                  "value": 5
+                }
+              ]
+            },
+            {
+              "id": "fb_mirrorshard",
+              "name": "Mirrorshard",
+              "type": "active",
+              "cost": 1,
+              "min_level": 11,
+              "requires": [
+                "fb_splinter_edge"
+              ],
+              "desc": "A shard that shows them their own ending: +50% to Chilled prey.",
+              "kind": "projectile",
+              "params": {
+                "count": 1,
+                "mult": 1.6,
+                "speed": 18,
+                "cd": 9.0,
+                "element": "frost"
+              },
+              "synergy": "+50% vs Chilled",
+              "bonus_vs": {
+                "chilled": 1.5
+              }
+            },
+            {
+              "id": "fb_long_dark_breath",
+              "name": "Breath of the Long Dark",
+              "type": "active",
+              "cost": 2,
+              "min_level": 16,
+              "requires": [
+                "fb_mirrorshard"
+              ],
+              "desc": "The winter between stars, exhaled: +75% to Chilled prey, shattering every chill in the cone.",
+              "kind": "cone",
+              "params": {
+                "mult": 1.7,
+                "reach": 3.6,
+                "arc_deg": 60,
+                "cd": 12.0,
+                "element": "frost"
+              },
+              "synergy": "+75% vs Chilled, consumes it",
+              "bonus_vs": {
+                "chilled": 1.75
+              },
+              "consumes": [
+                "chill"
+              ]
+            },
+            {
+              "id": "fb_winterfall",
+              "name": "Winterfall",
+              "type": "active",
+              "cost": 2,
+              "min_level": 20,
+              "requires": [
+                "fb_long_dark_breath"
+              ],
+              "desc": "The long winter, delivered all at once. +125% to Chilled prey, and every chill is spent in the breaking.",
+              "kind": "nova",
+              "params": {
+                "mult": 2.6,
+                "radius": 3.0,
+                "cd": 22.0,
+                "element": "frost"
+              },
+              "synergy": "+125% vs Chilled, consumes it",
+              "bonus_vs": {
+                "chilled": 2.25
+              },
+              "consumes": [
+                "chill"
+              ]
+            },
+            {
+              "id": "fb_unhurried_death",
+              "name": "Unhurried Death",
+              "type": "passive",
+              "cost": 1,
+              "min_level": 16,
+              "requires": [
+                "fb_winterfall"
+              ],
+              "desc": "Winter never rushes and never misses. +8% melee damage.",
+              "stat_mods": [
+                {
+                  "stat": "damage_pct",
+                  "value": 8
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Bulwark of Ice",
+          "nodes": [
+            {
+              "id": "fb_icebound_bulwark",
+              "name": "Icebound Bulwark",
+              "type": "active",
+              "cost": 1,
+              "min_level": 2,
+              "requires": [
+                "fb_root"
+              ],
+              "desc": "Wear the glacier's patience. Physical damage taken is cut hard for 5 s.",
+              "kind": "buff",
+              "params": {
+                "duration": 5.0,
+                "cd": 14.0,
+                "mults": {
+                  "armor": 1.6
+                }
+              }
+            },
+            {
+              "id": "fb_thick_ice",
+              "name": "Thick Ice",
+              "type": "passive",
+              "cost": 1,
+              "min_level": 4,
+              "requires": [
+                "fb_icebound_bulwark"
+              ],
+              "desc": "Layers on layers, all of them winter. +25 armor.",
+              "stat_mods": [
+                {
+                  "stat": "armor",
+                  "value": 25
+                }
+              ]
+            },
+            {
+              "id": "fb_stillwater_stance",
+              "name": "Stillwater Stance",
+              "type": "active",
+              "cost": 1,
+              "min_level": 10,
+              "requires": [
+                "fb_thick_ice"
+              ],
+              "desc": "Be the lake the storm cannot argue with: +15% damage, armored, for 6 s.",
+              "kind": "buff",
+              "params": {
+                "duration": 6.0,
+                "cd": 16.0,
+                "mults": {
+                  "damage": 1.15,
+                  "armor": 1.3
+                }
+              }
+            },
+            {
+              "id": "fb_deep_reserve",
+              "name": "Deep Reserve",
+              "type": "passive",
+              "cost": 1,
+              "min_level": 8,
+              "requires": [
+                "fb_stillwater_stance"
+              ],
+              "desc": "Under the ice, more ice. +40 max HP.",
+              "stat_mods": [
+                {
+                  "stat": "hp",
+                  "value": 40
+                }
+              ]
+            },
+            {
+              "id": "fb_glaciers_weight",
+              "name": "Glacier's Weight",
+              "type": "active",
+              "cost": 1,
+              "min_level": 13,
+              "requires": [
+                "fb_deep_reserve"
+              ],
+              "desc": "The mountain falls slowly, but it does fall: +50% to Chilled prey.",
+              "kind": "melee_arc",
+              "params": {
+                "mult": 2.0,
+                "reach": 2.6,
+                "arc_deg": 70,
+                "cd": 10.0
+              },
+              "synergy": "+50% vs Chilled",
+              "bonus_vs": {
+                "chilled": 1.5
+              }
+            },
+            {
+              "id": "fb_rimeblood_rush",
+              "name": "Rimeblood Rush",
+              "type": "active",
+              "cost": 1,
+              "min_level": 12,
+              "requires": [
+                "fb_glaciers_weight"
+              ],
+              "desc": "Cold blood moves faster than it should: +20% attack and move speed for 5 s.",
+              "kind": "buff",
+              "params": {
+                "duration": 5.0,
+                "cd": 15.0,
+                "mults": {
+                  "attack_speed": 1.2,
+                  "move": 1.2
+                }
+              }
+            },
+            {
+              "id": "fb_silence_of_snow",
+              "name": "The Silence of Snow",
+              "type": "active",
+              "cost": 2,
+              "min_level": 17,
+              "requires": [
+                "fb_rimeblood_rush"
+              ],
+              "desc": "Cold that lays the flesh bare: everything near is Chilled AND Exposed (+20% damage from ALL sources).",
+              "kind": "nova",
+              "params": {
+                "mult": 0.8,
+                "radius": 3.4,
+                "cd": 14.0,
+                "element": "frost"
+              },
+              "synergy": "applies Chill + Expose",
+              "applies": [
+                "chill",
+                "expose"
+              ]
+            },
+            {
+              "id": "fb_frost_heart",
+              "name": "Frost Heart",
+              "type": "passive",
+              "cost": 1,
+              "min_level": 13,
+              "requires": [
+                "fb_silence_of_snow"
+              ],
+              "desc": "The heart beats slower and outlasts everything. +8% max HP.",
+              "stat_mods": [
+                {
+                  "stat": "hp_pct",
+                  "value": 8
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "The Depths",
+          "nodes": [
+            {
+              "id": "fb_sleetstep",
+              "name": "Sleetstep",
+              "type": "active",
+              "cost": 1,
+              "min_level": 3,
+              "requires": [
+                "fb_root"
+              ],
+              "desc": "Move like weather. The line you cross is Chilled.",
+              "kind": "dash_strike",
+              "params": {
+                "mult": 1.0,
+                "dist": 4.5,
+                "cd": 7.0
+              },
+              "synergy": "applies Chill",
+              "applies": [
+                "chill"
+              ]
+            },
+            {
+              "id": "fb_hoarfrost_ring",
+              "name": "Hoarfrost Ring",
+              "type": "active",
+              "cost": 1,
+              "min_level": 6,
+              "requires": [
+                "fb_sleetstep"
+              ],
+              "desc": "Frost blooms outward in a breath. The ring Chills.",
+              "kind": "nova",
+              "params": {
+                "mult": 0.9,
+                "radius": 2.6,
+                "cd": 8.0,
+                "element": "frost"
+              },
+              "synergy": "applies Chill",
+              "applies": [
+                "chill"
+              ]
+            },
+            {
+              "id": "fb_cold_blood",
+              "name": "Cold Blood",
+              "type": "passive",
+              "cost": 1,
+              "min_level": 7,
+              "requires": [
+                "fb_hoarfrost_ring"
+              ],
+              "desc": "What runs cold cannot be boiled. +10% elemental resist.",
+              "stat_mods": [
+                {
+                  "stat": "resist_pct",
+                  "value": 10
+                }
+              ]
+            },
+            {
+              "id": "fb_cold_snap",
+              "name": "Cold Snap",
+              "type": "active",
+              "cost": 1,
+              "min_level": 9,
+              "requires": [
+                "fb_cold_blood"
+              ],
+              "desc": "Winter travels by word of mouth — a Chill that leaps between packmates.",
+              "kind": "chain",
+              "params": {
+                "mult": 1.0,
+                "jumps": 3,
+                "range": 5.0,
+                "cd": 9.0,
+                "element": "frost"
+              },
+              "synergy": "applies Chill",
+              "applies": [
+                "chill"
+              ]
+            },
+            {
+              "id": "fb_winters_grip",
+              "name": "Winter's Grip",
+              "type": "active",
+              "cost": 1,
+              "min_level": 13,
+              "requires": [
+                "fb_cold_snap"
+              ],
+              "desc": "The season closes its hand: Chills and Staggers the circle.",
+              "kind": "nova",
+              "params": {
+                "mult": 0.5,
+                "radius": 3.0,
+                "cd": 12.0,
+                "element": "frost"
+              },
+              "synergy": "applies Chill + Stagger",
+              "applies": [
+                "chill",
+                "stagger"
+              ]
+            },
+            {
+              "id": "fb_whiteout",
+              "name": "Whiteout",
+              "type": "active",
+              "cost": 1,
+              "min_level": 14,
+              "requires": [
+                "fb_winters_grip"
+              ],
+              "desc": "For one white second there is no world, only cold. Chills everything near.",
+              "kind": "nova",
+              "params": {
+                "mult": 1.2,
+                "radius": 2.8,
+                "cd": 12.0,
+                "element": "frost"
+              },
+              "synergy": "applies Chill",
+              "applies": [
+                "chill"
+              ]
+            },
+            {
+              "id": "fb_stillness",
+              "name": "Stillness",
+              "type": "passive",
+              "cost": 1,
+              "min_level": 11,
+              "requires": [
+                "fb_whiteout"
+              ],
+              "desc": "Nothing hurries under the ice. +10% cooldown recovery.",
+              "stat_mods": [
+                {
+                  "stat": "cooldown_reduction",
+                  "value": 10
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "core.class.mage": {
+      "name": "Gloam Mage",
+      "charge": {
+        "name": "Attunement",
+        "max": 5,
+        "per_stack": 0.25,
+        "desc": "Gloamweave skills Attune the caster (+1, max 5); release skills spend every stack for +25% damage each."
+      },
+      "branches": [
+        {
+          "name": "Root",
+          "nodes": [
+            {
+              "id": "gm_root",
+              "name": "Gloamtouch",
+              "type": "passive",
+              "cost": 0,
+              "min_level": 1,
+              "requires": [],
+              "desc": "The Gloom answered when you knocked — Arcane Bolt is its reply (LMB).",
+              "stat_mods": []
+            }
+          ]
+        },
+        {
+          "name": "Gloamweave",
+          "nodes": [
+            {
+              "id": "gm_gloambolt",
+              "name": "Gloambolt",
+              "type": "active",
+              "cost": 1,
+              "min_level": 1,
+              "requires": [
+                "gm_root"
+              ],
+              "desc": "A shard of the Gloom itself, borrowed politely. Attunes +1.",
+              "kind": "projectile",
+              "params": {
+                "count": 1,
+                "mult": 1.1,
+                "speed": 14,
+                "cd": 4.0,
+                "element": "arcane"
+              },
+              "synergy": "builds Attunement",
+              "charge_gain": 1,
+              "tags": [
+                "arcane"
+              ]
+            },
+            {
+              "id": "gm_unravel",
+              "name": "Unravel",
+              "type": "active",
+              "cost": 1,
+              "min_level": 2,
+              "requires": [
+                "gm_gloambolt"
+              ],
+              "desc": "Pick the one seam that holds a body shut. Exposed: +20% damage from ALL sources for 4 s.",
+              "kind": "projectile",
+              "params": {
+                "count": 1,
+                "mult": 0.9,
+                "speed": 13,
+                "cd": 6.0,
+                "element": "arcane"
+              },
+              "synergy": "applies Expose",
+              "applies": [
+                "expose"
+              ]
+            },
+            {
+              "id": "gm_dusk_volley",
+              "name": "Dusk Volley",
+              "type": "active",
+              "cost": 1,
+              "min_level": 4,
+              "requires": [
+                "gm_unravel"
+              ],
+              "desc": "Three questions the dark asks at once. Attunes +1.",
+              "kind": "projectile",
+              "params": {
+                "count": 3,
+                "spread_deg": 24,
+                "mult": 0.7,
+                "speed": 13,
+                "cd": 6.0,
+                "element": "arcane"
+              },
+              "synergy": "builds Attunement",
+              "charge_gain": 1,
+              "tags": [
+                "arcane"
+              ]
+            },
+            {
+              "id": "gm_deep_study",
+              "name": "Deep Study",
+              "type": "passive",
+              "cost": 1,
+              "min_level": 3,
+              "requires": [
+                "gm_dusk_volley"
+              ],
+              "desc": "You read the books they buried. +12% skill damage.",
+              "stat_mods": [
+                {
+                  "stat": "skill_damage_pct",
+                  "value": 12
+                }
+              ]
+            },
+            {
+              "id": "gm_umbral_coil",
+              "name": "Umbral Coil",
+              "type": "active",
+              "cost": 1,
+              "min_level": 6,
+              "requires": [
+                "gm_deep_study"
+              ],
+              "desc": "A rope of dark that ties three throats together. Attunes +1.",
+              "kind": "chain",
+              "params": {
+                "mult": 1.0,
+                "jumps": 3,
+                "range": 5.0,
+                "cd": 8.0,
+                "element": "arcane"
+              },
+              "synergy": "builds Attunement",
+              "charge_gain": 1,
+              "tags": [
+                "arcane"
+              ]
+            },
+            {
+              "id": "gm_starving_dark",
+              "name": "Starving Dark",
+              "type": "active",
+              "cost": 1,
+              "min_level": 8,
+              "requires": [
+                "gm_umbral_coil"
+              ],
+              "desc": "The dark around you remembers it is hungry. Attunes +1.",
+              "kind": "nova",
+              "params": {
+                "mult": 1.0,
+                "radius": 2.5,
+                "cd": 8.0,
+                "element": "arcane"
+              },
+              "synergy": "builds Attunement",
+              "charge_gain": 1,
+              "tags": [
+                "arcane"
+              ]
+            },
+            {
+              "id": "gm_attuned_step",
+              "name": "Attuned Step",
+              "type": "active",
+              "cost": 1,
+              "min_level": 10,
+              "requires": [
+                "gm_starving_dark"
+              ],
+              "desc": "Step through the thin place. Harms what you pass through; Attunes +1.",
+              "kind": "dash_strike",
+              "params": {
+                "mult": 0.8,
+                "dist": 4.5,
+                "cd": 8.0
+              },
+              "synergy": "builds Attunement",
+              "charge_gain": 1,
+              "tags": [
+                "arcane"
+              ]
+            }
+          ]
+        },
+        {
+          "name": "The Release",
+          "nodes": [
+            {
+              "id": "gm_gloomburst",
+              "name": "Gloomburst",
+              "type": "active",
+              "cost": 1,
+              "min_level": 5,
+              "requires": [
+                "gm_root"
+              ],
+              "desc": "Open the hand you have been closing: SPENDS all Attunement, +25% damage per stack.",
+              "kind": "nova",
+              "params": {
+                "mult": 1.5,
+                "radius": 2.6,
+                "cd": 9.0,
+                "element": "arcane"
+              },
+              "synergy": "spends Attunement",
+              "charge_spend": true
+            },
+            {
+              "id": "gm_lumenpiercer",
+              "name": "Lumenpiercer",
+              "type": "active",
+              "cost": 1,
+              "min_level": 9,
+              "requires": [
+                "gm_gloomburst"
+              ],
+              "desc": "A lance of everything the light left behind. Spends Attunement — +25% per stack.",
+              "kind": "projectile",
+              "params": {
+                "count": 1,
+                "mult": 2.0,
+                "speed": 20,
+                "cd": 10.0,
+                "element": "arcane"
+              },
+              "synergy": "spends Attunement",
+              "charge_spend": true
+            },
+            {
+              "id": "gm_patient_dark",
+              "name": "The Patient Dark",
+              "type": "passive",
+              "cost": 1,
+              "min_level": 8,
+              "requires": [
+                "gm_lumenpiercer"
+              ],
+              "desc": "The Gloom has waited eons; you can wait less. +12% cooldown recovery.",
+              "stat_mods": [
+                {
+                  "stat": "cooldown_reduction",
+                  "value": 12
+                }
+              ]
+            },
+            {
+              "id": "gm_hollow_choir",
+              "name": "The Hollow Choir",
+              "type": "active",
+              "cost": 1,
+              "min_level": 13,
+              "requires": [
+                "gm_patient_dark"
+              ],
+              "desc": "Voices with nothing behind them, aimed. Spends Attunement — +25% per stack.",
+              "kind": "cone",
+              "params": {
+                "mult": 1.6,
+                "reach": 3.4,
+                "arc_deg": 55,
+                "cd": 11.0,
+                "element": "arcane"
+              },
+              "synergy": "spends Attunement",
+              "charge_spend": true
+            },
+            {
+              "id": "gm_chainfire",
+              "name": "Chainfire of the Old Dark",
+              "type": "active",
+              "cost": 2,
+              "min_level": 16,
+              "requires": [
+                "gm_hollow_choir"
+              ],
+              "desc": "The first fire's shadow, passed hand to hand down five souls. Spends Attunement.",
+              "kind": "chain",
+              "params": {
+                "mult": 1.4,
+                "jumps": 5,
+                "range": 6.0,
+                "cd": 13.0,
+                "element": "arcane"
+              },
+              "synergy": "spends Attunement",
+              "charge_spend": true
+            },
+            {
+              "id": "gm_gloamfall",
+              "name": "Gloamfall",
+              "type": "active",
+              "cost": 2,
+              "min_level": 20,
+              "requires": [
+                "gm_chainfire"
+              ],
+              "desc": "The sky forgets the sun. Seven bolts, all your Attunement behind every one.",
+              "kind": "projectile",
+              "params": {
+                "count": 7,
+                "spread_deg": 70,
+                "mult": 0.8,
+                "speed": 13,
+                "cd": 18.0,
+                "element": "arcane"
+              },
+              "synergy": "spends Attunement",
+              "charge_spend": true
+            },
+            {
+              "id": "gm_starless",
+              "name": "Starless",
+              "type": "passive",
+              "cost": 1,
+              "min_level": 15,
+              "requires": [
+                "gm_gloamfall"
+              ],
+              "desc": "In perfect dark, every strike lands unseen. +15% critical damage.",
+              "stat_mods": [
+                {
+                  "stat": "crit_damage",
+                  "value": 15
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Unravelling",
+          "nodes": [
+            {
+              "id": "gm_whispered_ruin",
+              "name": "Whispered Ruin",
+              "type": "active",
+              "cost": 1,
+              "min_level": 7,
+              "requires": [
+                "gm_root"
+              ],
+              "desc": "Say the true name of the crack in them: +50% to Exposed prey.",
+              "kind": "projectile",
+              "params": {
+                "count": 1,
+                "mult": 1.4,
+                "speed": 15,
+                "cd": 8.0,
+                "element": "arcane"
+              },
+              "synergy": "+50% vs Exposed",
+              "bonus_vs": {
+                "exposed": 1.5
+              }
+            },
+            {
+              "id": "gm_gloom_sight",
+              "name": "Gloom-Sight",
+              "type": "passive",
+              "cost": 1,
+              "min_level": 6,
+              "requires": [
+                "gm_whispered_ruin"
+              ],
+              "desc": "You see where the seams are. +6% critical chance.",
+              "stat_mods": [
+                {
+                  "stat": "crit_chance",
+                  "value": 6
+                }
+              ]
+            },
+            {
+              "id": "gm_gloamlight_ring",
+              "name": "Gloamlight Ring",
+              "type": "active",
+              "cost": 1,
+              "min_level": 11,
+              "requires": [
+                "gm_gloom_sight"
+              ],
+              "desc": "A ring of not-quite-light that lays every seam bare: the circle is Exposed.",
+              "kind": "nova",
+              "params": {
+                "mult": 0.8,
+                "radius": 3.0,
+                "cd": 10.0,
+                "element": "arcane"
+              },
+              "synergy": "applies Expose",
+              "applies": [
+                "expose"
+              ]
+            },
+            {
+              "id": "gm_threadcutter",
+              "name": "Threadcutter",
+              "type": "active",
+              "cost": 2,
+              "min_level": 15,
+              "requires": [
+                "gm_gloamlight_ring"
+              ],
+              "desc": "One cut, four puppets. The chain Exposes each soul it visits.",
+              "kind": "chain",
+              "params": {
+                "mult": 1.1,
+                "jumps": 4,
+                "range": 5.0,
+                "cd": 11.0,
+                "element": "arcane"
+              },
+              "synergy": "applies Expose",
+              "applies": [
+                "expose"
+              ]
+            },
+            {
+              "id": "gm_last_light",
+              "name": "Last Light of Lumen",
+              "type": "active",
+              "cost": 2,
+              "min_level": 19,
+              "requires": [
+                "gm_threadcutter"
+              ],
+              "desc": "The old light, remembered badly and aimed well. Spends Attunement; +50% to Exposed prey, consuming the mark.",
+              "kind": "nova",
+              "params": {
+                "mult": 2.0,
+                "radius": 3.2,
+                "cd": 16.0,
+                "element": "arcane"
+              },
+              "synergy": "spends Attunement, +50% vs Exposed",
+              "bonus_vs": {
+                "exposed": 1.5
+              },
+              "consumes": [
+                "expose"
+              ],
+              "charge_spend": true
+            },
+            {
+              "id": "gm_thin_veil",
+              "name": "The Thin Veil",
+              "type": "passive",
+              "cost": 1,
+              "min_level": 10,
+              "requires": [
+                "gm_last_light"
+              ],
+              "desc": "KEYSTONE — pull the veil aside and hold it there: +18% skill damage, -10% max HP. The other side stares back.",
+              "stat_mods": [
+                {
+                  "stat": "skill_damage_pct",
+                  "value": 18
+                },
+                {
+                  "stat": "hp_pct",
+                  "value": -10
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "The Veil",
+          "nodes": [
+            {
+              "id": "gm_veil_of_moths",
+              "name": "Veil of Moths",
+              "type": "active",
+              "cost": 1,
+              "min_level": 3,
+              "requires": [
+                "gm_root"
+              ],
+              "desc": "A thousand grey wings between you and harm: armored and quick for 5 s.",
+              "kind": "buff",
+              "params": {
+                "duration": 5.0,
+                "cd": 14.0,
+                "mults": {
+                  "armor": 1.4,
+                  "move": 1.1
+                }
+              }
+            },
+            {
+              "id": "gm_riftlash",
+              "name": "Riftlash",
+              "type": "active",
+              "cost": 1,
+              "min_level": 5,
+              "requires": [
+                "gm_veil_of_moths"
+              ],
+              "desc": "Crack the world's skin and drag the edge across them. Attunes +1.",
+              "kind": "cone",
+              "params": {
+                "mult": 1.0,
+                "reach": 3.0,
+                "arc_deg": 50,
+                "cd": 6.0,
+                "element": "arcane"
+              },
+              "synergy": "builds Attunement",
+              "charge_gain": 1,
+              "tags": [
+                "arcane"
+              ]
+            },
+            {
+              "id": "gm_moth_wings",
+              "name": "Moth Wings",
+              "type": "passive",
+              "cost": 1,
+              "min_level": 5,
+              "requires": [
+                "gm_riftlash"
+              ],
+              "desc": "Weightless as a thing the light forgot. +6% move speed.",
+              "stat_mods": [
+                {
+                  "stat": "move_speed",
+                  "value": 6
+                }
+              ]
+            },
+            {
+              "id": "gm_pale_ward",
+              "name": "Pale Ward",
+              "type": "passive",
+              "cost": 1,
+              "min_level": 7,
+              "requires": [
+                "gm_moth_wings"
+              ],
+              "desc": "A circle drawn in older chalk. +10% elemental resist.",
+              "stat_mods": [
+                {
+                  "stat": "resist_pct",
+                  "value": 10
+                }
+              ]
+            },
+            {
+              "id": "gm_mirefen_call",
+              "name": "Mirefen Call",
+              "type": "active",
+              "cost": 1,
+              "min_level": 9,
+              "requires": [
+                "gm_pale_ward"
+              ],
+              "desc": "The fen answers to its old name — a creeping mire that slows and sickens what stands in it.",
+              "kind": "field",
+              "params": {
+                "field_kind": "mire",
+                "radius": 2.8,
+                "duration": 7.0,
+                "dps_mult": 0.3,
+                "range": 6.0,
+                "cd": 12.0
+              }
+            },
+            {
+              "id": "gm_umbra_font",
+              "name": "Umbra Font",
+              "type": "active",
+              "cost": 1,
+              "min_level": 12,
+              "requires": [
+                "gm_mirefen_call"
+              ],
+              "desc": "Drink from the dark spring. +25% damage for 8 s.",
+              "kind": "buff",
+              "params": {
+                "duration": 8.0,
+                "cd": 18.0,
+                "mults": {
+                  "damage": 1.25
+                }
+              }
+            },
+            {
+              "id": "gm_nightglass_spear",
+              "name": "Nightglass Spear",
+              "type": "active",
+              "cost": 1,
+              "min_level": 14,
+              "requires": [
+                "gm_umbra_font"
+              ],
+              "desc": "Obsidian that was never in a volcano. Staggers what it strikes.",
+              "kind": "projectile",
+              "params": {
+                "count": 1,
+                "mult": 1.5,
+                "speed": 17,
+                "cd": 10.0,
+                "element": "arcane"
+              },
+              "synergy": "applies Stagger",
+              "applies": [
+                "stagger"
+              ]
+            },
+            {
+              "id": "gm_last_breath",
+              "name": "Last Breath",
+              "type": "passive",
+              "cost": 1,
+              "min_level": 12,
+              "requires": [
+                "gm_nightglass_spear"
+              ],
+              "desc": "You have died a little before; it helps. +25 max HP.",
+              "stat_mods": [
+                {
+                  "stat": "hp",
+                  "value": 25
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "core.class.rogue": {
+      "name": "Veilblade",
+      "charge": {
+        "name": "Combo",
+        "max": 5,
+        "per_stack": 0.25,
+        "desc": "Threadwork skills build Combo (+1, max 5); spender skills release every stack for +25% damage each."
+      },
+      "branches": [
+        {
+          "name": "Root",
+          "nodes": [
+            {
+              "id": "vb_root",
+              "name": "First Knife",
+              "type": "passive",
+              "cost": 0,
+              "min_level": 1,
+              "requires": [],
+              "desc": "There is always one more knife than they counted — Swift Stab is where the counting starts (LMB).",
+              "stat_mods": []
+            }
+          ]
+        },
+        {
+          "name": "Threadwork",
+          "nodes": [
+            {
+              "id": "vb_quickstab",
+              "name": "Quickstab",
+              "type": "active",
+              "cost": 1,
+              "min_level": 1,
+              "requires": [
+                "vb_root"
+              ],
+              "desc": "In, out, forgotten. Builds Combo +1.",
+              "kind": "melee_arc",
+              "params": {
+                "mult": 0.9,
+                "reach": 2.0,
+                "arc_deg": 50,
+                "cd": 3.0
+              },
+              "synergy": "builds Combo",
+              "charge_gain": 1,
+              "tags": [
+                "stab"
+              ]
+            },
+            {
+              "id": "vb_lacerate",
+              "name": "Lacerate",
+              "type": "active",
+              "cost": 1,
+              "min_level": 3,
+              "requires": [
+                "vb_quickstab"
+              ],
+              "desc": "A long shallow argument that keeps making its point: applies Bleed, builds Combo +1.",
+              "kind": "melee_arc",
+              "params": {
+                "mult": 1.1,
+                "reach": 2.0,
+                "arc_deg": 60,
+                "cd": 5.0
+              },
+              "synergy": "Bleed + Combo",
+              "applies": [
+                "bleed"
+              ],
+              "charge_gain": 1,
+              "tags": [
+                "stab"
+              ]
+            },
+            {
+              "id": "vb_keen_point",
+              "name": "Keen Point",
+              "type": "passive",
+              "cost": 1,
+              "min_level": 4,
+              "requires": [
+                "vb_lacerate"
+              ],
+              "desc": "The tip knows the way between ribs. +8% critical chance.",
+              "stat_mods": [
+                {
+                  "stat": "crit_chance",
+                  "value": 8
+                }
+              ]
+            },
+            {
+              "id": "vb_fanned_steel",
+              "name": "Fanned Steel",
+              "type": "active",
+              "cost": 1,
+              "min_level": 6,
+              "requires": [
+                "vb_keen_point"
+              ],
+              "desc": "Three knives leave; none come back. Builds Combo +1.",
+              "kind": "projectile",
+              "params": {
+                "count": 3,
+                "spread_deg": 24,
+                "mult": 0.6,
+                "speed": 15,
+                "cd": 6.0,
+                "element": "steel"
+              },
+              "synergy": "builds Combo",
+              "charge_gain": 1,
+              "tags": [
+                "stab"
+              ]
+            },
+            {
+              "id": "vb_veilstep",
+              "name": "Veilstep",
+              "type": "active",
+              "cost": 1,
+              "min_level": 8,
+              "requires": [
+                "vb_fanned_steel"
+              ],
+              "desc": "Step behind the world for a stride, cutting as you go. Builds Combo +1.",
+              "kind": "dash_strike",
+              "params": {
+                "mult": 1.1,
+                "dist": 4.5,
+                "cd": 7.0
+              },
+              "synergy": "builds Combo",
+              "charge_gain": 1,
+              "tags": [
+                "stab"
+              ]
+            },
+            {
+              "id": "vb_knife_waltz",
+              "name": "Knife Waltz",
+              "type": "active",
+              "cost": 1,
+              "min_level": 11,
+              "requires": [
+                "vb_veilstep"
+              ],
+              "desc": "One full turn of the dance; everyone near takes a partner. Builds Combo +1.",
+              "kind": "nova",
+              "params": {
+                "mult": 1.0,
+                "radius": 2.2,
+                "cd": 8.0,
+                "element": "steel"
+              },
+              "synergy": "builds Combo",
+              "charge_gain": 1,
+              "tags": [
+                "stab"
+              ]
+            },
+            {
+              "id": "vb_quiet_hands",
+              "name": "Quiet Hands",
+              "type": "passive",
+              "cost": 1,
+              "min_level": 7,
+              "requires": [
+                "vb_knife_waltz"
+              ],
+              "desc": "The hands work; the mind watches. +6% attack speed.",
+              "stat_mods": [
+                {
+                  "stat": "attack_speed",
+                  "value": 6
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "The Spending",
+          "nodes": [
+            {
+              "id": "vb_heartseeker",
+              "name": "Heartseeker",
+              "type": "active",
+              "cost": 1,
+              "min_level": 5,
+              "requires": [
+                "vb_root"
+              ],
+              "desc": "The point finds the drum. SPENDS all Combo — +25% damage per stack.",
+              "kind": "melee_arc",
+              "params": {
+                "mult": 2.0,
+                "reach": 2.2,
+                "arc_deg": 40,
+                "cd": 9.0
+              },
+              "synergy": "spends Combo",
+              "charge_spend": true
+            },
+            {
+              "id": "vb_ghostcut",
+              "name": "Ghostcut",
+              "type": "active",
+              "cost": 1,
+              "min_level": 9,
+              "requires": [
+                "vb_heartseeker"
+              ],
+              "desc": "They bleed before they see you move. Spends Combo — +25% per stack, along the whole line.",
+              "kind": "dash_strike",
+              "params": {
+                "mult": 1.5,
+                "dist": 5.0,
+                "cd": 10.0
+              },
+              "synergy": "spends Combo",
+              "charge_spend": true
+            },
+            {
+              "id": "vb_cold_practice",
+              "name": "Cold Practice",
+              "type": "passive",
+              "cost": 1,
+              "min_level": 8,
+              "requires": [
+                "vb_ghostcut"
+              ],
+              "desc": "Ten thousand repetitions in the dark. +10% cooldown recovery.",
+              "stat_mods": [
+                {
+                  "stat": "cooldown_reduction",
+                  "value": 10
+                }
+              ]
+            },
+            {
+              "id": "vb_thousand_regrets",
+              "name": "A Thousand Regrets",
+              "type": "active",
+              "cost": 1,
+              "min_level": 14,
+              "requires": [
+                "vb_cold_practice"
+              ],
+              "desc": "Every knife you ever meant to throw, at once. Spends Combo.",
+              "kind": "nova",
+              "params": {
+                "mult": 1.4,
+                "radius": 2.6,
+                "cd": 12.0,
+                "element": "steel"
+              },
+              "synergy": "spends Combo",
+              "charge_spend": true
+            },
+            {
+              "id": "vb_killing_quiet",
+              "name": "The Killing Quiet",
+              "type": "active",
+              "cost": 2,
+              "min_level": 16,
+              "requires": [
+                "vb_thousand_regrets"
+              ],
+              "desc": "The pause before the room notices. Spends Combo; +50% to Exposed prey, consuming the mark.",
+              "kind": "melee_arc",
+              "params": {
+                "mult": 2.4,
+                "reach": 2.2,
+                "arc_deg": 40,
+                "cd": 13.0
+              },
+              "synergy": "spends Combo, +50% vs Exposed",
+              "bonus_vs": {
+                "exposed": 1.5
+              },
+              "consumes": [
+                "expose"
+              ],
+              "charge_spend": true
+            },
+            {
+              "id": "vb_unseen_verdict",
+              "name": "The Unseen Verdict",
+              "type": "active",
+              "cost": 2,
+              "min_level": 20,
+              "requires": [
+                "vb_killing_quiet"
+              ],
+              "desc": "They never hear the sentence read. Spends Combo; +100% to Bleeding prey, and the Bleed is spent with them.",
+              "kind": "melee_arc",
+              "params": {
+                "mult": 3.0,
+                "reach": 2.4,
+                "arc_deg": 50,
+                "cd": 18.0
+              },
+              "synergy": "spends Combo, x2 vs Bleeding",
+              "bonus_vs": {
+                "bleeding": 2.0
+              },
+              "consumes": [
+                "bleed"
+              ],
+              "charge_spend": true
+            },
+            {
+              "id": "vb_wire_muscle",
+              "name": "Wire and Muscle",
+              "type": "passive",
+              "cost": 1,
+              "min_level": 9,
+              "requires": [
+                "vb_unseen_verdict"
+              ],
+              "desc": "Thin does not mean fragile. +20 max HP.",
+              "stat_mods": [
+                {
+                  "stat": "hp",
+                  "value": 20
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Veinwork",
+          "nodes": [
+            {
+              "id": "vb_mark_the_vein",
+              "name": "Mark the Vein",
+              "type": "active",
+              "cost": 1,
+              "min_level": 2,
+              "requires": [
+                "vb_root"
+              ],
+              "desc": "A shallow cut in exactly the right place. Exposed: +20% damage from ALL sources for 4 s.",
+              "kind": "melee_arc",
+              "params": {
+                "mult": 0.8,
+                "reach": 2.2,
+                "arc_deg": 60,
+                "cd": 6.0
+              },
+              "synergy": "applies Expose",
+              "applies": [
+                "expose"
+              ]
+            },
+            {
+              "id": "vb_garrote_wire",
+              "name": "Garrote Wire",
+              "type": "active",
+              "cost": 1,
+              "min_level": 7,
+              "requires": [
+                "vb_mark_the_vein"
+              ],
+              "desc": "Wire remembers every neck. Bleeds and Staggers.",
+              "kind": "melee_arc",
+              "params": {
+                "mult": 1.3,
+                "reach": 2.0,
+                "arc_deg": 40,
+                "cd": 8.0
+              },
+              "synergy": "applies Bleed + Stagger",
+              "applies": [
+                "bleed",
+                "stagger"
+              ]
+            },
+            {
+              "id": "vb_serrated",
+              "name": "Serrated",
+              "type": "passive",
+              "cost": 1,
+              "min_level": 6,
+              "requires": [
+                "vb_garrote_wire"
+              ],
+              "desc": "Teeth on the blade, teeth in the wound. +8% melee damage.",
+              "stat_mods": [
+                {
+                  "stat": "damage_pct",
+                  "value": 8
+                }
+              ]
+            },
+            {
+              "id": "vb_red_ribbons",
+              "name": "Red Ribbons",
+              "type": "active",
+              "cost": 1,
+              "min_level": 10,
+              "requires": [
+                "vb_serrated"
+              ],
+              "desc": "Decorate the room: +50% to Bleeding prey all around you.",
+              "kind": "nova",
+              "params": {
+                "mult": 1.2,
+                "radius": 2.4,
+                "cd": 10.0,
+                "element": "steel"
+              },
+              "synergy": "+50% vs Bleeding",
+              "bonus_vs": {
+                "bleeding": 1.5
+              }
+            },
+            {
+              "id": "vb_pinning_fan",
+              "name": "Pinning Fan",
+              "type": "active",
+              "cost": 1,
+              "min_level": 12,
+              "requires": [
+                "vb_red_ribbons"
+              ],
+              "desc": "Five knives, five new leaks. Every hit Bleeds.",
+              "kind": "projectile",
+              "params": {
+                "count": 5,
+                "spread_deg": 40,
+                "mult": 0.6,
+                "speed": 15,
+                "cd": 10.0,
+                "element": "steel"
+              },
+              "synergy": "applies Bleed",
+              "applies": [
+                "bleed"
+              ]
+            },
+            {
+              "id": "vb_opportunist",
+              "name": "Opportunist",
+              "type": "active",
+              "cost": 1,
+              "min_level": 13,
+              "requires": [
+                "vb_pinning_fan"
+              ],
+              "desc": "Kick them while they're down; it's efficient: +75% to Staggered prey.",
+              "kind": "melee_arc",
+              "params": {
+                "mult": 1.6,
+                "reach": 2.2,
+                "arc_deg": 60,
+                "cd": 9.0
+              },
+              "synergy": "+75% vs Staggered",
+              "bonus_vs": {
+                "staggered": 1.75
+              }
+            },
+            {
+              "id": "vb_shallow_graves",
+              "name": "Shallow Graves",
+              "type": "passive",
+              "cost": 1,
+              "min_level": 12,
+              "requires": [
+                "vb_opportunist"
+              ],
+              "desc": "Waste nothing. Melee heals 5% of damage dealt.",
+              "stat_mods": [
+                {
+                  "stat": "blood_leech_pct",
+                  "value": 5
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Smoke",
+          "nodes": [
+            {
+              "id": "vb_smoke_veil",
+              "name": "Smoke Veil",
+              "type": "active",
+              "cost": 1,
+              "min_level": 4,
+              "requires": [
+                "vb_root"
+              ],
+              "desc": "Wear the room's shadow for 4 s: quick, and hard to hurt.",
+              "kind": "buff",
+              "params": {
+                "duration": 4.0,
+                "cd": 13.0,
+                "mults": {
+                  "move": 1.3,
+                  "armor": 1.4
+                }
+              }
+            },
+            {
+              "id": "vb_bloodletters_tempo",
+              "name": "Bloodletter's Tempo",
+              "type": "active",
+              "cost": 1,
+              "min_level": 9,
+              "requires": [
+                "vb_smoke_veil"
+              ],
+              "desc": "The metronome only you can hear speeds up: +30% attack speed for 5 s.",
+              "kind": "buff",
+              "params": {
+                "duration": 5.0,
+                "cd": 14.0,
+                "mults": {
+                  "attack_speed": 1.3
+                }
+              }
+            },
+            {
+              "id": "vb_light_feet",
+              "name": "Light Feet",
+              "type": "passive",
+              "cost": 1,
+              "min_level": 5,
+              "requires": [
+                "vb_bloodletters_tempo"
+              ],
+              "desc": "The floor never learns your name. +8% move speed.",
+              "stat_mods": [
+                {
+                  "stat": "move_speed",
+                  "value": 8
+                }
+              ]
+            },
+            {
+              "id": "vb_whisperknife",
+              "name": "Whisperknife",
+              "type": "active",
+              "cost": 1,
+              "min_level": 13,
+              "requires": [
+                "vb_light_feet"
+              ],
+              "desc": "It asks one quiet question. Builds Combo +1; +40% to Exposed prey.",
+              "kind": "projectile",
+              "params": {
+                "count": 1,
+                "mult": 1.4,
+                "speed": 16,
+                "cd": 8.0,
+                "element": "steel"
+              },
+              "synergy": "Combo + 40% vs Exposed",
+              "bonus_vs": {
+                "exposed": 1.4
+              },
+              "charge_gain": 1,
+              "tags": [
+                "stab"
+              ]
+            },
+            {
+              "id": "vb_veilborn",
+              "name": "Veilborn",
+              "type": "passive",
+              "cost": 1,
+              "min_level": 10,
+              "requires": [
+                "vb_whisperknife"
+              ],
+              "desc": "KEYSTONE — half in this world, half out of it: +25% critical damage, -10% max HP. The veil takes its toll.",
+              "stat_mods": [
+                {
+                  "stat": "crit_damage",
+                  "value": 25
+                },
+                {
+                  "stat": "hp_pct",
+                  "value": -10
+                }
+              ]
+            },
+            {
+              "id": "vb_ricochet_fan",
+              "name": "Ricochet Fan",
+              "type": "active",
+              "cost": 1,
+              "min_level": 15,
+              "requires": [
+                "vb_veilborn"
+              ],
+              "desc": "One knife, four appointments — steel that leaps from mark to mark.",
+              "kind": "chain",
+              "params": {
+                "mult": 0.9,
+                "jumps": 4,
+                "range": 4.5,
+                "cd": 10.0,
+                "element": "steel"
+              }
+            },
+            {
+              "id": "vb_silkstep_slaughter",
+              "name": "Silkstep Slaughter",
+              "type": "active",
+              "cost": 2,
+              "min_level": 18,
+              "requires": [
+                "vb_ricochet_fan"
+              ],
+              "desc": "Move like silk, finish like scissors: +20% damage, +15% move for 6 s.",
+              "kind": "buff",
+              "params": {
+                "duration": 6.0,
+                "cd": 16.0,
+                "mults": {
+                  "damage": 1.2,
+                  "move": 1.15
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  }
+}
