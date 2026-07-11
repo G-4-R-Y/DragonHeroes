@@ -1,7 +1,20 @@
-# Handoff — running state (updated 2026-07-11, v0.1.5)
+# Handoff — running state (updated 2026-07-11, v0.1.7)
 
 Read `CLAUDE.md` + `docs/00-canon.md` first (decisions log §12 is current through
-item 19). This file is the delta: exactly where work stopped and what's next.
+item 21). This file is the delta: exactly where work stopped and what's next.
+
+## v0.1.7 delta (2026-07-11) — skill trees + flow tuning
+
+- **Class skill trees** (canon §12.21): registries/skill_trees.json — per class
+  20 actives + 8 passives + root (145 nodes), ONE generic executor in player.gd
+  (projectile/nova/cone/melee_arc/dash_strike/buff/field/chain), data-expressed
+  synergies (bonus_vs/consumes, Ignite spread/detonate, Shatter, Attunement and
+  Combo charges), new statuses Bleed/Expose/Stagger on creatures, skill bar on
+  1-4 + learn/assign in CHARACTER -> Skills, loadout saved.
+- **Flow tuning** (canon §12.20, v0.1.6): hitboxes follow sprite scale;
+  legendary HP normalized (x1.4-3.0 of 900 budget — no 13.8k walls); items
+  roll at hunter level (+4%/level, ilvl stamped), boss/legendary drops
+  quality-floored (0.35/0.5).
 
 ## v0.1.5 delta (2026-07-11) — mass content
 
@@ -32,12 +45,11 @@ item 19). This file is the delta: exactly where work stopped and what's next.
 1. **Real gen-AI image provider** into the GenForge seam (stub provider today);
    tile/texture bundles so terrain gets the same treatment as actors.
 2. **Paper-doll**: equipped gear visible on the hero sprite (+ per-slot particles).
-3. **Full class kits** (design/10): six classes with distinct trees/resources
-   (mage/rogue trees still show the Reaver tree).
-4. Message log; R bestial slot; 7-element bolt flavors (storm/venom/blood wisps
-   currently fall back to umbral — see registry `wisp_element_flavor`).
-5. Legendary hp_mult bias: colossus-chassis entries at hp_mult 6 reach ~13.8k HP
-   at level 1 — consider biasing colossus rolls low in bestiary_gen.
+3. **Sixth class** (design/10 names six at launch; five are live) + per-class
+   resources beyond Attunement/Combo charges.
+4. Skill-tree balance pass after play (100 actives are fresh); message log;
+   R bestial slot; 7-element bolt flavors (storm/venom/blood wisps currently
+   fall back to umbral — see registry `wisp_element_flavor`).
 
 ## Next architectural step (bigger than the backlog)
 
@@ -55,4 +67,5 @@ Vendor godot-cpp, build `dh-godot` GDExtension, move authority from
   (must end `CLICKTEST DONE — ALL PASS`), `pytest genforge/tests/`,
   `python3 tools/validate_content.py`. After adding a `class_name` script, run
   `--import` once. `grep -c` exits 1 on zero matches — never chain gates with `&&`.
-- Git: v0.1 tag → 1c9d8c4 v0.1.4 → this commit v0.1.5. Rollback points exist.
+- Git: v0.1 tag → v0.1.5 mass content → 2133327 v0.1.6 tuning → a8f37a4 v0.1.7
+  skill trees. Rollback points exist at every step.
