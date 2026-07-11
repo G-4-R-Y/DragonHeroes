@@ -7,17 +7,20 @@
 class_name ProtoFx
 extends Node2D
 
-const ADD_POOL := 14
-const NORM_POOL := 8
+const ADD_POOL := 20         # 100x pass (Ricardo): richer bursts, still pooled
+const NORM_POOL := 12
 const BOLT_POOL := 4
-const MAX_AMOUNT := 24
+const RING_POOL := 6         # expanding shockwave rings (Line2D circles)
+const MAX_AMOUNT := 40
 
 var _add: Array = []
 var _norm: Array = []
 var _bolts: Array = []
+var _rings: Array = []
 var _ai := 0
 var _ni := 0
 var _bi := 0
+var _ri := 0
 
 func _ready() -> void:
 	z_index = 18
@@ -33,6 +36,15 @@ func _ready() -> void:
 		l.z_index = 30
 		add_child(l)
 		_bolts.append(l)
+	for i in RING_POOL:
+		var r := Line2D.new()
+		r.width = 2.5
+		r.material = ProtoGlow.add_material()
+		r.closed = true
+		r.visible = false
+		r.z_index = 24
+		add_child(r)
+		_rings.append(r)
 
 func _mk(add_blend: bool) -> CPUParticles2D:
 	var p := CPUParticles2D.new()
@@ -113,6 +125,35 @@ func tornado(at: Vector2) -> void:
 			"spread": 40.0, "v_min": 30.0, "v_max": 80.0, "gravity": Vector2(0, -200),
 			"tangential": 420.0, "emission_radius": 12.0, "s_min": 0.8, "s_max": 1.8,
 			"color": Color(0.8, 0.97, 1.0, 0.55)})
+
+# Expanding shockwave ring — the punctuation mark under novas/impacts/slams.
+func ring(at: Vector2, color: Color, radius: float, duration := 0.35) -> void:
+	var r: Line2D = _rings[_ri]
+	_ri = (_ri + 1) % RING_POOL
+	var pts := PackedVector2Array()
+	for i in 26:
+		pts.append(Vector2.from_angle(TAU * i / 26.0))
+	r.points = pts
+	r.position = at
+	r.scale = Vector2.ONE * (radius * 0.25)
+	r.default_color = color
+	r.visible = true
+	r.modulate = Color(1, 1, 1, 1)
+	var tw := r.create_tween()
+	tw.set_parallel(true)
+	tw.tween_property(r, "scale", Vector2.ONE * radius, duration) \
+			.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	tw.tween_property(r, "modulate:a", 0.0, duration)
+	tw.chain().tween_callback(func() -> void: r.visible = false)
+
+# Directional melee slash trail — a tight fan of sparks along the swing edge.
+func arc_slash(at: Vector2, dir: Vector2, color: Color) -> void:
+	burst(at, {"amount": 14, "lifetime": 0.22, "direction": dir, "spread": 34.0,
+			"v_min": 120.0, "v_max": 240.0, "gravity": Vector2.ZERO,
+			"s_min": 0.7, "s_max": 1.6, "color": color})
+	burst(at, {"amount": 6, "lifetime": 0.14, "direction": dir, "spread": 12.0,
+			"v_min": 200.0, "v_max": 320.0, "s_min": 0.5, "s_max": 1.0,
+			"color": Color(1, 1, 1, 0.9)})
 
 # Jagged white-blue strike from the sky — thunder SFX is the caller's business.
 func lightning(at: Vector2) -> void:

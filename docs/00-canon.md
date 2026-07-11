@@ -432,3 +432,14 @@ Still open:
    Matriarch (pack 13). The field system is generalized to kinds
    (fire/earth/mire/lava) with per-kind visuals and slow. Vulkan HDR glow is
    opt-in via tools/run_vulkan.sh only (gl_compatibility stays the default).
+19. **Mass content + five classes (2026-07-11, Ricardo):** GenForge batch
+   generation produces the bestiary as data — 100 legendary creatures (per-hunt
+   sampled scaled boss, power scaling with player level) and 1000 normal
+   creatures (catalog-driven pack spawning: name/element/tint/scale/stat rolls
+   over archetype chassis + art bundles). Classes grow to five: Gloam Mage
+   (ranged Arcane Bolts, Frost Nova) and Veilblade rogue (Swift Stab cadence,
+   Fan of Knives) join Reaver/Emberkin/Frostbinder — class KITS now reshape
+   LMB and E, not just stats. Friendly projectiles enter the sim contract.
+   VFX pass: pooled shockwave rings + slash trails; particle budgets raised
+   (desktop proposal). All numbers (proposal); catalogs live in
+   content/generated/ with provenance.

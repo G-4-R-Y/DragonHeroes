@@ -30,6 +30,10 @@ func _ready() -> void:
 	item_chance = 1.0
 	super._ready()
 
+# Boss power scaling (task 3, proposal): hp 6%/level, damage 3%/level at spawn.
+func _power_rates() -> Vector2:
+	return Vector2(0.06, 0.03)
+
 func _physics_process(delta: float) -> void:
 	for k in _skill_cd:
 		_skill_cd[k] = maxf(_skill_cd[k] - delta, 0.0)
@@ -108,5 +112,10 @@ func _hits_corridor(player: Node2D, dir: Vector2, length: float, width: float) -
 func _die() -> void:
 	var main := get_tree().get_first_node_in_group("main")
 	if main:
-		main.on_duo_boss_died(self)
+		# a solo hunt legendary riding a duo chassis has no partner to avenge —
+		# it takes the legendary spoils path instead of the duo one
+		if legendary_entry.is_empty():
+			main.on_duo_boss_died(self)
+		else:
+			main.on_legendary_died(self)
 	super._die()

@@ -1,0 +1,82 @@
+{
+  "skeleton": "golem",
+  "animations": {
+    "idle": {
+      "fps": 2,
+      "loop": true,
+      "frames": [
+        {},
+        {
+          "torso": {"offset": [0, 1], "rotation_deg": 1},
+          "head": {"offset": [0, 1]},
+          "arm_near": {"rotation_deg": 3},
+          "arm_far": {"rotation_deg": -3}
+        }
+      ]
+    },
+    "walk": {
+      "fps": 6,
+      "loop": true,
+      "frames": [
+        {
+          "leg_near": {"rotation_deg": -20},
+          "leg_far": {"rotation_deg": 18},
+          "arm_near": {"rotation_deg": 14},
+          "arm_far": {"rotation_deg": -12},
+          "torso": {"offset": [0, -1], "rotation_deg": 2},
+          "head": {"rotation_deg": -2}
+        },
+        {
+          "leg_near": {"rotation_deg": -6},
+          "leg_far": {"rotation_deg": 6},
+          "arm_near": {"rotation_deg": 5},
+          "arm_far": {"rotation_deg": -4}
+        },
+        {
+          "leg_near": {"rotation_deg": 18},
+          "leg_far": {"rotation_deg": -20},
+          "arm_near": {"rotation_deg": -12},
+          "arm_far": {"rotation_deg": 14},
+          "torso": {"offset": [0, -1], "rotation_deg": -2},
+          "head": {"rotation_deg": 2}
+        },
+        {
+          "leg_near": {"rotation_deg": 6},
+          "leg_far": {"rotation_deg": -6},
+          "arm_near": {"rotation_deg": -4},
+          "arm_far": {"rotation_deg": 5}
+        }
+      ]
+    },
+    "lunge": {
+      "fps": 7,
+      "loop": false,
+      "frames": [
+        {
+          "torso": {"rotation_deg": -8, "offset": [-2, -1]},
+          "head": {"rotation_deg": -4, "offset": [0, -1]},
+          "arm_near": {"rotation_deg": -70},
+          "arm_far": {"rotation_deg": -62},
+          "leg_near": {"rotation_deg": -8},
+          "leg_far": {"rotation_deg": 8}
+        },
+        {
+          "torso": {"rotation_deg": 12, "offset": [4, 3]},
+          "head": {"rotation_deg": 6, "offset": [1, 0]},
+          "arm_near": {"rotation_deg": 38, "offset": [1, 0]},
+          "arm_far": {"rotation_deg": 30, "offset": [1, 0]},
+          "leg_near": {"rotation_deg": 14},
+          "leg_far": {"rotation_deg": -12}
+        },
+        {
+          "torso": {"rotation_deg": 5, "offset": [2, 1]},
+          "head": {"rotation_deg": 2},
+          "arm_near": {"rotation_deg": 16},
+          "arm_far": {"rotation_deg": 12},
+          "leg_near": {"rotation_deg": 6},
+          "leg_far": {"rotation_deg": -5}
+        }
+      ]
+    }
+  }
+}

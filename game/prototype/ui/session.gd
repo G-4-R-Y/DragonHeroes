@@ -11,7 +11,8 @@ const MAX_PETS := 3            # (proposal) all bonded pets hunt together
 var player_name := "Hunter"
 var class_id := "core.class.reaver"
 const CLASS_NAMES := {"core.class.reaver": "Reaver",
-		"core.class.emberkin": "Emberkin", "core.class.frostbinder": "Frostbinder"}
+		"core.class.emberkin": "Emberkin", "core.class.frostbinder": "Frostbinder",
+		"core.class.mage": "Gloam Mage", "core.class.rogue": "Veilblade"}
 
 func class_display() -> String:
 	return str(CLASS_NAMES.get(class_id, "Reaver"))

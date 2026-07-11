@@ -9,6 +9,7 @@ var damage := 12.0
 var dmg_type := "fire"   # resist-mitigated on the player (stats.gd)
 var radius := 4.0
 var lifetime := 3.0
+var friendly := false    # player-cast (Mage bolts, Rogue knives): hits creatures
 # color parameters — ember by default; the wisp's umbral bolt sets violet
 var body_col := Color("ff7a33")
 var core_col := Color("ffd9a0")
@@ -31,6 +32,23 @@ func set_frost() -> void:
 	edge_col = Color("2a5a8a")
 	trail_a = Color(0.6, 0.9, 1.0, 0.9)
 	trail_b = Color(0.15, 0.3, 0.5, 0.0)
+
+func set_arcane() -> void:   # Gloam Mage bolt
+	dmg_type = "umbral"
+	body_col = Color("b48cff")
+	core_col = Color("f2eaff")
+	edge_col = Color("5a3aa8")
+	trail_a = Color(0.75, 0.6, 1.0, 0.95)
+	trail_b = Color(0.3, 0.5, 0.9, 0.0)
+
+func set_steel() -> void:    # Veilblade knife
+	dmg_type = "physical"
+	radius = 3.0
+	body_col = Color("cdd6dd")
+	core_col = Color("ffffff")
+	edge_col = Color("5a6570")
+	trail_a = Color(0.8, 0.85, 0.9, 0.6)
+	trail_b = Color(0.4, 0.45, 0.5, 0.0)
 
 func _ready() -> void:
 	var s := Sprite2D.new()
@@ -61,6 +79,21 @@ func _physics_process(delta: float) -> void:
 	lifetime -= delta
 	if lifetime <= 0.0:
 		queue_free()
+		return
+	if friendly:   # player-cast: swept check against every living creature
+		var seg_f := global_position - from
+		for c in get_tree().get_nodes_in_group("creatures"):
+			if c.dead:
+				continue
+			var t_f := 0.0
+			if seg_f.length_squared() > 0.0:
+				t_f = clampf((c.global_position - from).dot(seg_f) \
+						/ seg_f.length_squared(), 0.0, 1.0)
+			if (from + seg_f * t_f).distance_to(c.global_position) \
+					<= radius + c.body_radius:
+				c.take_damage(damage, velocity.normalized(), body_col)
+				_impact()
+				return
 		return
 	var player := get_tree().get_first_node_in_group("player")
 	if player and not player.dead:

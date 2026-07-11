@@ -1,0 +1,41 @@
+{
+  "entity": "shade",
+  "archetype": "shade",
+  "skeleton": "shade",
+  "frame_size": [
+    36,
+    44
+  ],
+  "anchor": [
+    18,
+    40
+  ],
+  "combined_sheet": "sheet.png",
+  "animations": {
+    "idle": {
+      "frames": 3,
+      "fps": 3.0,
+      "loop": true,
+      "strip": "strips/idle.png",
+      "row": 0
+    },
+    "walk": {
+      "frames": 3,
+      "fps": 5.0,
+      "loop": true,
+      "strip": "strips/walk.png",
+      "row": 1
+    },
+    "lunge": {
+      "frames": 3,
+      "fps": 10.0,
+      "loop": false,
+      "strip": "strips/lunge.png",
+      "row": 2
+    }
+  },
+  "logical_size": [
+    18,
+    22
+  ]
+}

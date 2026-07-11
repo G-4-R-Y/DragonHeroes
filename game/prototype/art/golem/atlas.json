@@ -1,0 +1,41 @@
+{
+  "entity": "golem",
+  "archetype": "golem",
+  "skeleton": "golem",
+  "frame_size": [
+    48,
+    46
+  ],
+  "anchor": [
+    24,
+    43
+  ],
+  "combined_sheet": "sheet.png",
+  "animations": {
+    "idle": {
+      "frames": 2,
+      "fps": 2.0,
+      "loop": true,
+      "strip": "strips/idle.png",
+      "row": 0
+    },
+    "walk": {
+      "frames": 4,
+      "fps": 6.0,
+      "loop": true,
+      "strip": "strips/walk.png",
+      "row": 1
+    },
+    "lunge": {
+      "frames": 3,
+      "fps": 7.0,
+      "loop": false,
+      "strip": "strips/lunge.png",
+      "row": 2
+    }
+  },
+  "logical_size": [
+    24,
+    23
+  ]
+}

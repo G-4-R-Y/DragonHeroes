@@ -38,7 +38,12 @@ func _ready() -> void:
 	super._ready()
 
 func _make_frames() -> SpriteFrames:
-	return ProtoSprites.boss_frames()
+	return _bundle_or(ProtoSprites.boss_frames())
+
+# All bosses scale power with the player (task 3, Ricardo, proposal):
+# hp x(1 + 0.06*(level-1)), damage x(1 + 0.03*(level-1)), read at spawn.
+func _power_rates() -> Vector2:
+	return Vector2(0.06, 0.03)
 
 func _sprite_lift() -> float:
 	return 14.0  # the Matriarch hovers a little above her shadow
@@ -128,7 +133,7 @@ func _strike(player: Node2D) -> void:
 			var p := EmberProjectile.new()
 			p.global_position = global_position
 			p.velocity = _attack_dir * 18.0 * TILE
-			p.damage = 12.0
+			p.damage = 12.0 * dmg_scale
 			get_parent().add_child(p)
 			if main:
 				main.play_sfx("bolt", global_position, -8.0)
@@ -138,14 +143,14 @@ func _strike(player: Node2D) -> void:
 				var seg := path
 				var t := clampf((player.global_position - global_position).dot(seg) / seg.length_squared(), 0.0, 1.0)
 				if (global_position + seg * t).distance_to(player.global_position) < 20.0 + player.body_radius:
-					player.take_damage(20.0, path.normalized())
+					player.take_damage(20.0 * dmg_scale, path.normalized())
 			global_position += path
 			if main:
 				main.hit_spark(global_position, Color("ff7a33"))
 		"gust":
 			if player and not player.dead \
 					and global_position.distance_to(player.global_position) <= 5.0 * TILE:
-				player.take_damage(8.0, (player.global_position - global_position).normalized())
+				player.take_damage(8.0 * dmg_scale, (player.global_position - global_position).normalized())
 				player.knockback((player.global_position - global_position).normalized() * 4.0 * TILE)
 		"screech":
 			_enraged = true
@@ -156,7 +161,7 @@ func _strike(player: Node2D) -> void:
 				main.play_sfx("boss_screech", global_position, -4.0)
 		"breath":
 			if main:
-				main.spawn_fire_field(_dive_target, 4.0 * TILE, 6.0, 6.0)
+				main.spawn_fire_field(_dive_target, 4.0 * TILE, 6.0, 6.0 * dmg_scale)
 
 func _telegraph_circle(at: Vector2, radius: float, dur: float) -> void:
 	var t := Telegraph.new()
@@ -179,5 +184,10 @@ func _telegraph_line(to: Vector2) -> void:
 func _die() -> void:
 	var main := get_tree().get_first_node_in_group("main")
 	if main:
-		main.on_boss_died(self)
+		# A hunt legendary riding the dragon chassis has its own spoils
+		# (main.on_legendary_died) — the Matriarch's blade/mount stay hers.
+		if legendary_entry.is_empty():
+			main.on_boss_died(self)
+		else:
+			main.on_legendary_died(self)
 	super._die()

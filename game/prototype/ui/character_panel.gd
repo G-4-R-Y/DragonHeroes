@@ -464,13 +464,31 @@ func _refresh_skills() -> void:
 	var m := _main()
 	var owns_rend: bool = Session.stones >= 1 or (m != null and m.stones >= 1)
 	_line(vb, "Skills — %s" % Session.class_display(), EMBER, 12)
-	_skill_card(vb, "cleave", "Cleave  (LMB)", PALE,
-			"%d dmg · %.2f s cd · 110 deg · 2.2 m · crit %d%%" % [
-			int(round(s.melee_damage)), 0.4 / s.attack_speed_mult,
-			int(s.crit_chance * 100.0)])
-	_skill_card(vb, "", "Whirlwind  (E)", Color("9fd4ff"),
-			"%d dmg · 4 s cd · full circle · 2.6 m + shove" % [
-			int(round(s.melee_damage * 0.8))])
+	match str(s.get("class_kit", "melee")):   # each class wears its own kit
+		"mage":
+			_skill_card(vb, "cleave", "Arcane Bolt  (LMB)", Color("b48cff"),
+					"%d dmg · %.2f s cd · ranged umbral bolt · crit %d%%" % [
+					int(round(s.melee_damage * 0.9)), 0.55 / s.attack_speed_mult,
+					int(s.crit_chance * 100.0)])
+			_skill_card(vb, "", "Frost Nova  (E)", Color("9fd4ff"),
+					"%d dmg · 5 s cd · 2.8 m radial · hard Chill" % [
+					int(round(s.melee_damage * 0.7 * s.skill_damage_mult))])
+		"rogue":
+			_skill_card(vb, "cleave", "Swift Stab  (LMB)", PALE,
+					"%d dmg · %.2f s cd · 60 deg · 1.8 m · crit %d%%" % [
+					int(round(s.melee_damage * 0.8)), 0.25 / s.attack_speed_mult,
+					int(s.crit_chance * 100.0)])
+			_skill_card(vb, "", "Fan of Knives  (E)", Color("cdd6dd"),
+					"5 x %d dmg · 4.5 s cd · piercing steel fan" % [
+					int(round(s.melee_damage * 0.5))])
+		_:
+			_skill_card(vb, "cleave", "Cleave  (LMB)", PALE,
+					"%d dmg · %.2f s cd · 110 deg · 2.2 m · crit %d%%" % [
+					int(round(s.melee_damage)), 0.4 / s.attack_speed_mult,
+					int(s.crit_chance * 100.0)])
+			_skill_card(vb, "", "Whirlwind  (E)", Color("9fd4ff"),
+					"%d dmg · 4 s cd · full circle · 2.6 m + shove" % [
+					int(round(s.melee_damage * 0.8))])
 	_skill_card(vb, "rend", "Shadow Rend  (Q)", VIOLET,
 			"%d dmg · 5 s cd · 130 deg · 2.2 m — umbral" % int(round(s.rend_damage)),
 			not owns_rend)

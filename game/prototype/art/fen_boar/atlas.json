@@ -1,0 +1,41 @@
+{
+  "entity": "fen_boar",
+  "archetype": "fen_boar",
+  "skeleton": "fen_boar",
+  "frame_size": [
+    52,
+    34
+  ],
+  "anchor": [
+    26,
+    30
+  ],
+  "combined_sheet": "sheet.png",
+  "animations": {
+    "idle": {
+      "frames": 2,
+      "fps": 2.5,
+      "loop": true,
+      "strip": "strips/idle.png",
+      "row": 0
+    },
+    "walk": {
+      "frames": 4,
+      "fps": 9.0,
+      "loop": true,
+      "strip": "strips/walk.png",
+      "row": 1
+    },
+    "lunge": {
+      "frames": 3,
+      "fps": 8.0,
+      "loop": false,
+      "strip": "strips/lunge.png",
+      "row": 2
+    }
+  },
+  "logical_size": [
+    26,
+    17
+  ]
+}

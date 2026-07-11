@@ -31,7 +31,8 @@ func _ready() -> void:
 	super._ready()
 
 func _make_frames() -> SpriteFrames:
-	return ProtoSprites.stalker_frames()   # giant rig stand-in, scaled 2.3x
+	# giant rig stand-in, scaled 2.3x (legendary bundles override)
+	return _bundle_or(ProtoSprites.stalker_frames())
 
 func _sprite_lift() -> float:
 	return 8.0
@@ -83,7 +84,7 @@ func _strike(player: Node2D) -> void:
 			_spikes(player, main)
 		"upheaval":
 			if main:
-				main.spawn_field(_cast_target, 3.0 * TILE, 8.0, 5.0, "earth")
+				main.spawn_field(_cast_target, 3.0 * TILE, 8.0, 5.0 * dmg_scale, "earth")
 		"boulder":
 			var p := BoulderProjectile.new()
 			p.dmg_type = "physical"
@@ -95,7 +96,7 @@ func _strike(player: Node2D) -> void:
 			p.radius = 7.0
 			p.global_position = global_position
 			p.velocity = _attack_dir * 10.0 * TILE
-			p.damage = 22.0
+			p.damage = 22.0 * dmg_scale
 			get_parent().add_child(p)
 			if main:
 				main.play_sfx("bolt", global_position, -6.0)
@@ -110,10 +111,10 @@ func _quake(player: Node2D, main: Node) -> void:
 			main.fx.debris(global_position + off)
 	if player and not player.dead and global_position.distance_to(
 			player.global_position) <= 4.5 * TILE + player.body_radius:
-		player.take_damage(30.0, (player.global_position
+		player.take_damage(30.0 * dmg_scale, (player.global_position
 				- global_position).normalized())
 	if main:
-		main.spawn_field(global_position, 3.5 * TILE, 7.0, 5.0, "earth")
+		main.spawn_field(global_position, 3.5 * TILE, 7.0, 5.0 * dmg_scale, "earth")
 
 # Stone Spikes: an 8-tile spike line — debris erupts along the corridor.
 func _spikes(player: Node2D, main: Node) -> void:
@@ -124,4 +125,4 @@ func _spikes(player: Node2D, main: Node) -> void:
 			main.fx.debris(global_position + dir * d * TILE, Color(0.55, 0.45, 0.3))
 		main.play_sfx("hit", global_position, -7.0)
 	if _hits_corridor(player, dir, 8.0 * TILE, 40.0):
-		player.take_damage(26.0, dir)
+		player.take_damage(26.0 * dmg_scale, dir)

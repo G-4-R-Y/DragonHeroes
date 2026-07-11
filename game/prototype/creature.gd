@@ -30,6 +30,11 @@ var archetype := "stalker"       # stalker | lunger | brute (spawn tables, propo
 var elite_affix := ""            # Brutal | Swift | Fiery | Bulwark on pack leaders
 var fiery := false               # Fiery affix: strikes add a 50% fire packet
 var name_tag := ""               # elite title shown above the sprite
+var species_name := ""           # bestiary catalog display name (brutes/elites only)
+var dmg_scale := 1.0             # entry dmg_mult x level curve — scales skill packets
+var legendary_entry := {}        # hunt legendary riding this chassis (main routes _die)
+var _entry := {}                 # bestiary_normal.json species entry (applied in _ready)
+var _bundle := ""                # baked GenForge actor key ("" = archetype frames)
 var _base_tint := Color(1, 1, 1)
 var _scale := 1.0
 
@@ -55,6 +60,7 @@ var sprite: AnimatedSprite2D
 var _shadow: Sprite2D
 
 func _ready() -> void:
+	_apply_entry()   # catalog species/legendary mults + player-level power scaling
 	add_to_group("creatures")
 	var sh := _shadow_dims()
 	_shadow = Sprite2D.new()
@@ -74,6 +80,17 @@ func _ready() -> void:
 		tag.add_theme_font_size_override("font_size", 8)
 		tag.add_theme_color_override("font_color", Color("ffd166"))
 		tag.position = Vector2(-40, -32.0 * _scale)
+		tag.size = Vector2(80, 10)
+		tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		add_child(tag)
+	elif species_name != "" and archetype == "brute":
+		# catalog species names show only on brutes/elites — commons stay clean
+		# (task 1: labels only where they matter; 60 FPS label budget)
+		var tag := Label.new()
+		tag.text = species_name
+		tag.add_theme_font_size_override("font_size", 7)
+		tag.add_theme_color_override("font_color", Color(0.85, 0.9, 1.0, 0.45))
+		tag.position = Vector2(-40, -30.0 * _scale)
 		tag.size = Vector2(80, 10)
 		tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		add_child(tag)
@@ -123,8 +140,85 @@ func setup_archetype(kind: String, affix := "") -> void:
 		name_tag = "%s %s" % [affix.to_upper(), kind.to_upper()]
 	hp = max_hp
 
+# Bestiary catalog species (bestiary_normal.json — call BEFORE add_child, like
+# setup_archetype, which it wraps): archetype reshapes the kit first, then the
+# species entry lands on top in _apply_entry() at _ready time so subclass stat
+# blocks (wisp/boss) keep the multipliers.
+func setup_from_entry(entry: Dictionary, affix := "") -> void:
+	var kind := str(entry.get("archetype", "stalker"))
+	if kind != "wisp":   # wisp flavor is the ProtoWisp class + element field
+		if not ["stalker", "lunger", "brute"].has(kind):
+			kind = "stalker"   # unknown archetype: stalker behavior (graceful)
+		setup_archetype(kind, affix)
+	_entry = entry
+
+# Hunt legendary (bestiary_legendary.json): ride an existing boss chassis and
+# rescale from its base kit. Call BEFORE add_child; main routes _die through
+# on_legendary_died and owns display_name/bar_color.
+func setup_legendary(entry: Dictionary) -> void:
+	legendary_entry = entry
+	_entry = entry
+
+# Species tint normalized so the max channel is 1: hue survives the multiply
+# over the archetype tint without crushing sprites toward black.
+static func tint_from(entry: Dictionary) -> Color:
+	var tint := str(entry.get("tint", ""))
+	if not Color.html_is_valid(tint):
+		return Color(1, 1, 1)
+	var c := Color.html(tint)
+	var m := maxf(c.r, maxf(c.g, c.b))
+	return Color(c.r / m, c.g / m, c.b / m) if m > 0.01 else Color(1, 1, 1)
+
+# Power scaling with the player (task 3, proposal): (hp_rate, dmg_rate) per
+# level above 1, read from Session.level ONCE at spawn. Normals gentle
+# (0.02/0.01); boss chassis override to (0.06/0.03). Gold rides the dmg curve.
+func _power_rates() -> Vector2:
+	return Vector2(0.02, 0.01)
+
+# Runs FIRST in _ready: bestiary entry multipliers + player-level power scaling
+# land on top of whatever stat block the subclass set up. Parsed catalogs and
+# per-entry clamps keep hostile/typo'd data from breaking the sim.
+func _apply_entry() -> void:
+	var rates := _power_rates()
+	var lvl := float(maxi(Session.level - 1, 0))
+	var hp_mult := 1.0 + rates.x * lvl
+	var dmg_mult := 1.0 + rates.y * lvl
+	var gold_mult := 1.0 + rates.y * lvl   # loot scales mildly with the same curve
+	if not _entry.is_empty():
+		species_name = str(_entry.get("name", ""))
+		_bundle = str(_entry.get("bundle", ""))
+		_base_tint = _base_tint * tint_from(_entry)   # species tint OVER archetype tint
+		_scale *= clampf(float(_entry.get("scale", 1.0)), 0.5, 3.0)
+		if not legendary_entry.is_empty():   # contract: hp 2.5-6, dmg 1.3-2.2
+			hp_mult *= clampf(float(_entry.get("hp_mult", 3.0)), 2.5, 6.0)
+			dmg_mult *= clampf(float(_entry.get("dmg_mult", 1.6)), 1.3, 2.2)
+			gold_mult *= maxf(float(_entry.get("gold_mult", 2.0)), 1.0)
+			name_tag = species_name.to_upper()
+		else:
+			hp_mult *= clampf(float(_entry.get("hp_mult", 1.0)), 0.2, 4.0)
+			dmg_mult *= clampf(float(_entry.get("dmg_mult", 1.0)), 0.2, 3.0)
+			move_speed *= clampf(float(_entry.get("speed_mult", 1.0)), 0.4, 2.0)
+			gold_mult *= maxf(float(_entry.get("gold_mult", 1.0)), 0.0)
+			if elite_affix != "" and species_name != "":   # "BRUTAL MIREFANG..." tag
+				name_tag = "%s %s" % [elite_affix.to_upper(), species_name.to_upper()]
+	max_hp *= hp_mult
+	damage *= dmg_mult
+	dmg_scale = dmg_mult   # boss kits multiply their hardcoded packets by this
+	gold_min = maxi(int(gold_min * gold_mult), 1)
+	gold_max = maxi(int(gold_max * gold_mult), gold_min)
+
+# Baked GenForge bundle for a catalog species when the actor exists on disk —
+# else the archetype's procedural frames (sliced once, cached in ProtoBundleArt).
+func _bundle_or(fallback_frames: SpriteFrames) -> SpriteFrames:
+	if _bundle != "":
+		var sf := ProtoBundleArt.frames_for(_bundle)
+		if sf != null:
+			ProtoBundleArt.ensure_animations(sf, ["idle", "walk", "lunge"])
+			return sf
+	return fallback_frames
+
 func _make_frames() -> SpriteFrames:
-	return ProtoSprites.stalker_frames()
+	return _bundle_or(ProtoSprites.stalker_frames())
 
 func _sprite_lift() -> float:
 	return 6.0

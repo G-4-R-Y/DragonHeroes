@@ -1,0 +1,134 @@
+{
+  "skeleton": "marsh_drake",
+  "animations": {
+    "idle": {
+      "fps": 3,
+      "loop": true,
+      "frames": [
+        {
+          "tail_1": {"rotation_deg": 2},
+          "tail_2": {"rotation_deg": 2}
+        },
+        {
+          "body": {"offset": [0, 1]},
+          "neck": {"rotation_deg": -3},
+          "head": {"rotation_deg": 2, "offset": [0, 1]},
+          "tail_1": {"rotation_deg": -3},
+          "tail_2": {"rotation_deg": -4}
+        }
+      ]
+    },
+    "walk": {
+      "fps": 8,
+      "loop": true,
+      "frames": [
+        {
+          "leg_front": {"rotation_deg": -20},
+          "leg_back": {"rotation_deg": 17},
+          "leg_ffar": {"rotation_deg": 17},
+          "leg_bfar": {"rotation_deg": -15},
+          "body": {"offset": [0, -1], "rotation_deg": 1},
+          "neck": {"rotation_deg": -2},
+          "tail_1": {"rotation_deg": 4},
+          "tail_2": {"rotation_deg": 4}
+        },
+        {
+          "leg_front": {"rotation_deg": -6},
+          "leg_back": {"rotation_deg": 6},
+          "leg_ffar": {"rotation_deg": 6},
+          "leg_bfar": {"rotation_deg": -6},
+          "tail_1": {"rotation_deg": 1},
+          "tail_2": {"rotation_deg": 2}
+        },
+        {
+          "leg_front": {"rotation_deg": 17},
+          "leg_back": {"rotation_deg": -20},
+          "leg_ffar": {"rotation_deg": -15},
+          "leg_bfar": {"rotation_deg": 17},
+          "body": {"offset": [0, -1], "rotation_deg": -1},
+          "neck": {"rotation_deg": 2},
+          "tail_1": {"rotation_deg": -2},
+          "tail_2": {"rotation_deg": -3}
+        },
+        {
+          "leg_front": {"rotation_deg": 6},
+          "leg_back": {"rotation_deg": -6},
+          "leg_ffar": {"rotation_deg": -6},
+          "leg_bfar": {"rotation_deg": 6},
+          "tail_1": {"rotation_deg": 1},
+          "tail_2": {"rotation_deg": 0}
+        }
+      ]
+    },
+    "attack": {
+      "fps": 8,
+      "loop": false,
+      "frames": [
+        {
+          "neck": {"rotation_deg": -14},
+          "head": {"rotation_deg": -8},
+          "jaw": {"rotation_deg": 4},
+          "body": {"offset": [-2, 1], "rotation_deg": -3},
+          "tail_1": {"rotation_deg": 6},
+          "tail_2": {"rotation_deg": 4}
+        },
+        {
+          "neck": {"rotation_deg": 8},
+          "head": {"rotation_deg": 6},
+          "jaw": {"rotation_deg": 24},
+          "body": {"offset": [1, 0]},
+          "tail_1": {"rotation_deg": -4},
+          "vfx_breath": {"hidden": false, "part": "vfx_breath_0"}
+        },
+        {
+          "neck": {"rotation_deg": 10},
+          "head": {"rotation_deg": 8},
+          "jaw": {"rotation_deg": 28},
+          "body": {"offset": [2, 0]},
+          "tail_1": {"rotation_deg": -6},
+          "tail_2": {"rotation_deg": -4},
+          "vfx_breath": {"hidden": false, "part": "vfx_breath_2"}
+        }
+      ]
+    },
+    "lunge": {
+      "fps": 8,
+      "loop": false,
+      "frames": [
+        {
+          "body": {"rotation_deg": -9, "offset": [-3, -1]},
+          "neck": {"rotation_deg": -7},
+          "head": {"rotation_deg": -4},
+          "leg_front": {"rotation_deg": -15},
+          "leg_back": {"rotation_deg": 22},
+          "leg_ffar": {"rotation_deg": -11},
+          "leg_bfar": {"rotation_deg": 18},
+          "tail_1": {"rotation_deg": 8},
+          "tail_2": {"rotation_deg": 6}
+        },
+        {
+          "body": {"rotation_deg": 11, "offset": [5, 3]},
+          "neck": {"rotation_deg": 5},
+          "head": {"rotation_deg": 4},
+          "jaw": {"rotation_deg": 14},
+          "leg_front": {"rotation_deg": 32},
+          "leg_back": {"rotation_deg": -18},
+          "leg_ffar": {"rotation_deg": 28},
+          "leg_bfar": {"rotation_deg": -14},
+          "tail_1": {"rotation_deg": -8},
+          "tail_2": {"rotation_deg": -6}
+        },
+        {
+          "body": {"rotation_deg": 5, "offset": [3, 1]},
+          "neck": {"rotation_deg": 2},
+          "jaw": {"rotation_deg": 5},
+          "leg_front": {"rotation_deg": 16},
+          "leg_back": {"rotation_deg": -7},
+          "leg_ffar": {"rotation_deg": 12},
+          "leg_bfar": {"rotation_deg": -3},
+          "tail_1": {"rotation_deg": -3}
+        }
+      ]
+    }
+  }
+}

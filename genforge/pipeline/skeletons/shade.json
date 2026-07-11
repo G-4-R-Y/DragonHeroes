@@ -1,0 +1,17 @@
+{
+  "name": "shade",
+  "canvas": [36, 44],
+  "anchor": [18, 40],
+  "bones": [
+    {"name": "root", "parent": null, "attach": [0, 0], "rotation_deg": 0, "z": 0, "part": null},
+
+    {"name": "arm_far", "parent": "shroud", "attach": [-5, 3], "rotation_deg": 14, "z": 20, "part": "arm_far"},
+
+    {"name": "shroud", "parent": "root", "attach": [0, -26], "rotation_deg": 0, "z": 30, "part": "shroud_0"},
+    {"name": "core", "parent": "shroud", "attach": [1, 6], "rotation_deg": 0, "z": 34, "part": "core"},
+
+    {"name": "head", "parent": "shroud", "attach": [1, -1], "rotation_deg": 0, "z": 40, "part": "head"},
+
+    {"name": "arm_near", "parent": "shroud", "attach": [6, 4], "rotation_deg": -10, "z": 44, "part": "arm_near"}
+  ]
+}

@@ -17,10 +17,10 @@ func _ready() -> void:
 	match element:                # elemental variants (effects registry)
 		"ember":
 			damage = 12.0
-			_base_tint = Color(1.25, 0.85, 0.6)
+			_base_tint *= Color(1.25, 0.85, 0.6)   # x= so catalog species tint survives
 		"frost":
 			damage = 8.0          # weaker hit, but bolts Chill (-35% move 1.2 s)
-			_base_tint = Color(0.75, 1.0, 1.2)
+			_base_tint *= Color(0.75, 1.0, 1.2)
 	move_speed = 3.5 * TILE
 	body_radius = 7.0
 	aggro_range = 9.0 * TILE
@@ -34,7 +34,7 @@ func _ready() -> void:
 	super._ready()
 
 func _make_frames() -> SpriteFrames:
-	return ProtoSprites.wisp_frames()
+	return _bundle_or(ProtoSprites.wisp_frames())
 
 func _sprite_lift() -> float:
 	return 10.0                   # floats well above its tiny shadow

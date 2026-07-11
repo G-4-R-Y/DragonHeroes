@@ -30,7 +30,7 @@ func _ready() -> void:
 	super._ready()
 
 func _make_frames() -> SpriteFrames:
-	return ProtoSprites.boss_frames()
+	return _bundle_or(ProtoSprites.boss_frames())
 
 func _sprite_lift() -> float:
 	return 16.0
@@ -100,7 +100,7 @@ func _strike(player: Node2D) -> void:
 		"gust":
 			if player and not player.dead and global_position.distance_to(
 					player.global_position) <= 4.5 * TILE:
-				player.take_damage(10.0, (player.global_position
+				player.take_damage(10.0 * dmg_scale, (player.global_position
 						- global_position).normalized())
 				player.knockback((player.global_position
 						- global_position).normalized() * 4.5 * TILE)
@@ -110,7 +110,7 @@ func _strike(player: Node2D) -> void:
 			var p := EmberProjectile.new()
 			p.global_position = global_position
 			p.velocity = _attack_dir * 18.0 * TILE
-			p.damage = 16.0
+			p.damage = 16.0 * dmg_scale
 			get_parent().add_child(p)
 			if main:
 				main.play_sfx("bolt", global_position, -8.0)
@@ -141,8 +141,8 @@ func _meteor_impact(at: Vector2) -> void:
 	var player := get_tree().get_first_node_in_group("player")
 	if player and not player.dead \
 			and at.distance_to(player.global_position) <= 2.2 * TILE + player.body_radius:
-		player.take_damage(26.0, (player.global_position - at).normalized(), "fire")
-	main.spawn_field(at, 2.2 * TILE, 6.0, 7.0, "fire")
+		player.take_damage(26.0 * dmg_scale, (player.global_position - at).normalized(), "fire")
+	main.spawn_field(at, 2.2 * TILE, 6.0, 7.0 * dmg_scale, "fire")
 
 # Cinder Breath: a 7-tile burning corridor; small fire fields smolder along it.
 func _breath(player: Node2D, main: Node) -> void:
@@ -152,8 +152,8 @@ func _breath(player: Node2D, main: Node) -> void:
 		main.fx.flame_cone(global_position + dir * 3.2 * TILE, dir)
 		main.play_sfx("hit", global_position, -8.0)
 	if _hits_corridor(player, dir, 7.0 * TILE, 52.0):
-		player.take_damage(24.0, dir, "fire")
+		player.take_damage(24.0 * dmg_scale, dir, "fire")
 	if main:
 		for d in [2.5, 4.5, 6.5]:
 			main.spawn_field(global_position + dir * d * TILE,
-					1.6 * TILE, 5.0, 6.0, "fire")
+					1.6 * TILE, 5.0, 6.0 * dmg_scale, "fire")

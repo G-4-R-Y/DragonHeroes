@@ -67,6 +67,18 @@
       ]
     },
     {
+      "name": "Bestiary & spawn rules (catalog-driven population)",
+      "entries": [
+        {"key": "bestiary_normal", "name": "Bestiary — normals", "desc": "1000 data-defined creatures (bestiary_normal.json): family bundle x element x tint x scale x stat rolls; pure data, weekly-extensible", "status": "live"},
+        {"key": "bestiary_legendary", "name": "Bestiary — legendaries", "desc": "100 named legendaries (bestiary_legendary.json) over dragon/colossus/hag chassis with elemental kits and lore", "status": "live"},
+        {"key": "species_roster", "name": "Species roster", "desc": "each hunt samples 6-10 species from the 1000; packs read as one species with a 25% stray chance per member", "status": "live"},
+        {"key": "hunt_legendary", "name": "Hunt legendary", "desc": "one sampled legendary per hunt (pack 13): chassis by base, hp x2.5-6 / dmg x1.3-2.2, guaranteed rare+ drop (60/30/10 rare/epic/legendary), 10% Soul Snare shower; magenta diamond on the minimap", "status": "live"},
+        {"key": "power_scale_normal", "name": "Power scaling — normals", "desc": "read at spawn from hunter level: HP +2%/level, damage +1%/level, gold rides the damage curve", "status": "live"},
+        {"key": "power_scale_boss", "name": "Power scaling — bosses", "desc": "all bosses incl. hunt legendaries: HP +6%/level, damage +3%/level (also scales every scripted boss skill packet)", "status": "live"},
+        {"key": "wisp_element_flavor", "name": "Wisp element mapping", "desc": "bestiary element -> bolt flavor: fire->ember, frost->frost, others->umbral (until 7-type bolts land)", "status": "live"}
+      ]
+    },
+    {
       "name": "Fields & ground effects (tile interaction system)",
       "entries": [
         {"key": "fire_field", "name": "Fire field", "desc": "burning ground, DoT ticks every 0.25 s; glows and telegraphs on landing", "status": "live"},
@@ -92,6 +104,11 @@
         {"key": "class_reaver", "name": "Reaver", "desc": "the balanced blade — umbral Shadow Rend, no tradeoffs", "status": "live"},
         {"key": "class_emberkin", "name": "Emberkin", "desc": "+12% fire on every hit and 20% Ignite chance — but -10% max HP", "status": "live"},
         {"key": "class_frostbinder", "name": "Frostbinder", "desc": "+15% max HP and every hit Chills — but -8% damage", "status": "live"},
+        {"key": "class_mage", "name": "Gloam Mage", "desc": "ranged Arcane Bolts (LMB) + Frost Nova (E: radial chill), +15% skill damage — but -20% HP", "status": "live"},
+        {"key": "class_rogue", "name": "Veilblade (rogue)", "desc": "Swift Stab (LMB: 60-degree 0.25 s cadence) + Fan of Knives (E: 5 steel fans), +10% crit and move — but -15% HP", "status": "live"},
+        {"key": "arcane_bolt", "name": "Arcane Bolt", "desc": "friendly umbral projectile, 0.9x melee stat, 13 m/s", "status": "live"},
+        {"key": "frost_nova", "name": "Frost Nova", "desc": "2.8 m radial burst, 0.7x skill-scaled + 1.5 s hard Chill", "status": "live"},
+        {"key": "fan_of_knives", "name": "Fan of Knives", "desc": "five 0.5x piercing knives in a 56-degree fan", "status": "live"},
         {"key": "classes_full", "name": "Six launch classes", "desc": "full distinct kits, trees and resources (docs/design/10)", "status": "planned"}
       ]
     },

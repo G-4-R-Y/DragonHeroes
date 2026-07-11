@@ -21,6 +21,10 @@ const CLASSES := {
 			"desc": "+12% fire on every hit, 20% chance to Ignite — but -10% HP"},
 	"core.class.frostbinder": {"name": "Frostbinder",
 			"desc": "+15% HP and every hit Chills the enemy — but -8% damage"},
+	"core.class.mage": {"name": "Gloam Mage",
+			"desc": "ranged Arcane Bolts + Frost Nova (E) · +15% skill damage — but -20% HP"},
+	"core.class.rogue": {"name": "Veilblade",
+			"desc": "blinding-fast stabs + Fan of Knives (E) · +10% crit and move — but -15% HP"},
 }
 
 func _ready() -> void:
@@ -74,7 +78,7 @@ func _ready() -> void:
 		cb.text = str(CLASSES[cid]["name"])
 		cb.toggle_mode = true
 		cb.focus_mode = Control.FOCUS_NONE
-		cb.custom_minimum_size = Vector2(84, 0)
+		cb.custom_minimum_size = Vector2(72, 0)
 		cb.pressed.connect(_pick_class.bind(str(cid)))
 		class_row.add_child(cb)
 		_class_btns[cid] = cb

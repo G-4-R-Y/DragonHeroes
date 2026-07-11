@@ -1,0 +1,90 @@
+{
+  "skeleton": "fen_boar",
+  "animations": {
+    "idle": {
+      "fps": 2.5,
+      "loop": true,
+      "frames": [
+        {},
+        {
+          "body": {"offset": [0, 1]},
+          "head": {"rotation_deg": 5, "offset": [0, 1]},
+          "tail": {"rotation_deg": -10}
+        }
+      ]
+    },
+    "walk": {
+      "fps": 9,
+      "loop": true,
+      "frames": [
+        {
+          "leg_fn": {"rotation_deg": -24},
+          "leg_bn": {"rotation_deg": 20},
+          "leg_ff": {"rotation_deg": 22},
+          "leg_bf": {"rotation_deg": -18},
+          "body": {"offset": [0, -1], "rotation_deg": 1},
+          "head": {"rotation_deg": -2},
+          "tail": {"rotation_deg": 6}
+        },
+        {
+          "leg_fn": {"rotation_deg": -8},
+          "leg_bn": {"rotation_deg": 8},
+          "leg_ff": {"rotation_deg": 8},
+          "leg_bf": {"rotation_deg": -8},
+          "tail": {"rotation_deg": 2}
+        },
+        {
+          "leg_fn": {"rotation_deg": 22},
+          "leg_bn": {"rotation_deg": -18},
+          "leg_ff": {"rotation_deg": -24},
+          "leg_bf": {"rotation_deg": 20},
+          "body": {"offset": [0, -1], "rotation_deg": -1},
+          "head": {"rotation_deg": 2},
+          "tail": {"rotation_deg": -4}
+        },
+        {
+          "leg_fn": {"rotation_deg": 8},
+          "leg_bn": {"rotation_deg": -8},
+          "leg_ff": {"rotation_deg": -8},
+          "leg_bf": {"rotation_deg": 8},
+          "tail": {"rotation_deg": -1}
+        }
+      ]
+    },
+    "lunge": {
+      "fps": 8,
+      "loop": false,
+      "frames": [
+        {
+          "body": {"offset": [-3, 2], "rotation_deg": 4},
+          "head": {"rotation_deg": 10, "offset": [0, 2]},
+          "tail": {"rotation_deg": 12},
+          "leg_fn": {"rotation_deg": -28},
+          "leg_ff": {"rotation_deg": -24},
+          "leg_bn": {"rotation_deg": 26},
+          "leg_bf": {"rotation_deg": 22}
+        },
+        {
+          "body": {"offset": [4, -3], "rotation_deg": -7},
+          "head": {"rotation_deg": -14, "offset": [1, -1]},
+          "jaw": {"rotation_deg": 16},
+          "tail": {"rotation_deg": -10},
+          "leg_fn": {"rotation_deg": 34},
+          "leg_ff": {"rotation_deg": 28},
+          "leg_bn": {"rotation_deg": -32},
+          "leg_bf": {"rotation_deg": -26}
+        },
+        {
+          "body": {"offset": [3, 0], "rotation_deg": -2},
+          "head": {"rotation_deg": -5},
+          "jaw": {"rotation_deg": 6},
+          "tail": {"rotation_deg": -4},
+          "leg_fn": {"rotation_deg": 12},
+          "leg_ff": {"rotation_deg": 10},
+          "leg_bn": {"rotation_deg": -12},
+          "leg_bf": {"rotation_deg": -10}
+        }
+      ]
+    }
+  }
+}

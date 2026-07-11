@@ -1,0 +1,17 @@
+{
+  "name": "golem",
+  "canvas": [48, 46],
+  "anchor": [24, 43],
+  "bones": [
+    {"name": "root", "parent": null, "attach": [0, 0], "rotation_deg": 0, "z": 0, "part": null},
+
+    {"name": "arm_far", "parent": "torso", "attach": [-9, -6], "rotation_deg": 4, "z": 10, "part": "arm_far"},
+    {"name": "leg_far", "parent": "torso", "attach": [-2, 8], "rotation_deg": 0, "z": 12, "part": "leg_far"},
+
+    {"name": "torso", "parent": "root", "attach": [0, -22], "rotation_deg": 0, "z": 30, "part": "torso"},
+
+    {"name": "leg_near", "parent": "torso", "attach": [5, 9], "rotation_deg": 0, "z": 34, "part": "leg_near"},
+    {"name": "head", "parent": "torso", "attach": [6, -12], "rotation_deg": 0, "z": 40, "part": "head"},
+    {"name": "arm_near", "parent": "torso", "attach": [10, -7], "rotation_deg": -4, "z": 44, "part": "arm_near"}
+  ]
+}

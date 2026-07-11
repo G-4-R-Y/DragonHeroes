@@ -35,6 +35,7 @@ var whirl_cd_s := 4.0            # Whirlwind (E): full-circle strike (proposal)
 var _whirl_cd := 0.0
 var _whirl_t := 0.0
 var _class_fx := ""              # Emberkin ignite / Frostbinder chill on hit
+var _kit := "melee"              # melee | mage | rogue — LMB and E reshape
 
 # Mounts (Ricardo, proposals): M rides the active mount. Walking respects
 # terrain; FLYING crosses water/rock. Combat or damage dismounts.
@@ -111,6 +112,21 @@ func apply_stats() -> void:
 	attack_cd_s = 0.4 / maxf(attack_speed_mult, 0.1)
 	leech_pct = s.leech_pct
 	_class_fx = str(s.get("class_fx", ""))
+	# class kits (proposal): the same stat block wears three different weapons
+	_kit = str(s.get("class_kit", "melee"))
+	attack_arc_deg = 110.0
+	attack_reach = 2.2 * TILE
+	whirl_cd_s = 4.0
+	match _kit:
+		"mage":    # Arcane Bolt caster: ranged, slower cadence, nova on E
+			attack_cd_s = 0.55 / maxf(attack_speed_mult, 0.1)
+			whirl_cd_s = 5.0
+		"rogue":   # Swift Stab: tight arc, blinding cadence, lighter hits
+			attack_damage = s.melee_damage * 0.8
+			attack_cd_s = 0.25 / maxf(attack_speed_mult, 0.1)
+			attack_arc_deg = 60.0
+			attack_reach = 1.8 * TILE
+			whirl_cd_s = 4.5
 	phys_reduction = s.phys_reduction
 	resist_pct = s.resist_pct
 	status_resist_pct = s.status_resist_pct
@@ -184,7 +200,13 @@ func _physics_process(delta: float) -> void:
 		if not mounted and Input.is_action_pressed("attack") and _attack_cd <= 0.0:
 			_attack()
 		if not mounted and Input.is_action_just_pressed("skill2") and _whirl_cd <= 0.0:
-			_whirlwind()
+			match _kit:
+				"mage":
+					_frost_nova()
+				"rogue":
+					_fan_of_knives()
+				_:
+					_whirlwind()
 		if not mounted and Input.is_action_just_pressed("bestial") and _rend_cd <= 0.0:
 			var main := get_tree().get_first_node_in_group("main")
 			if main and main.stones >= 1:   # owning a stone unlocks the bestial slot
@@ -265,6 +287,9 @@ func _arc_hit(dir: Vector2, reach: float, arc_deg: float, dmg: float,
 	return hit_any
 
 func _attack() -> void:
+	if _kit == "mage":   # the Mage's "swing" is a ranged Arcane Bolt
+		_cast_bolt()
+		return
 	_attack_cd = attack_cd_s
 	_swing = 1.0
 	_swing_dir = (get_global_mouse_position() - global_position).normalized()
@@ -276,6 +301,8 @@ func _attack() -> void:
 	var main := get_tree().get_first_node_in_group("main")
 	if main:
 		main.play_sfx("swing", global_position, -10.0)
+		main.fx.arc_slash(global_position + _swing_dir * attack_reach * 0.6,
+				_swing_dir, Color(0.85, 0.92, 1.0, 0.9))
 	var hit_any := _arc_hit(_swing_dir, attack_reach, attack_arc_deg,
 			attack_damage, Color("cfd6ff"), _rune_cleave)
 	if _rune_cleave == "rune_of_echoes":
@@ -298,6 +325,7 @@ func _shadow_rend(main: Node) -> void:
 	sprite.frame = 0
 	main.play_sfx("swing", global_position, -4.0)
 	main.fx.explosion(global_position, Color(0.62, 0.38, 1.0))   # umbral nova
+	main.fx.ring(global_position, Color(0.7, 0.45, 1.0, 0.9), rend_reach)
 	var hit_any := _arc_hit(_rend_dir, rend_reach, rend_arc_deg,
 			rend_damage, Color("b06cff"), _rune_rend)   # violet hit sparks
 	if _rune_rend == "rune_of_echoes":
@@ -337,10 +365,91 @@ func _whirlwind() -> void:
 	if main:
 		main.play_sfx("swing", global_position, -6.0)
 		main.fx.tornado(global_position)
+		main.fx.ring(global_position, Color(0.85, 0.95, 1.0, 0.8), 2.6 * TILE)
 		if hit_any:
 			main.hitstop()
 			main.shake(3.0)
 			main.refresh_hud()
+
+# Arcane Bolt (Gloam Mage LMB, proposal): ranged umbral projectile, 0.9x stat.
+func _cast_bolt() -> void:
+	_attack_cd = attack_cd_s
+	_swing_dir = (get_global_mouse_position() - global_position).normalized()
+	if _swing_dir.length() < 0.1:
+		_swing_dir = Vector2.RIGHT
+	sprite.flip_h = _swing_dir.x < 0.0
+	sprite.play("attack")
+	sprite.frame = 0
+	var dmg := attack_damage * 0.9
+	if randf() < crit_chance:
+		dmg *= crit_mult
+	var p := ProtoProjectile.new()
+	p.friendly = true
+	p.set_arcane()
+	p.damage = dmg
+	p.lifetime = 1.2
+	p.global_position = global_position + Vector2(0, -10) + _swing_dir * 8.0
+	p.velocity = _swing_dir * 13.0 * TILE
+	get_parent().add_child(p)
+	var main := get_tree().get_first_node_in_group("main")
+	if main:
+		main.play_sfx("bolt", global_position, -12.0)
+		main.fx.burst(global_position + _swing_dir * 10.0 + Vector2(0, -10),
+				{"amount": 7, "lifetime": 0.18, "direction": _swing_dir,
+				"spread": 30.0, "v_min": 60.0, "v_max": 160.0,
+				"gravity": Vector2.ZERO, "s_min": 0.6, "s_max": 1.3,
+				"color": Color(0.75, 0.6, 1.0, 0.9)})
+
+# Frost Nova (Gloam Mage E, proposal): radial chill burst, 0.7x + hard slow.
+func _frost_nova() -> void:
+	_whirl_cd = whirl_cd_s
+	_whirl_t = 1.0
+	var main := get_tree().get_first_node_in_group("main")
+	var dmg := attack_damage * 0.7 * _skill_mult
+	var hit_any := false
+	for c in get_tree().get_nodes_in_group("creatures"):
+		if c.dead:
+			continue
+		var to_c: Vector2 = c.global_position - global_position
+		if to_c.length() <= 2.8 * TILE + c.body_radius:
+			c.take_damage(dmg, to_c.normalized(), Color(0.65, 0.9, 1.0))
+			c.apply_slow(1.5)
+			hit_any = true
+	sprite.play("attack")
+	sprite.frame = 0
+	if main:
+		main.play_sfx("bolt", global_position, -8.0)
+		main.fx.ring(global_position, Color(0.7, 0.92, 1.0, 0.9), 2.8 * TILE)
+		main.fx.burst(global_position, {"amount": 26, "lifetime": 0.4,
+				"v_min": 60.0, "v_max": 190.0, "gravity": Vector2.ZERO,
+				"s_min": 0.8, "s_max": 1.8, "emission_radius": 10.0,
+				"color": Color(0.75, 0.95, 1.0, 0.85)})
+		if hit_any:
+			main.shake(2.5)
+
+# Fan of Knives (Veilblade E, proposal): five piercing steel fans, 0.5x each.
+func _fan_of_knives() -> void:
+	_whirl_cd = whirl_cd_s
+	_whirl_t = 0.6
+	var aim := (get_global_mouse_position() - global_position).normalized()
+	if aim.length() < 0.1:
+		aim = Vector2.RIGHT
+	sprite.flip_h = aim.x < 0.0
+	sprite.play("attack")
+	sprite.frame = 0
+	for i in 5:
+		var p := ProtoProjectile.new()
+		p.friendly = true
+		p.set_steel()
+		p.damage = attack_damage * 0.5
+		p.lifetime = 0.7
+		p.global_position = global_position + Vector2(0, -10)
+		p.velocity = aim.rotated(deg_to_rad(-28.0 + 14.0 * i)) * 15.0 * TILE
+		get_parent().add_child(p)
+	var main := get_tree().get_first_node_in_group("main")
+	if main:
+		main.play_sfx("swing", global_position, -6.0)
+		main.fx.arc_slash(global_position + aim * 12.0, aim, Color(0.85, 0.9, 0.95))
 
 func whirl_progress() -> float:
 	return clampf(1.0 - _whirl_cd / whirl_cd_s, 0.0, 1.0)

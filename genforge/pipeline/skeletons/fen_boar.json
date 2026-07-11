@@ -1,0 +1,21 @@
+{
+  "name": "fen_boar",
+  "canvas": [52, 34],
+  "anchor": [26, 30],
+  "bones": [
+    {"name": "root", "parent": null, "attach": [0, 0], "rotation_deg": 0, "z": 0, "part": null},
+
+    {"name": "tail", "parent": "body", "attach": [-16, -4], "rotation_deg": 0, "z": 8, "part": "tail"},
+
+    {"name": "leg_bf", "parent": "body", "attach": [-10, 4], "rotation_deg": 0, "z": 10, "part": "leg_far"},
+    {"name": "leg_ff", "parent": "body", "attach": [9, 4], "rotation_deg": 0, "z": 12, "part": "leg_far"},
+
+    {"name": "body", "parent": "root", "attach": [0, -13], "rotation_deg": 0, "z": 30, "part": "body"},
+
+    {"name": "jaw", "parent": "head", "attach": [9, 6], "rotation_deg": 0, "z": 36, "part": "jaw"},
+    {"name": "head", "parent": "body", "attach": [14, -1], "rotation_deg": 0, "z": 40, "part": "head"},
+
+    {"name": "leg_bn", "parent": "body", "attach": [-8, 5], "rotation_deg": 0, "z": 44, "part": "leg_near"},
+    {"name": "leg_fn", "parent": "body", "attach": [11, 5], "rotation_deg": 0, "z": 46, "part": "leg_near"}
+  ]
+}

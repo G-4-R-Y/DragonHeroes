@@ -45,7 +45,12 @@ func _ready() -> void:
 	super._ready()
 
 func _make_frames() -> SpriteFrames:
-	return ProtoSprites.wisp_frames()   # spirit rig stand-in until the hag rig lands
+	# spirit rig stand-in until the hag rig lands (legendary bundles override)
+	return _bundle_or(ProtoSprites.wisp_frames())
+
+# Boss power scaling (task 3, proposal): hp 6%/level, damage 3%/level at spawn.
+func _power_rates() -> Vector2:
+	return Vector2(0.06, 0.03)
 
 func _sprite_lift() -> float:
 	return 12.0
@@ -145,7 +150,7 @@ func _strike(player: Node2D) -> void:
 				p.global_position = global_position
 				p.velocity = _attack_dir.rotated(deg_to_rad(-14.0 + 14.0 * i)) \
 						* 13.0 * TILE
-				p.damage = 9.0
+				p.damage = 9.0 * dmg_scale
 				get_parent().add_child(p)
 			if main:
 				main.play_sfx("bolt", global_position, -8.0)
@@ -155,7 +160,7 @@ func _strike(player: Node2D) -> void:
 			_summon(main)
 		"mire":
 			if main:
-				main.spawn_field(_cast_target, 3.5 * TILE, 7.0, 3.0, "mire")
+				main.spawn_field(_cast_target, 3.5 * TILE, 7.0, 3.0 * dmg_scale, "mire")
 		"curse":
 			_cursed = true
 			_cd_scale = 0.65
@@ -205,7 +210,11 @@ func _summon(main: Node) -> void:
 func _die() -> void:
 	var main := get_tree().get_first_node_in_group("main")
 	if main:
-		main.on_hag_died(self)
+		# hunt legendary riding the hag chassis: legendary spoils, not hers
+		if legendary_entry.is_empty():
+			main.on_hag_died(self)
+		else:
+			main.on_legendary_died(self)
 	super._die()
 
 # --- Wispling: weak, short-lived summon (wispling_call.json). Expires without

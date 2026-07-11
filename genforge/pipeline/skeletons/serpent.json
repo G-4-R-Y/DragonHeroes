@@ -1,0 +1,17 @@
+{
+  "name": "serpent",
+  "canvas": [60, 32],
+  "anchor": [30, 28],
+  "bones": [
+    {"name": "root", "parent": null, "attach": [0, 0], "rotation_deg": 0, "z": 0, "part": null},
+
+    {"name": "tail", "parent": "aft", "attach": [-9, 0], "rotation_deg": 4, "z": 24, "part": "tail_tip"},
+    {"name": "aft", "parent": "body", "attach": [-12, 0], "rotation_deg": 2, "z": 26, "part": "coil_c"},
+
+    {"name": "body", "parent": "root", "attach": [0, -7], "rotation_deg": 0, "z": 30, "part": "coil_a"},
+
+    {"name": "fore", "parent": "body", "attach": [11, -1], "rotation_deg": -2, "z": 32, "part": "coil_b"},
+    {"name": "jaw", "parent": "head", "attach": [11, 4], "rotation_deg": 2, "z": 38, "part": "jaw"},
+    {"name": "head", "parent": "fore", "attach": [7, -4], "rotation_deg": 0, "z": 40, "part": "head"}
+  ]
+}

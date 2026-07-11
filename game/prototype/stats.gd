@@ -58,6 +58,10 @@ static func compute(sess: Node, equipment: Dictionary = {}) -> Dictionary:
 	var class_dmg := 1.0
 	var class_fire := 0.0
 	var class_fx := ""
+	var class_kit := "melee"     # melee | mage | rogue — reshapes LMB and E
+	var class_crit := 0.0
+	var class_move := 0.0
+	var class_skill := 1.0
 	match str(sess.class_id):
 		"core.class.emberkin":
 			class_hp = 0.9
@@ -67,6 +71,15 @@ static func compute(sess: Node, equipment: Dictionary = {}) -> Dictionary:
 			class_hp = 1.15
 			class_dmg = 0.92
 			class_fx = "chill"
+		"core.class.mage":       # ranged arcane caster: frail, skill-scaled
+			class_hp = 0.8
+			class_skill = 1.15
+			class_kit = "mage"
+		"core.class.rogue":      # crit machine: fast, precise, frail
+			class_hp = 0.85
+			class_crit = 10.0
+			class_move = 0.10
+			class_kit = "rogue"
 	return {
 		"max_hp": (BASE_HP + 6.0 * pts.vitality + float(totals.get("hp", 0.0))) \
 				* class_hp,
@@ -76,11 +89,12 @@ static func compute(sess: Node, equipment: Dictionary = {}) -> Dictionary:
 				* (1.0 + (float(totals.get("fire_damage_pct", 0.0)) + class_fire) / 100.0),
 		"rend_damage": BASE_REND * (1.0 + 0.02 * pts.intellect) \
 				* (1.0 + float(totals.get("umbral_damage_pct", 0.0)) / 100.0),
-		"skill_damage_mult": 1.0 + 0.02 * pts.intellect,
-		"move_speed_mult": 1.0 + 0.01 * pts.agility \
+		"skill_damage_mult": (1.0 + 0.02 * pts.intellect) * class_skill,
+		"class_kit": class_kit,
+		"move_speed_mult": 1.0 + 0.01 * pts.agility + class_move \
 				+ float(totals.get("move_speed", 0.0)) / 100.0,
 		"dodge_recharge_s": BASE_DODGE_RECHARGE / (1.0 + 0.02 * pts.agility),
-		"crit_chance": (BASE_CRIT + float(totals.get("crit_chance", 0.0)) \
+		"crit_chance": (BASE_CRIT + class_crit + float(totals.get("crit_chance", 0.0)) \
 				+ float(node_mods.get("crit_chance", 0.0))) / 100.0,
 		"crit_mult": CRIT_MULT,
 		"attack_speed_mult": 1.0 + float(node_mods.get("attack_speed", 0.0)) / 100.0,

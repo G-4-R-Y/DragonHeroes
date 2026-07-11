@@ -120,6 +120,34 @@ compiles into server images or client packs.
 }
 ```
 
+## The bestiary batch flow (v0 mass content, implemented)
+
+`pipeline/bestiary_gen.py` is the first mass-content generator: a
+deterministic, seeded batch run producing **1000 normal + 100 legendary
+creatures as pure data**, from component tables grounded in the world bible —
+twelve Veilands families, the seven canonical damage types
+(`content/core/registries/damage_types.json`), epithet/noun name tables, and
+size/temperament stat correlation. Legendary kits (5–10 skills, element/base
+coherent) are verified against `content/core/skills/` at generation time.
+
+```bash
+python3 -m genforge.pipeline.bestiary_gen --seed 2026        # same seed, same catalogs
+# -> content/generated/bestiary_{normal,legendary}.json      (canonical, provenance header)
+# -> game/prototype/data/bestiary_{normal,legendary}.json    (prototype snapshots)
+
+python3 -m genforge.pipeline.bestiary_art --previews /tmp/previews
+# -> game/prototype/art/{serpent,shade,golem,fen_boar,marsh_drake}/   five NEW
+#    base bodies (skeletons/poses in pipeline/skeletons|poses/) that multiply
+#    the catalogs' visual diversity alongside per-entry tint + scale
+
+python3 -m pytest genforge/tests/test_bestiary.py -v         # catalog gauntlet
+```
+
+Both are human-invoked dev batches (same carve-out as
+`pipeline/bake_game_art.py`): they write only `content/generated/` + prototype
+snapshots/art — never `content/core|drops` — and the existing five actor
+bundles are never touched.
+
 ## The candidate contract (non-negotiable)
 
 - GenForge writes **only** to a candidates area — never to `content/core|drops`

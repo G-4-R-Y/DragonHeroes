@@ -1,0 +1,2063 @@
+{
+ "version": 1,
+ "provenance": {
+  "generator": "genforge.pipeline.bestiary_gen",
+  "version": "1.0.0",
+  "seed": 2026,
+  "date": "2026-07-11",
+  "grounding": [
+   "genforge/lore/world-bible.md",
+   "content/core/registries/damage_types.json",
+   "content/core/skills/"
+  ],
+  "families": [
+   "bloodbriar",
+   "bloomfell",
+   "cinderglass",
+   "duskmaw",
+   "emberwing",
+   "fenwitch",
+   "gloamfen",
+   "mireborn",
+   "palewrought",
+   "pyre",
+   "skyborne",
+   "terravore"
+  ],
+  "tier": "legendary"
+ },
+ "entries": [
+  {
+   "id": "gen.creature.ssylild_choir_of_the_seventh_duologue",
+   "name": "Ssylild, Choir of the Seventh Duologue",
+   "base": "hag",
+   "bundle": "",
+   "element": "venom",
+   "tint": "679e24",
+   "scale": 1.18,
+   "hp_mult": 3.8,
+   "dmg_mult": 1.48,
+   "kit": [
+    "core.skill.hex_bolt",
+    "core.skill.void_step",
+    "core.skill.cleave",
+    "core.skill.wispling_call",
+    "core.skill.shrieking_curse",
+    "core.skill.shadow_rend"
+   ],
+   "lore": "Where it walks, the land stays gorgeous and becomes lethal; corruption here beautifies. Older than the Havens; it remembers being worshipped, and it remembers who stopped."
+  },
+  {
+   "id": "gen.creature.noczarr_hag_of_the_last_thaw",
+   "name": "Noczarr, Hag of the Last Thaw",
+   "base": "hag",
+   "bundle": "",
+   "element": "umbral",
+   "tint": "8b48b6",
+   "scale": 1.27,
+   "hp_mult": 2.77,
+   "dmg_mult": 1.75,
+   "kit": [
+    "core.skill.wispling_call",
+    "core.skill.shadow_rend",
+    "core.skill.shrieking_curse",
+    "core.skill.creeping_mire",
+    "core.skill.abyssal_maw",
+    "core.skill.void_step"
+   ],
+   "lore": "Older than the Havens; it remembers being worshipped, and it remembers who stopped. No bestiary agrees on its shape, because no witness account was finished."
+  },
+  {
+   "id": "gen.creature.bryneth_the_never_thawed",
+   "name": "Bryneth the Never-Thawed",
+   "base": "colossus",
+   "bundle": "",
+   "element": "frost",
+   "tint": "91c0d6",
+   "scale": 1.45,
+   "hp_mult": 4.03,
+   "dmg_mult": 1.38,
+   "kit": [
+    "core.skill.hex_bolt",
+    "core.skill.wing_gust",
+    "core.skill.stone_spikes",
+    "core.skill.stone_upheaval",
+    "core.skill.void_step",
+    "core.skill.cleave",
+    "core.skill.earthshatter",
+    "core.skill.boulder_hurl",
+    "core.skill.seismic_slam"
+   ],
+   "lore": "No bestiary agrees on its shape, because no witness account was finished. It was offered a Soul Snare once, at the exact edge of death. It chose the hunter \u2014 as a meal."
+  },
+  {
+   "id": "gen.creature.torvorn_maw_of_the_third_weaving",
+   "name": "Torvorn, Maw of the Third Weaving",
+   "base": "dragon",
+   "bundle": "marsh_drake",
+   "element": "storm",
+   "tint": "6b67d0",
+   "scale": 1.35,
+   "hp_mult": 4.24,
+   "dmg_mult": 1.57,
+   "kit": [
+    "core.skill.wing_gust",
+    "core.skill.void_step",
+    "core.skill.cleave",
+    "core.skill.talon_dive",
+    "core.skill.ember_screech"
+   ],
+   "lore": "Its spirit would enchant a Haven's whole arsenal \u2014 which is precisely why the enchanters forbid the hunt."
+  },
+  {
+   "id": "gen.creature.molien_wyrm_of_the_hundredth_kindling",
+   "name": "Molien, Wyrm of the Hundredth Kindling",
+   "base": "dragon",
+   "bundle": "emberwing_matriarch",
+   "element": "fire",
+   "tint": "e66d22",
+   "scale": 1.17,
+   "hp_mult": 4.58,
+   "dmg_mult": 1.65,
+   "kit": [
+    "core.skill.magma_breath",
+    "core.skill.void_step",
+    "core.skill.meteor_call",
+    "core.skill.ember_screech",
+    "core.skill.cleave",
+    "core.skill.wing_gust",
+    "core.skill.talon_dive"
+   ],
+   "lore": "Its spirit would enchant a Haven's whole arsenal \u2014 which is precisely why the enchanters forbid the hunt. Older than the Havens; it remembers being worshipped, and it remembers who stopped."
+  },
+  {
+   "id": "gen.creature.vaelur_pillar_of_the_sixth_silence",
+   "name": "Vaelur, Pillar of the Sixth Silence",
+   "base": "colossus",
+   "bundle": "",
+   "element": "frost",
+   "tint": "8bc7e7",
+   "scale": 1.5,
+   "hp_mult": 5.85,
+   "dmg_mult": 1.38,
+   "kit": [
+    "core.skill.hex_bolt",
+    "core.skill.wing_gust",
+    "core.skill.void_step",
+    "core.skill.seismic_slam",
+    "core.skill.cleave"
+   ],
+   "lore": "It was offered a Soul Snare once, at the exact edge of death. It chose the hunter \u2014 as a meal."
+  },
+  {
+   "id": "gen.creature.cyndeth_herald_of_the_last_silence",
+   "name": "Cyndeth, Herald of the Last Silence",
+   "base": "dragon",
+   "bundle": "emberwing_matriarch",
+   "element": "fire",
+   "tint": "ee6a20",
+   "scale": 1.39,
+   "hp_mult": 3.31,
+   "dmg_mult": 2.04,
+   "kit": [
+    "core.skill.cinder_breath",
+    "core.skill.void_step",
+    "core.skill.meteor_call",
+    "core.skill.talon_dive",
+    "core.skill.cleave",
+    "core.skill.wing_gust",
+    "core.skill.ember_screech",
+    "core.skill.ember_bolt"
+   ],
+   "lore": "No bestiary agrees on its shape, because no witness account was finished."
+  },
+  {
+   "id": "gen.creature.grumissa_colossus_of_the_umbral_depths",
+   "name": "Grumissa, Colossus of the Umbral Depths",
+   "base": "colossus",
+   "bundle": "",
+   "element": "physical",
+   "tint": "bb9d7b",
+   "scale": 1.38,
+   "hp_mult": 4.83,
+   "dmg_mult": 1.8,
+   "kit": [
+    "core.skill.cleave",
+    "core.skill.stone_spikes",
+    "core.skill.boulder_hurl",
+    "core.skill.seismic_slam",
+    "core.skill.earthshatter"
+   ],
+   "lore": "Every season the theme changes and every season it does not; it is the constant the songs tune against. No bestiary agrees on its shape, because no witness account was finished."
+  },
+  {
+   "id": "gen.creature.sathgon_hag_of_the_drowned_court",
+   "name": "Sathgon, Hag of the Drowned Court",
+   "base": "hag",
+   "bundle": "",
+   "element": "umbral",
+   "tint": "7856b8",
+   "scale": 1.33,
+   "hp_mult": 3.8,
+   "dmg_mult": 1.96,
+   "kit": [
+    "core.skill.hex_bolt",
+    "core.skill.shadow_rend",
+    "core.skill.abyssal_maw",
+    "core.skill.cleave",
+    "core.skill.shrieking_curse",
+    "core.skill.creeping_mire",
+    "core.skill.void_step"
+   ],
+   "lore": "It patrols the Unfinished Rim, eating the world before the Lumen finishes weaving it. The wells refuse to recall those it takes; its kills feed the Gloom directly."
+  },
+  {
+   "id": "gen.creature.zsaeth_the_unsnared",
+   "name": "Zsaeth the Unsnared",
+   "base": "hag",
+   "bundle": "",
+   "element": "venom",
+   "tint": "23b029",
+   "scale": 1.28,
+   "hp_mult": 4.01,
+   "dmg_mult": 1.5,
+   "kit": [
+    "core.skill.hex_bolt",
+    "core.skill.shrieking_curse",
+    "core.skill.wispling_call",
+    "core.skill.shadow_rend",
+    "core.skill.abyssal_maw"
+   ],
+   "lore": "The wells refuse to recall those it takes; its kills feed the Gloom directly."
+  },
+  {
+   "id": "gen.creature.dolveig_anvil_of_the_last_kindling",
+   "name": "Dolveig, Anvil of the Last Kindling",
+   "base": "colossus",
+   "bundle": "",
+   "element": "physical",
+   "tint": "8f8375",
+   "scale": 1.38,
+   "hp_mult": 5.68,
+   "dmg_mult": 1.68,
+   "kit": [
+    "core.skill.stone_upheaval",
+    "core.skill.boulder_hurl",
+    "core.skill.cleave",
+    "core.skill.seismic_slam",
+    "core.skill.void_step",
+    "core.skill.earthshatter"
+   ],
+   "lore": "The wells refuse to recall those it takes; its kills feed the Gloom directly."
+  },
+  {
+   "id": "gen.creature.vhalesh_well_cursed_pyre",
+   "name": "Vhalesh, Well-Cursed Pyre",
+   "base": "dragon",
+   "bundle": "emberwing_matriarch",
+   "element": "fire",
+   "tint": "cd4729",
+   "scale": 1.38,
+   "hp_mult": 3.24,
+   "dmg_mult": 1.51,
+   "kit": [
+    "core.skill.meteor_call",
+    "core.skill.cinder_breath",
+    "core.skill.void_step",
+    "core.skill.wing_gust",
+    "core.skill.talon_dive",
+    "core.skill.ember_bolt",
+    "core.skill.cleave"
+   ],
+   "lore": "The Lumen wove around it rather than through it, and it has never forgiven the courtesy."
+  },
+  {
+   "id": "gen.creature.ashkdris_herald_of_the_seventh_blooming",
+   "name": "Ashkdris, Herald of the Seventh Blooming",
+   "base": "dragon",
+   "bundle": "emberwing_matriarch",
+   "element": "fire",
+   "tint": "f8330d",
+   "scale": 1.31,
+   "hp_mult": 3.83,
+   "dmg_mult": 1.92,
+   "kit": [
+    "core.skill.magma_breath",
+    "core.skill.cinder_breath",
+    "core.skill.cleave",
+    "core.skill.ember_screech",
+    "core.skill.talon_dive",
+    "core.skill.wing_gust"
+   ],
+   "lore": "Every season the theme changes and every season it does not; it is the constant the songs tune against. Seventeen Guild champions have sworn to take its spirit. It keeps their skill stones in a tidy pile."
+  },
+  {
+   "id": "gen.creature.morrgon_hag_of_the_everbloom_wilds",
+   "name": "Morrgon, Hag of the Everbloom Wilds",
+   "base": "hag",
+   "bundle": "",
+   "element": "umbral",
+   "tint": "5926ad",
+   "scale": 1.13,
+   "hp_mult": 3.98,
+   "dmg_mult": 1.43,
+   "kit": [
+    "core.skill.shadow_rend",
+    "core.skill.void_step",
+    "core.skill.hex_bolt",
+    "core.skill.creeping_mire",
+    "core.skill.cleave",
+    "core.skill.abyssal_maw",
+    "core.skill.shrieking_curse",
+    "core.skill.wispling_call"
+   ],
+   "lore": "The Lumen wove around it rather than through it, and it has never forgiven the courtesy. It once fought beside another legend and the land itself melted; hunters call the scar a Duologue."
+  },
+  {
+   "id": "gen.creature.barrgon_the_hollow_crowned",
+   "name": "Barrgon the Hollow-Crowned",
+   "base": "colossus",
+   "bundle": "",
+   "element": "physical",
+   "tint": "908266",
+   "scale": 1.49,
+   "hp_mult": 4.29,
+   "dmg_mult": 1.84,
+   "kit": [
+    "core.skill.stone_upheaval",
+    "core.skill.seismic_slam",
+    "core.skill.cleave",
+    "core.skill.void_step",
+    "core.skill.boulder_hurl",
+    "core.skill.stone_spikes"
+   ],
+   "lore": "It was offered a Soul Snare once, at the exact edge of death. It chose the hunter \u2014 as a meal. Its spirit would enchant a Haven's whole arsenal \u2014 which is precisely why the enchanters forbid the hunt."
+  },
+  {
+   "id": "gen.creature.skarnoth_the_never_thawed",
+   "name": "Skarnoth the Never-Thawed",
+   "base": "hag",
+   "bundle": "",
+   "element": "blood",
+   "tint": "bd3b34",
+   "scale": 1.18,
+   "hp_mult": 2.88,
+   "dmg_mult": 1.8,
+   "kit": [
+    "core.skill.abyssal_maw",
+    "core.skill.shadow_rend",
+    "core.skill.wispling_call",
+    "core.skill.creeping_mire",
+    "core.skill.void_step",
+    "core.skill.hex_bolt"
+   ],
+   "lore": "No bestiary agrees on its shape, because no witness account was finished."
+  },
+  {
+   "id": "gen.creature.strakang_wyrm_of_palecrown",
+   "name": "Strakang, Wyrm of Palecrown",
+   "base": "dragon",
+   "bundle": "marsh_drake",
+   "element": "storm",
+   "tint": "5f57e8",
+   "scale": 1.27,
+   "hp_mult": 3.06,
+   "dmg_mult": 1.78,
+   "kit": [
+    "core.skill.wing_gust",
+    "core.skill.cleave",
+    "core.skill.void_step",
+    "core.skill.talon_dive",
+    "core.skill.ember_screech"
+   ],
+   "lore": "It patrols the Unfinished Rim, eating the world before the Lumen finishes weaving it. It once fought beside another legend and the land itself melted; hunters call the scar a Duologue."
+  },
+  {
+   "id": "gen.creature.magdris_weight_of_the_fourth_taking",
+   "name": "Magdris, Weight of the Fourth Taking",
+   "base": "colossus",
+   "bundle": "",
+   "element": "physical",
+   "tint": "977f65",
+   "scale": 1.4,
+   "hp_mult": 4.08,
+   "dmg_mult": 1.9,
+   "kit": [
+    "core.skill.earthshatter",
+    "core.skill.stone_upheaval",
+    "core.skill.seismic_slam",
+    "core.skill.void_step",
+    "core.skill.stone_spikes",
+    "core.skill.cleave",
+    "core.skill.boulder_hurl"
+   ],
+   "lore": "Its spirit would enchant a Haven's whole arsenal \u2014 which is precisely why the enchanters forbid the hunt."
+  },
+  {
+   "id": "gen.creature.ylthien_curse_of_the_umbral_depths",
+   "name": "Ylthien, Curse of the Umbral Depths",
+   "base": "hag",
+   "bundle": "",
+   "element": "umbral",
+   "tint": "9d61d7",
+   "scale": 1.25,
+   "hp_mult": 4.05,
+   "dmg_mult": 1.48,
+   "kit": [
+    "core.skill.wispling_call",
+    "core.skill.shrieking_curse",
+    "core.skill.void_step",
+    "core.skill.cleave",
+    "core.skill.abyssal_maw",
+    "core.skill.shadow_rend",
+    "core.skill.hex_bolt"
+   ],
+   "lore": "The wells refuse to recall those it takes; its kills feed the Gloom directly."
+  },
+  {
+   "id": "gen.creature.skarngon_the_undying",
+   "name": "Skarngon the Undying",
+   "base": "dragon",
+   "bundle": "emberwing_matriarch",
+   "element": "blood",
+   "tint": "98141a",
+   "scale": 1.36,
+   "hp_mult": 3.24,
+   "dmg_mult": 1.76,
+   "kit": [
+    "core.skill.hex_bolt",
+    "core.skill.abyssal_maw",
+    "core.skill.cleave",
+    "core.skill.shadow_rend",
+    "core.skill.void_step",
+    "core.skill.talon_dive",
+    "core.skill.wing_gust"
+   ],
+   "lore": "No bestiary agrees on its shape, because no witness account was finished."
+  },
+  {
+   "id": "gen.creature.brynul_the_thrice_bonded",
+   "name": "Brynul the Thrice-Bonded",
+   "base": "dragon",
+   "bundle": "emberwing_matriarch",
+   "element": "frost",
+   "tint": "84dae7",
+   "scale": 1.36,
+   "hp_mult": 4.34,
+   "dmg_mult": 1.69,
+   "kit": [
+    "core.skill.wing_gust",
+    "core.skill.talon_dive",
+    "core.skill.void_step",
+    "core.skill.cleave",
+    "core.skill.hex_bolt"
+   ],
+   "lore": "It was offered a Soul Snare once, at the exact edge of death. It chose the hunter \u2014 as a meal."
+  },
+  {
+   "id": "gen.creature.pyrrai_crown_of_the_hundred_havens",
+   "name": "Pyrrai, Crown of the Hundred Havens",
+   "base": "dragon",
+   "bundle": "emberwing_matriarch",
+   "element": "fire",
+   "tint": "fa711d",
+   "scale": 1.17,
+   "hp_mult": 3.35,
+   "dmg_mult": 1.67,
+   "kit": [
+    "core.skill.magma_breath",
+    "core.skill.ember_bolt",
+    "core.skill.wing_gust",
+    "core.skill.ember_screech",
+    "core.skill.talon_dive"
+   ],
+   "lore": "No bestiary agrees on its shape, because no witness account was finished."
+  },
+  {
+   "id": "gen.creature.molka_the_gloom_fed",
+   "name": "Molka the Gloom-Fed",
+   "base": "colossus",
+   "bundle": "",
+   "element": "fire",
+   "tint": "ef843d",
+   "scale": 1.52,
+   "hp_mult": 4.65,
+   "dmg_mult": 1.74,
+   "kit": [
+    "core.skill.magma_breath",
+    "core.skill.seismic_slam",
+    "core.skill.ember_screech",
+    "core.skill.cinder_breath",
+    "core.skill.cleave",
+    "core.skill.void_step",
+    "core.skill.earthshatter",
+    "core.skill.ember_bolt"
+   ],
+   "lore": "It once fought beside another legend and the land itself melted; hunters call the scar a Duologue."
+  },
+  {
+   "id": "gen.creature.orlissa_foundation_of_the_second_long_night",
+   "name": "Orlissa, Foundation of the Second Long Night",
+   "base": "colossus",
+   "bundle": "",
+   "element": "frost",
+   "tint": "84c9d8",
+   "scale": 1.4,
+   "hp_mult": 5.7,
+   "dmg_mult": 1.61,
+   "kit": [
+    "core.skill.hex_bolt",
+    "core.skill.wing_gust",
+    "core.skill.void_step",
+    "core.skill.cleave",
+    "core.skill.stone_spikes"
+   ],
+   "lore": "The wells refuse to recall those it takes; its kills feed the Gloom directly."
+  },
+  {
+   "id": "gen.creature.koroth_wyrm_of_the_last_taking",
+   "name": "Koroth, Wyrm of the Last Taking",
+   "base": "dragon",
+   "bundle": "emberwing_matriarch",
+   "element": "fire",
+   "tint": "fb893b",
+   "scale": 1.31,
+   "hp_mult": 2.86,
+   "dmg_mult": 1.58,
+   "kit": [
+    "core.skill.meteor_call",
+    "core.skill.ember_screech",
+    "core.skill.magma_breath",
+    "core.skill.void_step",
+    "core.skill.cleave"
+   ],
+   "lore": "Every season the theme changes and every season it does not; it is the constant the songs tune against."
+  },
+  {
+   "id": "gen.creature.sathorn_the_star_eaten",
+   "name": "Sathorn the Star-Eaten",
+   "base": "dragon",
+   "bundle": "emberwing_matriarch",
+   "element": "umbral",
+   "tint": "6d459a",
+   "scale": 1.47,
+   "hp_mult": 3.04,
+   "dmg_mult": 1.57,
+   "kit": [
+    "core.skill.abyssal_maw",
+    "core.skill.cleave",
+    "core.skill.void_step",
+    "core.skill.wispling_call",
+    "core.skill.shrieking_curse",
+    "core.skill.talon_dive",
+    "core.skill.wing_gust",
+    "core.skill.hex_bolt",
+    "core.skill.shadow_rend"
+   ],
+   "lore": "The Lumen wove around it rather than through it, and it has never forgiven the courtesy. Seventeen Guild champions have sworn to take its spirit. It keeps their skill stones in a tidy pile."
+  },
+  {
+   "id": "gen.creature.marnien_gloom_fed_matron",
+   "name": "Marnien, Gloom-Fed Matron",
+   "base": "hag",
+   "bundle": "",
+   "element": "blood",
+   "tint": "c82a26",
+   "scale": 1.16,
+   "hp_mult": 2.95,
+   "dmg_mult": 1.62,
+   "kit": [
+    "core.skill.hex_bolt",
+    "core.skill.creeping_mire",
+    "core.skill.abyssal_maw",
+    "core.skill.wispling_call",
+    "core.skill.shrieking_curse",
+    "core.skill.shadow_rend",
+    "core.skill.cleave"
+   ],
+   "lore": "The wells refuse to recall those it takes; its kills feed the Gloom directly. Its spirit would enchant a Haven's whole arsenal \u2014 which is precisely why the enchanters forbid the hunt."
+  },
+  {
+   "id": "gen.creature.zarrang_the_hollow_crowned",
+   "name": "Zarrang the Hollow-Crowned",
+   "base": "colossus",
+   "bundle": "",
+   "element": "fire",
+   "tint": "d15735",
+   "scale": 1.49,
+   "hp_mult": 3.55,
+   "dmg_mult": 1.52,
+   "kit": [
+    "core.skill.magma_breath",
+    "core.skill.ember_screech",
+    "core.skill.meteor_call",
+    "core.skill.earthshatter",
+    "core.skill.cleave",
+    "core.skill.stone_spikes"
+   ],
+   "lore": "It was offered a Soul Snare once, at the exact edge of death. It chose the hunter \u2014 as a meal."
+  },
+  {
+   "id": "gen.creature.torvwen_hunger_of_the_cinderwastes",
+   "name": "Torvwen, Hunger of the Cinderwastes",
+   "base": "colossus",
+   "bundle": "",
+   "element": "storm",
+   "tint": "70a5db",
+   "scale": 1.4,
+   "hp_mult": 4.93,
+   "dmg_mult": 1.37,
+   "kit": [
+    "core.skill.talon_dive",
+    "core.skill.stone_upheaval",
+    "core.skill.seismic_slam",
+    "core.skill.boulder_hurl",
+    "core.skill.wing_gust",
+    "core.skill.earthshatter",
+    "core.skill.cleave",
+    "core.skill.stone_spikes"
+   ],
+   "lore": "Seventeen Guild champions have sworn to take its spirit. It keeps their skill stones in a tidy pile."
+  },
+  {
+   "id": "gen.creature.syvur_scourge_of_the_unfinished_rim",
+   "name": "Syvur, Scourge of the Unfinished Rim",
+   "base": "dragon",
+   "bundle": "marsh_drake",
+   "element": "frost",
+   "tint": "6de3e3",
+   "scale": 1.41,
+   "hp_mult": 3.9,
+   "dmg_mult": 2.05,
+   "kit": [
+    "core.skill.hex_bolt",
+    "core.skill.wing_gust",
+    "core.skill.talon_dive",
+    "core.skill.void_step",
+    "core.skill.cleave"
+   ],
+   "lore": "Seventeen Guild champions have sworn to take its spirit. It keeps their skill stones in a tidy pile."
+  },
+  {
+   "id": "gen.creature.carnka_hag_of_the_unfinished_rim",
+   "name": "Carnka, Hag of the Unfinished Rim",
+   "base": "hag",
+   "bundle": "",
+   "element": "blood",
+   "tint": "b72821",
+   "scale": 1.26,
+   "hp_mult": 3.28,
+   "dmg_mult": 1.85,
+   "kit": [
+    "core.skill.abyssal_maw",
+    "core.skill.wispling_call",
+    "core.skill.creeping_mire",
+    "core.skill.shrieking_curse",
+    "core.skill.shadow_rend",
+    "core.skill.cleave",
+    "core.skill.void_step",
+    "core.skill.hex_bolt"
+   ],
+   "lore": "It once fought beside another legend and the land itself melted; hunters call the scar a Duologue. Where it walks, the land stays gorgeous and becomes lethal; corruption here beautifies."
+  },
+  {
+   "id": "gen.creature.vyxzarr_maw_of_the_hundredth_weaving",
+   "name": "Vyxzarr, Maw of the Hundredth Weaving",
+   "base": "dragon",
+   "bundle": "emberwing_matriarch",
+   "element": "storm",
+   "tint": "5c61d0",
+   "scale": 1.34,
+   "hp_mult": 4.81,
+   "dmg_mult": 1.89,
+   "kit": [
+    "core.skill.talon_dive",
+    "core.skill.cleave",
+    "core.skill.ember_screech",
+    "core.skill.wing_gust",
+    "core.skill.void_step"
+   ],
+   "lore": "The wells refuse to recall those it takes; its kills feed the Gloom directly. It patrols the Unfinished Rim, eating the world before the Lumen finishes weaving it."
+  },
+  {
+   "id": "gen.creature.ixilka_the_hollow_crowned",
+   "name": "Ixilka the Hollow-Crowned",
+   "base": "hag",
+   "bundle": "",
+   "element": "venom",
+   "tint": "24a62a",
+   "scale": 1.26,
+   "hp_mult": 3.51,
+   "dmg_mult": 1.44,
+   "kit": [
+    "core.skill.hex_bolt",
+    "core.skill.wispling_call",
+    "core.skill.void_step",
+    "core.skill.creeping_mire",
+    "core.skill.shrieking_curse"
+   ],
+   "lore": "It patrols the Unfinished Rim, eating the world before the Lumen finishes weaving it."
+  },
+  {
+   "id": "gen.creature.tharngon_grinder_of_the_second_waning",
+   "name": "Tharngon, Grinder of the Second Waning",
+   "base": "colossus",
+   "bundle": "",
+   "element": "physical",
+   "tint": "a1927a",
+   "scale": 1.47,
+   "hp_mult": 5.54,
+   "dmg_mult": 1.44,
+   "kit": [
+    "core.skill.cleave",
+    "core.skill.seismic_slam",
+    "core.skill.stone_upheaval",
+    "core.skill.void_step",
+    "core.skill.earthshatter"
+   ],
+   "lore": "The wells refuse to recall those it takes; its kills feed the Gloom directly. Seventeen Guild champions have sworn to take its spirit. It keeps their skill stones in a tidy pile."
+  },
+  {
+   "id": "gen.creature.ruthroth_widow_of_the_fifth_blooming",
+   "name": "Ruthroth, Widow of the Fifth Blooming",
+   "base": "hag",
+   "bundle": "",
+   "element": "blood",
+   "tint": "970c0f",
+   "scale": 1.18,
+   "hp_mult": 3.16,
+   "dmg_mult": 1.8,
+   "kit": [
+    "core.skill.abyssal_maw",
+    "core.skill.hex_bolt",
+    "core.skill.void_step",
+    "core.skill.creeping_mire",
+    "core.skill.cleave",
+    "core.skill.shrieking_curse",
+    "core.skill.wispling_call"
+   ],
+   "lore": "It once fought beside another legend and the land itself melted; hunters call the scar a Duologue. Its spirit would enchant a Haven's whole arsenal \u2014 which is precisely why the enchanters forbid the hunt."
+  },
+  {
+   "id": "gen.creature.pyrrorn_pyre_of_the_sixth_duologue",
+   "name": "Pyrrorn, Pyre of the Sixth Duologue",
+   "base": "dragon",
+   "bundle": "marsh_drake",
+   "element": "fire",
+   "tint": "d57233",
+   "scale": 1.35,
+   "hp_mult": 3.12,
+   "dmg_mult": 1.54,
+   "kit": [
+    "core.skill.meteor_call",
+    "core.skill.wing_gust",
+    "core.skill.cinder_breath",
+    "core.skill.ember_screech",
+    "core.skill.talon_dive"
+   ],
+   "lore": "It once fought beside another legend and the land itself melted; hunters call the scar a Duologue. Its spirit would enchant a Haven's whole arsenal \u2014 which is precisely why the enchanters forbid the hunt."
+  },
+  {
+   "id": "gen.creature.nyxai_the_undying",
+   "name": "Nyxai the Undying",
+   "base": "hag",
+   "bundle": "",
+   "element": "umbral",
+   "tint": "944caa",
+   "scale": 1.19,
+   "hp_mult": 3.44,
+   "dmg_mult": 1.5,
+   "kit": [
+    "core.skill.hex_bolt",
+    "core.skill.creeping_mire",
+    "core.skill.wispling_call",
+    "core.skill.void_step",
+    "core.skill.cleave",
+    "core.skill.shadow_rend",
+    "core.skill.shrieking_curse",
+    "core.skill.abyssal_maw"
+   ],
+   "lore": "The wells refuse to recall those it takes; its kills feed the Gloom directly. Its spirit would enchant a Haven's whole arsenal \u2014 which is precisely why the enchanters forbid the hunt."
+  },
+  {
+   "id": "gen.creature.druesh_the_unsnared",
+   "name": "Druesh the Unsnared",
+   "base": "hag",
+   "bundle": "",
+   "element": "umbral",
+   "tint": "5c1e91",
+   "scale": 1.29,
+   "hp_mult": 3.36,
+   "dmg_mult": 1.92,
+   "kit": [
+    "core.skill.hex_bolt",
+    "core.skill.void_step",
+    "core.skill.cleave",
+    "core.skill.shadow_rend",
+    "core.skill.abyssal_maw",
+    "core.skill.creeping_mire"
+   ],
+   "lore": "Older than the Havens; it remembers being worshipped, and it remembers who stopped. It patrols the Unfinished Rim, eating the world before the Lumen finishes weaving it."
+  },
+  {
+   "id": "gen.creature.vaelien_the_undying",
+   "name": "Vaelien the Undying",
+   "base": "dragon",
+   "bundle": "marsh_drake",
+   "element": "frost",
+   "tint": "7dbad4",
+   "scale": 1.27,
+   "hp_mult": 3.63,
+   "dmg_mult": 1.85,
+   "kit": [
+    "core.skill.hex_bolt",
+    "core.skill.cleave",
+    "core.skill.wing_gust",
+    "core.skill.talon_dive",
+    "core.skill.void_step"
+   ],
+   "lore": "Every season the theme changes and every season it does not; it is the constant the songs tune against. The Lumen wove around it rather than through it, and it has never forgiven the courtesy."
+  },
+  {
+   "id": "gen.creature.zsaka_undying_crone",
+   "name": "Zsaka, Undying Crone",
+   "base": "hag",
+   "bundle": "",
+   "element": "venom",
+   "tint": "74dd40",
+   "scale": 1.22,
+   "hp_mult": 2.96,
+   "dmg_mult": 1.96,
+   "kit": [
+    "core.skill.hex_bolt",
+    "core.skill.cleave",
+    "core.skill.creeping_mire",
+    "core.skill.abyssal_maw",
+    "core.skill.void_step"
+   ],
+   "lore": "Every season the theme changes and every season it does not; it is the constant the songs tune against."
+  },
+  {
+   "id": "gen.creature.vurgon_unbonded_pyre",
+   "name": "Vurgon, Unbonded Pyre",
+   "base": "dragon",
+   "bundle": "emberwing_matriarch",
+   "element": "fire",
+   "tint": "d8471c",
+   "scale": 1.29,
+   "hp_mult": 4.01,
+   "dmg_mult": 1.71,
+   "kit": [
+    "core.skill.magma_breath",
+    "core.skill.ember_bolt",
+    "core.skill.void_step",
+    "core.skill.cleave",
+    "core.skill.ember_screech",
+    "core.skill.meteor_call",
+    "core.skill.cinder_breath",
+    "core.skill.talon_dive",
+    "core.skill.wing_gust"
+   ],
+   "lore": "Its spirit would enchant a Haven's whole arsenal \u2014 which is precisely why the enchanters forbid the hunt. It patrols the Unfinished Rim, eating the world before the Lumen finishes weaving it."
+  },
+  {
+   "id": "gen.creature.skalang_pyre_of_the_fifth_thaw",
+   "name": "Skalang, Pyre of the Fifth Thaw",
+   "base": "dragon",
+   "bundle": "emberwing_matriarch",
+   "element": "fire",
+   "tint": "ce4d10",
+   "scale": 1.39,
+   "hp_mult": 4.27,
+   "dmg_mult": 2.11,
+   "kit": [
+    "core.skill.ember_screech",
+    "core.skill.wing_gust",
+    "core.skill.magma_breath",
+    "core.skill.void_step",
+    "core.skill.ember_bolt"
+   ],
+   "lore": "It once fought beside another legend and the land itself melted; hunters call the scar a Duologue. Its practiced technique has crystallized into skill stones twice. Both stones scream."
+  },
+  {
+   "id": "gen.creature.skralzarr_star_eaten_scourge",
+   "name": "Skralzarr, Star-Eaten Scourge",
+   "base": "dragon",
+   "bundle": "emberwing_matriarch",
+   "element": "storm",
+   "tint": "5e72e0",
+   "scale": 1.39,
+   "hp_mult": 4.98,
+   "dmg_mult": 2.13,
+   "kit": [
+    "core.skill.talon_dive",
+    "core.skill.wing_gust",
+    "core.skill.cleave",
+    "core.skill.void_step",
+    "core.skill.ember_screech"
+   ],
+   "lore": "It patrols the Unfinished Rim, eating the world before the Lumen finishes weaving it. Its practiced technique has crystallized into skill stones twice. Both stones scream."
+  },
+  {
+   "id": "gen.creature.vermgon_crown_of_the_last_weaving",
+   "name": "Vermgon, Crown of the Last Weaving",
+   "base": "dragon",
+   "bundle": "emberwing_matriarch",
+   "element": "umbral",
+   "tint": "ad38ce",
+   "scale": 1.44,
+   "hp_mult": 4.19,
+   "dmg_mult": 2.07,
+   "kit": [
+    "core.skill.shrieking_curse",
+    "core.skill.wing_gust",
+    "core.skill.shadow_rend",
+    "core.skill.cleave",
+    "core.skill.void_step",
+    "core.skill.wispling_call",
+    "core.skill.talon_dive"
+   ],
+   "lore": "No bestiary agrees on its shape, because no witness account was finished."
+  },
+  {
+   "id": "gen.creature.sathka_weaver_of_the_umbral_depths",
+   "name": "Sathka, Weaver of the Umbral Depths",
+   "base": "hag",
+   "bundle": "",
+   "element": "umbral",
+   "tint": "5e358c",
+   "scale": 1.32,
+   "hp_mult": 4.18,
+   "dmg_mult": 1.87,
+   "kit": [
+    "core.skill.shadow_rend",
+    "core.skill.void_step",
+    "core.skill.hex_bolt",
+    "core.skill.wispling_call",
+    "core.skill.abyssal_maw",
+    "core.skill.creeping_mire"
+   ],
+   "lore": "Older than the Havens; it remembers being worshipped, and it remembers who stopped."
+  },
+  {
+   "id": "gen.creature.pyrrissa_herald_of_the_fifth_taking",
+   "name": "Pyrrissa, Herald of the Fifth Taking",
+   "base": "dragon",
+   "bundle": "emberwing_matriarch",
+   "element": "fire",
+   "tint": "d05a15",
+   "scale": 1.24,
+   "hp_mult": 4.22,
+   "dmg_mult": 2.0,
+   "kit": [
+    "core.skill.magma_breath",
+    "core.skill.ember_bolt",
+    "core.skill.void_step",
+    "core.skill.wing_gust",
+    "core.skill.meteor_call",
+    "core.skill.cinder_breath"
+   ],
+   "lore": "It was offered a Soul Snare once, at the exact edge of death. It chose the hunter \u2014 as a meal. The Lumen wove around it rather than through it, and it has never forgiven the courtesy."
+  },
+  {
+   "id": "gen.creature.hrimmath_hollow_crowned_tempest",
+   "name": "Hrimmath, Hollow-Crowned Tempest",
+   "base": "dragon",
+   "bundle": "marsh_drake",
+   "element": "frost",
+   "tint": "a3f0fb",
+   "scale": 1.21,
+   "hp_mult": 4.54,
+   "dmg_mult": 2.02,
+   "kit": [
+    "core.skill.wing_gust",
+    "core.skill.cleave",
+    "core.skill.void_step",
+    "core.skill.talon_dive",
+    "core.skill.hex_bolt"
+   ],
+   "lore": "The wells refuse to recall those it takes; its kills feed the Gloom directly. It was offered a Soul Snare once, at the exact edge of death. It chose the hunter \u2014 as a meal."
+  },
+  {
+   "id": "gen.creature.carnur_the_unsnared",
+   "name": "Carnur the Unsnared",
+   "base": "hag",
+   "bundle": "",
+   "element": "blood",
+   "tint": "c61e2f",
+   "scale": 1.13,
+   "hp_mult": 3.64,
+   "dmg_mult": 1.55,
+   "kit": [
+    "core.skill.shadow_rend",
+    "core.skill.cleave",
+    "core.skill.void_step",
+    "core.skill.creeping_mire",
+    "core.skill.abyssal_maw",
+    "core.skill.shrieking_curse",
+    "core.skill.hex_bolt"
+   ],
+   "lore": "Every season the theme changes and every season it does not; it is the constant the songs tune against. It was offered a Soul Snare once, at the exact edge of death. It chose the hunter \u2014 as a meal."
+  },
+  {
+   "id": "gen.creature.ichrorn_pyre_of_the_cinderwastes",
+   "name": "Ichrorn, Pyre of the Cinderwastes",
+   "base": "dragon",
+   "bundle": "emberwing_matriarch",
+   "element": "blood",
+   "tint": "bb0b28",
+   "scale": 1.44,
+   "hp_mult": 3.2,
+   "dmg_mult": 1.63,
+   "kit": [
+    "core.skill.shadow_rend",
+    "core.skill.void_step",
+    "core.skill.wing_gust",
+    "core.skill.talon_dive",
+    "core.skill.hex_bolt",
+    "core.skill.abyssal_maw"
+   ],
+   "lore": "The wells refuse to recall those it takes; its kills feed the Gloom directly."
+  },
+  {
+   "id": "gen.creature.cyndild_scourge_of_the_third_weaving",
+   "name": "Cyndild, Scourge of the Third Weaving",
+   "base": "dragon",
+   "bundle": "emberwing_matriarch",
+   "element": "fire",
+   "tint": "d6422d",
+   "scale": 1.31,
+   "hp_mult": 3.0,
+   "dmg_mult": 1.88,
+   "kit": [
+    "core.skill.magma_breath",
+    "core.skill.ember_bolt",
+    "core.skill.ember_screech",
+    "core.skill.wing_gust",
+    "core.skill.cleave",
+    "core.skill.meteor_call",
+    "core.skill.void_step",
+    "core.skill.cinder_breath",
+    "core.skill.talon_dive"
+   ],
+   "lore": "It once fought beside another legend and the land itself melted; hunters call the scar a Duologue."
+  },
+  {
+   "id": "gen.creature.doleth_the_undying",
+   "name": "Doleth the Undying",
+   "base": "colossus",
+   "bundle": "",
+   "element": "physical",
+   "tint": "a9947b",
+   "scale": 1.45,
+   "hp_mult": 5.46,
+   "dmg_mult": 1.48,
+   "kit": [
+    "core.skill.stone_spikes",
+    "core.skill.stone_upheaval",
+    "core.skill.void_step",
+    "core.skill.cleave",
+    "core.skill.seismic_slam"
+   ],
+   "lore": "Its spirit would enchant a Haven's whole arsenal \u2014 which is precisely why the enchanters forbid the hunt. It patrols the Unfinished Rim, eating the world before the Lumen finishes weaving it."
+  },
+  {
+   "id": "gen.creature.verrai_matron_of_palecrown",
+   "name": "Verrai, Matron of Palecrown",
+   "base": "hag",
+   "bundle": "",
+   "element": "blood",
+   "tint": "b72326",
+   "scale": 1.15,
+   "hp_mult": 2.53,
+   "dmg_mult": 1.85,
+   "kit": [
+    "core.skill.shadow_rend",
+    "core.skill.hex_bolt",
+    "core.skill.cleave",
+    "core.skill.creeping_mire",
+    "core.skill.abyssal_maw",
+    "core.skill.shrieking_curse"
+   ],
+   "lore": "No bestiary agrees on its shape, because no witness account was finished."
+  },
+  {
+   "id": "gen.creature.uldroth_pillar_of_the_last_kindling",
+   "name": "Uldroth, Pillar of the Last Kindling",
+   "base": "colossus",
+   "bundle": "",
+   "element": "physical",
+   "tint": "ae947e",
+   "scale": 1.33,
+   "hp_mult": 5.51,
+   "dmg_mult": 1.8,
+   "kit": [
+    "core.skill.seismic_slam",
+    "core.skill.cleave",
+    "core.skill.stone_upheaval",
+    "core.skill.stone_spikes",
+    "core.skill.earthshatter"
+   ],
+   "lore": "The Lumen wove around it rather than through it, and it has never forgiven the courtesy."
+  },
+  {
+   "id": "gen.creature.vermien_the_well_cursed",
+   "name": "Vermien the Well-Cursed",
+   "base": "dragon",
+   "bundle": "emberwing_matriarch",
+   "element": "umbral",
+   "tint": "a460d3",
+   "scale": 1.3,
+   "hp_mult": 3.65,
+   "dmg_mult": 1.93,
+   "kit": [
+    "core.skill.shrieking_curse",
+    "core.skill.hex_bolt",
+    "core.skill.void_step",
+    "core.skill.wispling_call",
+    "core.skill.wing_gust",
+    "core.skill.abyssal_maw",
+    "core.skill.shadow_rend",
+    "core.skill.cleave"
+   ],
+   "lore": "The wells refuse to recall those it takes; its kills feed the Gloom directly. Where it walks, the land stays gorgeous and becomes lethal; corruption here beautifies."
+  },
+  {
+   "id": "gen.creature.kaldissa_star_eaten_wyrm",
+   "name": "Kaldissa, Star-Eaten Wyrm",
+   "base": "dragon",
+   "bundle": "emberwing_matriarch",
+   "element": "frost",
+   "tint": "73dade",
+   "scale": 1.31,
+   "hp_mult": 4.1,
+   "dmg_mult": 2.06,
+   "kit": [
+    "core.skill.hex_bolt",
+    "core.skill.wing_gust",
+    "core.skill.talon_dive",
+    "core.skill.void_step",
+    "core.skill.cleave"
+   ],
+   "lore": "Where it walks, the land stays gorgeous and becomes lethal; corruption here beautifies. It was offered a Soul Snare once, at the exact edge of death. It chose the hunter \u2014 as a meal."
+  },
+  {
+   "id": "gen.creature.cyndur_weight_of_the_first_fire_s_grave",
+   "name": "Cyndur, Weight of the First Fire's Grave",
+   "base": "colossus",
+   "bundle": "",
+   "element": "fire",
+   "tint": "d75715",
+   "scale": 1.38,
+   "hp_mult": 5.55,
+   "dmg_mult": 1.79,
+   "kit": [
+    "core.skill.magma_breath",
+    "core.skill.stone_upheaval",
+    "core.skill.void_step",
+    "core.skill.seismic_slam",
+    "core.skill.ember_bolt",
+    "core.skill.cinder_breath",
+    "core.skill.cleave",
+    "core.skill.boulder_hurl",
+    "core.skill.stone_spikes",
+    "core.skill.meteor_call"
+   ],
+   "lore": "No bestiary agrees on its shape, because no witness account was finished."
+  },
+  {
+   "id": "gen.creature.ghalmath_star_eaten_curse",
+   "name": "Ghalmath, Star-Eaten Curse",
+   "base": "hag",
+   "bundle": "",
+   "element": "umbral",
+   "tint": "aa4ad6",
+   "scale": 1.19,
+   "hp_mult": 3.67,
+   "dmg_mult": 1.67,
+   "kit": [
+    "core.skill.shrieking_curse",
+    "core.skill.cleave",
+    "core.skill.void_step",
+    "core.skill.wispling_call",
+    "core.skill.hex_bolt",
+    "core.skill.shadow_rend",
+    "core.skill.abyssal_maw"
+   ],
+   "lore": "Where it walks, the land stays gorgeous and becomes lethal; corruption here beautifies. It was offered a Soul Snare once, at the exact edge of death. It chose the hunter \u2014 as a meal."
+  },
+  {
+   "id": "gen.creature.rhesax_the_ever_burning",
+   "name": "Rhesax the Ever-Burning",
+   "base": "hag",
+   "bundle": "",
+   "element": "blood",
+   "tint": "bc2039",
+   "scale": 1.23,
+   "hp_mult": 3.68,
+   "dmg_mult": 1.48,
+   "kit": [
+    "core.skill.shadow_rend",
+    "core.skill.creeping_mire",
+    "core.skill.shrieking_curse",
+    "core.skill.hex_bolt",
+    "core.skill.cleave"
+   ],
+   "lore": "Every season the theme changes and every season it does not; it is the constant the songs tune against. Where it walks, the land stays gorgeous and becomes lethal; corruption here beautifies."
+  },
+  {
+   "id": "gen.creature.vurild_wyrm_of_the_unfinished_rim",
+   "name": "Vurild, Wyrm of the Unfinished Rim",
+   "base": "dragon",
+   "bundle": "emberwing_matriarch",
+   "element": "fire",
+   "tint": "f75a36",
+   "scale": 1.21,
+   "hp_mult": 3.9,
+   "dmg_mult": 1.57,
+   "kit": [
+    "core.skill.magma_breath",
+    "core.skill.ember_bolt",
+    "core.skill.wing_gust",
+    "core.skill.cleave",
+    "core.skill.void_step",
+    "core.skill.meteor_call",
+    "core.skill.cinder_breath",
+    "core.skill.talon_dive",
+    "core.skill.ember_screech"
+   ],
+   "lore": "Older than the Havens; it remembers being worshipped, and it remembers who stopped. The Lumen wove around it rather than through it, and it has never forgiven the courtesy."
+  },
+  {
+   "id": "gen.creature.zarrroth_anvil_of_the_hundred_havens",
+   "name": "Zarrroth, Anvil of the Hundred Havens",
+   "base": "colossus",
+   "bundle": "",
+   "element": "fire",
+   "tint": "da4936",
+   "scale": 1.45,
+   "hp_mult": 3.54,
+   "dmg_mult": 1.55,
+   "kit": [
+    "core.skill.meteor_call",
+    "core.skill.cleave",
+    "core.skill.stone_spikes",
+    "core.skill.ember_bolt",
+    "core.skill.stone_upheaval",
+    "core.skill.ember_screech",
+    "core.skill.void_step",
+    "core.skill.earthshatter"
+   ],
+   "lore": "No bestiary agrees on its shape, because no witness account was finished."
+  },
+  {
+   "id": "gen.creature.zarrwen_gloom_fed_maw",
+   "name": "Zarrwen, Gloom-Fed Maw",
+   "base": "dragon",
+   "bundle": "emberwing_matriarch",
+   "element": "fire",
+   "tint": "ce4624",
+   "scale": 1.49,
+   "hp_mult": 4.52,
+   "dmg_mult": 1.96,
+   "kit": [
+    "core.skill.meteor_call",
+    "core.skill.magma_breath",
+    "core.skill.cinder_breath",
+    "core.skill.void_step",
+    "core.skill.wing_gust",
+    "core.skill.talon_dive",
+    "core.skill.ember_bolt",
+    "core.skill.ember_screech",
+    "core.skill.cleave"
+   ],
+   "lore": "It once fought beside another legend and the land itself melted; hunters call the scar a Duologue. Where it walks, the land stays gorgeous and becomes lethal; corruption here beautifies."
+  },
+  {
+   "id": "gen.creature.vhalka_scourge_of_the_fourth_long_night",
+   "name": "Vhalka, Scourge of the Fourth Long Night",
+   "base": "dragon",
+   "bundle": "emberwing_matriarch",
+   "element": "fire",
+   "tint": "d76a1d",
+   "scale": 1.2,
+   "hp_mult": 3.66,
+   "dmg_mult": 2.07,
+   "kit": [
+    "core.skill.cinder_breath",
+    "core.skill.void_step",
+    "core.skill.ember_bolt",
+    "core.skill.cleave",
+    "core.skill.meteor_call",
+    "core.skill.talon_dive",
+    "core.skill.ember_screech"
+   ],
+   "lore": "It was offered a Soul Snare once, at the exact edge of death. It chose the hunter \u2014 as a meal."
+  },
+  {
+   "id": "gen.creature.pyrrzarr_scourge_of_the_ninth_kindling",
+   "name": "Pyrrzarr, Scourge of the Ninth Kindling",
+   "base": "dragon",
+   "bundle": "emberwing_matriarch",
+   "element": "fire",
+   "tint": "ea6b3b",
+   "scale": 1.28,
+   "hp_mult": 3.39,
+   "dmg_mult": 2.17,
+   "kit": [
+    "core.skill.ember_screech",
+    "core.skill.cinder_breath",
+    "core.skill.void_step",
+    "core.skill.meteor_call",
+    "core.skill.ember_bolt",
+    "core.skill.cleave"
+   ],
+   "lore": "It was offered a Soul Snare once, at the exact edge of death. It chose the hunter \u2014 as a meal. The wells refuse to recall those it takes; its kills feed the Gloom directly."
+  },
+  {
+   "id": "gen.creature.tharnax_anvil_of_the_seventh_waning",
+   "name": "Tharnax, Anvil of the Seventh Waning",
+   "base": "colossus",
+   "bundle": "",
+   "element": "physical",
+   "tint": "907b5a",
+   "scale": 1.47,
+   "hp_mult": 5.55,
+   "dmg_mult": 1.43,
+   "kit": [
+    "core.skill.cleave",
+    "core.skill.stone_upheaval",
+    "core.skill.seismic_slam",
+    "core.skill.earthshatter",
+    "core.skill.void_step"
+   ],
+   "lore": "It was offered a Soul Snare once, at the exact edge of death. It chose the hunter \u2014 as a meal."
+  },
+  {
+   "id": "gen.creature.thaxzarr_undying_choir",
+   "name": "Thaxzarr, Undying Choir",
+   "base": "hag",
+   "bundle": "",
+   "element": "venom",
+   "tint": "42cd3e",
+   "scale": 1.21,
+   "hp_mult": 4.02,
+   "dmg_mult": 1.45,
+   "kit": [
+    "core.skill.creeping_mire",
+    "core.skill.hex_bolt",
+    "core.skill.shrieking_curse",
+    "core.skill.shadow_rend",
+    "core.skill.void_step",
+    "core.skill.wispling_call"
+   ],
+   "lore": "Older than the Havens; it remembers being worshipped, and it remembers who stopped."
+  },
+  {
+   "id": "gen.creature.ghalax_crone_of_the_hundredth_hunt",
+   "name": "Ghalax, Crone of the Hundredth Hunt",
+   "base": "hag",
+   "bundle": "",
+   "element": "umbral",
+   "tint": "8146a3",
+   "scale": 1.22,
+   "hp_mult": 4.01,
+   "dmg_mult": 1.56,
+   "kit": [
+    "core.skill.shrieking_curse",
+    "core.skill.hex_bolt",
+    "core.skill.cleave",
+    "core.skill.void_step",
+    "core.skill.abyssal_maw",
+    "core.skill.wispling_call"
+   ],
+   "lore": "It was offered a Soul Snare once, at the exact edge of death. It chose the hunter \u2014 as a meal."
+  },
+  {
+   "id": "gen.creature.vyxgon_weight_of_the_third_taking",
+   "name": "Vyxgon, Weight of the Third Taking",
+   "base": "colossus",
+   "bundle": "",
+   "element": "storm",
+   "tint": "5d87cb",
+   "scale": 1.31,
+   "hp_mult": 5.07,
+   "dmg_mult": 1.7,
+   "kit": [
+    "core.skill.wing_gust",
+    "core.skill.stone_upheaval",
+    "core.skill.cleave",
+    "core.skill.seismic_slam",
+    "core.skill.stone_spikes",
+    "core.skill.earthshatter",
+    "core.skill.boulder_hurl"
+   ],
+   "lore": "It patrols the Unfinished Rim, eating the world before the Lumen finishes weaving it. It once fought beside another legend and the land itself melted; hunters call the scar a Duologue."
+  },
+  {
+   "id": "gen.creature.zsaul_the_half_woven",
+   "name": "Zsaul the Half-Woven",
+   "base": "hag",
+   "bundle": "",
+   "element": "venom",
+   "tint": "379d45",
+   "scale": 1.16,
+   "hp_mult": 4.2,
+   "dmg_mult": 1.42,
+   "kit": [
+    "core.skill.hex_bolt",
+    "core.skill.shrieking_curse",
+    "core.skill.cleave",
+    "core.skill.shadow_rend",
+    "core.skill.void_step",
+    "core.skill.wispling_call",
+    "core.skill.abyssal_maw"
+   ],
+   "lore": "No bestiary agrees on its shape, because no witness account was finished."
+  },
+  {
+   "id": "gen.creature.molild_scourge_of_palecrown",
+   "name": "Molild, Scourge of Palecrown",
+   "base": "dragon",
+   "bundle": "marsh_drake",
+   "element": "fire",
+   "tint": "f17e34",
+   "scale": 1.44,
+   "hp_mult": 3.24,
+   "dmg_mult": 1.66,
+   "kit": [
+    "core.skill.cinder_breath",
+    "core.skill.meteor_call",
+    "core.skill.magma_breath",
+    "core.skill.ember_bolt",
+    "core.skill.cleave",
+    "core.skill.ember_screech",
+    "core.skill.wing_gust",
+    "core.skill.talon_dive",
+    "core.skill.void_step"
+   ],
+   "lore": "No bestiary agrees on its shape, because no witness account was finished."
+  },
+  {
+   "id": "gen.creature.vhaldris_the_undying",
+   "name": "Vhaldris the Undying",
+   "base": "dragon",
+   "bundle": "emberwing_matriarch",
+   "element": "fire",
+   "tint": "d55924",
+   "scale": 1.18,
+   "hp_mult": 3.47,
+   "dmg_mult": 1.59,
+   "kit": [
+    "core.skill.ember_bolt",
+    "core.skill.ember_screech",
+    "core.skill.meteor_call",
+    "core.skill.wing_gust",
+    "core.skill.cinder_breath",
+    "core.skill.talon_dive"
+   ],
+   "lore": "Every season the theme changes and every season it does not; it is the constant the songs tune against. Seventeen Guild champions have sworn to take its spirit. It keeps their skill stones in a tidy pile."
+  },
+  {
+   "id": "gen.creature.skralang_pyre_of_the_first_kindling",
+   "name": "Skralang, Pyre of the First Kindling",
+   "base": "dragon",
+   "bundle": "emberwing_matriarch",
+   "element": "storm",
+   "tint": "419aed",
+   "scale": 1.32,
+   "hp_mult": 4.45,
+   "dmg_mult": 1.8,
+   "kit": [
+    "core.skill.wing_gust",
+    "core.skill.cleave",
+    "core.skill.void_step",
+    "core.skill.talon_dive",
+    "core.skill.ember_screech"
+   ],
+   "lore": "It patrols the Unfinished Rim, eating the world before the Lumen finishes weaving it. It once fought beside another legend and the land itself melted; hunters call the scar a Duologue."
+  },
+  {
+   "id": "gen.creature.crumath_lumen_blind_maw",
+   "name": "Crumath, Lumen-Blind Maw",
+   "base": "dragon",
+   "bundle": "emberwing_matriarch",
+   "element": "blood",
+   "tint": "921511",
+   "scale": 1.36,
+   "hp_mult": 4.02,
+   "dmg_mult": 2.1,
+   "kit": [
+    "core.skill.abyssal_maw",
+    "core.skill.cleave",
+    "core.skill.wing_gust",
+    "core.skill.void_step",
+    "core.skill.shadow_rend"
+   ],
+   "lore": "It once fought beside another legend and the land itself melted; hunters call the scar a Duologue."
+  },
+  {
+   "id": "gen.creature.vermwen_the_hollow_crowned",
+   "name": "Vermwen the Hollow-Crowned",
+   "base": "hag",
+   "bundle": "",
+   "element": "umbral",
+   "tint": "77499a",
+   "scale": 1.27,
+   "hp_mult": 3.15,
+   "dmg_mult": 1.45,
+   "kit": [
+    "core.skill.hex_bolt",
+    "core.skill.cleave",
+    "core.skill.void_step",
+    "core.skill.shrieking_curse",
+    "core.skill.creeping_mire",
+    "core.skill.shadow_rend",
+    "core.skill.wispling_call"
+   ],
+   "lore": "Seventeen Guild champions have sworn to take its spirit. It keeps their skill stones in a tidy pile. The Lumen wove around it rather than through it, and it has never forgiven the courtesy."
+  },
+  {
+   "id": "gen.creature.brynroth_pillar_of_the_last_kindling",
+   "name": "Brynroth, Pillar of the Last Kindling",
+   "base": "colossus",
+   "bundle": "",
+   "element": "frost",
+   "tint": "6eddee",
+   "scale": 1.57,
+   "hp_mult": 4.39,
+   "dmg_mult": 1.73,
+   "kit": [
+    "core.skill.wing_gust",
+    "core.skill.stone_upheaval",
+    "core.skill.boulder_hurl",
+    "core.skill.stone_spikes",
+    "core.skill.cleave",
+    "core.skill.earthshatter"
+   ],
+   "lore": "Where it walks, the land stays gorgeous and becomes lethal; corruption here beautifies. The wells refuse to recall those it takes; its kills feed the Gloom directly."
+  },
+  {
+   "id": "gen.creature.strakax_maw_of_the_second_thaw",
+   "name": "Strakax, Maw of the Second Thaw",
+   "base": "dragon",
+   "bundle": "emberwing_matriarch",
+   "element": "storm",
+   "tint": "4666e7",
+   "scale": 1.41,
+   "hp_mult": 4.19,
+   "dmg_mult": 1.98,
+   "kit": [
+    "core.skill.wing_gust",
+    "core.skill.ember_screech",
+    "core.skill.void_step",
+    "core.skill.cleave",
+    "core.skill.talon_dive"
+   ],
+   "lore": "The Lumen wove around it rather than through it, and it has never forgiven the courtesy. Where it walks, the land stays gorgeous and becomes lethal; corruption here beautifies."
+  },
+  {
+   "id": "gen.creature.cyndveig_anvil_of_the_first_weaving",
+   "name": "Cyndveig, Anvil of the First Weaving",
+   "base": "colossus",
+   "bundle": "",
+   "element": "fire",
+   "tint": "ce4812",
+   "scale": 1.59,
+   "hp_mult": 5.89,
+   "dmg_mult": 1.87,
+   "kit": [
+    "core.skill.cinder_breath",
+    "core.skill.meteor_call",
+    "core.skill.earthshatter",
+    "core.skill.boulder_hurl",
+    "core.skill.stone_upheaval",
+    "core.skill.ember_bolt",
+    "core.skill.stone_spikes"
+   ],
+   "lore": "Older than the Havens; it remembers being worshipped, and it remembers who stopped."
+  },
+  {
+   "id": "gen.creature.zsaax_crone_of_the_deep_weave",
+   "name": "Zsaax, Crone of the Deep Weave",
+   "base": "hag",
+   "bundle": "",
+   "element": "venom",
+   "tint": "41b149",
+   "scale": 1.2,
+   "hp_mult": 3.27,
+   "dmg_mult": 1.58,
+   "kit": [
+    "core.skill.hex_bolt",
+    "core.skill.wispling_call",
+    "core.skill.shadow_rend",
+    "core.skill.cleave",
+    "core.skill.void_step",
+    "core.skill.abyssal_maw"
+   ],
+   "lore": "Every season the theme changes and every season it does not; it is the constant the songs tune against. The wells refuse to recall those it takes; its kills feed the Gloom directly."
+  },
+  {
+   "id": "gen.creature.skarnul_hag_of_the_ninth_blooming",
+   "name": "Skarnul, Hag of the Ninth Blooming",
+   "base": "hag",
+   "bundle": "",
+   "element": "blood",
+   "tint": "b3091b",
+   "scale": 1.12,
+   "hp_mult": 3.53,
+   "dmg_mult": 1.8,
+   "kit": [
+    "core.skill.shadow_rend",
+    "core.skill.wispling_call",
+    "core.skill.abyssal_maw",
+    "core.skill.shrieking_curse",
+    "core.skill.hex_bolt",
+    "core.skill.void_step"
+   ],
+   "lore": "Its practiced technique has crystallized into skill stones twice. Both stones scream. It was offered a Soul Snare once, at the exact edge of death. It chose the hunter \u2014 as a meal."
+  },
+  {
+   "id": "gen.creature.nocroth_widow_of_the_second_blooming",
+   "name": "Nocroth, Widow of the Second Blooming",
+   "base": "hag",
+   "bundle": "",
+   "element": "umbral",
+   "tint": "6e4092",
+   "scale": 1.16,
+   "hp_mult": 3.93,
+   "dmg_mult": 1.68,
+   "kit": [
+    "core.skill.hex_bolt",
+    "core.skill.creeping_mire",
+    "core.skill.abyssal_maw",
+    "core.skill.void_step",
+    "core.skill.cleave"
+   ],
+   "lore": "Every season the theme changes and every season it does not; it is the constant the songs tune against."
+  },
+  {
+   "id": "gen.creature.torrmath_pillar_of_the_unfinished_rim",
+   "name": "Torrmath, Pillar of the Unfinished Rim",
+   "base": "colossus",
+   "bundle": "",
+   "element": "physical",
+   "tint": "948465",
+   "scale": 1.6,
+   "hp_mult": 4.0,
+   "dmg_mult": 1.39,
+   "kit": [
+    "core.skill.seismic_slam",
+    "core.skill.stone_spikes",
+    "core.skill.boulder_hurl",
+    "core.skill.stone_upheaval",
+    "core.skill.cleave",
+    "core.skill.earthshatter",
+    "core.skill.void_step"
+   ],
+   "lore": "Its practiced technique has crystallized into skill stones twice. Both stones scream. Where it walks, the land stays gorgeous and becomes lethal; corruption here beautifies."
+  },
+  {
+   "id": "gen.creature.kyrka_the_half_woven",
+   "name": "Kyrka the Half-Woven",
+   "base": "colossus",
+   "bundle": "",
+   "element": "storm",
+   "tint": "646fc8",
+   "scale": 1.34,
+   "hp_mult": 4.09,
+   "dmg_mult": 1.7,
+   "kit": [
+    "core.skill.talon_dive",
+    "core.skill.earthshatter",
+    "core.skill.void_step",
+    "core.skill.boulder_hurl",
+    "core.skill.stone_upheaval"
+   ],
+   "lore": "Older than the Havens; it remembers being worshipped, and it remembers who stopped. Its practiced technique has crystallized into skill stones twice. Both stones scream."
+  },
+  {
+   "id": "gen.creature.verrroth_never_thawed_tempest",
+   "name": "Verrroth, Never-Thawed Tempest",
+   "base": "dragon",
+   "bundle": "marsh_drake",
+   "element": "blood",
+   "tint": "b52533",
+   "scale": 1.18,
+   "hp_mult": 3.67,
+   "dmg_mult": 2.15,
+   "kit": [
+    "core.skill.abyssal_maw",
+    "core.skill.cleave",
+    "core.skill.hex_bolt",
+    "core.skill.shadow_rend",
+    "core.skill.void_step"
+   ],
+   "lore": "It once fought beside another legend and the land itself melted; hunters call the scar a Duologue."
+  },
+  {
+   "id": "gen.creature.grondang_undying_hunger",
+   "name": "Grondang, Undying Hunger",
+   "base": "colossus",
+   "bundle": "",
+   "element": "physical",
+   "tint": "957c62",
+   "scale": 1.44,
+   "hp_mult": 5.49,
+   "dmg_mult": 1.74,
+   "kit": [
+    "core.skill.boulder_hurl",
+    "core.skill.void_step",
+    "core.skill.stone_spikes",
+    "core.skill.cleave",
+    "core.skill.earthshatter",
+    "core.skill.seismic_slam"
+   ],
+   "lore": "Where it walks, the land stays gorgeous and becomes lethal; corruption here beautifies. It patrols the Unfinished Rim, eating the world before the Lumen finishes weaving it."
+  },
+  {
+   "id": "gen.creature.galvzarr_terror_of_the_umbral_depths",
+   "name": "Galvzarr, Terror of the Umbral Depths",
+   "base": "dragon",
+   "bundle": "emberwing_matriarch",
+   "element": "storm",
+   "tint": "79a8e1",
+   "scale": 1.34,
+   "hp_mult": 4.09,
+   "dmg_mult": 1.89,
+   "kit": [
+    "core.skill.talon_dive",
+    "core.skill.cleave",
+    "core.skill.void_step",
+    "core.skill.ember_screech",
+    "core.skill.wing_gust"
+   ],
+   "lore": "It was offered a Soul Snare once, at the exact edge of death. It chose the hunter \u2014 as a meal. The Lumen wove around it rather than through it, and it has never forgiven the courtesy."
+  },
+  {
+   "id": "gen.creature.grumang_half_woven_colossus",
+   "name": "Grumang, Half-Woven Colossus",
+   "base": "colossus",
+   "bundle": "",
+   "element": "physical",
+   "tint": "947a65",
+   "scale": 1.52,
+   "hp_mult": 5.46,
+   "dmg_mult": 1.77,
+   "kit": [
+    "core.skill.seismic_slam",
+    "core.skill.cleave",
+    "core.skill.boulder_hurl",
+    "core.skill.stone_spikes",
+    "core.skill.void_step",
+    "core.skill.earthshatter"
+   ],
+   "lore": "No bestiary agrees on its shape, because no witness account was finished."
+  },
+  {
+   "id": "gen.creature.isylwen_colossus_of_the_hundredth_hunt",
+   "name": "Isylwen, Colossus of the Hundredth Hunt",
+   "base": "colossus",
+   "bundle": "",
+   "element": "frost",
+   "tint": "88cce4",
+   "scale": 1.46,
+   "hp_mult": 5.76,
+   "dmg_mult": 1.7,
+   "kit": [
+    "core.skill.wing_gust",
+    "core.skill.void_step",
+    "core.skill.seismic_slam",
+    "core.skill.boulder_hurl",
+    "core.skill.earthshatter"
+   ],
+   "lore": "Older than the Havens; it remembers being worshipped, and it remembers who stopped. It once fought beside another legend and the land itself melted; hunters call the scar a Duologue."
+  },
+  {
+   "id": "gen.creature.velmath_lumen_blind_choir",
+   "name": "Velmath, Lumen-Blind Choir",
+   "base": "hag",
+   "bundle": "",
+   "element": "umbral",
+   "tint": "733aa8",
+   "scale": 1.22,
+   "hp_mult": 3.6,
+   "dmg_mult": 1.6,
+   "kit": [
+    "core.skill.shadow_rend",
+    "core.skill.void_step",
+    "core.skill.hex_bolt",
+    "core.skill.wispling_call",
+    "core.skill.creeping_mire",
+    "core.skill.shrieking_curse",
+    "core.skill.abyssal_maw",
+    "core.skill.cleave"
+   ],
+   "lore": "Seventeen Guild champions have sworn to take its spirit. It keeps their skill stones in a tidy pile. The wells refuse to recall those it takes; its kills feed the Gloom directly."
+  },
+  {
+   "id": "gen.creature.syvzarr_star_eaten_pillar",
+   "name": "Syvzarr, Star-Eaten Pillar",
+   "base": "colossus",
+   "bundle": "",
+   "element": "frost",
+   "tint": "78cfda",
+   "scale": 1.49,
+   "hp_mult": 3.78,
+   "dmg_mult": 1.32,
+   "kit": [
+    "core.skill.hex_bolt",
+    "core.skill.stone_spikes",
+    "core.skill.wing_gust",
+    "core.skill.stone_upheaval",
+    "core.skill.cleave",
+    "core.skill.void_step",
+    "core.skill.seismic_slam",
+    "core.skill.earthshatter"
+   ],
+   "lore": "It once fought beside another legend and the land itself melted; hunters call the scar a Duologue. It patrols the Unfinished Rim, eating the world before the Lumen finishes weaving it."
+  },
+  {
+   "id": "gen.creature.velul_whisper_of_the_umbral_depths",
+   "name": "Velul, Whisper of the Umbral Depths",
+   "base": "hag",
+   "bundle": "",
+   "element": "umbral",
+   "tint": "7135b8",
+   "scale": 1.11,
+   "hp_mult": 3.69,
+   "dmg_mult": 1.54,
+   "kit": [
+    "core.skill.abyssal_maw",
+    "core.skill.hex_bolt",
+    "core.skill.shrieking_curse",
+    "core.skill.wispling_call",
+    "core.skill.shadow_rend",
+    "core.skill.void_step",
+    "core.skill.creeping_mire"
+   ],
+   "lore": "It patrols the Unfinished Rim, eating the world before the Lumen finishes weaving it."
+  },
+  {
+   "id": "gen.creature.ostresh_grinder_of_the_second_waning",
+   "name": "Ostresh, Grinder of the Second Waning",
+   "base": "colossus",
+   "bundle": "",
+   "element": "physical",
+   "tint": "baa394",
+   "scale": 1.44,
+   "hp_mult": 5.91,
+   "dmg_mult": 1.84,
+   "kit": [
+    "core.skill.boulder_hurl",
+    "core.skill.stone_spikes",
+    "core.skill.seismic_slam",
+    "core.skill.stone_upheaval",
+    "core.skill.void_step"
+   ],
+   "lore": "Every season the theme changes and every season it does not; it is the constant the songs tune against. Its practiced technique has crystallized into skill stones twice. Both stones scream."
+  },
+  {
+   "id": "gen.creature.thaxveig_crone_of_the_deep_weave",
+   "name": "Thaxveig, Crone of the Deep Weave",
+   "base": "hag",
+   "bundle": "",
+   "element": "venom",
+   "tint": "66a441",
+   "scale": 1.26,
+   "hp_mult": 4.07,
+   "dmg_mult": 1.79,
+   "kit": [
+    "core.skill.hex_bolt",
+    "core.skill.void_step",
+    "core.skill.abyssal_maw",
+    "core.skill.wispling_call",
+    "core.skill.cleave",
+    "core.skill.creeping_mire",
+    "core.skill.shrieking_curse",
+    "core.skill.shadow_rend"
+   ],
+   "lore": "Every season the theme changes and every season it does not; it is the constant the songs tune against. It once fought beside another legend and the land itself melted; hunters call the scar a Duologue."
+  },
+  {
+   "id": "gen.creature.yrsagon_terror_of_the_hundredth_thaw",
+   "name": "Yrsagon, Terror of the Hundredth Thaw",
+   "base": "dragon",
+   "bundle": "marsh_drake",
+   "element": "frost",
+   "tint": "9ee3f1",
+   "scale": 1.45,
+   "hp_mult": 4.24,
+   "dmg_mult": 1.52,
+   "kit": [
+    "core.skill.wing_gust",
+    "core.skill.hex_bolt",
+    "core.skill.talon_dive",
+    "core.skill.void_step",
+    "core.skill.cleave"
+   ],
+   "lore": "Where it walks, the land stays gorgeous and becomes lethal; corruption here beautifies."
+  },
+  {
+   "id": "gen.creature.velild_choir_of_the_seventh_waning",
+   "name": "Velild, Choir of the Seventh Waning",
+   "base": "hag",
+   "bundle": "",
+   "element": "umbral",
+   "tint": "8843d5",
+   "scale": 1.34,
+   "hp_mult": 2.84,
+   "dmg_mult": 1.94,
+   "kit": [
+    "core.skill.wispling_call",
+    "core.skill.shadow_rend",
+    "core.skill.cleave",
+    "core.skill.shrieking_curse",
+    "core.skill.hex_bolt"
+   ],
+   "lore": "Where it walks, the land stays gorgeous and becomes lethal; corruption here beautifies."
+  },
+  {
+   "id": "gen.creature.hemadris_maw_of_the_deep_weave",
+   "name": "Hemadris, Maw of the Deep Weave",
+   "base": "dragon",
+   "bundle": "marsh_drake",
+   "element": "blood",
+   "tint": "9d1f31",
+   "scale": 1.36,
+   "hp_mult": 4.5,
+   "dmg_mult": 1.84,
+   "kit": [
+    "core.skill.abyssal_maw",
+    "core.skill.shadow_rend",
+    "core.skill.cleave",
+    "core.skill.talon_dive",
+    "core.skill.wing_gust"
+   ],
+   "lore": "It once fought beside another legend and the land itself melted; hunters call the scar a Duologue."
+  },
+  {
+   "id": "gen.creature.magang_mountain_of_the_everbloom_wilds",
+   "name": "Magang, Mountain of the Everbloom Wilds",
+   "base": "colossus",
+   "bundle": "",
+   "element": "physical",
+   "tint": "c0a683",
+   "scale": 1.54,
+   "hp_mult": 3.76,
+   "dmg_mult": 1.69,
+   "kit": [
+    "core.skill.stone_upheaval",
+    "core.skill.cleave",
+    "core.skill.void_step",
+    "core.skill.boulder_hurl",
+    "core.skill.stone_spikes",
+    "core.skill.seismic_slam"
+   ],
+   "lore": "Its practiced technique has crystallized into skill stones twice. Both stones scream. Older than the Havens; it remembers being worshipped, and it remembers who stopped."
+  },
+  {
+   "id": "gen.creature.grumka_anvil_of_the_fifth_hunt",
+   "name": "Grumka, Anvil of the Fifth Hunt",
+   "base": "colossus",
+   "bundle": "",
+   "element": "physical",
+   "tint": "957b60",
+   "scale": 1.47,
+   "hp_mult": 5.05,
+   "dmg_mult": 1.39,
+   "kit": [
+    "core.skill.stone_upheaval",
+    "core.skill.boulder_hurl",
+    "core.skill.cleave",
+    "core.skill.seismic_slam",
+    "core.skill.void_step",
+    "core.skill.earthshatter"
+   ],
+   "lore": "Seventeen Guild champions have sworn to take its spirit. It keeps their skill stones in a tidy pile."
+  },
+  {
+   "id": "gen.creature.aelur_gloom_fed_wyrm",
+   "name": "Aelur, Gloom-Fed Wyrm",
+   "base": "dragon",
+   "bundle": "emberwing_matriarch",
+   "element": "storm",
+   "tint": "3e46e6",
+   "scale": 1.41,
+   "hp_mult": 4.66,
+   "dmg_mult": 2.2,
+   "kit": [
+    "core.skill.wing_gust",
+    "core.skill.void_step",
+    "core.skill.talon_dive",
+    "core.skill.cleave",
+    "core.skill.ember_screech"
+   ],
+   "lore": "Seventeen Guild champions have sworn to take its spirit. It keeps their skill stones in a tidy pile."
+  },
+  {
+   "id": "gen.creature.ylthorn_pyre_of_the_deep_weave",
+   "name": "Ylthorn, Pyre of the Deep Weave",
+   "base": "dragon",
+   "bundle": "emberwing_matriarch",
+   "element": "umbral",
+   "tint": "752acf",
+   "scale": 1.38,
+   "hp_mult": 3.35,
+   "dmg_mult": 2.2,
+   "kit": [
+    "core.skill.abyssal_maw",
+    "core.skill.wispling_call",
+    "core.skill.void_step",
+    "core.skill.talon_dive",
+    "core.skill.wing_gust",
+    "core.skill.shadow_rend",
+    "core.skill.shrieking_curse",
+    "core.skill.hex_bolt",
+    "core.skill.cleave"
+   ],
+   "lore": "No bestiary agrees on its shape, because no witness account was finished. Its spirit would enchant a Haven's whole arsenal \u2014 which is precisely why the enchanters forbid the hunt."
+  },
+  {
+   "id": "gen.creature.torvveig_hollow_crowned_grinder",
+   "name": "Torvveig, Hollow-Crowned Grinder",
+   "base": "colossus",
+   "bundle": "",
+   "element": "storm",
+   "tint": "3445c0",
+   "scale": 1.56,
+   "hp_mult": 3.78,
+   "dmg_mult": 1.44,
+   "kit": [
+    "core.skill.talon_dive",
+    "core.skill.cleave",
+    "core.skill.boulder_hurl",
+    "core.skill.stone_spikes",
+    "core.skill.stone_upheaval",
+    "core.skill.wing_gust",
+    "core.skill.void_step"
+   ],
+   "lore": "No bestiary agrees on its shape, because no witness account was finished."
+  },
+  {
+   "id": "gen.creature.uldur_anvil_of_the_cinderwastes",
+   "name": "Uldur, Anvil of the Cinderwastes",
+   "base": "colossus",
+   "bundle": "",
+   "element": "physical",
+   "tint": "c0b091",
+   "scale": 1.36,
+   "hp_mult": 3.5,
+   "dmg_mult": 1.36,
+   "kit": [
+    "core.skill.stone_upheaval",
+    "core.skill.seismic_slam",
+    "core.skill.cleave",
+    "core.skill.boulder_hurl",
+    "core.skill.void_step",
+    "core.skill.earthshatter"
+   ],
+   "lore": "The Lumen wove around it rather than through it, and it has never forgiven the courtesy."
+  }
+ ]
+}

@@ -1,0 +1,48 @@
+{
+  "entity": "marsh_drake",
+  "archetype": "marsh_drake",
+  "skeleton": "marsh_drake",
+  "frame_size": [
+    68,
+    46
+  ],
+  "anchor": [
+    34,
+    41
+  ],
+  "combined_sheet": "sheet.png",
+  "animations": {
+    "idle": {
+      "frames": 2,
+      "fps": 3.0,
+      "loop": true,
+      "strip": "strips/idle.png",
+      "row": 0
+    },
+    "walk": {
+      "frames": 4,
+      "fps": 8.0,
+      "loop": true,
+      "strip": "strips/walk.png",
+      "row": 1
+    },
+    "attack": {
+      "frames": 3,
+      "fps": 8.0,
+      "loop": false,
+      "strip": "strips/attack.png",
+      "row": 2
+    },
+    "lunge": {
+      "frames": 3,
+      "fps": 8.0,
+      "loop": false,
+      "strip": "strips/lunge.png",
+      "row": 3
+    }
+  },
+  "logical_size": [
+    34,
+    23
+  ]
+}
