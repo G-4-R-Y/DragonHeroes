@@ -723,9 +723,11 @@ func on_creature_died(c: ProtoCreature) -> void:
 		_drop(c.global_position + Vector2(10, 0), "stone", 1)
 	if randf() < c.snare_chance:
 		_drop(c.global_position + Vector2(-10, 4), "snare", 1)
-	# REAL item rolls (items.gd): base pool + rarity weights by tier (proposal)
+	# REAL item rolls (items.gd): base pool + rarity weights by tier, rolled at
+	# the hunter's level so drops keep pace with the scaled monsters (proposal)
 	if randf() < c.item_chance:
-		_drop_item(ProtoItems.roll_loot(c.elite), c.global_position + Vector2(4, 10))
+		_drop_item(ProtoItems.roll_loot(c.elite, Session.level),
+				c.global_position + Vector2(4, 10))
 	if c.capturable and randf() < ESSENCE_CHANCE:   # Spirit Essence: abyssal kills
 		_drop_item(ProtoItems.make_essence(), c.global_position + Vector2(-14, -4))
 	if c.elite:
@@ -744,7 +746,7 @@ func on_boss_died(b: ProtoBoss) -> void:
 	shake(8.0)
 	# Signature drop: the Emberfang Blade minted as a REAL legendary instance
 	# (implicit fire roll + 4 affixes). Elite item/rune rolls run in on_creature_died.
-	_drop_item(ProtoItems.roll_item("emberfang_blade", "legendary"),
+	_drop_item(ProtoItems.roll_item("emberfang_blade", "legendary", Session.level, 0.35),
 			b.global_position + Vector2(-12, 0))
 	damage_number(b.global_position + Vector2(0, -40), 0, Color("ffd166"), "MATRIARCH FELLED!")
 	if not Session.owns_mount("emberwing_drakeling"):   # her brood takes to you
@@ -773,8 +775,8 @@ func on_duo_boss_died(b: ProtoDuoBoss) -> void:
 	fx.debris(b.global_position, Color(0.5, 0.32, 0.2))
 	shake(8.0)
 	var rarity := "legendary" if randf() < 0.25 else "epic"
-	_drop_item(ProtoItems.roll_item(ProtoItems.ALL_BASES.pick_random(), rarity),
-			b.global_position + Vector2(-12, 0))
+	_drop_item(ProtoItems.roll_item(ProtoItems.ALL_BASES.pick_random(), rarity,
+			Session.level, 0.35), b.global_position + Vector2(-12, 0))
 	# untyped on purpose: the partner may already be a freed instance, and
 	# assigning a freed object to a typed var is a runtime error
 	var mate: Variant = b.partner
@@ -809,8 +811,9 @@ func on_legendary_died(b) -> void:
 		rarity = "legendary"
 	elif r < 0.40:
 		rarity = "epic"
-	_drop_item(ProtoItems.roll_item(ProtoItems.ALL_BASES.pick_random(), rarity),
-			b.global_position + Vector2(-12, 0))
+	# quality 0.5: a legendary kill never drops bottom-of-band rolls (Ricardo)
+	_drop_item(ProtoItems.roll_item(ProtoItems.ALL_BASES.pick_random(), rarity,
+			Session.level, 0.5), b.global_position + Vector2(-12, 0))
 	if randf() < LEGENDARY_SNARE_SHOWER:
 		for k in 5:
 			_drop(b.global_position + Vector2(randf_range(-24, 24),

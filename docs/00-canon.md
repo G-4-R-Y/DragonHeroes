@@ -443,3 +443,12 @@ Still open:
    VFX pass: pooled shockwave rings + slash trails; particle budgets raised
    (desktop proposal). All numbers (proposal); catalogs live in
    content/generated/ with provenance.
+20. **Flow tuning + level-scaled loot (2026-07-11, Ricardo):** difficulty must
+   engage, not bore — hunt legendaries roll a NORMALIZED HP budget (x1.4-3.0
+   of the 900 reference, threat carried by dmg x1.3-2.2) instead of
+   multiplying chassis base HP (killed the 13.8k level-1 colossus walls).
+   Hitboxes follow sprites (bestiary scale multiplies collision radius;
+   lunger/brute get matched radii). The hunt must reward: items roll at the
+   hunter's level (ilvl, +4% per level on every stat roll, ~x5 at 100) and
+   boss/legendary kills are quality-floored to the upper roll band — no more
+   level-1 rolls from legendary kills. All numbers (proposal).

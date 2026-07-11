@@ -12,6 +12,9 @@ var hp := 120.0
 var damage := 14.0
 var move_speed := 4.5 * TILE     # px/s
 var body_radius := 9.0
+# One HP reference for every hunt legendary regardless of chassis (Matriarch
+# base); the entry's rolled hp_mult picks a spot inside a x1.4-3.0 band of it.
+const LEGENDARY_HP_BUDGET := 900.0
 var aggro_range := 7.0 * TILE
 var attack_reach := 1.8 * TILE
 var attack_arc_deg := 90.0
@@ -110,6 +113,7 @@ func setup_archetype(kind: String, affix := "") -> void:
 			attack_cd = 0.9
 			_base_tint = Color(0.8, 1.05, 1.1)
 			_scale = 0.9
+			body_radius = 8.0
 		"brute":    # slow wall: heavy telegraphed hits, double gold
 			max_hp *= 1.9
 			damage *= 1.7
@@ -120,6 +124,7 @@ func setup_archetype(kind: String, affix := "") -> void:
 			gold_max *= 2
 			_base_tint = Color(1.15, 0.85, 0.75)
 			_scale = 1.3
+			body_radius = 11.5
 	elite_affix = affix
 	match affix:
 		"Brutal":
@@ -188,9 +193,16 @@ func _apply_entry() -> void:
 		species_name = str(_entry.get("name", ""))
 		_bundle = str(_entry.get("bundle", ""))
 		_base_tint = _base_tint * tint_from(_entry)   # species tint OVER archetype tint
-		_scale *= clampf(float(_entry.get("scale", 1.0)), 0.5, 3.0)
-		if not legendary_entry.is_empty():   # contract: hp 2.5-6, dmg 1.3-2.2
-			hp_mult *= clampf(float(_entry.get("hp_mult", 3.0)), 2.5, 6.0)
+		var entry_scale := clampf(float(_entry.get("scale", 1.0)), 0.5, 3.0)
+		_scale *= entry_scale
+		body_radius *= entry_scale   # the hitbox follows the sprite (Ricardo 2026-07-11)
+		if not legendary_entry.is_empty():
+			# Flow over sponge (Ricardo 2026-07-11): legendaries roll a NORMALIZED
+			# HP budget off one reference instead of multiplying the chassis base —
+			# no more 13.8k colossus walls at level 1. Rolled hp_mult 2.5-6 maps to
+			# x1.4-3.0 of the budget; threat comes from dmg_mult, not sponge.
+			var hm := clampf(float(_entry.get("hp_mult", 3.0)), 2.5, 6.0)
+			max_hp = LEGENDARY_HP_BUDGET * remap(hm, 2.5, 6.0, 1.4, 3.0)
 			dmg_mult *= clampf(float(_entry.get("dmg_mult", 1.6)), 1.3, 2.2)
 			gold_mult *= maxf(float(_entry.get("gold_mult", 2.0)), 1.0)
 			name_tag = species_name.to_upper()

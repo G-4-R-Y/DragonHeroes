@@ -103,16 +103,30 @@ static func _affix_pool(slot: String) -> Array:
 				"min": float(t.get("min", 0)), "max": float(t.get("max", 0)), "weight": w})
 	return pool
 
+# Per level above 1, every rolled value grows 4% — the hunt must stay rewarding
+# as the monsters scale (Ricardo 2026-07-11); at 100 an item rolls ~x5 a fresh one.
+const ITEM_LEVEL_SCALE := 0.04
+
+# A single stat roll: `quality` (0-1) floors the roll inside its min-max band
+# (legendary kills roll the upper half, never "default weapons with lvl 1 rolls"),
+# then the item-level curve multiplies the result.
+static func _roll_value(lo: float, hi: float, level: int, quality: float) -> float:
+	var t := clampf(quality, 0.0, 1.0)
+	var band := lerpf(lo, hi, t + randf() * (1.0 - t))
+	return maxf(roundf(band * (1.0 + ITEM_LEVEL_SCALE * float(maxi(level, 1) - 1))), 1.0)
+
 # Rolls a full item instance from a base snapshot. Affix count follows rarity
 # (0/1/2/3/4), capped by the slot's available affix pool (prototype cap —
-# shipping legendaries are hand-authored uniques, canon §4).
-static func roll_item(base_key: String, rarity: String) -> Dictionary:
+# shipping legendaries are hand-authored uniques, canon §4). `level` is the
+# item level (stamped as ilvl); `quality` biases rolls toward the band's top.
+static func roll_item(base_key: String, rarity: String, level := 1, quality := 0.0) -> Dictionary:
 	var base := _data(base_key)
 	var slot := str(base.get("slot", "weapon"))
 	var affixes: Array = []
 	for m in base.get("implicit_mods", []):
 		affixes.append({"stat": str(m.get("stat", "?")),
-				"value": float(randi_range(int(m.get("min", 0)), int(m.get("max", 0)))),
+				"value": _roll_value(float(m.get("min", 0)), float(m.get("max", 0)),
+						level, quality),
 				"implicit": true})
 	var pool := _affix_pool(slot)
 	var prefix_name := ""
@@ -125,7 +139,7 @@ static func roll_item(base_key: String, rarity: String) -> Dictionary:
 		var pick: Dictionary = pool[int(_weighted_pick(weights))]
 		pool.erase(pick)
 		affixes.append({"stat": pick.stat,
-				"value": float(randi_range(int(pick.min), int(pick.max)))})
+				"value": _roll_value(float(pick.min), float(pick.max), level, quality)})
 		if pick.kind == "prefix" and prefix_name == "":
 			prefix_name = pick.name
 		elif pick.kind == "suffix" and suffix_name == "":
@@ -138,14 +152,16 @@ static func roll_item(base_key: String, rarity: String) -> Dictionary:
 	var sprite_key := str(base.get("weapon_class", slot)) if slot == "weapon" else slot
 	var item := {"uid": next_uid(), "base_id": str(base.get("id", "core.item." + base_key)),
 			"name": item_name, "slot": slot, "rarity": rarity, "affixes": affixes,
-			"power": 0, "upgrade_tier": 0, "enchant": null, "sprite_key": sprite_key}
+			"ilvl": maxi(level, 1), "power": 0, "upgrade_tier": 0, "enchant": null,
+			"sprite_key": sprite_key}
 	item.power = power(item)
 	return item
 
-# A creature-kill loot roll: random base + rarity from the tier's weights.
-static func roll_loot(elite: bool) -> Dictionary:
+# A creature-kill loot roll: random base + rarity from the tier's weights,
+# rolled at the hunter's level so drops keep pace with scaled monsters.
+static func roll_loot(elite: bool, level := 1) -> Dictionary:
 	var bases := ALL_BASES if elite else DROP_BASES
-	return roll_item(bases.pick_random(), roll_rarity(elite))
+	return roll_item(bases.pick_random(), roll_rarity(elite), level)
 
 # Spirit Essence as an inventory material (data/abyssal_remnant.json snapshot).
 static func make_essence() -> Dictionary:

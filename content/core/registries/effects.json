@@ -72,7 +72,8 @@
         {"key": "bestiary_normal", "name": "Bestiary — normals", "desc": "1000 data-defined creatures (bestiary_normal.json): family bundle x element x tint x scale x stat rolls; pure data, weekly-extensible", "status": "live"},
         {"key": "bestiary_legendary", "name": "Bestiary — legendaries", "desc": "100 named legendaries (bestiary_legendary.json) over dragon/colossus/hag chassis with elemental kits and lore", "status": "live"},
         {"key": "species_roster", "name": "Species roster", "desc": "each hunt samples 6-10 species from the 1000; packs read as one species with a 25% stray chance per member", "status": "live"},
-        {"key": "hunt_legendary", "name": "Hunt legendary", "desc": "one sampled legendary per hunt (pack 13): chassis by base, hp x2.5-6 / dmg x1.3-2.2, guaranteed rare+ drop (60/30/10 rare/epic/legendary), 10% Soul Snare shower; magenta diamond on the minimap", "status": "live"},
+        {"key": "hunt_legendary", "name": "Hunt legendary", "desc": "one sampled legendary per hunt (pack 13): chassis by base, NORMALIZED HP budget (x1.4-3.0 of the 900 reference — flow over sponge, threat comes from dmg x1.3-2.2), guaranteed rare+ drop (60/30/10 rare/epic/legendary) rolled at quality 0.5, 10% Soul Snare shower; magenta diamond on the minimap", "status": "live"},
+        {"key": "hitbox_scale", "name": "Hitbox scaling", "desc": "collision radius follows the sprite: bestiary scale multiplies body_radius; lungers 8.0 / brutes 11.5 base", "status": "live"},
         {"key": "power_scale_normal", "name": "Power scaling — normals", "desc": "read at spawn from hunter level: HP +2%/level, damage +1%/level, gold rides the damage curve", "status": "live"},
         {"key": "power_scale_boss", "name": "Power scaling — bosses", "desc": "all bosses incl. hunt legendaries: HP +6%/level, damage +3%/level (also scales every scripted boss skill packet)", "status": "live"},
         {"key": "wisp_element_flavor", "name": "Wisp element mapping", "desc": "bestiary element -> bolt flavor: fire->ember, frost->frost, others->umbral (until 7-type bolts land)", "status": "live"}
@@ -134,6 +135,7 @@
       "entries": [
         {"key": "forge_upgrade", "name": "Forge upgrade", "desc": "+10% to all affix values per tier, max +5; cost 50 x 2^tier gold", "status": "live"},
         {"key": "forge_fail", "name": "Forge fail risk", "desc": "attempts into +4/+5 fail 25%/40% — gold burns, the item survives", "status": "live"},
+        {"key": "loot_level_scaling", "name": "Loot level scaling", "desc": "items roll at the hunter's level (ilvl): every stat roll grows 4%/level (~x5 at 100); boss drops quality-floored to the upper roll band", "status": "live"},
         {"key": "vendor_sell", "name": "Vendor sell", "desc": "price scales with rarity and tier (gold sink); per-rarity sell-all chips clear junk in one click", "status": "live"},
         {"key": "haven_chest", "name": "Haven chest", "desc": "120-slot stash at the Haven; bag <-> chest moves are free, stacks travel whole", "status": "live"},
         {"key": "stacking", "name": "Item stacking", "desc": "materials (Spirit Essences) stack into one slot with a qty badge; consuming/selling is stack-aware", "status": "live"},
