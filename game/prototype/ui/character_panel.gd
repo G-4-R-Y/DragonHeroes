@@ -1,9 +1,10 @@
 # PROTOTYPE HARNESS — character panel (C/Tab): equipment, the inventory grid
 # (REAL item instances from items.gd, rarity-bordered icons), REAL attribute
-# allocation, skills with rune sockets (canon §4), and the 3-slot pet roster.
-# Everything binds to the Session autoload so the panel works mid-hunt AND in
-# the Haven; the shipping panel binds to replicated dh-sim character state
-# instead (docs/tech/22). Pauses nothing — the hunt keeps running.
+# allocation, the VISUAL class skill tree (branch lanes + drawn prerequisite
+# connectors + a fixed detail card; canon §12.21), rune sockets (canon §4), and
+# the 3-slot pet roster. Everything binds to the Session autoload so the panel
+# works mid-hunt AND in the Haven; the shipping panel binds to replicated
+# dh-sim character state instead (docs/tech/22). Pauses nothing.
 class_name ProtoCharacterPanel
 extends CanvasLayer
 
@@ -16,21 +17,31 @@ const CYAN := Color("7fe7ff")
 const GREEN := Color("58c470")
 const RED := Color("ff8a7a")
 
-# attribute effects per allocated point (stats.gd proposals)
-const ATTR_FX := {
-	"might": "+2% melee dmg", "agility": "+1% move, +2% dodge rchg",
-	"intellect": "+2% skill dmg", "vitality": "+6 max HP",
-	"willpower": "+1% resist, +2% status res",
-}
 const SKILL_SOCKETS := ["cleave", "rend", "dodge"]
 
 const RARITY_ORDER := {"common": 0, "uncommon": 1, "rare": 2, "epic": 3, "legendary": 4}
+
+# skill-tree visual language: element accents + status colors (effects registry)
+const ELEM_COLORS := {"ember": Color("ff9a3c"), "frost": Color("7fe7ff"),
+		"arcane": Color("cf9dff"), "steel": Color("cdd6dd")}
+const STATUS_COLORS := {"bleed": Color("ff6b6b"), "ignite": Color("ff9a3c"),
+		"chill": Color("7fe7ff"), "expose": Color("cf9dff"), "stagger": Color("ffd166")}
+const VS_TO_STATUS := {"bleeding": "bleed", "ignited": "ignite", "chilled": "chill",
+		"exposed": "expose", "staggered": "stagger"}
+const TREE_W := 264.0     # tree canvas width inside the tab scroll (scrollbar-safe)
 
 var _boxes := {}          # tab name -> VBoxContainer
 var _sel_uid := -1        # selected bag item uid
 var _sel_slot := ""       # selected equipment slot
 var _bag_filter := "all"  # all | gear | rune | material
 var _socket_for := ""     # skill whose rune chooser is open
+var _sel_node := ""       # selected skill-tree node (detail card)
+var _sk_points: Label
+var _sk_class: Label
+var _sk_charge: Label
+var _sk_loadout: HBoxContainer
+var _sk_detail: PanelContainer
+var _sk_detail_box: VBoxContainer
 
 func _ready() -> void:
 	layer = 4
@@ -48,13 +59,13 @@ func _ready() -> void:
 	bar.add_theme_constant_override("separation", 6)
 	root.add_child(bar)
 	var title := Label.new()
-	title.text = "CHARACTER"
+	title.text = ProtoLang.t("cp_title")
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	title.add_theme_font_size_override("font_size", 11)
 	title.add_theme_color_override("font_color", EMBER)
 	bar.add_child(title)
 	var hint := Label.new()
-	hint.text = "Esc / C close"
+	hint.text = ProtoLang.t("cp_close_hint")
 	hint.add_theme_font_size_override("font_size", 8)
 	hint.add_theme_color_override("font_color", DIM)
 	bar.add_child(hint)
@@ -70,6 +81,9 @@ func _ready() -> void:
 	tabs.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	root.add_child(tabs)
 	for tab_name in ["Gear", "Bag", "Attributes", "Skills", "Pets", "Mounts"]:
+		if tab_name == "Skills":   # the tree tab owns its layout (fixed header/card)
+			tabs.add_child(_build_skills_tab())
+			continue
 		var scroll := ScrollContainer.new()
 		scroll.name = tab_name
 		scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -79,6 +93,65 @@ func _ready() -> void:
 		vb.add_theme_constant_override("separation", 4)
 		scroll.add_child(vb)
 		_boxes[tab_name] = vb
+	# tab titles localize; node names stay EN (stable lookups for tests/tools)
+	for i in tabs.get_tab_count():
+		tabs.set_tab_title(i, ProtoLang.t(
+				"tab_" + str(tabs.get_tab_control(i).name).to_lower()))
+
+# Skills tab shell: points header + loadout row pinned on top, the tree in a
+# ScrollContainer, and a FIXED detail card pinned at the bottom (not a tooltip).
+func _build_skills_tab() -> Control:
+	var root := VBoxContainer.new()
+	root.name = "Skills"
+	root.add_theme_constant_override("separation", 3)
+	var head := HBoxContainer.new()
+	head.add_theme_constant_override("separation", 6)
+	root.add_child(head)
+	_sk_points = Label.new()
+	_sk_points.add_theme_font_size_override("font_size", 12)
+	_sk_points.add_theme_color_override("font_color", GOLD)
+	head.add_child(_sk_points)
+	_sk_class = Label.new()
+	_sk_class.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_sk_class.add_theme_font_size_override("font_size", 8)
+	_sk_class.add_theme_color_override("font_color", DIM)
+	_sk_class.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
+	head.add_child(_sk_class)
+	_sk_charge = Label.new()
+	_sk_charge.add_theme_font_size_override("font_size", 9)
+	_sk_charge.add_theme_color_override("font_color", VIOLET)
+	_sk_charge.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
+	_sk_charge.mouse_filter = Control.MOUSE_FILTER_STOP   # hover shows the mechanic
+	head.add_child(_sk_charge)
+	_sk_loadout = HBoxContainer.new()
+	_sk_loadout.add_theme_constant_override("separation", 3)
+	root.add_child(_sk_loadout)
+	var scroll := ScrollContainer.new()
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	root.add_child(scroll)
+	var vb := VBoxContainer.new()
+	vb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	vb.add_theme_constant_override("separation", 4)
+	scroll.add_child(vb)
+	_boxes["Skills"] = vb
+	_sk_detail = PanelContainer.new()
+	_sk_detail.custom_minimum_size = Vector2(0, 92)
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.04, 0.06, 0.085, 0.98)
+	sb.border_color = ProtoTheme.EMBER_DIM
+	sb.set_border_width_all(1)
+	sb.set_corner_radius_all(3)
+	sb.content_margin_left = 6.0
+	sb.content_margin_right = 6.0
+	sb.content_margin_top = 4.0
+	sb.content_margin_bottom = 4.0
+	_sk_detail.add_theme_stylebox_override("panel", sb)
+	_sk_detail_box = VBoxContainer.new()
+	_sk_detail_box.add_theme_constant_override("separation", 2)
+	_sk_detail.add_child(_sk_detail_box)
+	root.add_child(_sk_detail)
+	return root
 
 func toggle() -> void:
 	visible = not visible
@@ -173,8 +246,8 @@ func _apply_live() -> void:
 func _refresh_gear() -> void:
 	var vb: VBoxContainer = _boxes["Gear"]
 	_clear(vb)
-	_line(vb, "%s — %s, level %d" % [Session.player_name, Session.class_display(),
-			Session.level], EMBER, 12)
+	_line(vb, ProtoLang.t("cp_gear_header") % [Session.player_name,
+			Session.class_display(), Session.level], EMBER, 12)
 	var s := ProtoStats.compute(Session)
 	for sl in ProtoStats.summary_lines(s):
 		_line(vb, sl, DIM, 9)
@@ -185,12 +258,12 @@ func _refresh_gear() -> void:
 		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		b.add_theme_font_size_override("font_size", 10)
 		if it.is_empty():
-			b.text = "%s — empty" % str(slot).capitalize()
+			b.text = ProtoLang.t("cp_slot_empty") % ProtoLang.term("slot", str(slot))
 			b.add_theme_color_override("font_color", DIM)
 		else:
 			b.icon = _icon(it)
-			b.text = "%s — %s · pw %d" % [str(slot).capitalize(), _iname(it),
-					ProtoItems.power(it)]
+			b.text = ProtoLang.t("cp_slot_row") % [ProtoLang.term("slot", str(slot)),
+					_iname(it), ProtoItems.power(it)]
 			b.add_theme_color_override("font_color", _rcolor(it))
 			b.tooltip_text = "\n".join(PackedStringArray(ProtoItems.describe(it)))
 		b.pressed.connect(_select_slot.bind(str(slot)))
@@ -199,16 +272,18 @@ func _refresh_gear() -> void:
 		var it: Dictionary = Session.equipment.get(_sel_slot, {})
 		if not it.is_empty():
 			_line(vb, "— %s —" % _iname(it), _rcolor(it), 11)
-			_line(vb, "%s %s · sells %d gold" % [str(it.get("rarity", "?")),
-					str(it.get("slot", "?")), ProtoItems.sell_price(it)], DIM, 9)
+			_line(vb, ProtoLang.t("cp_item_meta") % [
+					ProtoLang.term("rarity", str(it.get("rarity", "?"))),
+					ProtoLang.term("slot", str(it.get("slot", "?"))).to_lower(),
+					ProtoItems.sell_price(it)], DIM, 9)
 			for d in ProtoItems.describe(it):
 				_line(vb, str(d), PALE, 10)
 			var hb := HBoxContainer.new()
 			hb.add_theme_constant_override("separation", 6)
 			vb.add_child(hb)
-			_btn(hb, "Unequip", _do_unequip.bind(_sel_slot), GOLD)
+			_btn(hb, ProtoLang.t("cp_unequip"), _do_unequip.bind(_sel_slot), GOLD)
 			if Session.inventory.size() >= ProtoItems.INVENTORY_CAP:
-				_line(vb, "bag full — sell something first", RED, 9)
+				_line(vb, ProtoLang.t("cp_bag_full"), RED, 9)
 
 func _select_slot(slot: String) -> void:
 	_sel_slot = "" if _sel_slot == slot else slot
@@ -225,18 +300,19 @@ func _do_unequip(slot: String) -> void:
 func _refresh_bag() -> void:
 	var vb: VBoxContainer = _boxes["Bag"]
 	_clear(vb)
-	_line(vb, "Bag %d/%d — gold %d" % [Session.inventory.size(),
+	_line(vb, ProtoLang.t("cp_bag_header") % [Session.inventory.size(),
 			ProtoItems.INVENTORY_CAP, _gold()], EMBER, 12)
 	if Session.inventory.is_empty():
-		_line(vb, "empty — creatures drop gear, essences and (from Elites) runes.", DIM)
+		_line(vb, ProtoLang.t("cp_bag_empty"), DIM)
 		return
 	# toolbar: filter chips + one-click sorts (bag organization — Ricardo)
 	var bar := HBoxContainer.new()
 	bar.add_theme_constant_override("separation", 4)
 	vb.add_child(bar)
-	for f in [["all", "All"], ["gear", "Gear"], ["rune", "Runes"], ["material", "Mats"]]:
+	for f in [["all", "flt_all"], ["gear", "flt_gear"], ["rune", "flt_runes"],
+			["material", "flt_mats"]]:
 		var fb := Button.new()
-		fb.text = str(f[1])
+		fb.text = ProtoLang.t(str(f[1]))
 		fb.focus_mode = Control.FOCUS_NONE
 		fb.add_theme_font_size_override("font_size", 9)
 		if _bag_filter == str(f[0]):
@@ -246,11 +322,11 @@ func _refresh_bag() -> void:
 	var gap := Control.new()
 	gap.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	bar.add_child(gap)
-	for srt in [["rarity", "rarity"], ["power", "power"], ["slot", "slot"]]:
+	for srt in [["rarity", "srt_rarity"], ["power", "srt_power"], ["slot", "srt_slot"]]:
 		var sb2 := Button.new()
-		sb2.text = str(srt[1])
+		sb2.text = ProtoLang.t(str(srt[1]))
 		sb2.focus_mode = Control.FOCUS_NONE
-		sb2.tooltip_text = "sort the bag by %s" % str(srt[0])
+		sb2.tooltip_text = ProtoLang.t("cp_sort_tip") % ProtoLang.t(str(srt[1]))
 		sb2.add_theme_font_size_override("font_size", 9)
 		sb2.add_theme_color_override("font_color", DIM)
 		sb2.pressed.connect(_sort_bag.bind(str(srt[0])))
@@ -320,7 +396,8 @@ func _sort_bag(key: String) -> void:
 # Inspect popup: affixes, enchant, vs-equipped stat diff, equip/sell actions.
 func _bag_detail(vb: VBoxContainer, item: Dictionary) -> void:
 	_line(vb, "— %s —" % _iname(item), _rcolor(item), 11)
-	_line(vb, "%s %s" % [str(item.get("rarity", "?")), str(item.get("slot", "?"))], DIM, 9)
+	_line(vb, "%s %s" % [ProtoLang.term("rarity", str(item.get("rarity", "?"))),
+			ProtoLang.term("slot", str(item.get("slot", "?"))).to_lower()], DIM, 9)
 	var slot := str(item.get("slot", ""))
 	var equipped: Dictionary = Session.equipment.get(slot, {}) \
 			if ProtoItems.GEAR_SLOTS.has(slot) else {}
@@ -332,7 +409,7 @@ func _bag_detail(vb: VBoxContainer, item: Dictionary) -> void:
 		var cols := HBoxContainer.new()
 		cols.add_theme_constant_override("separation", 10)
 		vb.add_child(cols)
-		for pair in [[item, "SELECTED"], [equipped, "EQUIPPED"]]:
+		for pair in [[item, ProtoLang.t("cp_selected")], [equipped, ProtoLang.t("cp_equipped")]]:
 			var it2: Dictionary = pair[0]
 			var col := VBoxContainer.new()
 			col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -344,7 +421,7 @@ func _bag_detail(vb: VBoxContainer, item: Dictionary) -> void:
 			head.add_theme_color_override("font_color", DIM)
 			col.add_child(head)
 			var nm := Label.new()
-			nm.text = "%s · pw %d" % [_iname(it2), ProtoItems.power(it2)]
+			nm.text = ProtoLang.t("cp_pw") % [_iname(it2), ProtoItems.power(it2)]
 			nm.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 			nm.add_theme_font_size_override("font_size", 9)
 			nm.add_theme_color_override("font_color", _rcolor(it2))
@@ -362,29 +439,30 @@ func _bag_detail(vb: VBoxContainer, item: Dictionary) -> void:
 		hypo[slot] = item
 		var cur := ProtoStats.compute(Session)
 		var alt := ProtoStats.compute(Session, hypo)
-		var rows := [["max HP", "max_hp", 1.0], ["melee dmg", "melee_damage", 1.0],
-				["rend dmg", "rend_damage", 1.0], ["crit %", "crit_chance", 100.0],
-				["move %", "move_speed_mult", 100.0], ["armor", "armor", 1.0],
-				["resist %", "resist_pct", 100.0]]
+		var rows := [["cmp_max_hp", "max_hp", 1.0], ["cmp_melee", "melee_damage", 1.0],
+				["cmp_rend", "rend_damage", 1.0], ["cmp_crit", "crit_chance", 100.0],
+				["cmp_move", "move_speed_mult", 100.0], ["cmp_armor", "armor", 1.0],
+				["cmp_resist", "resist_pct", 100.0]]
 		var any := false
 		for r in rows:
 			var d: float = (float(alt[r[1]]) - float(cur[r[1]])) * float(r[2])
 			if absf(d) < 0.05:
 				continue
 			any = true
-			_line(vb, "  %s %+.1f vs equipped" % [r[0], d], GREEN if d > 0.0 else RED, 9)
+			_line(vb, ProtoLang.t("cp_vs_diff") % [ProtoLang.t(str(r[0])), d],
+					GREEN if d > 0.0 else RED, 9)
 		if not any:
-			_line(vb, "  no stat change vs equipped", DIM, 9)
+			_line(vb, ProtoLang.t("cp_no_change"), DIM, 9)
 	elif slot == "rune":
-		_line(vb, "socket it on a skill — Skills tab", VIOLET, 9)
+		_line(vb, ProtoLang.t("cp_rune_hint"), VIOLET, 9)
 	elif slot == "material":
-		_line(vb, "spend it at the Haven ENCHANTER", CYAN, 9)
+		_line(vb, ProtoLang.t("cp_mat_hint"), CYAN, 9)
 	var hb := HBoxContainer.new()
 	hb.add_theme_constant_override("separation", 6)
 	vb.add_child(hb)
 	if ProtoItems.GEAR_SLOTS.has(slot):
-		_btn(hb, "Equip", _do_equip.bind(int(item.get("uid", -1))), GOLD)
-	_btn(hb, "Sell %d g" % (ProtoItems.sell_price(item) * int(item.get("qty", 1))),
+		_btn(hb, ProtoLang.t("cp_equip"), _do_equip.bind(int(item.get("uid", -1))), GOLD)
+	_btn(hb, ProtoLang.t("cp_sell") % (ProtoItems.sell_price(item) * int(item.get("qty", 1))),
 			_do_sell.bind(int(item.get("uid", -1))))
 
 func _do_equip(uid: int) -> void:
@@ -410,16 +488,15 @@ func _do_sell(uid: int) -> void:
 func _refresh_attributes() -> void:
 	var vb: VBoxContainer = _boxes["Attributes"]
 	_clear(vb)
-	_line(vb, "Attributes — unspent points: %d" % Session.attribute_points, EMBER, 12)
-	_line(vb, ("Allocation is REAL (stats.gd): +5 points per level, 1 level per " +
-			"20 kills (proposal). Prototype allows refunds down to base %d.") % [
-			Session.BASE_ATTRIBUTE], DIM, 9)
+	_line(vb, ProtoLang.t("cp_attr_header") % Session.attribute_points, EMBER, 12)
+	_line(vb, ProtoLang.t("cp_attr_note") % [Session.BASE_ATTRIBUTE], DIM, 9)
 	for attr in Session.ATTRIBUTES:
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 4)
 		vb.add_child(row)
 		var nl := Label.new()
-		nl.text = "%s  (%s)" % [str(attr).capitalize(), ATTR_FX[attr]]
+		nl.text = "%s  (%s)" % [ProtoLang.t("attr_" + str(attr)),
+				ProtoLang.t("fxs_" + str(attr))]
 		nl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		nl.add_theme_font_size_override("font_size", 9)
 		nl.add_theme_color_override("font_color", PALE)
@@ -455,177 +532,499 @@ func _adjust_attribute(attr: String, delta: int) -> void:
 	_refresh_gear()
 	_refresh_skills()
 
-# ---- Skills tab (numbers + rune sockets) -------------------------------------------------
+# ---- Skills tab: visual class tree + fixed detail card + base kit ---------------
 
 func _refresh_skills() -> void:
+	var s := ProtoStats.compute(Session)
+	_sk_points.text = ProtoLang.t("cp_skill_points") % Session.skill_points
+	_sk_points.tooltip_text = ProtoLang.t("cp_pts_tip")
+	_sk_class.text = ProtoLang.t("cp_class_tree") % Session.class_display()
+	var charge := Session.class_charge()
+	_sk_charge.visible = not charge.is_empty()
+	if not charge.is_empty():
+		_sk_charge.text = "◈ %s" % ProtoLang.pick(charge, "name")
+		_sk_charge.tooltip_text = ProtoLang.pick(charge, "desc")
+	_refresh_loadout()
 	var vb: VBoxContainer = _boxes["Skills"]
 	_clear(vb)
-	var s := ProtoStats.compute(Session)
-	var m := _main()
-	var owns_rend: bool = Session.stones >= 1 or (m != null and m.stones >= 1)
-	_line(vb, "Skills — %s" % Session.class_display(), EMBER, 12)
-	match str(s.get("class_kit", "melee")):   # each class wears its own kit
-		"mage":
-			_skill_card(vb, "cleave", "Arcane Bolt  (LMB)", Color("b48cff"),
-					"%d dmg · %.2f s cd · ranged umbral bolt · crit %d%%" % [
-					int(round(s.melee_damage * 0.9)), 0.55 / s.attack_speed_mult,
-					int(s.crit_chance * 100.0)])
-			_skill_card(vb, "", "Frost Nova  (E)", Color("9fd4ff"),
-					"%d dmg · 5 s cd · 2.8 m radial · hard Chill" % [
-					int(round(s.melee_damage * 0.7 * s.skill_damage_mult))])
-		"rogue":
-			_skill_card(vb, "cleave", "Swift Stab  (LMB)", PALE,
-					"%d dmg · %.2f s cd · 60 deg · 1.8 m · crit %d%%" % [
-					int(round(s.melee_damage * 0.8)), 0.25 / s.attack_speed_mult,
-					int(s.crit_chance * 100.0)])
-			_skill_card(vb, "", "Fan of Knives  (E)", Color("cdd6dd"),
-					"5 x %d dmg · 4.5 s cd · piercing steel fan" % [
-					int(round(s.melee_damage * 0.5))])
-		_:
-			_skill_card(vb, "cleave", "Cleave  (LMB)", PALE,
-					"%d dmg · %.2f s cd · 110 deg · 2.2 m · crit %d%%" % [
-					int(round(s.melee_damage)), 0.4 / s.attack_speed_mult,
-					int(s.crit_chance * 100.0)])
-			_skill_card(vb, "", "Whirlwind  (E)", Color("9fd4ff"),
-					"%d dmg · 4 s cd · full circle · 2.6 m + shove" % [
-					int(round(s.melee_damage * 0.8))])
-	_skill_card(vb, "rend", "Shadow Rend  (Q)", VIOLET,
-			"%d dmg · 5 s cd · 130 deg · 2.2 m — umbral" % int(round(s.rend_damage)),
-			not owns_rend)
-	_skill_card(vb, "dodge", "Dodge  (Shift)", CYAN,
-			"4 m dash · 3 charges · %.2f s recharge — no i-frames" % s.dodge_recharge_s)
-	if not owns_rend:
-		_line(vb, "Shadow Rend awakens with a Bestial Skill stone (the first pack drops one).",
-				DIM, 9)
-	if _socket_for != "":
-		_socket_chooser(vb)
-	# ---- the class skill tree (skill_trees.json): learn + assign to keys 1-4 -----
-	_line(vb, "%s tree — skill points: %d (1 per level)" % [Session.class_display(),
-			Session.skill_points], EMBER, 11)
-	# hotbar chips: what 1-4 cast right now (click a filled chip to clear it)
-	var bar := HBoxContainer.new()
-	bar.add_theme_constant_override("separation", 4)
-	vb.add_child(bar)
+	_build_tree(vb, s)
+	_line(vb, ProtoLang.t("cp_tree_legend"), DIM, 7)
+	_build_base_kit(vb, s)
+	_refresh_detail(s)
+
+# Hotbar chips: what 1-4 cast right now (click a filled chip to clear it).
+func _refresh_loadout() -> void:
+	_clear(_sk_loadout)
 	for i in 4:
 		var d := Session.skill_def(str(Session.skill_loadout[i]))
 		var b := Button.new()
 		b.focus_mode = Control.FOCUS_NONE
-		b.add_theme_font_size_override("font_size", 9)
+		b.add_theme_font_size_override("font_size", 8)
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		b.clip_text = true
 		if d.is_empty():
-			b.text = "%d · —" % (i + 1)
+			b.text = "%d ·  —" % (i + 1)
 			b.add_theme_color_override("font_color", DIM)
-			b.tooltip_text = "empty — learn an active below, then tap its %d chip" % (i + 1)
+			b.tooltip_text = ProtoLang.t("cp_slot_empty_tip") % (i + 1)
 		else:
-			b.text = "%d · %s" % [i + 1, str(d.get("name", "?"))]
+			b.text = "%d · %s" % [i + 1, ProtoLang.pick(d, "name", "?")]
 			b.add_theme_color_override("font_color", GOLD)
-			b.tooltip_text = "casts on key %d — click to clear the slot" % (i + 1)
+			b.tooltip_text = ProtoLang.t("cp_slot_cast_tip") % (i + 1)
 			b.pressed.connect(_do_assign.bind(i, ""))
-		bar.add_child(b)
-	var charge := Session.class_charge()
-	if not charge.is_empty():
-		_line(vb, "◈ %s — %s" % [str(charge.get("name", "")),
-				str(charge.get("desc", ""))], VIOLET, 8)
+			var sb := ProtoTheme.chip_box(GOLD, 0.10)
+			b.add_theme_stylebox_override("normal", sb)
+			b.add_theme_stylebox_override("hover", ProtoTheme.chip_box(GOLD, 0.2))
+			b.add_theme_stylebox_override("pressed", sb)
+		_sk_loadout.add_child(b)
+
+# The tree proper: one root chip on top, then a column ("lane") per branch with
+# prerequisite connectors drawn top-to-bottom by the TreeCanvas underneath.
+func _build_tree(vb: Container, s: Dictionary) -> void:
+	var branches: Array = []
+	var root_node := {}
 	for br in Session.class_branches():
 		var nodes: Array = br.get("nodes", [])
 		if nodes.size() == 1 and int(nodes[0].get("cost", 1)) <= 0:
-			continue   # the free root branch needs no rows
-		_line(vb, "— %s —" % str(br.get("name", "?")), EMBER, 10)
-		for node in nodes:
-			_tree_node_row(vb, node, s)
-	_line(vb, "◆ active (assign to 1-4) · ○ passive · ⟡ synergy — hover any node " +
-			"for numbers. Runes drop from Elites — click a socket chip to slot one.",
-			DIM, 8)
+			root_node = nodes[0]
+			continue
+		branches.append(br)
+	if branches.is_empty():
+		_line(vb, ProtoLang.t("cp_no_tree"), DIM, 9)
+		return
+	var cols := branches.size()
+	var col_w := floorf(TREE_W / cols)
+	var chip_w := col_w - 5.0
+	var chip_h := 40.0
+	var row_h := chip_h + 14.0
+	var y0 := 44.0
+	var max_rows := 0
+	for br in branches:
+		max_rows = maxi(max_rows, (br.get("nodes", []) as Array).size())
+	var canvas := TreeCanvas.new()
+	canvas.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	canvas.custom_minimum_size = Vector2(TREE_W, y0 + max_rows * row_h)
+	vb.add_child(canvas)
+	var root_w := 110.0
+	var root_pos := Vector2((TREE_W - root_w) * 0.5, 0.0)
+	if not root_node.is_empty():
+		_tree_chip(canvas, root_node, s, Rect2(root_pos, Vector2(root_w, 24.0)), true)
+	for ci in cols:
+		var br: Dictionary = branches[ci]
+		var cx := ci * col_w
+		var hl := Label.new()
+		hl.text = ProtoLang.pick(br, "name", "?").to_upper()
+		hl.position = Vector2(cx, 31.0)
+		hl.size = Vector2(col_w - 2.0, 10.0)
+		hl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		hl.clip_text = true
+		hl.add_theme_font_size_override("font_size", 7)
+		hl.add_theme_color_override("font_color", EMBER)
+		hl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		canvas.add_child(hl)
+		var nodes: Array = br.get("nodes", [])
+		for ni in nodes.size():
+			var node: Dictionary = nodes[ni]
+			var rect := Rect2(Vector2(cx + (col_w - chip_w) * 0.5, y0 + ni * row_h),
+					Vector2(chip_w, chip_h))
+			var st := _tree_chip(canvas, node, s, rect, false)
+			var from := Vector2(root_pos.x + root_w * 0.5, 24.0) if ni == 0 \
+					else Vector2(rect.position.x + chip_w * 0.5,
+							y0 + (ni - 1) * row_h + chip_h)
+			canvas.add_edge(from,
+					Vector2(rect.position.x + chip_w * 0.5, rect.position.y), st)
 
-# One tree node = one compact row: state glyph + name (tooltip carries desc,
-# synergy and live numbers — no text walls), then Learn or the 1-4 assign chips.
-func _tree_node_row(vb: Container, node: Dictionary, s: Dictionary) -> void:
+# One node = one chip: kind icon (element-tinted), name, state microline.
+# learned = lit ember · learnable-now = pulsing gold border · locked = dim + lock.
+func _tree_chip(canvas: TreeCanvas, node: Dictionary, s: Dictionary, rect: Rect2,
+		is_root: bool) -> Dictionary:
 	var id := str(node.get("id", ""))
-	var cost := int(node.get("cost", 1))
-	if cost <= 0:
-		return   # free roots aren't rows
+	var st := _node_state(node)
+	var accent := _node_accent(node)
+	var b := Button.new()
+	b.focus_mode = Control.FOCUS_NONE
+	b.position = rect.position
+	b.size = rect.size
+	b.tooltip_text = "(node %s)\n%s" % [id, _node_tooltip(node, s)]
+	b.pressed.connect(_select_node.bind(id))
+	var sel := _sel_node == id
+	var sb := StyleBoxFlat.new()
+	sb.set_corner_radius_all(3)
+	sb.set_border_width_all(2 if sel else 1)
+	var base_border: Color
+	if st.learned:
+		sb.bg_color = Color(0.16, 0.11, 0.05, 0.95)
+		base_border = EMBER
+	elif st.learnable:
+		sb.bg_color = Color(0.10, 0.14, 0.17)
+		base_border = GOLD
+	elif st.open:   # gates met, no points banked
+		sb.bg_color = Color(0.075, 0.105, 0.14)
+		base_border = Color(0.45, 0.4, 0.25)
+	else:
+		sb.bg_color = Color(0.05, 0.07, 0.095)
+		base_border = Color(0.13, 0.17, 0.21)
+	sb.border_color = Color(0.92, 0.88, 0.78) if sel else base_border
+	var hover := sb.duplicate() as StyleBoxFlat
+	hover.bg_color = sb.bg_color.lightened(0.07)
+	b.add_theme_stylebox_override("normal", sb)
+	b.add_theme_stylebox_override("hover", hover)
+	b.add_theme_stylebox_override("pressed", sb)
+	b.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
+	if st.learnable and not sel:   # the "you can learn this NOW" pulse
+		canvas.pulse_boxes.append({"sb": sb, "a": base_border, "b": Color(1.0, 0.93, 0.62)})
+		canvas.pulse_boxes.append({"sb": hover, "a": base_border, "b": Color(1.0, 0.93, 0.62)})
+	canvas.add_child(b)
+	var locked: bool = not (st.learned or st.learnable or st.open)
+	if is_root:
+		var rl := Label.new()
+		rl.text = ProtoLang.t("cp_free_root") % ProtoLang.pick(node, "name", "?")
+		rl.position = Vector2(0, 0)
+		rl.size = rect.size
+		rl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		rl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		rl.clip_text = true
+		rl.add_theme_font_size_override("font_size", 8)
+		rl.add_theme_color_override("font_color", GOLD)
+		rl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		b.add_child(rl)
+		return st
+	var icon := TextureRect.new()
+	icon.texture = _kind_icon(_node_kind_key(node), accent)
+	icon.position = Vector2((rect.size.x - 16.0) * 0.5, 2.0)
+	icon.size = Vector2(16, 16)
+	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	if locked:
+		icon.modulate = Color(1, 1, 1, 0.4)
+	b.add_child(icon)
+	if locked:
+		var lock := TextureRect.new()
+		lock.texture = _lock_tex()
+		lock.position = icon.position + Vector2(11.0, 9.0)
+		lock.size = Vector2(8, 8)
+		lock.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		b.add_child(lock)
+	var nl := Label.new()
+	nl.text = ProtoLang.pick(node, "name", "?")
+	nl.position = Vector2(1.0, 19.0)
+	nl.size = Vector2(rect.size.x - 2.0, 9.0)
+	nl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	nl.clip_text = true
+	nl.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	nl.add_theme_font_size_override("font_size", 7)
+	nl.add_theme_color_override("font_color",
+			GOLD if st.learned else (Color(0.93, 0.91, 0.84) if st.learnable
+			else (PALE if st.open else DIM)))
+	nl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	b.add_child(nl)
+	var micro := Label.new()
+	if st.learned:
+		micro.text = ProtoLang.t("cp_learned")
+		micro.add_theme_color_override("font_color", ProtoTheme.EMBER_DIM)
+	elif st.learnable:
+		micro.text = ProtoLang.t("cp_learn_pt") % st.cost
+		micro.add_theme_color_override("font_color", GOLD)
+	elif st.open:
+		micro.text = ProtoLang.t("cp_pt") % st.cost
+		micro.add_theme_color_override("font_color", DIM)
+	elif not st.lvl_ok:
+		micro.text = ProtoLang.t("cp_level_req") % int(node.get("min_level", 1))
+		micro.add_theme_color_override("font_color", Color(0.8, 0.45, 0.4))
+	else:
+		micro.text = ProtoLang.t("cp_needs") % ", ".join(st.req_names)
+		micro.add_theme_color_override("font_color", DIM)
+	micro.position = Vector2(1.0, 29.0)
+	micro.size = Vector2(rect.size.x - 2.0, 9.0)
+	micro.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	micro.clip_text = true
+	micro.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	micro.add_theme_font_size_override("font_size", 7)
+	micro.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	b.add_child(micro)
+	return st
+
+# Learn/level/point gates for one node — single source for chips, edges and card.
+func _node_state(node: Dictionary) -> Dictionary:
 	var learned := Session.def_learned(node)
-	var reqs_met := true
 	var req_names: Array[String] = []
+	var reqs_met := true
 	for r in node.get("requires", []):
 		var rdef := Session.skill_def(str(r))
 		if not (Session.node_learned(str(r)) \
 				or (not rdef.is_empty() and Session.def_learned(rdef))):
 			reqs_met = false
-			req_names.append(str(rdef.get("name", r)))
+			req_names.append(ProtoLang.pick(rdef, "name", str(r)))
 	var lvl_ok := Session.level >= int(node.get("min_level", 1))
+	var cost := int(node.get("cost", 1))
+	var afford := Session.skill_points >= cost
+	return {"learned": learned, "reqs_met": reqs_met, "lvl_ok": lvl_ok,
+			"afford": afford, "req_names": req_names, "cost": cost,
+			"learnable": not learned and reqs_met and lvl_ok and afford and cost > 0,
+			"open": not learned and reqs_met and lvl_ok and not afford and cost > 0}
+
+# Element accent for a node: explicit element > first applied status > neutral.
+func _node_accent(node: Dictionary) -> Color:
+	var p: Dictionary = node.get("params", {})
+	var elem := str(p.get("element", ""))
+	if ELEM_COLORS.has(elem):
+		return ELEM_COLORS[elem]
+	var applies: Array = node.get("applies", [])
+	if not applies.is_empty() and STATUS_COLORS.has(str(applies[0])):
+		return STATUS_COLORS[str(applies[0])]
+	if _node_kind_key(node) == "keystone":
+		return GOLD
+	return PALE
+
+# Icon key: actives use their executor kind; passives split plain vs keystone
+# (the tradeoff passive — any negative stat mod marks it).
+func _node_kind_key(node: Dictionary) -> String:
+	if str(node.get("type", "")) == "active":
+		return str(node.get("kind", "melee_arc"))
+	for m in node.get("stat_mods", []):
+		if float(m.get("value", 0)) < 0.0:
+			return "keystone"
+	return "passive"
+
+func _select_node(id: String) -> void:
+	_sel_node = "" if _sel_node == id else id
+	_refresh_skills()
+
+# The fixed detail card at the bottom of the tab: identity, live numbers,
+# synergy, status chips, then Learn / assign-to-slot actions.
+func _refresh_detail(s: Dictionary) -> void:
+	_clear(_sk_detail_box)
+	var node := Session.skill_def(_sel_node)
+	if node.is_empty():
+		var hint := Label.new()
+		hint.text = ProtoLang.t("cp_detail_hint")
+		hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		hint.add_theme_font_size_override("font_size", 8)
+		hint.add_theme_color_override("font_color", DIM)
+		_sk_detail_box.add_child(hint)
+		return
+	var st := _node_state(node)
+	var accent := _node_accent(node)
 	var active := str(node.get("type", "")) == "active"
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 4)
-	vb.add_child(row)
-	var name_l := Label.new()
-	name_l.text = "%s %s%s" % ["◆" if active else "○", str(node.get("name", "?")),
-			"  ⟡" if node.has("synergy") else ""]
-	name_l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	name_l.add_theme_font_size_override("font_size", 10)
-	name_l.mouse_filter = Control.MOUSE_FILTER_STOP   # labels need this for tooltips
-	name_l.tooltip_text = _node_tooltip(node, s)
-	if learned:
-		name_l.add_theme_color_override("font_color", GOLD)
-	elif reqs_met and lvl_ok:
-		name_l.add_theme_color_override("font_color", PALE)
+	var head := HBoxContainer.new()
+	head.add_theme_constant_override("separation", 5)
+	_sk_detail_box.add_child(head)
+	var icon := TextureRect.new()
+	icon.texture = _kind_icon(_node_kind_key(node), accent)
+	icon.custom_minimum_size = Vector2(16, 16)
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_CENTERED
+	head.add_child(icon)
+	var nm := Label.new()
+	nm.text = ProtoLang.pick(node, "name", "?")
+	nm.add_theme_font_size_override("font_size", 11)
+	nm.add_theme_color_override("font_color", accent)
+	head.add_child(nm)
+	var kind_l := Label.new()
+	kind_l.text = "· %s" % ProtoLang.term("kind",
+			_node_kind_key(node) if not active else str(node.get("kind", "?"))).replace("_", " ")
+	kind_l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	kind_l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	kind_l.add_theme_font_size_override("font_size", 8)
+	kind_l.add_theme_color_override("font_color", DIM)
+	head.add_child(kind_l)
+	var elem := str((node.get("params", {}) as Dictionary).get("element", ""))
+	if ELEM_COLORS.has(elem):
+		_status_chip(head, ProtoLang.term("elem", elem), ELEM_COLORS[elem],
+				ProtoLang.t("elem_damage") % ProtoLang.term("elem", elem))
+	# live numbers (this character's StatBlock) or passive stat mods
+	if active:
+		var bits := _active_bits(node, s)
+		_detail_line(" · ".join(bits), PALE, 9)
 	else:
-		name_l.add_theme_color_override("font_color", DIM)
-	row.add_child(name_l)
-	if learned and active:   # assign chips: 1-4, gold = currently in that slot
+		var mods: Array[String] = []
+		for m in node.get("stat_mods", []):
+			mods.append("%s %+d" % [str(m.get("stat", "?")).replace("_", " "),
+					int(m.get("value", 0))])
+		if not mods.is_empty():
+			_detail_line(" · ".join(mods), PALE, 9)
+	var d := _detail_line(ProtoLang.pick(node, "desc"), DIM, 8)
+	d.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	d.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	d.max_lines_visible = 2
+	if node.has("synergy"):
+		_detail_line("⟡ %s" % ProtoLang.pick(node, "synergy"), GOLD, 8)
+	# status/mechanic chips: applies / consumes / bonus_vs / charge build+spend
+	var chips := HBoxContainer.new()
+	chips.add_theme_constant_override("separation", 3)
+	var statuses: Dictionary = Session.load_content("skill_trees").get("statuses", {})
+	for ap in node.get("applies", []):
+		var key := str(ap)
+		var sdef: Dictionary = statuses.get(key, {})
+		_status_chip(chips, ProtoLang.t("cp_applies") % ProtoLang.pick(sdef, "name", key),
+				STATUS_COLORS.get(key, PALE), ProtoLang.pick(sdef, "desc"))
+	for vs in node.get("bonus_vs", {}):
+		var key2: String = VS_TO_STATUS.get(str(vs), str(vs))
+		_status_chip(chips, ProtoLang.t("cp_x_vs") % [
+				String.num(float(node.bonus_vs[vs]), 2), ProtoLang.term("vs", str(vs))],
+				STATUS_COLORS.get(key2, PALE),
+				ProtoLang.t("cp_bonus_tip") % ProtoLang.term("vs", str(vs)))
+	for cs in node.get("consumes", []):
+		var key3 := str(cs)
+		_status_chip(chips, ProtoLang.t("cp_consumes") % ProtoLang.pick(
+				statuses.get(key3, {}) as Dictionary, "name", key3),
+				STATUS_COLORS.get(key3, PALE), ProtoLang.t("cp_consumes_tip"))
+	var charge := Session.class_charge()
+	if not charge.is_empty():
+		if int(node.get("charge_gain", 0)) > 0:
+			_status_chip(chips, "◈ +%d %s" % [int(node.charge_gain),
+					ProtoLang.pick(charge, "name")], VIOLET, ProtoLang.pick(charge, "desc"))
+		if bool(node.get("charge_spend", false)):
+			_status_chip(chips, ProtoLang.t("cp_charge_spend") % ProtoLang.pick(charge, "name"),
+					VIOLET, ProtoLang.pick(charge, "desc"))
+	if chips.get_child_count() > 0:
+		_sk_detail_box.add_child(chips)
+	# action row: Learn (with reason when gated) or the 1-4 assign chips
+	var act := HBoxContainer.new()
+	act.add_theme_constant_override("separation", 4)
+	_sk_detail_box.add_child(act)
+	var id := str(node.get("id", ""))
+	if int(node.get("cost", 1)) <= 0:
+		_action_note(act, ProtoLang.t("cp_free_root_note"), ProtoTheme.EMBER_DIM)
+	elif not st.learned:
+		var lb := Button.new()
+		lb.text = ProtoLang.t("cp_learn_btn") % st.cost
+		lb.tooltip_text = "learn " + id   # stable hook (click test) — stays EN
+		lb.focus_mode = Control.FOCUS_NONE
+		lb.add_theme_font_size_override("font_size", 9)
+		lb.add_theme_color_override("font_color", GOLD)
+		lb.disabled = not st.learnable
+		lb.pressed.connect(_do_learn.bind(id, st.cost))
+		act.add_child(lb)
+		if not st.reqs_met:
+			_action_note(act, ProtoLang.t("cp_needs") % ", ".join(st.req_names), RED)
+		elif not st.lvl_ok:
+			_action_note(act, ProtoLang.t("cp_unlock_note") % [
+					int(node.get("min_level", 1)), Session.level], RED)
+		elif not st.afford:
+			_action_note(act, ProtoLang.t("cp_no_points"), RED)
+	elif active:
+		_action_note(act, ProtoLang.t("cp_slot_label"), DIM)
 		for i in 4:
 			var here := str(Session.skill_loadout[i]) == id
 			var ab := Button.new()
 			ab.text = str(i + 1)
 			ab.focus_mode = Control.FOCUS_NONE
-			ab.custom_minimum_size = Vector2(20, 0)
-			ab.add_theme_font_size_override("font_size", 8)
+			ab.custom_minimum_size = Vector2(22, 0)
+			ab.add_theme_font_size_override("font_size", 9)
 			ab.add_theme_color_override("font_color", GOLD if here else DIM)
-			ab.tooltip_text = "assign %s to slot %d" % [str(node.get("name", "?")), i + 1]
+			if here:
+				ab.add_theme_stylebox_override("normal", ProtoTheme.chip_box(GOLD, 0.16))
+			ab.tooltip_text = ProtoLang.t("cp_assign_tip") % [ProtoLang.pick(node, "name", "?"), i + 1] \
+					if not here else ProtoLang.t("cp_on_key_tip") % (i + 1)
 			ab.pressed.connect(_do_assign.bind(i, "" if here else id))
-			row.add_child(ab)
-	elif not learned:
-		if reqs_met and lvl_ok and Session.skill_points >= cost:
-			var lb := _btn(row, "Learn (%d pt)" % cost, _do_learn.bind(id, cost), GOLD)
-			lb.tooltip_text = "learn " + id
-		else:
-			var why := "%d pt" % cost
-			if not reqs_met:
-				why = "needs " + ", ".join(req_names)
-			elif not lvl_ok:
-				why = "level %d" % int(node.get("min_level", 1))
-			var lk := Label.new()
-			lk.text = why
-			lk.add_theme_font_size_override("font_size", 8)
-			lk.add_theme_color_override("font_color", DIM)
-			row.add_child(lk)
+			act.add_child(ab)
+		_action_note(act, ProtoLang.t("cp_learned_active"), ProtoTheme.EMBER_DIM)
+	else:
+		_action_note(act, ProtoLang.t("cp_learned_passive"), ProtoTheme.EMBER_DIM)
+
+func _detail_line(text: String, color: Color, font_size: int) -> Label:
+	var l := Label.new()
+	l.text = text
+	l.add_theme_font_size_override("font_size", font_size)
+	l.add_theme_color_override("font_color", color)
+	_sk_detail_box.add_child(l)
+	return l
+
+func _action_note(parent: Container, text: String, color: Color) -> void:
+	var l := Label.new()
+	l.text = text
+	l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	l.add_theme_font_size_override("font_size", 8)
+	l.add_theme_color_override("font_color", color)
+	parent.add_child(l)
+
+# Small accent-tinted chip ("applies Ignite", "x1.5 vs Chilled", "◈ +1 Combo").
+func _status_chip(parent: Container, text: String, color: Color, tip := "") -> void:
+	var pc := PanelContainer.new()
+	pc.add_theme_stylebox_override("panel", ProtoTheme.chip_box(color))
+	if tip != "":
+		pc.tooltip_text = tip
+		pc.mouse_filter = Control.MOUSE_FILTER_STOP
+	var l := Label.new()
+	l.text = text
+	l.add_theme_font_size_override("font_size", 7)
+	l.add_theme_color_override("font_color", color.lerp(Color.WHITE, 0.35))
+	pc.add_child(l)
+	parent.add_child(pc)
+
+# The always-owned kit (LMB/E/Q/Shift) with its rune sockets, below the tree.
+func _build_base_kit(vb: Container, s: Dictionary) -> void:
+	var m := _main()
+	var owns_rend: bool = Session.stones >= 1 or (m != null and m.stones >= 1)
+	_line(vb, ProtoLang.t("cp_base_kit"), EMBER, 9)
+	match str(s.get("class_kit", "melee")):   # each class wears its own kit
+		"mage":
+			_skill_card(vb, "cleave", ProtoLang.t("kit_arcane_bolt"), Color("b48cff"),
+					ProtoLang.t("cp_kit_bolt_nums") % [
+					int(round(s.melee_damage * 0.9)), 0.55 / s.attack_speed_mult,
+					int(s.crit_chance * 100.0)])
+			_skill_card(vb, "", ProtoLang.t("kit_frost_nova"), Color("9fd4ff"),
+					ProtoLang.t("cp_kit_nova_nums") % [
+					int(round(s.melee_damage * 0.7 * s.skill_damage_mult))])
+		"rogue":
+			_skill_card(vb, "cleave", ProtoLang.t("kit_swift_stab"), PALE,
+					ProtoLang.t("cp_kit_stab_nums") % [
+					int(round(s.melee_damage * 0.8)), 0.25 / s.attack_speed_mult,
+					int(s.crit_chance * 100.0)])
+			_skill_card(vb, "", ProtoLang.t("kit_fan_knives"), Color("cdd6dd"),
+					ProtoLang.t("cp_kit_fan_nums") % [
+					int(round(s.melee_damage * 0.5))])
+		_:
+			_skill_card(vb, "cleave", ProtoLang.t("kit_cleave"), PALE,
+					ProtoLang.t("cp_kit_cleave_nums") % [
+					int(round(s.melee_damage)), 0.4 / s.attack_speed_mult,
+					int(s.crit_chance * 100.0)])
+			_skill_card(vb, "", ProtoLang.t("kit_whirlwind"), Color("9fd4ff"),
+					ProtoLang.t("cp_kit_whirl_nums") % [
+					int(round(s.melee_damage * 0.8))])
+	_skill_card(vb, "rend", ProtoLang.t("kit_shadow_rend"), VIOLET,
+			ProtoLang.t("cp_kit_rend_nums") % int(round(s.rend_damage)),
+			not owns_rend)
+	_skill_card(vb, "dodge", ProtoLang.t("kit_dodge"), CYAN,
+			ProtoLang.t("cp_kit_dodge_nums") % s.dodge_recharge_s)
+	if not owns_rend:
+		_line(vb, ProtoLang.t("cp_rend_stone_note"), DIM, 8)
+	if _socket_for != "":
+		_socket_chooser(vb)
+	_line(vb, ProtoLang.t("cp_runes_drop_note"), DIM, 7)
+
+# Live numbers for an active: damage from the CURRENT StatBlock, then geometry.
+func _active_bits(node: Dictionary, s: Dictionary) -> Array[String]:
+	var p: Dictionary = node.get("params", {})
+	var kind := str(node.get("kind", ""))
+	var dmg: float = s.melee_damage * float(p.get("mult", 1.0))
+	if not kind in ["melee_arc", "dash_strike"]:
+		dmg *= s.skill_damage_mult
+	var bits: Array[String] = []
+	if not kind in ["buff", "field"]:
+		bits.append(ProtoLang.t("cp_dmg") % int(round(dmg)))
+	if p.has("count"):
+		bits.append("x%d" % int(p.get("count")))
+	if p.has("jumps"):
+		bits.append(ProtoLang.t("cp_jumps") % int(p.get("jumps")))
+	if p.has("radius"):
+		bits.append("%.1f m" % float(p.get("radius")))
+	if p.has("reach"):
+		bits.append("%.1f m" % float(p.get("reach")))
+	if p.has("arc_deg"):
+		bits.append(ProtoLang.t("cp_deg") % int(p.get("arc_deg")))
+	if p.has("duration"):
+		bits.append("%.0f s" % float(p.get("duration")))
+	bits.append(ProtoLang.t("cp_cd") % (float(p.get("cd", 6.0)) * float(s.get("cdr_mult", 1.0))))
+	return bits
 
 # Tooltip: desc + synergy line + LIVE numbers (dmg from the current StatBlock).
 func _node_tooltip(node: Dictionary, s: Dictionary) -> String:
-	var lines: Array[String] = [str(node.get("desc", ""))]
+	var lines: Array[String] = [ProtoLang.pick(node, "desc")]
 	if node.has("synergy"):
-		lines.append("⟡ " + str(node.get("synergy")))
-	var p: Dictionary = node.get("params", {})
-	var kind := str(node.get("kind", ""))
+		lines.append("⟡ " + ProtoLang.pick(node, "synergy"))
 	if str(node.get("type", "")) == "active":
-		var dmg: float = s.melee_damage * float(p.get("mult", 1.0))
-		if not kind in ["melee_arc", "dash_strike"]:
-			dmg *= s.skill_damage_mult
-		var bits: Array[String] = [kind.replace("_", " ")]
-		if not kind in ["buff", "field"]:
-			bits.append("~%d dmg" % int(round(dmg)))
-		if p.has("count"):
-			bits.append("x%d" % int(p.get("count")))
-		if p.has("jumps"):
-			bits.append("%d jumps" % int(p.get("jumps")))
-		if p.has("radius"):
-			bits.append("%.1f m" % float(p.get("radius")))
-		if p.has("reach"):
-			bits.append("%.1f m" % float(p.get("reach")))
-		if p.has("duration"):
-			bits.append("%.0f s" % float(p.get("duration")))
-		bits.append("%.1f s cd" % (float(p.get("cd", 6.0))
-				* float(s.get("cdr_mult", 1.0))))
+		var bits: Array[String] = [
+			ProtoLang.term("kind", str(node.get("kind", ""))).replace("_", " ")]
+		bits.append_array(_active_bits(node, s))
 		lines.append(" · ".join(bits))
 	else:
 		var mods: Array[String] = []
@@ -634,7 +1033,7 @@ func _node_tooltip(node: Dictionary, s: Dictionary) -> String:
 					int(m.get("value", 0))])
 		if not mods.is_empty():
 			lines.append(" · ".join(mods))
-	lines.append("min level %d · cost %d pt" % [int(node.get("min_level", 1)),
+	lines.append(ProtoLang.t("cp_min_level") % [int(node.get("min_level", 1)),
 			int(node.get("cost", 1))])
 	return "\n".join(lines)
 
@@ -655,7 +1054,7 @@ func _skill_card(vb: Container, skill_key: String, title: String, color: Color,
 	left.add_theme_constant_override("separation", 1)
 	hb.add_child(left)
 	var t := Label.new()
-	t.text = title + ("   [locked]" if locked else "")
+	t.text = title + (ProtoLang.t("cp_locked") if locked else "")
 	t.add_theme_font_size_override("font_size", 11)
 	t.add_theme_color_override("font_color", DIM if locked else color)
 	left.add_child(t)
@@ -672,7 +1071,7 @@ func _skill_card(vb: Container, skill_key: String, title: String, color: Color,
 		sb.add_theme_font_size_override("font_size", 9)
 		sb.custom_minimum_size = Vector2(96, 0)
 		if r.is_empty():
-			sb.text = "◇ socket rune"
+			sb.text = ProtoLang.t("cp_socket_rune_chip")
 			sb.add_theme_color_override("font_color", DIM)
 		else:
 			sb.text = "◆ %s" % str(r.get("name", "?")).replace("Rune of ", "").replace("the ", "")
@@ -685,9 +1084,10 @@ func _skill_card(vb: Container, skill_key: String, title: String, color: Color,
 # Chooser: opened from a card's socket chip; lists bag runes + remove option.
 func _socket_chooser(vb: VBoxContainer) -> void:
 	var r: Dictionary = Session.skill_runes.get(_socket_for, {})
-	_line(vb, "— socket on %s —" % _socket_for.capitalize(), VIOLET, 10)
+	_line(vb, ProtoLang.t("cp_socket_on") % ProtoLang.term("sock", _socket_for), VIOLET, 10)
 	if not r.is_empty():
-		_btn(vb, "remove ◆ %s" % str(r.get("name", "?")), _do_unsocket_pick, RED)
+		_btn(vb, ProtoLang.t("cp_remove_rune") % str(r.get("name", "?")),
+				_do_unsocket_pick, RED)
 	var any := false
 	for it in Session.inventory:
 		if str(it.get("slot", "")) != "rune":
@@ -697,7 +1097,7 @@ func _socket_chooser(vb: VBoxContainer) -> void:
 				str(it.get("rune_key", ""))).get("desc", ""))],
 				_do_socket_pick.bind(int(it.get("uid", -1))), VIOLET)
 	if not any and r.is_empty():
-		_line(vb, "no runes in the bag — Elites drop them.", DIM, 9)
+		_line(vb, ProtoLang.t("cp_no_runes"), DIM, 9)
 
 func _open_socket_chooser(skill: String) -> void:
 	_socket_for = "" if _socket_for == skill else skill
@@ -720,25 +1120,15 @@ func _do_learn(node: String, cost := 1) -> void:
 		_apply_live()
 	refresh()
 
-func _do_socket(skill: String, uid: int) -> void:
-	if Session.socket_rune(skill, uid):
-		_apply_live()
-	refresh()
-
-func _do_unsocket(skill: String) -> void:
-	if Session.unsocket_rune(skill):
-		_apply_live()
-	refresh()
-
 # ---- Pets tab (3 slots, canon §3) ----------------------------------------------------------
 
 func _refresh_pets() -> void:
 	var vb: VBoxContainer = _boxes["Pets"]
 	_clear(vb)
-	_line(vb, "Pets — %d/%d bonded" % [Session.pets.size(), Session.MAX_PETS], EMBER, 12)
+	_line(vb, ProtoLang.t("cp_pets_header") % [Session.pets.size(), Session.MAX_PETS],
+			EMBER, 12)
 	if Session.pets.is_empty():
-		_line(vb, "none bonded — weaken a Gloamfen Stalker below 35% HP and press F " +
-				"with a Soul Snare (stalkers drop them)", DIM)
+		_line(vb, ProtoLang.t("cp_pets_none"), DIM)
 	for pet in Session.pets:
 		var resting := false
 		for n in get_tree().get_nodes_in_group("pet"):
@@ -754,18 +1144,18 @@ func _refresh_pets() -> void:
 		cv.add_child(hb)
 		var nl := Label.new()
 		nl.text = "%s   %s" % [str(pet.get("name", "?")),
-				"· resting" if resting else "· on the hunt"]
+				ProtoLang.t("cp_resting") if resting else ProtoLang.t("cp_on_hunt")]
 		nl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		nl.add_theme_font_size_override("font_size", 11)
 		nl.add_theme_color_override("font_color",
 				Color("ff8a7a") if resting else CYAN)
 		hb.add_child(nl)
-		_btn(hb, "→ stables", _do_stable.bind(int(pet.get("uid", 0))))
+		_btn(hb, ProtoLang.t("cp_to_stables"), _do_stable.bind(int(pet.get("uid", 0))))
 		var skills: Array[String] = []
 		for sk in pet.get("skills", []):
 			skills.append(_pretty_id(str(sk)))
 		var det := Label.new()
-		det.text = "roll %d%%  ·  %s" % [int(pet.get("roll_pct", 100)),
+		det.text = ProtoLang.t("cp_pet_roll") % [int(pet.get("roll_pct", 100)),
 				" · ".join(skills)]
 		det.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		det.add_theme_font_size_override("font_size", 9)
@@ -773,7 +1163,7 @@ func _refresh_pets() -> void:
 		cv.add_child(det)
 	# The stables (Ricardo: pets are NEVER abandoned) — overflow captures land here.
 	if not Session.stables.is_empty():
-		_line(vb, "STABLES — %d resting" % Session.stables.size(), EMBER, 11)
+		_line(vb, ProtoLang.t("cp_stables_header") % Session.stables.size(), EMBER, 11)
 		var room := Session.pets.size() < Session.MAX_PETS
 		for pet in Session.stables:
 			var card := PanelContainer.new()
@@ -785,19 +1175,19 @@ func _refresh_pets() -> void:
 			for sk in pet.get("skills", []):
 				skills.append(_pretty_id(str(sk)))
 			var nl := Label.new()
-			nl.text = "%s\nroll %d%%  ·  %s" % [str(pet.get("name", "?")),
+			nl.text = ProtoLang.t("cp_stable_row") % [str(pet.get("name", "?")),
 					int(pet.get("roll_pct", 100)), " · ".join(skills)]
 			nl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 			nl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			nl.add_theme_font_size_override("font_size", 9)
 			nl.add_theme_color_override("font_color", PALE)
 			hb.add_child(nl)
-			var b := _btn(hb, "make active", _do_activate.bind(int(pet.get("uid", 0))), CYAN)
+			var b := _btn(hb, ProtoLang.t("cp_make_active"),
+					_do_activate.bind(int(pet.get("uid", 0))), CYAN)
 			b.disabled = not room
 			if not room:
-				b.tooltip_text = "active pack is full — stable one first"
-	_line(vb, "Overflow captures STABLE the oldest bond — pets are never abandoned " +
-			"and never die (they rest 15 s, and respawn with you).", DIM, 9)
+				b.tooltip_text = ProtoLang.t("cp_pack_full_tip")
+	_line(vb, ProtoLang.t("cp_stables_note"), DIM, 9)
 
 func _do_stable(uid: int) -> void:
 	for pet in Session.pets:
@@ -826,10 +1216,9 @@ func _do_activate(uid: int) -> void:
 func _refresh_mounts() -> void:
 	var vb: VBoxContainer = _boxes["Mounts"]
 	_clear(vb)
-	_line(vb, "Mounts — press M on the hunt to ride", EMBER, 12)
+	_line(vb, ProtoLang.t("cp_mounts_header"), EMBER, 12)
 	if Session.mounts.is_empty():
-		_line(vb, "none owned — the Haven VENDOR sells the Gloam Strider (walking); " +
-				"a FLYING drakeling is said to nest with the Emberwing Matriarch.", DIM)
+		_line(vb, ProtoLang.t("cp_mounts_none"), DIM)
 		return
 	for m in Session.mounts:
 		var active := int(m.get("uid", -1)) == Session.active_mount
@@ -838,18 +1227,18 @@ func _refresh_mounts() -> void:
 		hb.add_theme_constant_override("separation", 6)
 		vb.add_child(hb)
 		var nl := Label.new()
-		nl.text = "%s — %s · x%.1f speed%s" % [str(m.get("name", "?")),
-				"FLYING" if flying else "walking", float(m.get("speed_mult", 1.0)),
-				"   ← active" if active else ""]
+		nl.text = ProtoLang.t("cp_mount_row") % [str(m.get("name", "?")),
+				ProtoLang.t("cp_flying") if flying else ProtoLang.t("cp_walking"),
+				float(m.get("speed_mult", 1.0)),
+				ProtoLang.t("cp_active_tag") if active else ""]
 		nl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		nl.add_theme_font_size_override("font_size", 10)
 		nl.add_theme_color_override("font_color",
 				ProtoItems.rarity_color(str(m.get("rarity", "common"))))
 		hb.add_child(nl)
 		if not active:
-			_btn(hb, "select", _do_select_mount.bind(int(m.get("uid", -1))), CYAN)
-	_line(vb, "Walking mounts respect terrain; FLYING mounts cross water and rock " +
-			"(land on solid ground). Attacking or taking damage dismounts you.", DIM, 9)
+			_btn(hb, ProtoLang.t("cp_select"), _do_select_mount.bind(int(m.get("uid", -1))), CYAN)
+	_line(vb, ProtoLang.t("cp_mounts_note"), DIM, 9)
 
 func _do_select_mount(uid: int) -> void:
 	Session.active_mount = uid
@@ -861,3 +1250,179 @@ func _sync_hunt_pets() -> void:
 	var m := _main()
 	if m and m.has_method("sync_pet_nodes"):
 		m.sync_pet_nodes()
+
+# ---- kind icons: tiny code-drawn glyphs, one per executor kind (ProtoSprites
+# style — no external assets). Cached per kind+accent. ----------------------------
+
+static var _kicon_cache := {}
+static var _lock_cache: ImageTexture = null
+
+static func _ipx(img: Image, x: int, y: int, c: Color) -> void:
+	if x >= 0 and y >= 0 and x < img.get_width() and y < img.get_height():
+		img.set_pixel(x, y, c)
+
+static func _iline(img: Image, a: Vector2i, b: Vector2i, c: Color) -> void:
+	var steps := maxi(absi(b.x - a.x), absi(b.y - a.y))
+	if steps == 0:
+		_ipx(img, a.x, a.y, c)
+		return
+	for i in steps + 1:
+		var t := float(i) / steps
+		_ipx(img, roundi(lerpf(a.x, b.x, t)), roundi(lerpf(a.y, b.y, t)), c)
+
+static func _iarc(img: Image, cx: float, cy: float, rx: float, ry: float, c: Color,
+		a0 := 0.0, a1 := TAU) -> void:
+	var n := int(maxf(10.0, maxf(rx, ry) * 8.0))
+	for i in n + 1:
+		var ang := a0 + (a1 - a0) * float(i) / n
+		_ipx(img, roundi(cx + cos(ang) * rx), roundi(cy + sin(ang) * ry), c)
+
+static func _idot(img: Image, cx: int, cy: int, r: int, c: Color) -> void:
+	for y in range(cy - r, cy + r + 1):
+		for x in range(cx - r, cx + r + 1):
+			if Vector2(x - cx, y - cy).length() <= r + 0.2:
+				_ipx(img, x, y, c)
+
+static func _kind_icon(kind: String, accent: Color) -> ImageTexture:
+	var key := kind + accent.to_html()
+	if _kicon_cache.has(key):
+		return _kicon_cache[key]
+	var img := Image.create(16, 16, false, Image.FORMAT_RGBA8)
+	img.fill(Color(0, 0, 0, 0))
+	var core := accent.lerp(Color.WHITE, 0.55)
+	var faint := Color(accent.r, accent.g, accent.b, 0.45)
+	match kind:
+		"projectile":   # bolt streaking right
+			_iline(img, Vector2i(2, 8), Vector2i(7, 8), accent)
+			_iline(img, Vector2i(3, 6), Vector2i(6, 6), faint)
+			_iline(img, Vector2i(3, 10), Vector2i(6, 10), faint)
+			_idot(img, 11, 8, 2, accent)
+			_ipx(img, 11, 8, core)
+			_ipx(img, 12, 7, core)
+		"nova":         # ring bursting outward
+			_iarc(img, 8, 8, 4.6, 4.6, accent)
+			_idot(img, 8, 8, 1, core)
+			_iline(img, Vector2i(8, 1), Vector2i(8, 2), core)
+			_iline(img, Vector2i(8, 13), Vector2i(8, 14), core)
+			_iline(img, Vector2i(1, 8), Vector2i(2, 8), core)
+			_iline(img, Vector2i(13, 8), Vector2i(14, 8), core)
+			for p in [Vector2i(3, 3), Vector2i(12, 3), Vector2i(3, 12), Vector2i(12, 12)]:
+				_ipx(img, p.x, p.y, faint)
+		"cone":         # fan opening from the apex
+			_iline(img, Vector2i(2, 8), Vector2i(13, 3), accent)
+			_iline(img, Vector2i(2, 8), Vector2i(13, 13), accent)
+			_iline(img, Vector2i(2, 8), Vector2i(12, 8), faint)
+			_iarc(img, 2, 8, 11.0, 11.0, core, -0.4, 0.4)
+		"melee_arc":    # slash crescent
+			_iarc(img, 5, 8, 6.2, 6.2, accent, -0.95, 0.95)
+			_iarc(img, 5, 8, 5.0, 5.0, faint, -0.8, 0.8)
+			_iline(img, Vector2i(12, 8), Vector2i(13, 8), core)
+		"dash_strike":  # arrow with speed lines
+			_iline(img, Vector2i(2, 8), Vector2i(11, 8), accent)
+			_iline(img, Vector2i(12, 8), Vector2i(9, 5), accent)
+			_iline(img, Vector2i(12, 8), Vector2i(9, 11), accent)
+			_ipx(img, 13, 8, core)
+			_iline(img, Vector2i(2, 5), Vector2i(5, 5), faint)
+			_iline(img, Vector2i(2, 11), Vector2i(5, 11), faint)
+		"buff":         # rising chevrons
+			_iline(img, Vector2i(3, 9), Vector2i(8, 4), accent)
+			_iline(img, Vector2i(8, 4), Vector2i(13, 9), accent)
+			_iline(img, Vector2i(3, 13), Vector2i(8, 8), faint)
+			_iline(img, Vector2i(8, 8), Vector2i(13, 13), faint)
+			_ipx(img, 8, 2, core)
+		"field":        # ground ellipse with motes rising
+			_iarc(img, 8, 11, 5.5, 2.6, accent)
+			_iarc(img, 8, 11, 3.2, 1.4, faint)
+			_idot(img, 6, 6, 1, core)
+			_ipx(img, 9, 4, core)
+			_ipx(img, 11, 7, faint)
+		"chain":        # jolt jumping between marks
+			_iline(img, Vector2i(2, 11), Vector2i(6, 6), accent)
+			_iline(img, Vector2i(6, 6), Vector2i(9, 10), accent)
+			_iline(img, Vector2i(9, 10), Vector2i(13, 4), accent)
+			for p in [Vector2i(2, 11), Vector2i(6, 6), Vector2i(9, 10), Vector2i(13, 4)]:
+				_idot(img, p.x, p.y, 1, core)
+		"keystone":     # the tradeoff diamond
+			_iline(img, Vector2i(8, 2), Vector2i(14, 8), accent)
+			_iline(img, Vector2i(14, 8), Vector2i(8, 14), accent)
+			_iline(img, Vector2i(8, 14), Vector2i(2, 8), accent)
+			_iline(img, Vector2i(2, 8), Vector2i(8, 2), accent)
+			_iline(img, Vector2i(8, 5), Vector2i(11, 8), faint)
+			_iline(img, Vector2i(11, 8), Vector2i(8, 11), faint)
+			_iline(img, Vector2i(8, 11), Vector2i(5, 8), faint)
+			_iline(img, Vector2i(5, 8), Vector2i(8, 5), faint)
+			_ipx(img, 8, 8, core)
+		_:              # passive: quiet ring
+			_iarc(img, 8, 8, 3.4, 3.4, accent)
+			_ipx(img, 8, 8, faint)
+	var tex := ImageTexture.create_from_image(img)
+	_kicon_cache[key] = tex
+	return tex
+
+# 8x8 padlock for gated nodes.
+static func _lock_tex() -> ImageTexture:
+	if _lock_cache != null:
+		return _lock_cache
+	var img := Image.create(8, 8, false, Image.FORMAT_RGBA8)
+	img.fill(Color(0, 0, 0, 0))
+	var body := Color(0.82, 0.78, 0.68)
+	var dark := Color(0.45, 0.42, 0.36)
+	for y in range(4, 8):
+		for x in range(2, 7):
+			_ipx(img, x, y, body)
+	_ipx(img, 4, 5, dark)   # keyhole
+	_iline(img, Vector2i(3, 1), Vector2i(5, 1), body)   # shackle
+	_ipx(img, 2, 2, body)
+	_ipx(img, 2, 3, body)
+	_ipx(img, 6, 2, body)
+	_ipx(img, 6, 3, body)
+	_lock_cache = ImageTexture.create_from_image(img)
+	return _lock_cache
+
+# One Control draws every prerequisite connector and drives the learnable-now
+# pulse. Chips are its Button children (absolute positions), so ScrollContainer's
+# ensure_control_visible still reaches every node.
+class TreeCanvas:
+	extends Control
+
+	var edges: Array = []        # {pts, color, pulse}
+	var pulse_boxes: Array = []  # {sb: StyleBoxFlat, a: Color, b: Color}
+	var _t := 0.0
+	var _any_pulse_edge := false
+
+	func add_edge(from: Vector2, to: Vector2, st: Dictionary) -> void:
+		var pts: PackedVector2Array
+		if absf(from.x - to.x) < 0.5:
+			pts = PackedVector2Array([from, to])
+		else:   # root fan-out: vertical → horizontal → vertical elbow
+			var my := (from.y + to.y) * 0.5
+			pts = PackedVector2Array([from, Vector2(from.x, my), Vector2(to.x, my), to])
+		var color := Color(0.2, 0.25, 0.3)
+		var pulse := false
+		if bool(st.get("learned", false)):
+			color = Color(1.0, 0.6, 0.24, 0.85)
+		elif bool(st.get("learnable", false)):
+			color = Color(1.0, 0.82, 0.4, 0.8)
+			pulse = true
+			_any_pulse_edge = true
+		elif bool(st.get("open", false)):
+			color = Color(0.5, 0.45, 0.3, 0.7)
+		edges.append({"pts": pts, "color": color, "pulse": pulse})
+
+	func _process(delta: float) -> void:
+		if not is_visible_in_tree() or (pulse_boxes.is_empty() and not _any_pulse_edge):
+			return
+		_t += delta
+		var k := 0.5 + 0.5 * sin(_t * 5.0)
+		for pb in pulse_boxes:
+			(pb.sb as StyleBoxFlat).border_color = (pb.a as Color).lerp(pb.b as Color, k)
+		if _any_pulse_edge:
+			queue_redraw()
+
+	func _draw() -> void:
+		var k := 0.5 + 0.5 * sin(_t * 5.0)
+		for e in edges:
+			var c: Color = e.color
+			if e.pulse:
+				c = c.lerp(Color(1.0, 0.95, 0.7), 0.45 * k)
+			draw_polyline(e.pts, c, 1.0)

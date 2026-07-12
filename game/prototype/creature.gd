@@ -71,6 +71,11 @@ var _flash := 0.0
 var _step_accum := Vector2.ZERO
 var sprite: AnimatedSprite2D
 var _shadow: Sprite2D
+# Juice pass: ONE pose tween per creature (killed on re-trigger, never stacked).
+# Transform-only — GenForge frames stay intact; every tween's final keys ARE the
+# base pose (rotation 0, scale Vector2.ONE * _scale) so the sprite can never be
+# left off-base and hitboxes keep matching sprites (Ricardo 2026-07-11 tuning).
+var _pose_tw: Tween
 
 func _ready() -> void:
 	_apply_entry()   # catalog species/legendary mults + player-level power scaling
@@ -324,6 +329,63 @@ func _play_anim(anim: String) -> void:
 	if sprite.animation != anim:
 		sprite.play(anim)
 
+# ---- pose vocabulary (shared by every creature/boss subclass) --------------------
+# Anticipation lean, strike recoil, hit squash, enrage pulse: all snap the sprite
+# off base then spring HOME — one running tween max, killed on every re-trigger.
+
+func _kill_pose_tw() -> void:
+	if _pose_tw != null and _pose_tw.is_valid():
+		_pose_tw.kill()
+	_pose_tw = null
+
+# Snap the sprite to an off-base pose and spring back to base (elastic).
+# scale_mult is relative to the tuned base scale; rot in radians.
+func _pose_punch(scale_mult: Vector2, rot := 0.0, dur := 0.25) -> void:
+	if dead:
+		return
+	_kill_pose_tw()
+	sprite.scale = Vector2(_scale * scale_mult.x, _scale * scale_mult.y)
+	sprite.rotation = rot
+	_pose_tw = create_tween().set_parallel(true)
+	_pose_tw.tween_property(sprite, "scale", Vector2.ONE * _scale, dur) \
+			.set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
+	_pose_tw.tween_property(sprite, "rotation", 0.0, dur) \
+			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+# Windup anticipation: ease INTO a lean-back crouch over the telegraph window;
+# the strike's own punch (every strike branch fires one) releases it to base.
+func _anticipate(dir: Vector2, time: float) -> void:
+	if dead:
+		return
+	_kill_pose_tw()
+	var lean := -0.13 * (1.0 if dir.x >= 0.0 else -1.0)
+	var t := clampf(time * 0.8, 0.1, 0.5)
+	_pose_tw = create_tween().set_parallel(true)
+	_pose_tw.tween_property(sprite, "scale",
+			Vector2(_scale * 1.06, _scale * 0.9), t) \
+			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	_pose_tw.tween_property(sprite, "rotation", lean, t) \
+			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+
+# Strike release: lunge the pose INTO the attack direction, spring home.
+func _strike_recoil(dir: Vector2, punch := 1.0) -> void:
+	var horiz := absf(dir.x) >= absf(dir.y)
+	var stretch := Vector2(1.0 + 0.18 * punch, 1.0 - 0.12 * punch) if horiz \
+			else Vector2(1.0 - 0.12 * punch, 1.0 + 0.18 * punch)
+	_pose_punch(stretch, 0.16 * punch * (1.0 if dir.x >= 0.0 else -1.0), 0.24)
+
+# Hit reaction: squash perpendicular to the blow, spring back (white flash and
+# the 6 px knockback nudge already live in take_damage).
+func _hit_squash(from_dir: Vector2) -> void:
+	if absf(from_dir.x) >= absf(from_dir.y):
+		_pose_punch(Vector2(0.85, 1.15), 0.0, 0.22)
+	else:
+		_pose_punch(Vector2(1.15, 0.85), 0.0, 0.22)
+
+# Radial pulse — enrages, blink landings, screeches.
+func _pose_pulse(amount := 1.18, dur := 0.3) -> void:
+	_pose_punch(Vector2(amount, amount), 0.0, dur)
+
 func _idle(delta: float, player: Node2D) -> void:
 	_wander_t -= delta
 	if _wander_t <= 0.0:
@@ -366,6 +428,7 @@ func apply_slow(duration: float) -> void:
 func enrage(duration: float) -> void:
 	_enrage_t = duration
 	sprite.self_modulate = _base_tint * Color(1.5, 0.82, 0.82)
+	_pose_pulse(1.2)
 	if _state == "idle":
 		_state = "chase"
 
@@ -378,6 +441,7 @@ func _begin_windup(dir: Vector2) -> void:
 	sprite.flip_h = dir.x < 0.0
 	sprite.play("lunge")
 	sprite.frame = 0
+	_anticipate(dir, windup_time)   # lean-back crouch — the tell reads in the body
 	if archetype == "brute":   # slam is radial — telegraph the landing circle
 		var tg := ProtoTelegraph.new()
 		tg.radius = 2.2 * TILE
@@ -391,9 +455,11 @@ func _strike(player: Node2D) -> void:
 	_cd = attack_cd
 	var main := get_tree().get_first_node_in_group("main")
 	if archetype == "brute":   # ground slam: radial AoE — dodge OUT, not around
+		_pose_punch(Vector2(1.3, 0.72), 0.0, 0.32)   # landing squash
 		if main:
 			main.shake(5.0)
 			main.fx.debris(global_position)
+			main.fx.dust(global_position, 1.5)   # dust rolls out of the slam
 			main.play_sfx("hit", global_position, -6.0)
 		if player != null and not player.dead and global_position.distance_to(
 				player.global_position) <= 2.2 * TILE + player.body_radius:
@@ -407,13 +473,21 @@ func _strike(player: Node2D) -> void:
 		return
 	if archetype == "lunger" and _pounce_target != Vector2.ZERO:
 		var dash: Vector2 = (_pounce_target - global_position).limit_length(3.0 * TILE)
+		var launch := global_position
 		for _i in 6:   # stepped so walkability still gates the leap
 			_move(dash / 6.0)
 		_pounce_target = Vector2.ZERO
+		# pounce stretch: elongated along the leap, springs back on landing
+		var horiz := absf(dash.x) >= absf(dash.y)
+		_pose_punch(Vector2(1.32, 0.76) if horiz else Vector2(0.76, 1.32),
+				0.12 * (1.0 if dash.x >= 0.0 else -1.0), 0.26)
 		if main:
+			main.fx.dust(launch, 0.8)   # kick-off dirt at the launch point
 			main.fx.burst(global_position, {"amount": 6, "lifetime": 0.25,
 					"v_min": 30.0, "v_max": 90.0, "s_min": 0.6, "s_max": 1.2,
 					"color": Color(0.7, 0.85, 0.9, 0.6)})
+	else:
+		_strike_recoil(_attack_dir)   # basic swipe: lunge into the bite
 	var cos_half := cos(deg_to_rad(attack_arc_deg * 0.5))
 	if player != null and not player.dead:
 		var to_player := player.global_position - global_position
@@ -549,7 +623,8 @@ func take_damage(dmg: float, from_dir: Vector2, spark_color := Color("cfd6ff")) 
 	hp -= dmg
 	_flash = 1.0
 	threat = true
-	_move(from_dir.normalized() * 6.0)
+	_move(from_dir.normalized() * 6.0)   # knockback nudge
+	_hit_squash(from_dir)                # directional squash, springs back
 	var main := get_tree().get_first_node_in_group("main")
 	if main:
 		main.damage_number(global_position + Vector2(0, -18), dmg, Color("ffe9d0"))
@@ -560,12 +635,29 @@ func take_damage(dmg: float, from_dir: Vector2, spark_color := Color("cfd6ff")) 
 	if hp <= 0.0:
 		_die()
 
+# Death: 0.3 s collapse (squash to the ground + fade) instead of a blink-out.
+# The corpse stops processing IMMEDIATELY (physics off, out of the "creatures"
+# group — every consumer already filters `dead` too) and frees right after the
+# collapse tween; loot/FX spawn up front via main.on_creature_died as before.
 func _die() -> void:
 	dead = true
 	var main := get_tree().get_first_node_in_group("main")
 	if main:
 		main.on_creature_died(self)
-	queue_free()
+	remove_from_group("creatures")
+	set_physics_process(false)
+	queue_redraw()   # hides the health bar (guarded by `dead` in _draw)
+	_kill_pose_tw()
+	var tw := create_tween()
+	tw.set_parallel(true)
+	tw.tween_property(sprite, "scale",
+			Vector2(_scale * 1.25, _scale * 0.08), 0.26) \
+			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tw.tween_property(sprite, "position:y", -1.0, 0.26) \
+			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tw.tween_property(sprite, "rotation", 0.0, 0.1)
+	tw.tween_property(self, "modulate:a", 0.0, 0.3)
+	tw.chain().tween_callback(queue_free)
 
 func _draw() -> void:
 	if dead or hp >= max_hp:

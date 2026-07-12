@@ -463,3 +463,15 @@ Still open:
    Bleed (5 stacks), Expose (+20% taken), Stagger (0.5 s). Skill bar on 1-4,
    assigned in CHARACTER -> Skills, loadout saved per character. Numbers
    (proposal); full six-class kits with resources remain design/10 (planned).
+22. **UI/feel/localization pass (2026-07-12, Ricardo):** Haven nav became a
+   2-wide grid (QUIT was cropped off the 360 px viewport — now test-guarded
+   on-screen). Skills tab is a VISUAL tree: drawn prerequisite connectors,
+   kind-icon chips with element accents, pulsing learnable states, pinned
+   detail card with live stat numbers and Learn/assign actions. Fresh hunters
+   start with 3 skill points and two level-1 actives per class (variety from
+   the start). Animation juice pass: directional swing leans, cast wind-ups,
+   dodge afterimages, hit squash, death collapses, boss anticipation tells —
+   all tweened/pooled, 60 FPS lock intact. PT-BR is the first supported
+   locale: ProtoLang (EN/PT chrome table + _pt data twins, user://settings
+   .json, menu + Haven toggles), skill trees fully bilingual; EN stays the
+   default. Registry PT twins for the CODEX: planned.

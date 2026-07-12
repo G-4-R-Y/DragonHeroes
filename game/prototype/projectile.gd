@@ -20,6 +20,13 @@ var core_col := Color("ffd9a0")
 var edge_col := Color("8a3a12")
 var trail_a := Color(1.0, 0.72, 0.35, 0.9)
 var trail_b := Color(0.6, 0.15, 0.05, 0.0)
+# in-flight juice (transforms only — no new frames, no per-frame allocation):
+# knives spin, energy bolts breathe; impacts pop a tiny pooled ring.
+var spin := 0.0          # rad/s sprite spin (steel knives)
+var pulse_amp := 0.08    # sine scale pulse for energy bolts (0 disables)
+var impact_ring := true  # steel opts out — the knife fan would starve the pool
+var _spr: Sprite2D
+var _t := 0.0
 
 func set_violet() -> void:
 	dmg_type = "umbral"
@@ -28,6 +35,7 @@ func set_violet() -> void:
 	edge_col = Color("4a2a8a")
 	trail_a = Color(0.68, 0.5, 1.0, 0.9)
 	trail_b = Color(0.25, 0.1, 0.45, 0.0)
+	pulse_amp = 0.11
 
 func set_frost() -> void:
 	dmg_type = "frost"
@@ -36,6 +44,7 @@ func set_frost() -> void:
 	edge_col = Color("2a5a8a")
 	trail_a = Color(0.6, 0.9, 1.0, 0.9)
 	trail_b = Color(0.15, 0.3, 0.5, 0.0)
+	pulse_amp = 0.11
 
 func set_arcane() -> void:   # Gloam Mage bolt
 	dmg_type = "umbral"
@@ -44,6 +53,7 @@ func set_arcane() -> void:   # Gloam Mage bolt
 	edge_col = Color("5a3aa8")
 	trail_a = Color(0.75, 0.6, 1.0, 0.95)
 	trail_b = Color(0.3, 0.5, 0.9, 0.0)
+	pulse_amp = 0.11
 
 func set_steel() -> void:    # Veilblade knife
 	dmg_type = "physical"
@@ -53,11 +63,15 @@ func set_steel() -> void:    # Veilblade knife
 	edge_col = Color("5a6570")
 	trail_a = Color(0.8, 0.85, 0.9, 0.6)
 	trail_b = Color(0.4, 0.45, 0.5, 0.0)
+	spin = 24.0          # thrown steel whirls
+	pulse_amp = 0.0
+	impact_ring = false
 
 func _ready() -> void:
-	var s := Sprite2D.new()
-	s.texture = ProtoSprites.circle_tex(10, body_col, core_col, edge_col)
-	add_child(s)
+	_spr = Sprite2D.new()
+	_spr.texture = ProtoSprites.circle_tex(10, body_col, core_col, edge_col)
+	add_child(_spr)
+	_t = randf() * TAU   # desync pulses across a volley
 	# small ember trail left behind as the bolt travels
 	var trail := CPUParticles2D.new()
 	trail.amount = 8
@@ -78,6 +92,12 @@ func _ready() -> void:
 	trail.emitting = true
 
 func _physics_process(delta: float) -> void:
+	# in-flight juice: pure transform math, zero allocation (60 FPS hard rule)
+	_t += delta
+	if spin != 0.0:
+		_spr.rotation += spin * delta
+	elif pulse_amp > 0.0:
+		_spr.scale = Vector2.ONE * (1.0 + sin(_t * 12.0) * pulse_amp)
 	var from := global_position
 	global_position += velocity * delta
 	lifetime -= delta
@@ -121,4 +141,6 @@ func _impact() -> void:
 	var main := get_tree().get_first_node_in_group("main")
 	if main:
 		main.hit_spark(global_position, body_col)
+		if impact_ring:   # squash-flash pop (tiny pooled ring, fx.gd)
+			main.fx.impact_pop(global_position, body_col)
 	queue_free()

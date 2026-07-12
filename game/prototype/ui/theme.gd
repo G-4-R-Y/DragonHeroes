@@ -30,6 +30,15 @@ static func _box(bg: Color, border: Color, radius := 3, margin := 6.0,
 	sb.content_margin_bottom = margin * 0.6
 	return sb
 
+# Accent-tinted chip box — status chips, loadout slots, section chips. One place
+# so every surface's chips look like siblings (panel, Haven, menu).
+static func chip_box(accent: Color, bg_alpha := 0.14, border_w := 1) -> StyleBoxFlat:
+	var sb := _box(Color(accent.r, accent.g, accent.b, bg_alpha),
+			Color(accent.r, accent.g, accent.b, 0.55), 3, 5.0, border_w)
+	sb.content_margin_top = 2.0
+	sb.content_margin_bottom = 2.0
+	return sb
+
 static func get_theme() -> Theme:
 	if _theme != null:
 		return _theme
@@ -37,7 +46,12 @@ static func get_theme() -> Theme:
 	t.set_stylebox("panel", "PanelContainer", _box(PANEL_BG, PANEL_BORDER, 4, 8.0))
 	t.set_stylebox("normal", "Button", _box(BTN_BG, PANEL_BORDER))
 	t.set_stylebox("hover", "Button", _box(BTN_BG_HOVER, EMBER_DIM))
-	t.set_stylebox("pressed", "Button", _box(BTN_BG_PRESSED, EMBER))
+	# pressed nudges its content down 1 px — cheap tactile feedback
+	var pressed := _box(BTN_BG_PRESSED, EMBER)
+	pressed.content_margin_top += 1.0
+	pressed.content_margin_bottom -= 1.0
+	t.set_stylebox("pressed", "Button", pressed)
+	t.set_stylebox("hover_pressed", "Button", _box(BTN_BG_HOVER, EMBER))
 	t.set_stylebox("disabled", "Button", _box(Color(0.06, 0.08, 0.1, 0.6),
 			Color(0.12, 0.16, 0.2)))
 	t.set_stylebox("focus", "Button", StyleBoxEmpty.new())
@@ -63,5 +77,11 @@ static func get_theme() -> Theme:
 	t.set_stylebox("panel", "TooltipPanel", _box(Color(0.04, 0.06, 0.08, 0.97), EMBER_DIM))
 	t.set_color("font_color", "TooltipLabel", PALE)
 	t.set_font_size("font_size", "TooltipLabel", 9)
+	# separators: a quiet 1 px rule (Haven/panel section breaks)
+	var sep := StyleBoxLine.new()
+	sep.color = PANEL_BORDER
+	sep.thickness = 1
+	t.set_stylebox("separator", "HSeparator", sep)
+	t.set_constant("separation", "HSeparator", 5)
 	_theme = t
 	return t

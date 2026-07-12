@@ -11,6 +11,9 @@ func _ready() -> void:
 	_run()
 
 func _run() -> void:
+	# the suite asserts English strings — a stray user://settings.json from a
+	# local PT-BR session must never break CI
+	ProtoLang.set_lang("en")
 	Session.gold = 1000
 	var sword: Dictionary = ProtoItems.roll_item("emberfang_blade", "rare")
 	Session.add_item(sword)
@@ -22,6 +25,16 @@ func _run() -> void:
 	await get_tree().process_frame
 	await get_tree().process_frame
 	print("haven root rect: ", haven.get_global_rect())
+	# QUIT must sit FULLY on-screen — the 2-wide nav grid regression guard
+	var quit_btn := _btn_with_text(haven, "QUIT")
+	var vp_rect := Rect2(Vector2.ZERO, Vector2(640, 360))
+	if quit_btn == null:
+		_fail("no QUIT button at the Haven")
+	elif not vp_rect.encloses(quit_btn.get_global_rect()):
+		_fail("QUIT button rect %s pokes outside the 640x360 viewport"
+				% quit_btn.get_global_rect())
+	else:
+		print("CLICKTEST OK: Haven QUIT button fully inside the 640x360 viewport")
 	var forge_btn := _btn_with_text(haven, "FORGE")
 	if forge_btn == null:
 		_fail("no FORGE button found")
@@ -41,7 +54,8 @@ func _run() -> void:
 	if up == null:
 		_fail("gear click did not open the upgrade preview")
 		return _done()
-	await _click(up.get_global_rect().get_center())
+	await _scroll_to(up)   # the wider nav column wraps the explainer; UPGRADE
+	await _click(up.get_global_rect().get_center())   # can sit below the fold
 	if int(sword.get("upgrade_tier", 0)) == 1:
 		print("CLICKTEST OK: forge upgrade applied via clicks (tier +1, gold %d)" % Session.gold)
 	else:
@@ -74,37 +88,50 @@ func _run() -> void:
 	else:
 		_fail("Equip click had no effect")
 
-	# ---- skill tree: learn a passive + an ACTIVE, assign it to slot 1 ------------
+	# ---- skill tree: node chips open the fixed detail card; Learn + the 1-4
+	# assign chips live on the card (visual tree redesign) --------------------------
 	Session.level = 20   # min_level gates open (brutal_edge needs level 2)
 	Session.skill_points = 3
 	tabs.current_tab = 3   # Skills
 	cp.refresh()
 	await get_tree().process_frame
-	var learn := _btn_with_tooltip(cp, "learn brutal_edge")
-	if learn == null:
-		_fail("no Learn button for brutal_edge on the Skills tab")
+	if _btn_with_tooltip(cp, "learn brutal_edge") != null:
+		_fail("Learn button rendered before any node was selected")
+	var chip := _btn_with_tooltip(cp, "(node brutal_edge)")
+	if chip == null:
+		_fail("no tree chip for brutal_edge on the Skills tab")
 	else:
-		await _scroll_to(learn)   # the tree sits below the fold since the v7 cards
-		await _click(learn.get_global_rect().get_center())
-		if Session.node_learned("brutal_edge"):
-			print("CLICKTEST OK: passive node learned via click (brutal_edge)")
+		await _scroll_to(chip)   # chips live inside the tab's ScrollContainer
+		await _click(chip.get_global_rect().get_center())
+		var learn := _btn_with_tooltip(cp, "learn brutal_edge")
+		if learn == null:
+			_fail("chip click did not open the detail card (no Learn for brutal_edge)")
 		else:
-			_fail("Learn click had no effect (brutal_edge)")
-	var learn_act := _btn_with_tooltip(cp, "learn rv_gash")
-	if learn_act == null:
-		_fail("no Learn button for the rv_gash active")
+			print("CLICKTEST OK: node detail card opened via chip click (brutal_edge)")
+			await _click(learn.get_global_rect().get_center())
+			if Session.node_learned("brutal_edge"):
+				print("CLICKTEST OK: passive learned via the detail card (brutal_edge)")
+			else:
+				_fail("detail-card Learn click had no effect (brutal_edge)")
+	var chip_act := _btn_with_tooltip(cp, "(node rv_gash)")
+	if chip_act == null:
+		_fail("no tree chip for the rv_gash active")
 	else:
-		await _scroll_to(learn_act)
-		await _click(learn_act.get_global_rect().get_center())
-		if Session.node_learned("rv_gash"):
-			print("CLICKTEST OK: active skill learned via click (rv_gash)")
+		await _scroll_to(chip_act)
+		await _click(chip_act.get_global_rect().get_center())
+		var learn_act := _btn_with_tooltip(cp, "learn rv_gash")
+		if learn_act == null:
+			_fail("rv_gash chip click did not open its detail card")
 		else:
-			_fail("Learn click had no effect (rv_gash)")
+			await _click(learn_act.get_global_rect().get_center())
+			if Session.node_learned("rv_gash"):
+				print("CLICKTEST OK: active skill learned via the detail card (rv_gash)")
+			else:
+				_fail("detail-card Learn click had no effect (rv_gash)")
 	var assign := _btn_with_tooltip(cp, "assign Gash to slot 1")
 	if assign == null:
-		_fail("learned active shows no assign chip for slot 1")
+		_fail("learned active shows no assign chip for slot 1 on the detail card")
 	else:
-		await _scroll_to(assign)
 		await _click(assign.get_global_rect().get_center())
 		if str(Session.skill_loadout[0]) == "rv_gash":
 			print("CLICKTEST OK: active assigned to skill-bar slot 1 via click")
@@ -119,6 +146,9 @@ func _run() -> void:
 	cr.global_position = pl.global_position + Vector2(24, 0)   # inside Gash reach
 	add_child(cr)
 	await get_tree().process_frame
+	# use_skill aims at the mouse — park it to the player's RIGHT so the arc
+	# covers the creature (UI clicks above left the cursor pointing elsewhere)
+	await _mouse_move(pl.global_position + Vector2(300, 0))
 	var hp0: float = cr.hp
 	if pl.use_skill(Session.skill_def("rv_gash")) and cr.hp < hp0 \
 			and cr.has_status("bleeding") and pl.skill_cd_left("rv_gash") > 0.0:
@@ -127,17 +157,21 @@ func _run() -> void:
 		_fail("use_skill(rv_gash) failed (hp %.1f -> %.1f, bleeding %s, cd %.2f)" % [
 				hp0, cr.hp, str(cr.has_status("bleeding")), pl.skill_cd_left("rv_gash")])
 	# keys 1-4 path: learn a buff active, assign it to slot 2, cast it with KEY_2
-	var learn_buff := _btn_with_tooltip(cp, "learn rv_blood_howl")
-	if learn_buff == null:
-		_fail("no Learn button for rv_blood_howl")
+	var chip_buff := _btn_with_tooltip(cp, "(node rv_blood_howl)")
+	if chip_buff == null:
+		_fail("no tree chip for rv_blood_howl")
 	else:
-		await _scroll_to(learn_buff)
-		await _click(learn_buff.get_global_rect().get_center())
+		await _scroll_to(chip_buff)
+		await _click(chip_buff.get_global_rect().get_center())
+		var learn_buff := _btn_with_tooltip(cp, "learn rv_blood_howl")
+		if learn_buff == null:
+			_fail("rv_blood_howl chip click did not open its detail card")
+		else:
+			await _click(learn_buff.get_global_rect().get_center())
 		var assign2 := _btn_with_tooltip(cp, "assign Blood Howl to slot 2")
 		if assign2 == null:
 			_fail("no assign chip for Blood Howl slot 2")
 		else:
-			await _scroll_to(assign2)
 			await _click(assign2.get_global_rect().get_center())
 			# slot path (KEY_2 in play): headless physics ticks don't align with
 			# injected-event flush frames, so drive the same code directly.
@@ -182,6 +216,35 @@ func _run() -> void:
 		_fail("Esc did not close the panel")
 	else:
 		print("CLICKTEST OK: panel toggles via C and closes via Esc")
+
+	# ---- PT-BR: toggle to pt — SAIR stays inside the viewport (the longest
+	# nav label regression) and the detail card speaks Portuguese ---------------
+	ProtoLang.set_lang("pt")
+	var haven_pt: Control = (load("res://prototype/ui/haven.tscn") as PackedScene).instantiate()
+	add_child(haven_pt)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	var sair := _btn_with_text(haven_pt, "SAIR")
+	if sair == null:
+		_fail("PT: no SAIR button at the Haven")
+	elif not vp_rect.encloses(sair.get_global_rect()):
+		_fail("PT: SAIR button rect %s pokes outside the 640x360 viewport"
+				% sair.get_global_rect())
+	else:
+		print("CLICKTEST OK: PT-BR — SAIR button fully inside the 640x360 viewport")
+	cp._sel_node = "rv_gash"
+	cp.refresh()
+	await get_tree().process_frame
+	var pt_name := str(Session.skill_def("rv_gash").get("name_pt", ""))
+	if pt_name == "":
+		_fail("PT: rv_gash carries no name_pt in skill_trees.json")
+	elif _label_with_text(cp, pt_name) == null:
+		_fail("PT: detail card does not show rv_gash's name_pt ('%s')" % pt_name)
+	else:
+		print("CLICKTEST OK: PT-BR — detail card titles rv_gash as '%s'" % pt_name)
+	ProtoLang.set_lang("en")
+	haven_pt.queue_free()
+	await get_tree().process_frame
 
 	# ---- persistence: save → mutate → login reloads (stables included) ----------
 	Session.login("clicktest")
@@ -237,6 +300,14 @@ func _click(pos: Vector2) -> void:
 	await get_tree().process_frame
 	await get_tree().process_frame
 
+func _mouse_move(pos: Vector2) -> void:
+	var ev := InputEventMouseMotion.new()
+	ev.position = pos
+	ev.global_position = pos
+	Input.parse_input_event(ev)
+	await get_tree().process_frame
+	await get_tree().process_frame
+
 # Injected clicks miss controls scrolled out of view — bring them on screen first.
 func _scroll_to(ctl: Control) -> void:
 	var p: Node = ctl.get_parent()
@@ -278,5 +349,11 @@ func _btn_with_tooltip(root: Node, part: String) -> Button:
 func _label_starting(root: Node, part: String) -> Label:
 	for l in root.find_children("*", "Label", true, false):
 		if str(l.text).begins_with(part):
+			return l
+	return null
+
+func _label_with_text(root: Node, text: String) -> Label:
+	for l in root.find_children("*", "Label", true, false):
+		if str(l.text) == text:
 			return l
 	return null

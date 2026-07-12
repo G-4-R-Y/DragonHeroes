@@ -352,7 +352,7 @@ func _spawn_legendary(anchor: Vector2) -> void:
 			leg = BossScene.new()   # dragon chassis (unknown bases land here too)
 	leg.setup_legendary(entry)
 	_legendary_name = str(entry.get("name", "???"))
-	leg.display_name = "%s — Legendary" % _legendary_name.to_upper()
+	leg.display_name = ProtoLang.t("legendary_suffix") % _legendary_name.to_upper()
 	var tint := ProtoCreature.tint_from(entry)
 	if tint != Color(1, 1, 1):
 		leg.bar_color = tint
@@ -575,7 +575,7 @@ func _try_capture() -> void:
 		return
 	if snares <= 0:
 		damage_number(player.global_position + Vector2(0, -24), 0,
-				Color(0.7, 0.9, 1.0, 0.9), "no Soul Snare — stalkers drop them")
+				Color(0.7, 0.9, 1.0, 0.9), ProtoLang.t("msg_no_snare"))
 		return
 	var best: ProtoCreature = null
 	var best_d := 3.0 * TILE
@@ -588,16 +588,16 @@ func _try_capture() -> void:
 			best = c
 	if best == null:
 		damage_number(player.global_position + Vector2(0, -24), 0,
-				Color(0.7, 0.9, 1.0, 0.9), "no stalker within 3 m")
+				Color(0.7, 0.9, 1.0, 0.9), ProtoLang.t("msg_no_stalker"))
 		return
 	if best.hp > best.max_hp * 0.35:
 		damage_number(best.global_position + Vector2(0, -24), 0,
-				Color(0.7, 0.9, 1.0, 0.9), "too strong — wound it below 35%")
+				Color(0.7, 0.9, 1.0, 0.9), ProtoLang.t("msg_too_strong"))
 		return
 	if Session.pets.size() >= Session.MAX_PETS and _replace_window <= 0.0:
 		_replace_window = 3.0
 		damage_number(player.global_position + Vector2(0, -24), 0,
-				Color(0.7, 0.9, 1.0, 0.9), "pet slots full — F again in 3 s stables %s"
+				Color(0.7, 0.9, 1.0, 0.9), ProtoLang.t("msg_slots_full")
 				% str(Session.pets[0].get("name", "?")))
 		return
 	_replace_window = 0.0
@@ -613,19 +613,20 @@ func _try_capture() -> void:
 				if is_instance_valid(old_node):
 					old_node.queue_free()
 			damage_number(player.global_position + Vector2(0, -36), 0,
-					Color(0.7, 0.9, 1.0, 0.8), "%s sent to the stables" % str(old.get("name", "")))
+					Color(0.7, 0.9, 1.0, 0.8), ProtoLang.t("msg_sent_stables") % str(old.get("name", "")))
 		var data := _roll_pet()
 		Session.pets.append(data)
 		var at: Vector2 = best.global_position
 		hit_spark(at, Color("7fe7ff"))
-		damage_number(at + Vector2(0, -24), 0, Color("7fe7ff"), "BONDED — %s (pet %d/%d)"
+		damage_number(at + Vector2(0, -24), 0, Color("7fe7ff"), ProtoLang.t("msg_bonded")
 				% [data["name"], Session.pets.size(), Session.MAX_PETS])
 		best.dead = true   # removed, not killed: no loot, no kill credit
 		best.queue_free()
 		_spawn_pet(data, at)
 	else:
 		play_ui("snare_fail", -6.0)
-		damage_number(best.global_position + Vector2(0, -24), 0, Color("ff8a7a"), "RESISTED!")
+		damage_number(best.global_position + Vector2(0, -24), 0, Color("ff8a7a"),
+				ProtoLang.t("msg_resisted"))
 		best.enrage(5.0)   # +30% speed for 5 s
 	_sync_session()
 	refresh_hud()
@@ -701,7 +702,7 @@ func _build_confirm() -> void:
 	vb.add_theme_constant_override("separation", 8)
 	pc.add_child(vb)
 	var q := Label.new()
-	q.text = "Return to Haven?"
+	q.text = ProtoLang.t("confirm_return")
 	q.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	q.add_theme_color_override("font_color", Color("ff9a3c"))
 	vb.add_child(q)
@@ -710,12 +711,12 @@ func _build_confirm() -> void:
 	hb.add_theme_constant_override("separation", 12)
 	vb.add_child(hb)
 	var yes := Button.new()
-	yes.text = "Yes"
+	yes.text = ProtoLang.t("confirm_yes")
 	yes.custom_minimum_size = Vector2(64, 0)
 	yes.pressed.connect(_return_to_haven)
 	hb.add_child(yes)
 	var no := Button.new()
-	no.text = "No"
+	no.text = ProtoLang.t("confirm_no")
 	no.custom_minimum_size = Vector2(64, 0)
 	no.pressed.connect(func() -> void: _confirm.visible = false)
 	hb.add_child(no)
@@ -759,14 +760,15 @@ func on_boss_died(b: ProtoBoss) -> void:
 	# (implicit fire roll + 4 affixes). Elite item/rune rolls run in on_creature_died.
 	_drop_item(ProtoItems.roll_item("emberfang_blade", "legendary", Session.level, 0.35),
 			b.global_position + Vector2(-12, 0))
-	damage_number(b.global_position + Vector2(0, -40), 0, Color("ffd166"), "MATRIARCH FELLED!")
+	damage_number(b.global_position + Vector2(0, -40), 0, Color("ffd166"),
+			ProtoLang.t("msg_matriarch_felled"))
 	if not Session.owns_mount("emberwing_drakeling"):   # her brood takes to you
 		Session.grant_mount({"uid": ProtoItems.next_uid(), "key": "emberwing_drakeling",
 				"name": "Emberwing Drakeling", "kind": "fly", "speed_mult": 1.9,
 				"rarity": "legendary", "tint": "ff9a5c"})
 		damage_number(b.global_position + Vector2(0, -54), 0, Color("ff9a3c"),
-				"MOUNT BONDED — Emberwing Drakeling (press M to FLY)")
-	_hud.hint.text = "Victory — the Emberfang Blade is yours. Forge/enchant/sell at the Haven (Esc)."
+				ProtoLang.t("msg_mount_bonded"))
+	_hud.hint.text = ProtoLang.t("msg_victory_matriarch")
 
 # The Fenwitch Hag (Elite mid-boss): elite loot/rune rolls run in
 # on_creature_died; this adds the boss-kill flourish.
@@ -776,7 +778,7 @@ func on_hag_died(h: Node2D) -> void:
 	play_ui("victory", -6.0)
 	shake(6.0)
 	damage_number(h.global_position + Vector2(0, -40), 0, Color("cf9dff"),
-			"THE FENWITCH FALLS!")
+			ProtoLang.t("msg_fenwitch"))
 
 # Legendary duo (canon §4): each boss guarantees an epic+ item (proposal: 25%
 # legendary). First death enrages the survivor; second is the real victory.
@@ -794,15 +796,15 @@ func on_duo_boss_died(b: ProtoDuoBoss) -> void:
 	if is_instance_valid(mate) and not mate.dead:
 		mate.avenge()   # the Duologue dies with the fallen; fury remains
 		damage_number(b.global_position + Vector2(0, -40), 0, Color("ffd166"),
-				"ONE FALLS — the other AVENGES!")
-		_hud.hint.text = "Half the duo is down — the survivor is enraged. Finish it."
+				ProtoLang.t("msg_one_falls"))
+		_hud.hint.text = ProtoLang.t("msg_duo_hint")
 	else:
 		fx.lightning(b.global_position + Vector2(-22, 0))
 		fx.lightning(b.global_position + Vector2(26, -8))
 		play_ui("victory", -4.0)
 		damage_number(b.global_position + Vector2(0, -40), 0, Color("ffd166"),
-				"THE LEGENDARY DUO FALLS!")
-		_hud.hint.text = "Victory — Legendary spoils twice over. Forge/enchant/sell at the Haven (Esc)."
+				ProtoLang.t("msg_duo_falls"))
+		_hud.hint.text = ProtoLang.t("msg_victory_duo")
 
 # Hunt legendary down (task 2): guaranteed rare+ item (proposal weights
 # 60/30/10 rare/epic/legendary) on top of the chassis's elite rolls; gold
@@ -830,12 +832,12 @@ func on_legendary_died(b) -> void:
 			_drop(b.global_position + Vector2(randf_range(-24, 24),
 					randf_range(-24, 24)), "snare", 1)
 		damage_number(b.global_position + Vector2(0, -54), 0, Color("7fe7ff"),
-				"SOUL SNARE SHOWER!")
+				ProtoLang.t("msg_snare_shower"))
 	damage_number(b.global_position + Vector2(0, -40), 0, Color("d84aff"),
-			"%s FALLS!" % str(b.species_name).to_upper())
+			ProtoLang.t("msg_leg_falls") % str(b.species_name).to_upper())
 	legendary_boss = null
 	_legendary_name = ""
-	_hud.hint.text = "The hunt's Legendary falls — rare spoils are yours. Forge/enchant/sell at the Haven (Esc)."
+	_hud.hint.text = ProtoLang.t("msg_victory_leg")
 
 # Runes (canon §4): guaranteed on the FIRST Elite kill, then 5% per Elite+ kill
 # (proposal). Prefers a rune the player doesn't own yet.
@@ -893,9 +895,9 @@ func _grant_level_ups() -> void:
 	fx.lightning(player.global_position)   # the sky marks the hunter
 	hit_spark(player.global_position, Color("ffd166"))
 	damage_number(player.global_position + Vector2(0, -36), 0, Color("ffd166"),
-			"LEVEL %d!" % new_level)
+			ProtoLang.t("msg_level_up") % new_level)
 	damage_number(player.global_position + Vector2(0, -24), 0, Color("ffe9d0"),
-			"+%d attribute points · +%d skill point (C)" % [gained, levels])
+			ProtoLang.t("msg_level_points") % [gained, levels])
 	player.apply_stats()   # higher level unlocks higher affix tiers on future rolls
 
 func _drop(at: Vector2, kind: String, amount: int) -> void:
@@ -921,18 +923,18 @@ func collect(kind: String, amount: int, at: Vector2, item: Dictionary = {}) -> v
 	match kind:
 		"gold":
 			gold += amount
-			damage_number(at, 0, Color("ffd166"), "+%d gold" % amount)
+			damage_number(at, 0, Color("ffd166"), ProtoLang.t("msg_gold") % amount)
 		"stone":
 			var first := stones == 0
 			stones += amount
-			damage_number(at, 0, Color("b06cff"), "Bestial Skill stone!")
+			damage_number(at, 0, Color("b06cff"), ProtoLang.t("msg_stone"))
 			if first:   # owning a stone awakens the bestial slot
 				damage_number(at + Vector2(0, -14), 0, Color("cf9dff"),
-						"SHADOW REND awakened — press Q")
+						ProtoLang.t("msg_rend_awake"))
 				_hud.hint.text = _hint_text()
 		"snare":
 			snares += amount
-			damage_number(at, 0, Color("7fe7ff"), "Soul Snare!")
+			damage_number(at, 0, Color("7fe7ff"), ProtoLang.t("msg_snare"))
 		"item":
 			_collect_item(item, at)
 	_sync_session()
@@ -948,13 +950,13 @@ func _collect_item(item: Dictionary, at: Vector2) -> void:
 		if str(item.get("base_id", "")) == "core.item.emberfang_blade":
 			Session.has_blade = true
 		player.apply_stats()
-		damage_number(at, 0, col, "%s — equipped" % str(item.get("name", "?")))
+		damage_number(at, 0, col, ProtoLang.t("msg_equipped") % str(item.get("name", "?")))
 	else:
 		Session.add_item(item)   # can_collect_item() gated the pickup
 		damage_number(at, 0, col, str(item.get("name", "?")))
 	if slot == "rune":
 		damage_number(at + Vector2(0, -14), 0, Color("cf9dff"),
-				"a RUNE — socket it on a skill (C - Skills)")
+				ProtoLang.t("msg_rune_drop"))
 
 # Panel/vendor hook — gold earned or spent mid-hunt flows through main.
 func add_gold(amount: int) -> void:
@@ -967,7 +969,7 @@ func on_player_death() -> void:
 	var lost := int(gold * 0.25)
 	gold -= lost
 	_sync_session()
-	_hud.hint.text = "You died — %d gold lost to the dark. Respawning..." % lost
+	_hud.hint.text = ProtoLang.t("msg_died") % lost
 	refresh_hud()
 	await get_tree().create_timer(2.0).timeout
 	player.respawn(world.spawn_point())
@@ -981,15 +983,13 @@ func on_player_death() -> void:
 
 # ---- HUD --------------------------------------------------------------------
 
-const HINT_TEXT := "LMB cleave · Shift dodge x3 · Q rend · E whirlwind · 1-4 skills · Z mount · F bond · C character · K keys · Esc haven"
-
 func _hint_text() -> String:
-	var t := HINT_TEXT
+	var t := ProtoLang.t("hud_hint_base")
 	if stones >= 1:
-		t += " · Q shadow rend"
-	t += " — hunt the Fenwitch Hag, the Legendary duo, the Matriarch"
+		t += ProtoLang.t("hud_hint_rend")
+	t += ProtoLang.t("hud_hint_bosses")
 	if _legendary_name != "":
-		t += " · a LEGENDARY prowls: %s" % _legendary_name
+		t += ProtoLang.t("hud_hint_leg") % _legendary_name
 	return t
 
 func _build_hud() -> void:
@@ -1014,11 +1014,12 @@ func _build_hud() -> void:
 		pip.size = Vector2(10, 4)
 		canvas.add_child(pip)
 		pips.append(pip)
-	# XP progress to the next level (kills-based, proposal) — thin gold sliver
+	# XP progress to the next level (kills-based, proposal) — thin gold sliver,
+	# same width as the HP bar so the top-left block reads as one column
 	var xp_bg := ColorRect.new()
 	xp_bg.color = Color(0, 0, 0, 0.55)
 	xp_bg.position = Vector2(12, 35)
-	xp_bg.size = Vector2(90, 3)
+	xp_bg.size = Vector2(184, 3)
 	canvas.add_child(xp_bg)
 	var xp_bar := ColorRect.new()
 	xp_bar.color = Color("ffd166")
@@ -1065,10 +1066,11 @@ func _build_hud() -> void:
 	e_bar.size = Vector2(32, 4)
 	e_bg.add_child(e_bar)
 	# skill bar (1-4): class-tree actives — chips in the Q/E gauge style, one
-	# row below (cooldown fill + the assigned skill's leading name word)
+	# row below (cooldown fill + the assigned skill's leading name word).
+	# 54 px pitch = the Q/E column pitch, so 1 sits under Q and 2 under E.
 	var slots: Array = []
 	for i in 4:
-		var x := 56.0 + i * 52.0
+		var x := 56.0 + i * 54.0
 		var s_key := Label.new()
 		s_key.text = str(i + 1)
 		s_key.position = Vector2(x, 38)
@@ -1076,7 +1078,7 @@ func _build_hud() -> void:
 		canvas.add_child(s_key)
 		var s_bg := ColorRect.new()
 		s_bg.color = Color(0, 0, 0, 0.55)
-		s_bg.position = Vector2(x + 10, 45)
+		s_bg.position = Vector2(x + 12, 45)
 		s_bg.size = Vector2(36, 6)
 		canvas.add_child(s_bg)
 		var s_bar := ColorRect.new()
@@ -1085,19 +1087,23 @@ func _build_hud() -> void:
 		s_bar.size = Vector2(32, 4)
 		s_bg.add_child(s_bar)
 		var s_name := Label.new()
-		s_name.position = Vector2(x + 10, 52)
+		s_name.position = Vector2(x + 12, 52)
+		s_name.size = Vector2(42, 9)
+		s_name.clip_text = true
 		s_name.add_theme_font_size_override("font_size", 7)
 		s_name.modulate = Color(1, 1, 1, 0.6)
 		canvas.add_child(s_name)
 		slots.append({"key": s_key, "bar": s_bar, "name": s_name})
-	# class charge chip (Veilblade Combo / Gloam Mage Attunement)
+	# class charge chip (Veilblade Combo / Gloam Mage Attunement) — after slot 4
 	var charge := Label.new()
-	charge.position = Vector2(268, 43)
+	charge.position = Vector2(278, 43)
 	charge.add_theme_font_size_override("font_size", 9)
 	charge.add_theme_color_override("font_color", Color("cf9dff"))
 	canvas.add_child(charge)
 	var stats := Label.new()
-	stats.position = Vector2(12, 60)
+	stats.position = Vector2(12, 62)
+	stats.add_theme_font_size_override("font_size", 10)
+	stats.modulate = Color(1, 1, 1, 0.92)
 	canvas.add_child(stats)
 	var hint := Label.new()
 	hint.text = _hint_text()
@@ -1173,7 +1179,7 @@ func _update_boss_bar() -> void:
 	_hud.boss_bar.color = rows[0].bar_color
 	_hud.boss_bar.size.x = 300.0 * clampf(rows[0].hp / rows[0].max_hp, 0, 1)
 	if duo:
-		_hud.boss_name.text = "%s + %s — Legendary Duo" % [
+		_hud.boss_name.text = ProtoLang.t("duo_label") % [
 				str(rows[0].display_name).split(" — ")[0],
 				str(rows[1].display_name).split(" — ")[0]]
 	else:
@@ -1185,7 +1191,7 @@ func _update_boss_bar() -> void:
 
 func refresh_hud() -> void:
 	_hud.hp_bar.size.x = 180.0 * clampf(player.hp / player.max_hp, 0, 1)
-	_hud.stats.text = "Lv %d   Gold %d   Kills %d   Stones %d   Snares %d   Bag %d/%d   Pets %d/%d" % [
+	_hud.stats.text = ProtoLang.t("hud_stats") % [
 			Session.level, gold, kills, stones, snares,
 			Session.inventory.size(), ProtoItems.INVENTORY_CAP,
 			Session.pets.size(), Session.MAX_PETS]
@@ -1195,7 +1201,7 @@ func refresh_hud() -> void:
 func _update_gauges(delta: float) -> void:
 	_pip_flash = maxf(_pip_flash - delta * 3.0, 0.0)
 	_q_flash = maxf(_q_flash - delta * 3.0, 0.0)
-	_hud.xp_bar.size.x = 90.0 * _level_progress(kills)
+	_hud.xp_bar.size.x = 184.0 * _level_progress(kills)
 	_chip_t -= delta
 	if _chip_t <= 0.0:   # pet chips refresh at 4 Hz — cheap
 		_chip_t = 0.25
@@ -1264,11 +1270,15 @@ func _update_skill_slots(pulse: float) -> void:
 		chip.bar.size.x = 32.0 * prog
 		chip.bar.color = Color("c9853c") if prog < 1.0 \
 				else Color("ffb45c").lerp(Color(1.0, 0.95, 0.85), 0.45 * pulse)
-		chip.name.text = str(def.get("name", "?")).get_slice(" ", 0).left(8)
+		# localized skill name, first word only — the label clips at 42 px
+		chip.name.text = ProtoLang.pick(def, "name", "?").get_slice(" ", 0).left(8)
 	if player.charge_name == "" or player.charge_stacks <= 0:
 		_hud.charge.text = ""
 	else:
-		_hud.charge.text = "◈ %s x%d" % [player.charge_name, player.charge_stacks]
+		# player.charge_name is the EN mechanic name; display its _pt twin
+		_hud.charge.text = "◈ %s x%d" % [
+				ProtoLang.pick(Session.class_charge(), "name", player.charge_name),
+				player.charge_stacks]
 
 func _update_pet_chips() -> void:
 	for i in _hud.pet_chips.size():
@@ -1282,7 +1292,7 @@ func _update_pet_chips() -> void:
 			if n.uid == int(pet.get("uid", 0)):
 				resting = n.resting()
 		chip.text = "◆ %s%s" % [str(pet.get("name", "?")),
-				"  · resting" if resting else ""]
+				ProtoLang.t("hud_resting") if resting else ""]
 		chip.add_theme_color_override("font_color",
 				Color("ff8a7a") if resting else Color("7fe7ff"))
 
@@ -1295,31 +1305,46 @@ func _build_keybinds() -> void:
 	var pc := PanelContainer.new()
 	pc.theme = ProtoTheme.get_theme()
 	pc.position = Vector2(408, 44)
+	# longer localized rows must never poke past the 640 px viewport — clamp
+	# the card back inside once its content size settles
+	pc.resized.connect(func() -> void:
+		pc.position.x = minf(408.0, 632.0 - pc.size.x))
 	_kb_overlay.add_child(pc)
 	var vb := VBoxContainer.new()
 	vb.add_theme_constant_override("separation", 2)
 	pc.add_child(vb)
 	var title := Label.new()
-	title.text = "KEYBINDS"
+	title.text = ProtoLang.t("kb_title")
 	title.add_theme_color_override("font_color", Color("ffd166"))
 	title.add_theme_font_size_override("font_size", 10)
 	vb.add_child(title)
-	for line in [
-		"WASD / arrows   move",
-		"mouse           aim",
-		"LMB / Space     cleave",
-		"Shift / RMB     dodge (3 charges)",
-		"Q               Shadow Rend (stone)",
-		"E               Whirlwind",
-		"1-4             class skills (learn/assign: C - Skills)",
-		"F               bond pet (Soul Snare)",
-		"Z               mount / dismount",
-		"C / Tab         character panel",
-		"K               this card",
-		"Esc             return to Haven",
+	# two aligned columns (the default font is proportional — space-padding drifts)
+	for pair in [
+		[ProtoLang.t("kb_move_k"), ProtoLang.t("kb_move_v")],
+		[ProtoLang.t("kb_aim_k"), ProtoLang.t("kb_aim_v")],
+		[ProtoLang.t("kb_atk_k"), ProtoLang.t("kb_atk_v")],
+		[ProtoLang.t("kb_dodge_k"), ProtoLang.t("kb_dodge_v")],
+		["Q", ProtoLang.t("kb_q_v")],
+		["E", ProtoLang.t("kb_e_v")],
+		["1-4", ProtoLang.t("kb_slots_v")],
+		["F", ProtoLang.t("kb_f_v")],
+		["Z", ProtoLang.t("kb_z_v")],
+		["C / Tab", ProtoLang.t("kb_c_v")],
+		["K", ProtoLang.t("kb_k_v")],
+		["Esc", ProtoLang.t("kb_esc_v")],
 	]:
-		var l := Label.new()
-		l.text = line
-		l.add_theme_font_size_override("font_size", 9)
-		l.modulate = Color(0.92, 0.95, 1.0, 0.95)
-		vb.add_child(l)
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 8)
+		vb.add_child(row)
+		var kl := Label.new()
+		kl.text = str(pair[0])
+		kl.custom_minimum_size = Vector2(82, 0)
+		kl.add_theme_font_size_override("font_size", 9)
+		kl.add_theme_color_override("font_color", Color("ffd166"))
+		kl.modulate = Color(1, 1, 1, 0.9)
+		row.add_child(kl)
+		var dl := Label.new()
+		dl.text = str(pair[1])
+		dl.add_theme_font_size_override("font_size", 9)
+		dl.modulate = Color(0.92, 0.95, 1.0, 0.95)
+		row.add_child(dl)

@@ -118,6 +118,7 @@ func _cast(skill: String, player: Node2D) -> void:
 			_timer = 0.66
 			_skill_cd["breath"] = 12.0 * _cd_scale
 			_telegraph_circle(_dive_target, 4.0 * TILE, 0.66)
+	_anticipate(_attack_dir, _timer)   # signature tells read in the body too
 
 func _strike(player: Node2D) -> void:
 	if _pending == "":
@@ -135,6 +136,7 @@ func _strike(player: Node2D) -> void:
 			p.velocity = _attack_dir * 18.0 * TILE
 			p.damage = 12.0 * dmg_scale
 			get_parent().add_child(p)
+			_strike_recoil(-_attack_dir, 0.6)   # kick back off the shot
 			if main:
 				main.play_sfx("bolt", global_position, -8.0)
 		"dive":
@@ -145,21 +147,34 @@ func _strike(player: Node2D) -> void:
 				if (global_position + seg * t).distance_to(player.global_position) < 20.0 + player.body_radius:
 					player.take_damage(20.0 * dmg_scale, path.normalized())
 			global_position += path
+			# talons-first landing: stretched along the dive, springs back
+			var horiz := absf(path.x) >= absf(path.y)
+			_pose_punch(Vector2(1.35, 0.72) if horiz else Vector2(0.72, 1.35),
+					0.14 * (1.0 if path.x >= 0.0 else -1.0), 0.3)
 			if main:
 				main.hit_spark(global_position, Color("ff7a33"))
+				main.fx.dust(global_position, 1.6)
+				main.shake(4.0)   # her landing carries weight
 		"gust":
+			_pose_pulse(1.22, 0.32)   # wings snap wide
 			if player and not player.dead \
 					and global_position.distance_to(player.global_position) <= 5.0 * TILE:
 				player.take_damage(8.0 * dmg_scale, (player.global_position - global_position).normalized())
 				player.knockback((player.global_position - global_position).normalized() * 4.0 * TILE)
+			if main:
+				main.fx.tornado(global_position)
+				main.shake(3.0)
 		"screech":
 			_enraged = true
 			_cd_scale = 0.7
 			sprite.self_modulate = Color(1.5, 0.75, 0.75)
+			_pose_pulse(1.28, 0.4)   # the enrage swells through her
 			if main:
 				main.damage_number(global_position + Vector2(0, -30), 0, Color("ff6a4a"), "ENRAGED!")
 				main.play_sfx("boss_screech", global_position, -4.0)
+				main.shake(3.0)
 		"breath":
+			_strike_recoil(-_attack_dir, 0.8)   # rears back as the fire pours out
 			if main:
 				main.spawn_fire_field(_dive_target, 4.0 * TILE, 6.0, 6.0 * dmg_scale)
 

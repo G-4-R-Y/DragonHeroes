@@ -94,10 +94,13 @@ func _strike(player: Node2D) -> void:
 	var main := get_tree().get_first_node_in_group("main")
 	match skill:
 		"meteor":
+			_pose_pulse(1.24, 0.4)   # wings flare as the sky answers
 			_call_meteors(player)
 		"breath":
+			_strike_recoil(-_attack_dir, 0.9)   # rears back, pours the fire out
 			_breath(player, main)
 		"gust":
+			_pose_pulse(1.22, 0.32)   # wingbeat snap
 			if player and not player.dead and global_position.distance_to(
 					player.global_position) <= 4.5 * TILE:
 				player.take_damage(10.0 * dmg_scale, (player.global_position
@@ -106,12 +109,14 @@ func _strike(player: Node2D) -> void:
 						- global_position).normalized() * 4.5 * TILE)
 			if main:
 				main.fx.tornado(global_position)
+				main.shake(3.0)
 		"bolt":
 			var p := EmberProjectile.new()
 			p.global_position = global_position
 			p.velocity = _attack_dir * 18.0 * TILE
 			p.damage = 16.0 * dmg_scale
 			get_parent().add_child(p)
+			_strike_recoil(-_attack_dir, 0.6)
 			if main:
 				main.play_sfx("bolt", global_position, -8.0)
 

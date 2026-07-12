@@ -131,6 +131,7 @@ func _cast(skill: String, player: Node2D) -> void:
 			get_parent().add_child(tg)
 		"curse":
 			_timer = 0.4
+	_anticipate(_attack_dir, _timer)   # she gathers herself before every cast
 
 func _strike(player: Node2D) -> void:
 	if _pending == "":
@@ -152,13 +153,16 @@ func _strike(player: Node2D) -> void:
 						* 13.0 * TILE
 				p.damage = 9.0 * dmg_scale
 				get_parent().add_child(p)
+			_strike_recoil(-_attack_dir, 0.8)   # the volley shoves her backward
 			if main:
 				main.play_sfx("bolt", global_position, -8.0)
 		"blink":
 			_blink(player, main)
 		"summon":
+			_pose_pulse(1.2, 0.35)   # the call ripples through her
 			_summon(main)
 		"mire":
+			_strike_recoil(-_attack_dir, 0.5)   # flings the mire from her sleeves
 			if main:
 				main.spawn_field(_cast_target, 3.5 * TILE, 7.0, 3.0 * dmg_scale, "mire")
 		"curse":
@@ -166,10 +170,12 @@ func _strike(player: Node2D) -> void:
 			_cd_scale = 0.65
 			attack_cd *= 0.75
 			sprite.self_modulate = _base_tint * Color(1.4, 0.75, 1.1)
+			_pose_pulse(1.28, 0.4)
 			if main:
 				main.damage_number(global_position + Vector2(0, -30), 0,
 						Color("cf9dff"), "CURSED SHRIEK!")
 				main.play_sfx("boss_screech", global_position, -4.0)
+				main.shake(3.0)
 
 # Void Step, hag-flavored: 4 m hop away from the hunter (walkability-checked),
 # violet bursts at both ends. The landing recovery is punishable.
@@ -184,6 +190,7 @@ func _blink(player: Node2D, main: Node) -> void:
 				"v_max": 120.0, "s_min": 0.8, "s_max": 1.8,
 				"color": Color(0.65, 0.45, 1.0, 0.8)})
 	global_position = dest
+	_pose_punch(Vector2(0.55, 1.4), 0.0, 0.3)   # re-forms tall out of the void
 	if main:
 		main.fx.burst(global_position, {"amount": 10, "lifetime": 0.3, "v_min": 40.0,
 				"v_max": 120.0, "s_min": 0.8, "s_max": 1.8,

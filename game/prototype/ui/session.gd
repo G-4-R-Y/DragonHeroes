@@ -115,6 +115,9 @@ func login(pname: String) -> void:
 	if FileAccess.file_exists(save_path()):
 		_load_state()
 	else:
+		# A fresh hunter starts with points to spend: 2-3 actives learnable at
+		# the character screen, not one lonely root skill (Ricardo 2026-07-12).
+		skill_points = 3
 		save()   # claim the slot right away
 
 func save_path() -> String:

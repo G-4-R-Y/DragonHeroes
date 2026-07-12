@@ -1,7 +1,23 @@
-# Handoff — running state (updated 2026-07-11, v0.1.7)
+# Handoff — running state (updated 2026-07-12, v0.1.8)
 
 Read `CLAUDE.md` + `docs/00-canon.md` first (decisions log §12 is current through
-item 21). This file is the delta: exactly where work stopped and what's next.
+item 22). This file is the delta: exactly where work stopped and what's next.
+
+## v0.1.8 delta (2026-07-12) — UI/feel/PT-BR
+
+- **Visual skill tree** (character_panel.gd): drawn prerequisite connectors,
+  kind-icon chips w/ element accents, pulsing learnable states, pinned detail
+  card (live stat numbers, synergy highlight, Learn/assign 1-4). Fresh
+  hunters start w/ 3 points + two level-1 actives per class.
+- **Haven nav**: 2-wide grid — QUIT was cropped off-screen; now test-guarded.
+  Forge/enchanter action buttons above the fold; vendor leads with selling.
+- **Animation juice** (player/creature/bosses/projectiles): swing leans, cast
+  wind-ups, dodge afterimages (pooled ghosts), hit squash, death collapses,
+  boss anticipation tells; ~50-60 concurrent tweens worst case, 60 FPS holds.
+- **PT-BR** (ui/lang.gd ProtoLang): 330-key EN/PT chrome table + _pt data
+  twins; skill trees 145/145 nodes bilingual; toggle in menu + Haven,
+  persisted in user://settings.json; EN default (CI-safe). CODEX registry
+  PT twins = planned (registry "content_pt_twins").
 
 ## v0.1.7 delta (2026-07-11) — skill trees + flow tuning
 

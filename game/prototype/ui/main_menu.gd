@@ -14,20 +14,43 @@ var _class_btns := {}
 var _class_desc: Label
 
 # class-lite roster (proposal): shared kit, distinct casts. Full kits: design/10.
+# kit = what LMB and E actually cast; accent = the class's signature color.
+# Class names are proper nouns (never localized); kit/desc carry _pt twins
+# rendered through ProtoLang.pick.
 const CLASSES := {
-	"core.class.reaver": {"name": "Reaver",
-			"desc": "the balanced blade — umbral Shadow Rend, no tradeoffs"},
-	"core.class.emberkin": {"name": "Emberkin",
-			"desc": "+12% fire on every hit, 20% chance to Ignite — but -10% HP"},
-	"core.class.frostbinder": {"name": "Frostbinder",
-			"desc": "+15% HP and every hit Chills the enemy — but -8% damage"},
-	"core.class.mage": {"name": "Gloam Mage",
-			"desc": "ranged Arcane Bolts + Frost Nova (E) · +15% skill damage — but -20% HP"},
-	"core.class.rogue": {"name": "Veilblade",
-			"desc": "blinding-fast stabs + Fan of Knives (E) · +10% crit and move — but -15% HP"},
+	"core.class.reaver": {"name": "Reaver", "kit": "Cleave · Whirlwind",
+			"kit_pt": "Cutilada · Redemoinho",
+			"accent": Color("ff8a7a"),
+			"desc": "the balanced blade — umbral Shadow Rend, no tradeoffs",
+			"desc_pt": "a lâmina equilibrada — Rasgo Sombrio umbral, sem contrapartidas"},
+	"core.class.emberkin": {"name": "Emberkin", "kit": "Cleave · Whirlwind",
+			"kit_pt": "Cutilada · Redemoinho",
+			"accent": Color("ff9a3c"),
+			"desc": "+12% fire on every hit, 20% chance to Ignite — but -10% HP",
+			"desc_pt": "+12% de fogo em cada golpe, 20% de chance de Incendiar — mas -10% de HP"},
+	"core.class.frostbinder": {"name": "Frostbinder", "kit": "Cleave · Whirlwind",
+			"kit_pt": "Cutilada · Redemoinho",
+			"accent": Color("7fe7ff"),
+			"desc": "+15% HP and every hit Chills the enemy — but -8% damage",
+			"desc_pt": "+15% de HP e cada golpe Gela o inimigo — mas -8% de dano"},
+	"core.class.mage": {"name": "Gloam Mage", "kit": "Arcane Bolt · Frost Nova",
+			"kit_pt": "Seta Arcana · Nova de Gelo",
+			"accent": Color("cf9dff"),
+			"desc": "ranged Arcane Bolts + Frost Nova (E) · +15% skill damage — but -20% HP",
+			"desc_pt": "Setas Arcanas à distância + Nova de Gelo (E) · +15% de dano de habilidade — mas -20% de HP"},
+	"core.class.rogue": {"name": "Veilblade", "kit": "Swift Stab · Fan of Knives",
+			"kit_pt": "Estocada · Leque de Lâminas",
+			"accent": Color("cdd6dd"),
+			"desc": "blinding-fast stabs + Fan of Knives (E) · +10% crit and move — but -15% HP",
+			"desc_pt": "estocadas velozes como um piscar + Leque de Lâminas (E) · +10% de crítico e movimento — mas -15% de HP"},
 }
 
 func _ready() -> void:
+	_build()
+
+# The whole menu is code-built, so the language toggle just rebuilds it in
+# place (keeping whatever name was typed).
+func _build() -> void:
 	theme = ProtoTheme.get_theme()
 	var bg := ColorRect.new()
 	bg.color = Color("0c1116")
@@ -55,7 +78,7 @@ func _ready() -> void:
 	vb.add_child(title)
 
 	var sub := Label.new()
-	sub.text = "pre-alpha prototype"
+	sub.text = ProtoLang.t("menu_subtitle")
 	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	sub.add_theme_font_size_override("font_size", 12)
 	sub.add_theme_color_override("font_color", DIM)
@@ -63,23 +86,44 @@ func _ready() -> void:
 
 	vb.add_child(_spacer(10.0))
 
-	_name_edit = _edit(vb, "hunter name", false)
-	_edit(vb, "password", true)
+	_name_edit = _edit(vb, ProtoLang.t("menu_hunter_name"), false)
+	_edit(vb, ProtoLang.t("menu_password"), true)
 
 	vb.add_child(_spacer(4.0))
 
-	# class selection (new characters; existing saves keep their class)
+	# class selection (new characters; existing saves keep their class) — small
+	# cards: class name in its accent color + the actual LMB/E kit line under it
 	var class_row := HBoxContainer.new()
 	class_row.alignment = BoxContainer.ALIGNMENT_CENTER
 	class_row.add_theme_constant_override("separation", 6)
 	vb.add_child(class_row)
 	for cid in CLASSES:
+		var card: Dictionary = CLASSES[cid]
 		var cb := Button.new()
-		cb.text = str(CLASSES[cid]["name"])
 		cb.toggle_mode = true
 		cb.focus_mode = Control.FOCUS_NONE
-		cb.custom_minimum_size = Vector2(72, 0)
+		cb.custom_minimum_size = Vector2(104, 32)
 		cb.pressed.connect(_pick_class.bind(str(cid)))
+		var col := VBoxContainer.new()
+		col.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		col.alignment = BoxContainer.ALIGNMENT_CENTER
+		col.add_theme_constant_override("separation", 0)
+		col.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		cb.add_child(col)
+		var nm := Label.new()
+		nm.text = str(card["name"])
+		nm.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		nm.add_theme_font_size_override("font_size", 10)
+		nm.add_theme_color_override("font_color", card["accent"])
+		nm.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		col.add_child(nm)
+		var kit := Label.new()
+		kit.text = ProtoLang.pick(card, "kit")
+		kit.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		kit.add_theme_font_size_override("font_size", 7)
+		kit.add_theme_color_override("font_color", DIM)
+		kit.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		col.add_child(kit)
 		class_row.add_child(cb)
 		_class_btns[cid] = cb
 	_class_desc = Label.new()
@@ -92,7 +136,7 @@ func _ready() -> void:
 	vb.add_child(_spacer(4.0))
 
 	var btn := Button.new()
-	btn.text = "Enter the World"
+	btn.text = ProtoLang.t("menu_enter")
 	btn.custom_minimum_size = Vector2(190, 0)
 	btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	btn.pressed.connect(_enter)
@@ -105,20 +149,39 @@ func _ready() -> void:
 		for s in saves:
 			names.append("%s (lv %d)" % [str(s.name), int(s.level)])
 		var cont := Label.new()
-		cont.text = "saved hunters: %s — enter a name to continue" % " · ".join(names)
+		cont.text = ProtoLang.t("menu_saved") % " · ".join(names)
 		cont.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		cont.add_theme_font_size_override("font_size", 9)
 		cont.add_theme_color_override("font_color", Color("7fe7ff"))
 		vb.add_child(cont)
 
 	var foot := Label.new()
-	foot.text = "offline prototype login — real auth arrives with Nakama (docs/tech/26)"
+	foot.text = ProtoLang.t("menu_foot")
 	foot.position = Vector2(0, 344)
 	foot.size = Vector2(640, 14)
 	foot.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	foot.add_theme_font_size_override("font_size", 10)
 	foot.add_theme_color_override("font_color", DIM)
 	add_child(foot)
+
+	# EN / PT-BR toggle (Ricardo) — bottom-left, switches live and persists
+	# (user://settings.json via ProtoLang).
+	var lang_btn := Button.new()
+	lang_btn.text = ProtoLang.t("lang_toggle")
+	lang_btn.focus_mode = Control.FOCUS_NONE
+	lang_btn.add_theme_font_size_override("font_size", 8)
+	lang_btn.position = Vector2(8, 330)
+	lang_btn.pressed.connect(_toggle_lang)
+	add_child(lang_btn)
+
+func _toggle_lang() -> void:
+	ProtoLang.set_lang("pt" if ProtoLang.lang == "en" else "en")
+	var keep := _name_edit.text
+	for c in get_children():
+		remove_child(c)
+		c.queue_free()
+	_build()
+	_name_edit.text = keep
 
 func _edit(parent: Container, placeholder: String, is_secret: bool) -> LineEdit:
 	var e := LineEdit.new()
@@ -172,8 +235,10 @@ func _pick_class(cid: String) -> void:
 
 func _update_class_ui() -> void:
 	for cid in _class_btns:
-		_class_btns[cid].button_pressed = cid == _class_pick
-	_class_desc.text = str(CLASSES[_class_pick]["desc"])
+		var on: bool = cid == _class_pick
+		_class_btns[cid].button_pressed = on
+		_class_btns[cid].modulate = Color(1, 1, 1, 1.0 if on else 0.75)
+	_class_desc.text = ProtoLang.pick(CLASSES[_class_pick], "desc")
 
 func _enter() -> void:
 	var pname := _name_edit.text.strip_edges()

@@ -124,6 +124,13 @@
       ]
     },
     {
+      "name": "Localization",
+      "entries": [
+        {"key": "localization", "name": "Localization", "name_pt": "Localização", "desc": "chrome and content text carry _pt twins; ProtoLang picks by user language (user://settings.json, toggle in the main menu + Haven); skill trees fully bilingual (409 PT fields)", "status": "live"},
+        {"key": "content_pt_twins", "name": "Registry PT twins", "desc": "give every registry group/entry name_pt/desc_pt so the CODEX follows the language — data-only, zero engine work", "status": "planned"}
+      ]
+    },
+    {
       "name": "Mounts (walking + flying)",
       "entries": [
         {"key": "gloam_strider", "name": "Gloam Strider", "desc": "walking mount, x1.6 speed; sold by the Haven vendor (400 g)", "status": "live"},

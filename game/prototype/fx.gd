@@ -2,6 +2,8 @@
 # one-shot emitters (14 additive "emissive" + 8 normal "debris") plus 4 pooled
 # lightning Line2Ds — nothing is allocated mid-fight, and the worst case stays
 # under ~400 concurrent particles (22 emitters x <=24 amount + ambient/trails).
+# Juice pass adds two pooled primitives: afterimage GHOSTS (8 Sprite2Ds — dodge
+# trails, snapshot a frame texture and fade) and a DUST puff preset over burst().
 # The shipping path is GPU-driven particles with explicit budgets (docs/design/17);
 # this pool is its gl_compatibility stand-in and dies when dh-godot lands.
 class_name ProtoFx
@@ -10,17 +12,23 @@ extends Node2D
 const ADD_POOL := 20         # 100x pass (Ricardo): richer bursts, still pooled
 const NORM_POOL := 12
 const BOLT_POOL := 4
-const RING_POOL := 6         # expanding shockwave rings (Line2D circles)
+const RING_POOL := 8         # expanding shockwave rings (Line2D circles)
+const GHOST_POOL := 8        # afterimage sprites (dodge/dash trails)
 const MAX_AMOUNT := 40
 
 var _add: Array = []
 var _norm: Array = []
 var _bolts: Array = []
 var _rings: Array = []
+var _ghosts: Array = []
+var _bolt_tw: Array = []     # per-slot running tween — killed on slot reuse so a
+var _ring_tw: Array = []     # recycled node is never fought over by a stale fade
+var _ghost_tw: Array = []
 var _ai := 0
 var _ni := 0
 var _bi := 0
 var _ri := 0
+var _gi := 0
 
 func _ready() -> void:
 	z_index = 18
@@ -36,6 +44,7 @@ func _ready() -> void:
 		l.z_index = 30
 		add_child(l)
 		_bolts.append(l)
+		_bolt_tw.append(null)
 	for i in RING_POOL:
 		var r := Line2D.new()
 		r.width = 2.5
@@ -45,6 +54,21 @@ func _ready() -> void:
 		r.z_index = 24
 		add_child(r)
 		_rings.append(r)
+		_ring_tw.append(null)
+	for i in GHOST_POOL:
+		var g := Sprite2D.new()
+		g.visible = false
+		g.z_index = -8   # under the sparks/rings — trails read as behind the actor
+		add_child(g)
+		_ghosts.append(g)
+		_ghost_tw.append(null)
+
+# Kill the recycled slot's running tween before reprogramming the node.
+func _reuse(tweens: Array, idx: int) -> void:
+	var tw: Tween = tweens[idx]
+	if tw != null and tw.is_valid():
+		tw.kill()
+	tweens[idx] = null
 
 func _mk(add_blend: bool) -> CPUParticles2D:
 	var p := CPUParticles2D.new()
@@ -129,6 +153,8 @@ func tornado(at: Vector2) -> void:
 # Expanding shockwave ring — the punctuation mark under novas/impacts/slams.
 func ring(at: Vector2, color: Color, radius: float, duration := 0.35) -> void:
 	var r: Line2D = _rings[_ri]
+	_reuse(_ring_tw, _ri)
+	var slot := _ri
 	_ri = (_ri + 1) % RING_POOL
 	var pts := PackedVector2Array()
 	for i in 26:
@@ -145,6 +171,43 @@ func ring(at: Vector2, color: Color, radius: float, duration := 0.35) -> void:
 			.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 	tw.tween_property(r, "modulate:a", 0.0, duration)
 	tw.chain().tween_callback(func() -> void: r.visible = false)
+	_ring_tw[slot] = tw
+
+# Tiny pooled ring pop — projectile impact "squash flash" (short + small so the
+# knife-fan worst case can't starve the nova rings for long).
+func impact_pop(at: Vector2, color: Color) -> void:
+	ring(at, Color(color.r, color.g, color.b, 0.85), 9.0, 0.16)
+
+# Grounded dust puff (brute slams, pounce landings, boss dives) — normal-blend
+# so it reads as dirt, not light. Rides the same pooled burst path.
+func dust(at: Vector2, strength := 1.0) -> void:
+	burst(at, {"add": false, "amount": int(10.0 * strength), "lifetime": 0.45,
+			"direction": Vector2.UP, "spread": 70.0, "v_min": 20.0,
+			"v_max": 70.0 * strength, "gravity": Vector2(0, -30),
+			"s_min": 1.2, "s_max": 2.4 * strength,
+			"color": Color(0.62, 0.56, 0.45, 0.5)})
+
+# Pooled afterimage ghost: snapshot of an actor frame left behind by a dash.
+# Fades out fast; slot reuse kills the previous fade first (no fighting tweens).
+func afterimage(tex: Texture2D, at: Vector2, flip: bool, spr_scale: Vector2,
+		tint := Color(0.55, 0.9, 1.0, 0.45), life := 0.25) -> void:
+	if tex == null:
+		return
+	var g: Sprite2D = _ghosts[_gi]
+	_reuse(_ghost_tw, _gi)
+	var slot := _gi
+	_gi = (_gi + 1) % GHOST_POOL
+	g.texture = tex
+	g.global_position = at
+	g.flip_h = flip
+	g.global_scale = spr_scale
+	g.modulate = tint
+	g.visible = true
+	var tw := g.create_tween()
+	tw.tween_property(g, "modulate:a", 0.0, life) \
+			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw.tween_callback(func() -> void: g.visible = false)
+	_ghost_tw[slot] = tw
 
 # Directional melee slash trail — a tight fan of sparks along the swing edge.
 func arc_slash(at: Vector2, dir: Vector2, color: Color) -> void:
@@ -159,6 +222,8 @@ func arc_slash(at: Vector2, dir: Vector2, color: Color) -> void:
 # creature to creature on these. Same pooled Line2Ds as the sky bolts.
 func arc_link(from: Vector2, to: Vector2, color: Color) -> void:
 	var l: Line2D = _bolts[_bi]
+	_reuse(_bolt_tw, _bi)
+	var slot := _bi
 	_bi = (_bi + 1) % BOLT_POOL
 	var pts := PackedVector2Array()
 	var n := 5
@@ -174,10 +239,13 @@ func arc_link(from: Vector2, to: Vector2, color: Color) -> void:
 	var tw := l.create_tween()
 	tw.tween_property(l, "modulate:a", 0.0, 0.18)
 	tw.tween_callback(func() -> void: l.visible = false)
+	_bolt_tw[slot] = tw
 
 # Jagged white-blue strike from the sky — thunder SFX is the caller's business.
 func lightning(at: Vector2) -> void:
 	var l: Line2D = _bolts[_bi]
+	_reuse(_bolt_tw, _bi)
+	var slot := _bi
 	_bi = (_bi + 1) % BOLT_POOL
 	var pts := PackedVector2Array()
 	var from := at + Vector2(randf_range(-26.0, 26.0), -150.0)
@@ -195,5 +263,6 @@ func lightning(at: Vector2) -> void:
 	var tw := l.create_tween()
 	tw.tween_property(l, "modulate:a", 0.0, 0.22)
 	tw.tween_callback(func() -> void: l.visible = false)
+	_bolt_tw[slot] = tw
 	burst(at, {"amount": 10, "lifetime": 0.25, "v_min": 70.0, "v_max": 200.0,
 			"s_min": 0.7, "s_max": 1.6, "color": Color(0.8, 0.92, 1.0, 0.95)})

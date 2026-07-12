@@ -86,6 +86,13 @@ var _knockback := Vector2.ZERO
 var _stats_applied := false
 var sprite: AnimatedSprite2D
 var _shadow: Sprite2D
+# Juice pass: ONE pose tween (killed on re-trigger, never stacked) drives swing
+# lean/snap-back, cast pulses, dodge stretch and mount squash — transforms only,
+# GenForge frames untouched. Every tween's final keys ARE the base pose
+# (rotation 0, scale ONE, position (0, SPRITE_BASE_Y)); no per-frame allocation.
+const SPRITE_BASE_Y := -12.0
+var _anim_tw: Tween
+var _walk_t := 0.0               # walk-bob phase (pure math, no nodes)
 
 func _ready() -> void:
 	add_to_group("player")
@@ -211,6 +218,7 @@ func _physics_process(delta: float) -> void:
 					else (get_global_mouse_position() - global_position).normalized()
 			_dodging = 0.12
 			var main := get_tree().get_first_node_in_group("main")
+			_dodge_fx(_dodge_dir, main)   # stretch + pooled afterimages
 			if main:
 				main.play_sfx("swing", global_position, -16.0)   # soft whoosh
 				main.fx.burst(global_position, {"amount": 8, "lifetime": 0.28,
@@ -240,6 +248,8 @@ func _physics_process(delta: float) -> void:
 	step += _knockback * delta * 8.0
 	_knockback = _knockback.lerp(Vector2.ZERO, delta * 10.0)
 	_try_move(step)
+	if not mounted and _dodging <= 0.0 and step.length() > 0.05:
+		_walk_t += delta   # walk-bob phase only advances while actually stepping
 	_update_anim(step)
 	queue_redraw()
 
@@ -258,8 +268,99 @@ func _update_anim(step: Vector2) -> void:
 			sprite.flip_h = step.x < 0.0
 		if sprite.animation != "walk":
 			sprite.play("walk")
-	elif sprite.animation != "idle":
-		sprite.play("idle")
+		if _pose_free():   # step feel: subtle ground-contact bob (<=1.4 px)
+			sprite.position.y = SPRITE_BASE_Y - absf(sin(_walk_t * 10.0)) * 1.4
+	else:
+		if sprite.animation != "idle":
+			sprite.play("idle")
+		if _pose_free():
+			sprite.position.y = SPRITE_BASE_Y
+
+# ---- pose juice helpers (transform tweens on the ONE hero sprite) -----------------
+
+func _pose_free() -> bool:
+	return _anim_tw == null or not _anim_tw.is_valid() or not _anim_tw.is_running()
+
+func _kill_anim_tw() -> void:
+	if _anim_tw != null and _anim_tw.is_valid():
+		_anim_tw.kill()
+	_anim_tw = null
+
+func _reset_pose() -> void:
+	_kill_anim_tw()
+	sprite.rotation = 0.0
+	sprite.scale = Vector2.ONE
+	sprite.position = Vector2(0.0, SPRITE_BASE_Y)
+
+# Melee swing: snap INTO a directional lean + shove, spring back elastic.
+func _swing_lean(dir: Vector2, strength := 1.0) -> void:
+	_kill_anim_tw()
+	sprite.rotation = 0.17 * strength * (1.0 if dir.x >= 0.0 else -1.0)
+	sprite.scale = Vector2.ONE
+	sprite.position = Vector2(0.0, SPRITE_BASE_Y) + dir * 3.0 * strength
+	_anim_tw = create_tween().set_parallel(true)
+	_anim_tw.tween_property(sprite, "rotation", 0.0, 0.24) \
+			.set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
+	_anim_tw.tween_property(sprite, "position", Vector2(0.0, SPRITE_BASE_Y), 0.24) \
+			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+# Cast: brief wind-up pulse (1.0 -> 1.08 -> 1.0) + recoil kick off the release.
+func _cast_pulse(aim: Vector2) -> void:
+	_kill_anim_tw()
+	sprite.rotation = 0.0
+	sprite.scale = Vector2.ONE
+	sprite.position = Vector2(0.0, SPRITE_BASE_Y) - aim * 2.5
+	_anim_tw = create_tween().set_parallel(true)
+	_anim_tw.tween_property(sprite, "scale", Vector2.ONE * 1.08, 0.07) \
+			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	_anim_tw.tween_property(sprite, "scale", Vector2.ONE, 0.13).set_delay(0.07) \
+			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	_anim_tw.tween_property(sprite, "position", Vector2(0.0, SPRITE_BASE_Y), 0.16) \
+			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+
+# Whirlwind: one full sprite spin riding the strike.
+func _whirl_spin() -> void:
+	_reset_pose()
+	_anim_tw = create_tween()
+	_anim_tw.tween_property(sprite, "rotation", TAU, 0.28) \
+			.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	_anim_tw.tween_callback(func() -> void: sprite.rotation = 0.0)
+
+# Dodge: stretch along the dash + 3 pooled afterimage ghosts along the path.
+func _dodge_fx(dir: Vector2, main: Node) -> void:
+	_kill_anim_tw()
+	var ax := absf(dir.x)
+	var ay := absf(dir.y)
+	sprite.rotation = 0.0
+	sprite.position = Vector2(0.0, SPRITE_BASE_Y)   # clear any interrupted lean
+	sprite.scale = Vector2(1.0 + 0.3 * ax - 0.18 * ay, 1.0 + 0.3 * ay - 0.18 * ax)
+	_anim_tw = create_tween().set_parallel(true)
+	_anim_tw.tween_property(sprite, "scale", Vector2.ONE, 0.22).set_delay(0.05) \
+			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	if main:
+		for i in 3:
+			_anim_tw.tween_callback(_spawn_ghost.bind(main)) \
+					.set_delay(0.02 + 0.035 * i)
+
+# Snapshot the current hero frame into the pooled ghost sprites (fx.gd).
+func _spawn_ghost(main: Node) -> void:
+	if dead or sprite.sprite_frames == null:
+		return
+	var anim := sprite.animation
+	if sprite.sprite_frames.get_frame_count(anim) == 0:
+		return
+	main.fx.afterimage(sprite.sprite_frames.get_frame_texture(anim, sprite.frame),
+			sprite.global_position, sprite.flip_h, sprite.global_scale)
+
+# Mount/dismount: quick saddle squash (scale only — the mount owns position.y).
+func _mount_squash() -> void:
+	_kill_anim_tw()
+	sprite.rotation = 0.0
+	sprite.position.x = 0.0
+	sprite.scale = Vector2(1.22, 0.78)
+	_anim_tw = create_tween()
+	_anim_tw.tween_property(sprite, "scale", Vector2.ONE, 0.22) \
+			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 func _try_move(step: Vector2) -> void:
 	if mounted and str(mount_data.get("kind", "")) == "fly":
@@ -326,6 +427,7 @@ func _attack() -> void:
 	sprite.flip_h = _swing_dir.x < 0.0
 	sprite.play("attack")
 	sprite.frame = 0
+	_swing_lean(_swing_dir)   # lean into the cleave, elastic snap-back
 	var main := get_tree().get_first_node_in_group("main")
 	if main:
 		main.play_sfx("swing", global_position, -10.0)
@@ -351,6 +453,7 @@ func _shadow_rend(main: Node) -> void:
 	sprite.flip_h = _rend_dir.x < 0.0
 	sprite.play("attack")
 	sprite.frame = 0
+	_swing_lean(_rend_dir, 1.35)   # the bestial cleave throws the whole body
 	main.play_sfx("swing", global_position, -4.0)
 	main.fx.explosion(global_position, Color(0.62, 0.38, 1.0))   # umbral nova
 	main.fx.ring(global_position, Color(0.7, 0.45, 1.0, 0.9), rend_reach)
@@ -391,6 +494,7 @@ func _whirlwind() -> void:
 		hp = minf(hp + dmg * lp, max_hp)
 	sprite.play("attack")
 	sprite.frame = 0
+	_whirl_spin()   # the sprite rides the full-circle strike
 	if main:
 		main.play_sfx("swing", global_position, -6.0)
 		main.fx.tornado(global_position)
@@ -409,6 +513,7 @@ func _cast_bolt() -> void:
 	sprite.flip_h = _swing_dir.x < 0.0
 	sprite.play("attack")
 	sprite.frame = 0
+	_cast_pulse(_swing_dir)   # wind-up pulse + recoil off the bolt
 	var dmg := attack_damage * 0.9 * _buff_mult("damage")
 	if randf() < crit_chance:
 		dmg *= crit_mult
@@ -446,6 +551,7 @@ func _frost_nova() -> void:
 			hit_any = true
 	sprite.play("attack")
 	sprite.frame = 0
+	_cast_pulse(Vector2.ZERO)   # radial release: pulse without directional recoil
 	if main:
 		main.play_sfx("bolt", global_position, -8.0)
 		main.fx.ring(global_position, Color(0.7, 0.92, 1.0, 0.9), 2.8 * TILE)
@@ -466,6 +572,7 @@ func _fan_of_knives() -> void:
 	sprite.flip_h = aim.x < 0.0
 	sprite.play("attack")
 	sprite.frame = 0
+	_cast_pulse(aim)   # recoil off the fan release
 	for i in 5:
 		var p := ProtoProjectile.new()
 		p.friendly = true
@@ -534,6 +641,13 @@ func use_skill(def: Dictionary) -> bool:
 	sprite.flip_h = aim.x < 0.0
 	sprite.play("attack")
 	sprite.frame = 0
+	match kind:   # pose juice: swings lean, casts pulse (transform-only)
+		"melee_arc", "dash_strike":
+			_swing_lean(aim)
+		"nova", "buff", "field":
+			_cast_pulse(Vector2.ZERO)
+		_:
+			_cast_pulse(aim)
 	var hit_any := false
 	match kind:
 		"melee_arc":
@@ -760,6 +874,8 @@ func _exec_chain(def: Dictionary, p: Dictionary, aim: Vector2, dmg: float,
 func _exec_dash(def: Dictionary, p: Dictionary, aim: Vector2, dmg: float,
 		col: Color, main: Node) -> bool:
 	var start := global_position
+	if main:
+		_spawn_ghost(main)   # one afterimage left at the launch point
 	var dist := float(p.get("dist", 4.5)) * TILE
 	for _i in 8:   # stepped so walls still gate the dash
 		_try_move(aim * dist / 8.0)
@@ -856,6 +972,7 @@ func toggle_mount() -> void:
 	add_child(_mount_sprite)
 	move_child(_mount_sprite, 1)   # between shadow and hero — the hero rides on top
 	_mount_sprite.play("fly" if flying else "walk")
+	_mount_squash()   # the hero drops into the saddle
 	if main:
 		main.play_ui("capture", -14.0)
 
@@ -878,7 +995,8 @@ func _dismount(force := false) -> void:
 	mount_data = {}
 	if is_instance_valid(_mount_sprite):
 		_mount_sprite.queue_free()
-	sprite.position.y = -12.0
+	sprite.position.y = SPRITE_BASE_Y
+	_mount_squash()   # lands on his feet with a little give
 
 # Chill (frost wisp bolts, effects registry): -35% move while active.
 func apply_slow(duration: float) -> void:
@@ -888,6 +1006,7 @@ func apply_slow(duration: float) -> void:
 func _fire_echo() -> void:
 	if dead:
 		return
+	_swing_lean(_echo_dir, 0.5)   # the echo tugs the body along, half strength
 	if _echo_skill == "rend":
 		_rend_swing = 0.6
 		_arc_hit(_echo_dir, rend_reach, rend_arc_deg, rend_damage * 0.4,
@@ -943,6 +1062,7 @@ func take_damage(dmg: float, _from_dir: Vector2, dmg_type := "physical") -> void
 	if hp <= 0.0:
 		dead = true
 		visible = false
+		_reset_pose()   # never leave the sprite mid-tween across a respawn
 		if main:
 			main.on_player_death()
 
@@ -955,6 +1075,7 @@ func respawn(at: Vector2) -> void:
 	visible = true
 	dodge_charges = DODGE_CHARGES_MAX
 	_knockback = Vector2.ZERO
+	_reset_pose()
 	sprite.play("idle")
 
 # HUD gauge feeds (main.gd _update_gauges): fill fraction of the currently

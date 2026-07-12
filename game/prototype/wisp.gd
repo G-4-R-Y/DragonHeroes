@@ -74,6 +74,7 @@ func _strike(player: Node2D) -> void:
 	_timer = 0.5
 	_cd = attack_cd
 	if player == null or player.dead:
+		_pose_punch(Vector2.ONE, 0.0, 0.2)   # dry fire: release the windup lean
 		return
 	var dir := (player.global_position - global_position).normalized()
 	var p := Bolt.new()
@@ -88,6 +89,7 @@ func _strike(player: Node2D) -> void:
 	p.velocity = dir * 14.0 * TILE
 	p.damage = damage
 	get_parent().add_child(p)
+	_strike_recoil(-dir, 0.7)   # the orb kicks back as the bolt leaves it
 	var main := get_tree().get_first_node_in_group("main")
 	if main:
 		main.play_sfx("bolt", global_position, -10.0)

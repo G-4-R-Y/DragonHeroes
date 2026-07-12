@@ -59,11 +59,13 @@ func avenge() -> void:
 	move_speed *= 1.15
 	damage *= 1.2
 	sprite.self_modulate = _base_tint * Color(1.5, 0.72, 0.72)
+	_pose_pulse(1.3, 0.45)   # grief becomes fury — the body swells with it
 	var main := get_tree().get_first_node_in_group("main")
 	if main:
 		main.damage_number(global_position + Vector2(0, -34), 0, Color("ff6a4a"),
 				"VENGEANCE!")
 		main.play_sfx("boss_screech", global_position, -4.0)
+		main.shake(3.0)
 
 func _begin_cast(skill: String, player: Node2D, windup: float) -> void:
 	_pending = skill
@@ -76,6 +78,7 @@ func _begin_cast(skill: String, player: Node2D, windup: float) -> void:
 	sprite.flip_h = _attack_dir.x < 0.0
 	sprite.play("lunge")
 	sprite.frame = 0
+	_anticipate(_attack_dir, windup)   # legendary tells read in the body too
 
 func _telegraph_circle(at: Vector2, radius: float, dur: float,
 		col := Color(1.0, 0.55, 0.15, 0.35)) -> void:

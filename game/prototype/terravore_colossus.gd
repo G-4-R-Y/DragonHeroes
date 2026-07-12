@@ -79,10 +79,13 @@ func _strike(player: Node2D) -> void:
 	var main := get_tree().get_first_node_in_group("main")
 	match skill:
 		"quake":
+			_pose_punch(Vector2(1.34, 0.68), 0.0, 0.4)   # full-body ground slam
 			_quake(player, main)
 		"spikes":
+			_strike_recoil(_attack_dir, 1.2)   # rips the line open toward you
 			_spikes(player, main)
 		"upheaval":
+			_pose_punch(Vector2(1.18, 0.84), 0.0, 0.3)   # stomps the earth awake
 			if main:
 				main.spawn_field(_cast_target, 3.0 * TILE, 8.0, 5.0 * dmg_scale, "earth")
 		"boulder":
@@ -98,6 +101,7 @@ func _strike(player: Node2D) -> void:
 			p.velocity = _attack_dir * 10.0 * TILE
 			p.damage = 22.0 * dmg_scale
 			get_parent().add_child(p)
+			_strike_recoil(-_attack_dir, 0.9)   # the hurl rocks it backward
 			if main:
 				main.play_sfx("bolt", global_position, -6.0)
 
@@ -109,6 +113,7 @@ func _quake(player: Node2D, main: Node) -> void:
 		main.play_sfx("hit", global_position, -4.0)
 		for off in [Vector2.ZERO, Vector2(28, -10), Vector2(-30, 8)]:
 			main.fx.debris(global_position + off)
+		main.fx.dust(global_position, 2.0)   # the quake kicks a dirt curtain up
 	if player and not player.dead and global_position.distance_to(
 			player.global_position) <= 4.5 * TILE + player.body_radius:
 		player.take_damage(30.0 * dmg_scale, (player.global_position
