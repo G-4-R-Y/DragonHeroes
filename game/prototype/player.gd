@@ -225,6 +225,8 @@ func _physics_process(delta: float) -> void:
 						"direction": -_dodge_dir, "spread": 24.0, "v_min": 60.0,
 						"v_max": 150.0, "gravity": Vector2.ZERO, "s_min": 0.6,
 						"s_max": 1.4, "color": Color(0.55, 0.9, 1.0, 0.75)})
+				# §3: cyan dash streak along the dodge path (ghosts kept as accent)
+				main.fx.ribbon_streak(global_position, global_position + _dodge_dir * 4.0 * TILE, {"color": Color(0.55, 0.9, 1.0), "width": 7, "life": 0.25})
 			if _rune_dodge == "rune_of_the_gale":
 				_wind_burst(main)
 		if not mounted and Input.is_action_pressed("attack") and _attack_cd <= 0.0:
@@ -433,6 +435,11 @@ func _attack() -> void:
 		main.play_sfx("swing", global_position, -10.0)
 		main.fx.arc_slash(global_position + _swing_dir * attack_reach * 0.6,
 				_swing_dir, Color(0.85, 0.92, 1.0, 0.9))
+		if _kit == "rogue":   # §3: fast twin steel flick
+			main.fx.ribbon_arc(global_position + _swing_dir * attack_reach * 0.6, _swing_dir, {"life": 0.12, "width": 4, "color": Color(0.85, 0.92, 1.0, 0.9)})
+			main.fx.ribbon_arc(global_position + _swing_dir * attack_reach * 0.6, _swing_dir.rotated(0.16), {"life": 0.12, "width": 4, "color": Color(0.85, 0.92, 1.0, 0.9)})
+		else:   # §3: melee cleave crescent
+			main.fx.ribbon_arc(global_position + _swing_dir * attack_reach * 0.6, _swing_dir, {"span": 2.1, "width": 6, "color": Color(0.85, 0.92, 1.0, 0.9)})
 	var hit_any := _arc_hit(_swing_dir, attack_reach, attack_arc_deg,
 			attack_damage, Color("cfd6ff"), _rune_cleave)
 	if _rune_cleave == "rune_of_echoes":
@@ -442,6 +449,8 @@ func _attack() -> void:
 	if hit_any and main:
 		main.hitstop()
 		main.shake(2.0)
+		if _kit != "rogue":   # §3: cleave impact shockwave on connect
+			main.fx.shockwave(global_position + _swing_dir * attack_reach * 0.6, Color(0.85, 0.92, 1.0, 0.9), 24.0)
 
 # Shadow Rend — the bestial skill slot (Q): heavier umbral cleave, violet flash.
 func _shadow_rend(main: Node) -> void:
@@ -457,6 +466,12 @@ func _shadow_rend(main: Node) -> void:
 	main.play_sfx("swing", global_position, -4.0)
 	main.fx.explosion(global_position, Color(0.62, 0.38, 1.0))   # umbral nova
 	main.fx.ring(global_position, Color(0.7, 0.45, 1.0, 0.9), rend_reach)
+	# §3 signature: screen-filling umbral orbital + big violet cleave + shockwave + post kick
+	main.fx.orbital(global_position, {"count": 12, "turns": 1.5, "radius": 70.0, "color": Color(0.62, 0.38, 1.0)})
+	main.fx.ribbon_arc(global_position + _rend_dir * rend_reach * 0.6, _rend_dir, {"span": 2.1, "width": 10, "color": Color(0.7, 0.45, 1.0, 0.95)})
+	main.fx.shockwave(global_position, Color(0.62, 0.38, 1.0), 80.0)
+	if main.get("post") != null:
+		main.post.pulse(0.8)
 	var hit_any := _arc_hit(_rend_dir, rend_reach, rend_arc_deg,
 			rend_damage, Color("b06cff"), _rune_rend)   # violet hit sparks
 	if _rune_rend == "rune_of_echoes":
@@ -499,6 +514,9 @@ func _whirlwind() -> void:
 		main.play_sfx("swing", global_position, -6.0)
 		main.fx.tornado(global_position)
 		main.fx.ring(global_position, Color(0.85, 0.95, 1.0, 0.8), 2.6 * TILE)
+		# §3: orbital vortex tracking the hero + impact shockwave
+		main.fx.orbital(global_position, {"count": int(lerp(6.0, 20.0, ProtoFx.intensity)), "turns": 2.5, "radius": 26.0, "radius_jitter": 8.0, "life": 0.5, "owner": self})
+		main.fx.shockwave(global_position, Color(0.85, 0.95, 1.0), 60.0)
 		if hit_any:
 			main.hitstop()
 			main.shake(3.0)
@@ -533,6 +551,8 @@ func _cast_bolt() -> void:
 				"spread": 30.0, "v_min": 60.0, "v_max": 160.0,
 				"gravity": Vector2.ZERO, "s_min": 0.6, "s_max": 1.3,
 				"color": Color(0.75, 0.6, 1.0, 0.9)})
+		# §3: arcane muzzle orbital (bolt trail is projectile.gd, agent X)
+		main.fx.orbital(global_position + _swing_dir * 10.0 + Vector2(0, -10), {"count": 4, "radius": 4.0, "life": 0.2, "color": Color(0.75, 0.6, 1.0)})
 
 # Frost Nova (Gloam Mage E, proposal): radial chill burst, 0.7x + hard slow.
 func _frost_nova() -> void:
@@ -559,6 +579,9 @@ func _frost_nova() -> void:
 				"v_min": 60.0, "v_max": 190.0, "gravity": Vector2.ZERO,
 				"s_min": 0.8, "s_max": 1.8, "emission_radius": 10.0,
 				"color": Color(0.75, 0.95, 1.0, 0.85)})
+		# §3: triple frost shockwave + radial ribbon petals
+		main.fx.shockwave(global_position, Color(0.7, 0.92, 1.0), 2.8 * TILE, {"rings": 3})
+		main.fx.ribbon_radial(global_position, {"count": 12, "radius": 2.8 * TILE, "color": Color(0.7, 0.92, 1.0)})
 		if hit_any:
 			main.shake(2.5)
 
@@ -586,6 +609,8 @@ func _fan_of_knives() -> void:
 	if main:
 		main.play_sfx("swing", global_position, -6.0)
 		main.fx.arc_slash(global_position + aim * 12.0, aim, Color(0.85, 0.9, 0.95))
+		# §3: wide steel muzzle fan (per-knife trails are projectile.gd, agent X)
+		main.fx.ribbon_arc(global_position + aim * 12.0, aim, {"span": 1.4, "width": 5, "color": Color(0.85, 0.9, 0.95, 0.9)})
 
 func whirl_progress() -> float:
 	return clampf(1.0 - _whirl_cd / whirl_cd_s, 0.0, 1.0)
@@ -722,6 +747,9 @@ func _detonate_pop(at: Vector2, total: float, radius: float, main: Node) -> void
 	if main:
 		main.fx.explosion(at, Color(1.0, 0.5, 0.15))
 		main.fx.ring(at, Color(1.0, 0.55, 0.2, 0.85), radius)
+		# §3 Cinderburst detonate: fire shockwave + orbital burst
+		main.fx.shockwave(at, Color(1.0, 0.5, 0.15), radius)
+		main.fx.orbital(at, {"count": 6, "radius": 10.0, "life": 0.35, "color": Color(1.0, 0.55, 0.2)})
 		main.play_sfx("hit", at, -6.0)
 	for n in get_tree().get_nodes_in_group("creatures"):
 		if n.dead:
@@ -753,6 +781,8 @@ func _exec_arc(def: Dictionary, p: Dictionary, aim: Vector2, dmg: float,
 		if melee:
 			main.play_sfx("swing", global_position, -8.0)
 			main.fx.arc_slash(global_position + aim * reach * 0.6, aim, col)
+			# §3 melee_arc: element-tinted crescent
+			main.fx.ribbon_arc(global_position + aim * reach * 0.6, aim, {"span": 2.1, "width": 6, "color": col})
 		else:
 			main.play_sfx("bolt", global_position, -8.0)
 			if str(p.get("element", "ember")) == "ember":
@@ -763,6 +793,8 @@ func _exec_arc(def: Dictionary, p: Dictionary, aim: Vector2, dmg: float,
 						"spread": float(p.get("arc_deg", 50.0)) * 0.5,
 						"v_min": 140.0, "v_max": 240.0, "gravity": Vector2.ZERO,
 						"s_min": 1.2, "s_max": 2.6, "color": col})
+			# §3 cone: wide element-tinted ribbon sheet
+			main.fx.ribbon_arc(global_position + aim * 8.0, aim, {"span": 1.6, "width": 14, "color": col})
 	if hit:
 		if melee:
 			var lp := leech_pct + _buff_add("leech")
@@ -794,6 +826,9 @@ func _exec_nova(def: Dictionary, p: Dictionary, dmg: float, col: Color,
 		main.fx.burst(global_position, {"amount": 24, "lifetime": 0.4,
 				"v_min": 60.0, "v_max": 190.0, "gravity": Vector2.ZERO,
 				"s_min": 0.8, "s_max": 1.8, "emission_radius": 10.0, "color": col})
+		# §3 nova: triple shockwave + radial ribbon petals
+		main.fx.shockwave(global_position, col, radius, {"rings": 3})
+		main.fx.ribbon_radial(global_position, {"count": 12, "radius": radius, "color": col})
 		if hit:
 			main.shake(2.5)
 			main.refresh_hud()
@@ -827,6 +862,9 @@ func _exec_projectile(def: Dictionary, p: Dictionary, aim: Vector2, dmg: float,
 		get_parent().add_child(b)
 	if main:
 		main.play_sfx("bolt", global_position, -10.0)
+		# §3 projectile: muzzle orbital flare (bolt trails are projectile.gd, agent X)
+		var mcol: Color = ELEMENT_COLORS.get(str(p.get("element", "ember")), Color("cfd6ff"))
+		main.fx.orbital(global_position + Vector2(0, -10) + aim * 8.0, {"count": 4, "radius": 4.0, "life": 0.2, "color": mcol})
 
 func _nearest_creature(at: Vector2, max_d: float, exclude: Array) -> Node2D:
 	var best: Node2D = null
@@ -859,6 +897,7 @@ func _exec_chain(def: Dictionary, p: Dictionary, aim: Vector2, dmg: float,
 		visited.append(nxt)
 		if main:
 			main.fx.arc_link(from, nxt.global_position + Vector2(0, -8), col)
+			main.fx.shockwave(nxt.global_position, col, 14.0, {"rings": 1})   # §3: small pop per node
 		_skill_hit(nxt, falloff, (nxt.global_position - global_position).normalized(),
 				def, col, main)
 		from = nxt.global_position + Vector2(0, -8)
@@ -897,6 +936,9 @@ func _exec_dash(def: Dictionary, p: Dictionary, aim: Vector2, dmg: float,
 				"spread": 20.0, "v_min": 60.0, "v_max": 160.0,
 				"gravity": Vector2.ZERO, "s_min": 0.6, "s_max": 1.4, "color": col})
 		main.fx.arc_slash(global_position, aim, col)
+		# §3 dash_strike: streak along the traveled segment + landing shockwave
+		main.fx.ribbon_streak(start, global_position, {"color": col, "width": 7, "life": 0.25})
+		main.fx.shockwave(global_position, col, 30.0)
 	if hit:
 		var lp := leech_pct + _buff_add("leech")
 		if lp > 0.0:
@@ -912,6 +954,8 @@ func _exec_buff(def: Dictionary, p: Dictionary, main: Node) -> void:
 	if main:
 		main.play_ui("capture", -14.0)
 		main.fx.ring(global_position, Color(1.0, 0.85, 0.5, 0.8), 1.6 * TILE)
+		# §3 buff: green protective aura — bright ring + 3 orbiting ribbons for the duration
+		main.fx.aura(self, Color(0.45, 1.0, 0.55), {"radius": 22.0, "dur": float(p.get("duration", 5.0)), "orbit_ribbons": 3})
 		main.damage_number(global_position + Vector2(0, -30), 0, Color("ffd166"),
 				str(def.get("name", "?")).to_upper())
 
@@ -929,6 +973,16 @@ func _exec_field(p: Dictionary, main: Node) -> void:
 			float(p.get("duration", 6.0)),
 			attack_damage * float(p.get("dps_mult", 0.4)) * _skill_mult
 			* _buff_mult("damage"), str(p.get("field_kind", "fire")), true)
+	# §3 field: ignition orbital burst (the danger-ring telegraph is main.spawn_field, agent M)
+	var fcol := Color(1.0, 0.55, 0.2)
+	match str(p.get("field_kind", "fire")):
+		"mire":
+			fcol = Color(0.5, 0.85, 0.35)
+		"frost":
+			fcol = Color(0.6, 0.9, 1.0)
+		"earth":
+			fcol = Color(0.7, 0.55, 0.35)
+	main.fx.orbital(at, {"count": 5, "radius": 12.0, "life": 0.35, "color": fcol})
 
 func _buff_mult(key: String) -> float:
 	var m := 1.0
@@ -975,6 +1029,7 @@ func toggle_mount() -> void:
 	_mount_squash()   # the hero drops into the saddle
 	if main:
 		main.play_ui("capture", -14.0)
+		main.fx.orbital(global_position, {"count": 5, "radius": 14.0, "life": 0.3})   # §3: mount swirl
 
 # Flying mounts must land on walkable ground — unless forced (damage knocks you
 # out of the sky and you tumble to the nearest solid tile).
@@ -997,6 +1052,10 @@ func _dismount(force := false) -> void:
 		_mount_sprite.queue_free()
 	sprite.position.y = SPRITE_BASE_Y
 	_mount_squash()   # lands on his feet with a little give
+	var main := get_tree().get_first_node_in_group("main")   # §3: landing dust burst
+	if main:
+		main.fx.shockwave(global_position, Color(0.72, 0.62, 0.48), 30.0)
+		main.fx.dust(global_position)
 
 # Chill (frost wisp bolts, effects registry): -35% move while active.
 func apply_slow(duration: float) -> void:

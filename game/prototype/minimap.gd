@@ -13,7 +13,7 @@ var _span_tiles := Vector2i.ONE
 var _accum := 0.0
 
 func _ready() -> void:
-	layer = 2
+	layer = 12   # spec §2.0: above post(5)/damage(6)/HUD(10) — minimap stays crisp
 	var world := get_tree().get_first_node_in_group("world") as ProtoWorld
 	if world == null or world.chunks.is_empty():
 		return

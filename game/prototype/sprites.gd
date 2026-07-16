@@ -1144,6 +1144,28 @@ static func vignette_tex() -> ImageTexture:
 	_tex_cache["vignette"] = tex
 	return tex
 
+# Soft strip for the MultiMesh ribbon quads (ribbons.gd). Alpha is a transverse (Y)
+# gaussian falloff, ~uniform along the length (X), so abutting segment quads read as
+# ONE continuous glowing strip — a radial glow_tex() would go dotty at the joins.
+# Cached once like the other textures. Sampled with LINEAR filter on the ribbon node.
+const RIBBON_TEX_W := 32
+const RIBBON_TEX_H := 16
+
+static func ribbon_tex() -> ImageTexture:
+	if _tex_cache.has("ribbon"):
+		return _tex_cache["ribbon"]
+	var img := _img(RIBBON_TEX_W, RIBBON_TEX_H)
+	var cy := (RIBBON_TEX_H - 1) * 0.5
+	for y in RIBBON_TEX_H:
+		var dy := (y - cy) / cy               # -1 (top edge) .. +1 (bottom edge)
+		var a := exp(-3.5 * dy * dy)          # transverse gaussian; ~0 at the rims
+		a *= smoothstep(0.0, 0.12, 1.0 - absf(dy))   # crisp fade to zero at the edge
+		for x in RIBBON_TEX_W:
+			img.set_pixel(x, y, Color(1, 1, 1, clampf(a, 0.0, 1.0)))
+	var tex := _tex(img)
+	_tex_cache["ribbon"] = tex
+	return tex
+
 # ---- legacy shape helpers (projectiles etc.) ------------------------------------
 
 static func circle_tex(diameter: int, fill: Color, core: Color, outline: Color) -> ImageTexture:

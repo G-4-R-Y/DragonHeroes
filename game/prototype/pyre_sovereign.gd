@@ -109,6 +109,11 @@ func _strike(player: Node2D) -> void:
 						- global_position).normalized() * 4.5 * TILE)
 			if main:
 				main.fx.tornado(global_position)
+				main.fx.orbital(global_position, {"count": 10, "turns": 2.0,
+						"radius": 44.0, "radius_jitter": 8.0, "life": 0.5,
+						"color": Color(0.85, 0.95, 1.0)})
+				main.fx.shockwave(global_position, Color(0.85, 0.95, 1.0),
+						4.5 * TILE, {"rings": 2})
 				main.shake(3.0)
 		"bolt":
 			var p := EmberProjectile.new()
@@ -118,6 +123,8 @@ func _strike(player: Node2D) -> void:
 			get_parent().add_child(p)
 			_strike_recoil(-_attack_dir, 0.6)
 			if main:
+				main.fx.orbital(global_position + _attack_dir * 12.0,
+						{"count": 4, "radius": 5.0, "life": 0.22, "color": Color("ff9a4a")})
 				main.play_sfx("bolt", global_position, -8.0)
 
 # Meteor Call: 3 telegraphed points around the hunter, impacts land 0.9 s later
@@ -125,14 +132,18 @@ func _strike(player: Node2D) -> void:
 func _call_meteors(player: Node2D) -> void:
 	var world := get_tree().get_first_node_in_group("world")
 	var center: Vector2 = player.global_position if player else _cast_target
+	var main := get_tree().get_first_node_in_group("main")
 	for i in 3:
 		var at := center
 		if i > 0:
 			at = world.random_walkable_in_ring(center, 1.5 * TILE, 3.5 * TILE) \
 					if world else center + Vector2(randf_range(-56, 56), randf_range(-56, 56))
-		_telegraph_circle(at, 2.2 * TILE, 0.9)
+		# Sky-converging red BEAMS per meteor point (spec §3): the delayed-impact tell
+		# converges from the upper hemisphere onto the impact spot before it lands.
+		if main:
+			main.telegraphs.beams(at, Vector2.UP, {"count": 6, "spread": PI,
+					"converge_dist": 2.6 * TILE, "dur": 0.9})
 		_meteors.append({"pos": at, "t": 0.9})
-	var main := get_tree().get_first_node_in_group("main")
 	if main:
 		main.play_sfx("boss_screech", global_position, -12.0)
 
@@ -141,6 +152,9 @@ func _meteor_impact(at: Vector2) -> void:
 	if main == null:
 		return
 	main.fx.explosion(at, Color(1.0, 0.5, 0.15), true)
+	main.fx.shockwave(at, Color(1.0, 0.5, 0.15), 2.6 * TILE, {"rings": 3})
+	main.fx.orbital(at, {"count": 8, "turns": 1.2, "radius": 2.0 * TILE,
+			"radius_jitter": 10.0, "life": 0.45, "color": Color(1.0, 0.55, 0.2)})
 	main.shake(5.0)
 	main.play_sfx("hit", at, -6.0)
 	var player := get_tree().get_first_node_in_group("player")
@@ -153,6 +167,11 @@ func _meteor_impact(at: Vector2) -> void:
 func _breath(player: Node2D, main: Node) -> void:
 	var dir := _attack_dir
 	if main:
+		# flame SHEETS (ribbon crescents) layered over the ember particle cones
+		main.fx.ribbon_arc(global_position + dir * 0.8 * TILE, dir,
+				{"span": 1.6, "width": 16.0, "color": Color(1.0, 0.5, 0.15)})
+		main.fx.ribbon_arc(global_position + dir * 3.2 * TILE, dir,
+				{"span": 1.4, "width": 14.0, "color": Color(1.0, 0.62, 0.22)})
 		main.fx.flame_cone(global_position + dir * 0.8 * TILE, dir)
 		main.fx.flame_cone(global_position + dir * 3.2 * TILE, dir)
 		main.play_sfx("hit", global_position, -8.0)

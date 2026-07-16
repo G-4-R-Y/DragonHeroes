@@ -1,5 +1,12 @@
 # PROTOTYPE HARNESS — visual attack telegraphs. Color grammar is owned by
 # docs/design/17 §6.1; this prototype uses the hostile amber/ember family only.
+#
+# DEPRECATED (spec §2.4, 2026-07-15) — superseded by ProtoTelegraphs (telegraphs.gd),
+# the pooled 24-descriptor / 2-draw-call system held as main.telegraphs. This
+# per-cast `ProtoTelegraph.new()` node allocates one Node2D per windup. It is kept
+# fully functional ONLY until the 7 call sites (boss.gd / hag.gd / duo_boss.gd /
+# pyre_sovereign.gd / terravore_colossus.gd / creature.gd / main.gd) migrate to
+# main.telegraphs.ring/.line/.beams (agents M/C/B). Do not add new callers.
 class_name ProtoTelegraph
 extends Node2D
 

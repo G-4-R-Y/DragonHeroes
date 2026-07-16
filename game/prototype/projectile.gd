@@ -27,6 +27,7 @@ var pulse_amp := 0.08    # sine scale pulse for energy bolts (0 disables)
 var impact_ring := true  # steel opts out — the knife fan would starve the pool
 var _spr: Sprite2D
 var _t := 0.0
+var _trail_id := -1       # pooled ribbon trail (fx.trail_attach), -1 = none
 
 func set_violet() -> void:
 	dmg_type = "umbral"
@@ -72,24 +73,15 @@ func _ready() -> void:
 	_spr.texture = ProtoSprites.circle_tex(10, body_col, core_col, edge_col)
 	add_child(_spr)
 	_t = randf() * TAU   # desync pulses across a volley
-	# small ember trail left behind as the bolt travels
-	var trail := CPUParticles2D.new()
-	trail.amount = 8
-	trail.lifetime = 0.3
-	trail.local_coords = false
-	trail.direction = Vector2(0, -1)
-	trail.spread = 180.0
-	trail.gravity = Vector2(0, -40)
-	trail.initial_velocity_min = 2.0
-	trail.initial_velocity_max = 12.0
-	trail.scale_amount_min = 0.8
-	trail.scale_amount_max = 1.8
-	var ramp := Gradient.new()
-	ramp.offsets = PackedFloat32Array([0.0, 1.0])
-	ramp.colors = PackedColorArray([trail_a, trail_b])
-	trail.color_ramp = ramp
-	add_child(trail)
-	trail.emitting = true
+	# Pooled ribbon trail (§2.8): one STREAK_FOLLOW ribbon per bolt, replacing the
+	# per-bolt CPUParticles2D. The `life` fallback self-releases the ribbon if the
+	# bolt frees without an explicit detach — no leak. P/C/B deliberately do NOT
+	# attach here (would double the trail + burn a second pinned slot).
+	var main := get_tree().get_first_node_in_group("main")
+	if main != null and main.get("fx") != null:
+		_trail_id = main.fx.trail_attach(self, {
+				"color": trail_a, "width": maxf(radius * 1.1, 3.5),
+				"life": lifetime + 0.3})
 
 func _physics_process(delta: float) -> void:
 	# in-flight juice: pure transform math, zero allocation (60 FPS hard rule)
@@ -102,6 +94,7 @@ func _physics_process(delta: float) -> void:
 	global_position += velocity * delta
 	lifetime -= delta
 	if lifetime <= 0.0:
+		_release_trail()
 		queue_free()
 		return
 	if friendly:   # player-cast: swept check against every living creature
@@ -143,4 +136,15 @@ func _impact() -> void:
 		main.hit_spark(global_position, body_col)
 		if impact_ring:   # squash-flash pop (tiny pooled ring, fx.gd)
 			main.fx.impact_pop(global_position, body_col)
+	_release_trail()
 	queue_free()
+
+# Detach the pooled ribbon trail on either exit path. Cheap idempotent no-op if
+# never attached; the ribbon's own `life` fallback covers any path we miss.
+func _release_trail() -> void:
+	if _trail_id == -1:
+		return
+	var main := get_tree().get_first_node_in_group("main")
+	if main != null and main.get("fx") != null:
+		main.fx.trail_detach(_trail_id)
+	_trail_id = -1

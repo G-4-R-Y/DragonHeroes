@@ -9,7 +9,6 @@
 class_name ProtoDuoBoss
 extends ProtoCreature
 
-const Telegraph := preload("res://prototype/telegraph.gd")
 
 var partner: ProtoDuoBoss = null
 var display_name := "LEGENDARY"
@@ -62,10 +61,14 @@ func avenge() -> void:
 	_pose_pulse(1.3, 0.45)   # grief becomes fury — the body swells with it
 	var main := get_tree().get_first_node_in_group("main")
 	if main:
+		main.telegraphs.beams(global_position, Vector2.RIGHT,
+				{"count": 12, "spread": TAU, "converge_dist": 6.0 * TILE, "dur": 0.6})
+		main.fx.aura(self, Color(1.0, 0.28, 0.16), {"radius": body_radius + 10.0, "dur": 3.0})
 		main.damage_number(global_position + Vector2(0, -34), 0, Color("ff6a4a"),
 				"VENGEANCE!")
 		main.play_sfx("boss_screech", global_position, -4.0)
 		main.shake(3.0)
+		main.post.pulse(0.7)
 
 func _begin_cast(skill: String, player: Node2D, windup: float) -> void:
 	_pending = skill
@@ -82,25 +85,21 @@ func _begin_cast(skill: String, player: Node2D, windup: float) -> void:
 
 func _telegraph_circle(at: Vector2, radius: float, dur: float,
 		col := Color(1.0, 0.55, 0.15, 0.35)) -> void:
-	var t := Telegraph.new()
-	t.kind = Telegraph.Kind.CIRCLE
-	t.radius = radius
-	t.duration = dur
-	t.color = col
-	t.global_position = at
-	get_parent().add_child(t)
+	var main := get_tree().get_first_node_in_group("main")
+	if main:
+		main.telegraphs.ring(at, radius, dur, Color(col.r, col.g, col.b, 1.0))
 
 func _telegraph_line(to: Vector2, width: float, dur: float,
 		col := Color(1.0, 0.55, 0.15, 0.35)) -> void:
-	var t := Telegraph.new()
-	t.kind = Telegraph.Kind.LINE
-	t.direction = to - global_position
-	t.length = (to - global_position).length()
-	t.width = width
-	t.duration = dur
-	t.color = col
-	t.global_position = global_position
-	get_parent().add_child(t)
+	# Dramatic line tells (Cinder Breath, Stone Spikes) escalate to red converging
+	# BEAMS (spec §3): wedges advance inward along the corridor onto the strike point.
+	# width/col kept for caller compatibility; BEAMS render in the red danger family.
+	var main := get_tree().get_first_node_in_group("main")
+	if main == null:
+		return
+	var path := to - global_position
+	main.telegraphs.beams(to, (-path).normalized(), {"count": 5, "spread": 1.0,
+			"converge_dist": clampf(path.length() * 0.55, 90.0, 220.0), "dur": dur})
 
 # Corridor check shared by every line skill (dive-style segment-vs-circle).
 func _hits_corridor(player: Node2D, dir: Vector2, length: float, width: float) -> bool:

@@ -12,9 +12,16 @@ extends Node2D
 const ADD_POOL := 20         # 100x pass (Ricardo): richer bursts, still pooled
 const NORM_POOL := 12
 const BOLT_POOL := 4
-const RING_POOL := 8         # expanding shockwave rings (Line2D circles)
+const RING_POOL := 12        # expanding shockwave rings (was 8) — a 3-ring
+                             # fx.shockwave() can't starve the nova/impact rings
 const GHOST_POOL := 8        # afterimage sprites (dodge/dash trails)
 const MAX_AMOUNT := 40
+
+# Master spectacle / quality knob (spec §4). LOW/MED/HIGH = 0.15 / 0.5 / 1.0;
+# mobile default MED. Read by ribbons, post, damage numbers, and the particle
+# amount scale below. Governing invariant: pools are sized for the HIGH ceiling
+# at load; intensity gates per-frame USAGE only, never allocation.
+static var intensity: float = 0.5
 
 var _add: Array = []
 var _norm: Array = []
@@ -30,8 +37,14 @@ var _bi := 0
 var _ri := 0
 var _gi := 0
 
+var _ribbons: ProtoRibbons          # orbital / sweeping-trail MultiMesh (ribbons.gd)
+var _aura_seq := 0
+var _auras: Dictionary = {}         # handle -> {tele:int, ribbons:Array[int]}
+
 func _ready() -> void:
 	z_index = 18
+	_ribbons = ProtoRibbons.new()   # ONE MultiMesh, one draw call; sized for HIGH
+	add_child(_ribbons)
 	for i in ADD_POOL:
 		_add.append(_mk(true))
 	for i in NORM_POOL:
@@ -95,7 +108,9 @@ func burst(at: Vector2, cfg: Dictionary = {}) -> void:
 		p = _norm[_ni]
 		_ni = (_ni + 1) % NORM_POOL
 	p.global_position = at
-	p.amount = mini(int(cfg.get("amount", 12)), MAX_AMOUNT)
+	# intensity scales EMITTED amount only (pool node counts stay fixed); floor 1.
+	var amt_scale := lerpf(0.4, 1.0, intensity)
+	p.amount = clampi(int(round(int(cfg.get("amount", 12)) * amt_scale)), 1, MAX_AMOUNT)
 	p.lifetime = float(cfg.get("lifetime", 0.4))
 	p.direction = cfg.get("direction", Vector2.UP)
 	p.spread = float(cfg.get("spread", 180.0))
@@ -151,11 +166,13 @@ func tornado(at: Vector2) -> void:
 			"color": Color(0.8, 0.97, 1.0, 0.55)})
 
 # Expanding shockwave ring — the punctuation mark under novas/impacts/slams.
-func ring(at: Vector2, color: Color, radius: float, duration := 0.35) -> void:
+# `width` defaults to the pool's baseline 2.5; fx.shockwave() passes fatter rings.
+func ring(at: Vector2, color: Color, radius: float, duration := 0.35, width := 2.5) -> void:
 	var r: Line2D = _rings[_ri]
 	_reuse(_ring_tw, _ri)
 	var slot := _ri
 	_ri = (_ri + 1) % RING_POOL
+	r.width = width
 	var pts := PackedVector2Array()
 	for i in 26:
 		pts.append(Vector2.from_angle(TAU * i / 26.0))
@@ -266,3 +283,85 @@ func lightning(at: Vector2) -> void:
 	_bolt_tw[slot] = tw
 	burst(at, {"amount": 10, "lifetime": 0.25, "v_min": 70.0, "v_max": 200.0,
 			"s_min": 0.7, "s_max": 1.6, "color": Color(0.8, 0.92, 1.0, 0.95)})
+
+# ---- ribbon forwarders (ribbons.gd — orbital / sweeping-trail MultiMesh) --------
+# Thin pass-throughs so callers keep the main.fx.<preset>() contract. cfg keys
+# (all optional, sane defaults): count, radius(r0), r1, radius_jitter, turns,
+# ang_vel, span, dir, life, width, color, owner, cw.
+
+func orbital(center: Vector2, cfg: Dictionary = {}) -> void:
+	_ribbons.spawn_orbit(center, cfg)
+
+func ribbon_arc(at: Vector2, dir: Vector2, cfg: Dictionary = {}) -> void:
+	_ribbons.spawn_crescent(at, dir, cfg)
+
+func ribbon_streak(from: Vector2, to: Vector2, cfg: Dictionary = {}) -> void:
+	_ribbons.spawn_streak(from, to, cfg)
+
+func ribbon_radial(center: Vector2, cfg: Dictionary = {}) -> void:
+	_ribbons.spawn_radial(center, cfg)
+
+# STREAK_FOLLOW trail pinned to a node; returns an id. cfg.life is the orphan
+# fallback so a bolt that frees without trail_detach still self-releases.
+func trail_attach(node: Node2D, cfg: Dictionary = {}) -> int:
+	return _ribbons.attach(node, cfg)
+
+func trail_detach(id: int) -> void:
+	_ribbons.detach(id)
+
+# ---- shockwave: fat multi-ring impact / nova / death nova -----------------------
+# cfg: rings (default 3, staggered radii + phase), width (thicker than ring's 2.5),
+# life. Rides the pooled RING_POOL (bumped to 12 so a 3-ring wave can't starve it).
+func shockwave(at: Vector2, color: Color, radius: float, cfg: Dictionary = {}) -> void:
+	var rings := maxi(1, int(cfg.get("rings", 3)))
+	var w := float(cfg.get("width", 5.0))
+	var life := float(cfg.get("life", 0.45))
+	for n in rings:
+		var t := float(n) / float(rings)
+		var r := radius * (0.6 + 0.4 * t)                # staggered radii
+		var dur := life * (0.85 + 0.35 * t)              # staggered decay = phase feel
+		var a := clampf(0.85 - 0.18 * float(n), 0.25, 1.0)
+		ring(at, Color(color.r, color.g, color.b, a), r, dur, w * (1.0 - 0.2 * t))
+
+# ---- aura: persistent glowing ring + orbiting ribbons following an owner --------
+# Green = player buff protection; red/orange = boss enrage. Delegates the ring to
+# ProtoTelegraphs (AURA descriptor) and pins cfg.orbit_ribbons ORBIT ribbons tinted
+# to the owner. Returns an opaque handle for aura_detach(). cfg: radius, dur, pulse,
+# orbit_ribbons.
+func aura(owner: Node2D, color: Color, cfg: Dictionary = {}) -> int:
+	var radius := float(cfg.get("radius", 22.0))
+	var dur := float(cfg.get("dur", 2.0))
+	var orbits := maxi(0, int(cfg.get("orbit_ribbons", 3)))
+	var handle := _aura_seq
+	_aura_seq += 1
+	var tele := -1
+	var m := get_tree().get_first_node_in_group("main")
+	if m != null and m.get("telegraphs") != null:
+		tele = m.telegraphs.aura(owner, color, {"radius": radius, "dur": dur,
+				"pulse": cfg.get("pulse", true)})
+	var ids: Array = []
+	for n in orbits:
+		var id: int = _ribbons.pin_orbit(owner, {"radius": radius + 6.0, "life": dur,
+				"width": 4.0, "color": color, "turns": maxf(dur, 0.5),
+				"phase": TAU * float(n) / float(maxi(orbits, 1))})
+		if id >= 0:
+			ids.append(id)
+	_auras[handle] = {"tele": tele, "ribbons": ids}
+	return handle
+
+func aura_detach(handle: int) -> void:
+	if not _auras.has(handle):
+		return
+	var rec: Dictionary = _auras[handle]
+	var m := get_tree().get_first_node_in_group("main")
+	if int(rec.tele) >= 0 and m != null and m.get("telegraphs") != null:
+		m.telegraphs.clear(int(rec.tele))
+	for id in rec.ribbons:
+		_ribbons.detach(int(id))
+	_auras.erase(handle)
+
+# Aggregate pool health for the budget harness (fx.gd's own pools are fixed-size
+# round-robin; the ribbon sub-pool reports its live peak).
+func _pool_debug() -> Dictionary:
+	var rb: Dictionary = _ribbons._pool_debug() if _ribbons != null else {"size": 0, "peak_in_use": 0}
+	return {"ribbons": rb, "add_pool": ADD_POOL, "ring_pool": RING_POOL}

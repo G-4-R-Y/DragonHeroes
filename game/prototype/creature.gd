@@ -442,12 +442,21 @@ func _begin_windup(dir: Vector2) -> void:
 	sprite.play("lunge")
 	sprite.frame = 0
 	_anticipate(dir, windup_time)   # lean-back crouch — the tell reads in the body
-	if archetype == "brute":   # slam is radial — telegraph the landing circle
-		var tg := ProtoTelegraph.new()
-		tg.radius = 2.2 * TILE
-		tg.duration = windup_time
-		tg.position = global_position
-		get_parent().add_child(tg)
+	# Pooled amber danger ring under EVERY dangerous windup (spec §3) — migrated
+	# from the old brute-only ProtoTelegraph node. Center + radius match the real
+	# strike shape so the tell reads true; fire-and-forget (auto-expires with the
+	# windup). `telegraphs` is mounted by main — guard via get() until it exists.
+	var main := get_tree().get_first_node_in_group("main")
+	var tg = main.get("telegraphs") if main else null
+	if tg:
+		var ring_pos := global_position
+		var ring_r := attack_reach              # melee swipe: reach circle
+		if archetype == "brute":
+			ring_r = 2.2 * TILE                 # ground slam AoE (matches _strike)
+		elif archetype == "lunger" and _pounce_target != Vector2.ZERO:
+			ring_pos = _pounce_target           # telegraph the LANDING spot, not here
+			ring_r = 1.6 * TILE
+		tg.ring(ring_pos, ring_r, windup_time)
 
 func _strike(player: Node2D) -> void:
 	_state = "recover"
@@ -458,6 +467,7 @@ func _strike(player: Node2D) -> void:
 		_pose_punch(Vector2(1.3, 0.72), 0.0, 0.32)   # landing squash
 		if main:
 			main.shake(5.0)
+			main.fx.shockwave(global_position, _base_tint, 48.0)   # fat impact nova (spec §3)
 			main.fx.debris(global_position)
 			main.fx.dust(global_position, 1.5)   # dust rolls out of the slam
 			main.play_sfx("hit", global_position, -6.0)
@@ -482,6 +492,9 @@ func _strike(player: Node2D) -> void:
 		_pose_punch(Vector2(1.32, 0.76) if horiz else Vector2(0.76, 1.32),
 				0.12 * (1.0 if dash.x >= 0.0 else -1.0), 0.26)
 		if main:
+			main.fx.ribbon_streak(launch, global_position,
+					{"color": _base_tint, "width": 6.0, "life": 0.22})   # leap streak (spec §3)
+			main.fx.shockwave(global_position, _base_tint, 30.0)         # landing pop (spec §3)
 			main.fx.dust(launch, 0.8)   # kick-off dirt at the launch point
 			main.fx.burst(global_position, {"amount": 6, "lifetime": 0.25,
 					"v_min": 30.0, "v_max": 90.0, "s_min": 0.6, "s_max": 1.2,
@@ -615,7 +628,7 @@ func shove(dir: Vector2, dist: float) -> void:
 	if not dead:
 		_move(dir.normalized() * dist)
 
-func take_damage(dmg: float, from_dir: Vector2, spark_color := Color("cfd6ff")) -> void:
+func take_damage(dmg: float, from_dir: Vector2, spark_color := Color("cfd6ff"), crit := false) -> void:
 	if dead:
 		return
 	if _expose_t > 0.0:   # Exposed: +20% from ALL sources (skill-tree synergy)
@@ -627,7 +640,10 @@ func take_damage(dmg: float, from_dir: Vector2, spark_color := Color("cfd6ff")) 
 	_hit_squash(from_dir)                # directional squash, springs back
 	var main := get_tree().get_first_node_in_group("main")
 	if main:
-		main.damage_number(global_position + Vector2(0, -18), dmg, Color("ffe9d0"))
+		# Pooled punchy number (spec §2.5 / §3): crit → gold + bigger pop. The spark
+		# is pooled by main (routes to fx.burst). NO post.pulse per creature — a pack
+		# taking simultaneous hits would strobe the whole screen.
+		main.damage_number(global_position + Vector2(0, -18), dmg, Color("ffe9d0"), "", crit)
 		main.hit_spark(global_position, spark_color)
 		main.play_sfx("hit", global_position, -12.0)
 	if _state == "idle":

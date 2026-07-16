@@ -83,6 +83,19 @@
       ]
     },
     {
+      "name": "VFX systems (spectacle pass — Ricardo 2026-07-15)",
+      "entries": [
+        {"key": "orbital_ribbon", "name": "Orbital Ribbon Trails", "desc": "Pooled MultiMesh2D swept-quad ribbons (40x16=640 inst, 1 draw call, shared ADD material). Orbit/crescent/streak/radial modes drive whirlwind vortices, cleaves, dash streaks, projectile trails, death finales.", "status": "live"},
+        {"key": "screen_postfx", "name": "Screen Post-FX", "desc": "One full-frame canvas shader (chromatic aberration + vignette + over-bright) on a dedicated CanvasLayer(5). pulse() kicks aberration on signature hits; skipped below intensity 0.15. gl_compatibility fake-bloom; Vulkan adds HDR glow on top via set_hdr_mode.", "status": "live"},
+        {"key": "converging_beams", "name": "Converging Beam Telegraph", "desc": "Red tapered wedges converging inward before a boss impact (dive, screech, meteor, spikes, enrage). Pooled telegraph descriptor, never intensity-scaled.", "status": "live"},
+        {"key": "danger_ring", "name": "Ground Danger Ring", "desc": "Pooled amber filling ring under every dangerous windup (24-descriptor telegraph layer, 2 draw calls). Replaces per-cast telegraph nodes.", "status": "live"},
+        {"key": "protective_aura", "name": "Protective / Enrage Aura", "desc": "Persistent glowing ring + orbiting ribbons following an owner. Green = player buff protection; red/orange = boss enrage.", "status": "live"},
+        {"key": "punchy_numbers", "name": "Punchy Damage Numbers", "desc": "Pooled 48-label ring, scale-pop + crit grammar + vertical stacking, one shared _process, zero per-hit allocation.", "status": "live"},
+        {"key": "shockwave", "name": "Shockwave", "desc": "Fat multi-ring additive nova for impacts, novas, and deaths (RING_POOL 12).", "status": "live"},
+        {"key": "vfx_intensity", "name": "Intensity knob", "desc": "Single ProtoFx.intensity in [0,1] (LOW/MED/HIGH = 0.15/0.5/1.0, mobile default MED) gates per-frame usage only, never allocation; telegraphs exempt (gameplay clarity).", "status": "live"}
+      ]
+    },
+    {
       "name": "Fields & ground effects (tile interaction system)",
       "entries": [
         {"key": "fire_field", "name": "Fire field", "desc": "burning ground, DoT ticks every 0.25 s; glows and telegraphs on landing", "status": "live"},

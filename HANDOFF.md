@@ -1,7 +1,33 @@
-# Handoff — running state (updated 2026-07-12, v0.1.8)
+# Handoff — running state (updated 2026-07-15, v0.1.9)
 
 Read `CLAUDE.md` + `docs/00-canon.md` first (decisions log §12 is current through
-item 22). This file is the delta: exactly where work stopped and what's next.
+item 23). This file is the delta: exactly where work stopped and what's next.
+
+## v0.1.9 delta (2026-07-15) — spectacle VFX overhaul
+
+Reference: three commercial-ARPG spectacle screenshots. Full spec:
+docs/design/18-spectacle-vfx-spec.md. Engine decision (deep-research, verified):
+STAY ON GODOT (genre + our Godot+C++-sim+MultiMesh arch are proven; bloom wall was
+a renderer setting). Renderer = "Layered now + Vulkan-ready" (Ricardo): full look on
+gl_compatibility default w/ faked additive bloom; Vulkan opt-in adds real HDR glow via
+ProtoPost.set_hdr_mode() inside the EXISTING main.gd renderer branch (gate condition
+UNCHANGED — dev tests the Vulkan flip on real hardware; never auto-flip).
+
+- New engine (game/prototype/): ribbons.gd (ProtoRibbons MultiMesh, 640 inst/1 draw,
+  orbit/crescent/streak/streak_follow/radial), post.gd + post.gdshader (ProtoPost
+  CanvasLayer 5: chromatic aberration + vignette + over-bright; pulse/flash/set_intensity/
+  set_hdr_mode), telegraphs.gd (ProtoTelegraphs z=-2: ring/line/beams/aura, 24-pool,
+  2 draw calls), damage_numbers.gd (ProtoDamage layer 6: 48-label pool, crit grammar).
+- fx.gd gained 6 ribbon forwarders + shockwave + aura + static intensity; RING_POOL 12.
+- CanvasLayer renumber (M): HUD 10 / minimap 12 / kb+panel 14 / confirm 15 / post 5 /
+  dmg 6 (post grades world+ribbons+telegraphs, not UI; escapes the day/night tint).
+- 4 per-event allocators pooled away (hit_spark, damage_number, telegraph.gd nodes,
+  per-bolt projectile trail) — net node count DROPS.
+- Budget gate: tests/fx_stress.gd (FXSTRESS OK; ribbons 40/40, labels 48/48,
+  telegraphs 20/24, 0 nodes after warmup, 5.9ms). ONE knob ProtoFx.intensity (MED
+  mobile default) gates usage not allocation; telegraphs exempt.
+- STILL HEADLESS-ONLY VERIFIED. The look itself + additive fill-rate on mid-mobile
+  need Ricardo's eyes + a manual --print-fps run (canon "profile before/after").
 
 ## v0.1.8 delta (2026-07-12) — UI/feel/PT-BR
 
@@ -58,12 +84,14 @@ item 22). This file is the delta: exactly where work stopped and what's next.
 
 ## Top backlog (Ricardo's asks not yet landed)
 
-1. **Real gen-AI image provider** into the GenForge seam (stub provider today);
+1. **Measure Godot Vulkan mid-mobile 60 FPS** (unproven per research) + confirm the
+   dev's X-crash is gone on current 4.6 before defaulting to the Vulkan renderer.
+2. **Real gen-AI image provider** into the GenForge seam (stub provider today);
    tile/texture bundles so terrain gets the same treatment as actors.
-2. **Paper-doll**: equipped gear visible on the hero sprite (+ per-slot particles).
-3. **Sixth class** (design/10 names six at launch; five are live) + per-class
+3. **Paper-doll**: equipped gear visible on the hero sprite (+ per-slot particles).
+4. **Sixth class** (design/10 names six at launch; five are live) + per-class
    resources beyond Attunement/Combo charges.
-4. Skill-tree balance pass after play (100 actives are fresh); message log;
+5. Skill-tree balance pass after play (100 actives are fresh); message log;
    R bestial slot; 7-element bolt flavors (storm/venom/blood wisps currently
    fall back to umbral — see registry `wisp_element_flavor`).
 

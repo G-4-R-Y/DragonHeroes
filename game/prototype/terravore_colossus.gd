@@ -103,6 +103,8 @@ func _strike(player: Node2D) -> void:
 			get_parent().add_child(p)
 			_strike_recoil(-_attack_dir, 0.9)   # the hurl rocks it backward
 			if main:
+				main.fx.orbital(global_position + _attack_dir * 16.0,
+						{"count": 6, "radius": 10.0, "life": 0.3, "color": Color(0.7, 0.55, 0.35)})
 				main.play_sfx("bolt", global_position, -6.0)
 
 # Earthshatter: radial quake — shake, debris, big radial hit, an earth field
@@ -111,6 +113,9 @@ func _quake(player: Node2D, main: Node) -> void:
 	if main:
 		main.shake(9.0)
 		main.play_sfx("hit", global_position, -4.0)
+		main.fx.shockwave(global_position, Color(0.72, 0.54, 0.32), 90.0,
+				{"rings": 3, "width": 7.0})
+		main.post.pulse(0.7)
 		for off in [Vector2.ZERO, Vector2(28, -10), Vector2(-30, 8)]:
 			main.fx.debris(global_position + off)
 		main.fx.dust(global_position, 2.0)   # the quake kicks a dirt curtain up
@@ -126,8 +131,14 @@ func _spikes(player: Node2D, main: Node) -> void:
 	var dir := _attack_dir
 	if main:
 		main.shake(4.0)
+		# eruptions march down the corridor: radial earth ribbons + a small shock pop
+		# + the existing debris at each step (the red BEAMS converging tell was the windup)
 		for d in [2.0, 4.0, 6.0, 8.0]:
-			main.fx.debris(global_position + dir * d * TILE, Color(0.55, 0.45, 0.3))
+			var at: Vector2 = global_position + dir * d * TILE
+			main.fx.ribbon_radial(at, {"count": 4, "radius": 20.0, "life": 0.3,
+					"color": Color(0.72, 0.54, 0.32)})
+			main.fx.shockwave(at, Color(0.68, 0.5, 0.3), 26.0, {"rings": 1, "width": 4.0})
+			main.fx.debris(at, Color(0.55, 0.45, 0.3))
 		main.play_sfx("hit", global_position, -7.0)
 	if _hits_corridor(player, dir, 8.0 * TILE, 40.0):
 		player.take_damage(26.0 * dmg_scale, dir)

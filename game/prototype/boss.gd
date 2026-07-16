@@ -8,7 +8,6 @@ class_name ProtoBoss
 extends ProtoCreature
 
 const EmberProjectile := preload("res://prototype/projectile.gd")
-const Telegraph := preload("res://prototype/telegraph.gd")
 
 var display_name := "EMBERWING MATRIARCH — Elite"   # boss bar (main._update_boss_bar)
 var bar_color := Color("ff7a33")
@@ -138,9 +137,14 @@ func _strike(player: Node2D) -> void:
 			get_parent().add_child(p)
 			_strike_recoil(-_attack_dir, 0.6)   # kick back off the shot
 			if main:
+				# muzzle swirl (spec §3 bolt); the bolt's ribbon trail is intrinsic
+				# to projectile.gd (agent X, spec §2.8) — not re-attached here.
+				main.fx.orbital(global_position + _attack_dir * 12.0,
+						{"count": 4, "radius": 5.0, "life": 0.22, "color": Color("ff9a4a")})
 				main.play_sfx("bolt", global_position, -8.0)
 		"dive":
 			var path := _dive_target - global_position
+			var start := global_position   # streak the whole dive arc (spec §3)
 			if player and not player.dead:
 				var seg := path
 				var t := clampf((player.global_position - global_position).dot(seg) / seg.length_squared(), 0.0, 1.0)
@@ -152,9 +156,13 @@ func _strike(player: Node2D) -> void:
 			_pose_punch(Vector2(1.35, 0.72) if horiz else Vector2(0.72, 1.35),
 					0.14 * (1.0 if path.x >= 0.0 else -1.0), 0.3)
 			if main:
+				main.fx.ribbon_streak(start, global_position,
+						{"color": Color(1.0, 0.5, 0.15), "width": 8.0, "life": 0.28})
 				main.hit_spark(global_position, Color("ff7a33"))
 				main.fx.dust(global_position, 1.6)
+				main.fx.shockwave(global_position, Color(1.0, 0.5, 0.15), 70.0)
 				main.shake(4.0)   # her landing carries weight
+				main.post.pulse(0.6)
 		"gust":
 			_pose_pulse(1.22, 0.32)   # wings snap wide
 			if player and not player.dead \
@@ -163,6 +171,11 @@ func _strike(player: Node2D) -> void:
 				player.knockback((player.global_position - global_position).normalized() * 4.0 * TILE)
 			if main:
 				main.fx.tornado(global_position)
+				main.fx.orbital(global_position, {"count": 10, "turns": 2.0,
+						"radius": 46.0, "radius_jitter": 8.0, "life": 0.5,
+						"color": Color(0.8, 0.97, 1.0)})
+				main.fx.shockwave(global_position, Color(0.8, 0.97, 1.0), 5.0 * TILE,
+						{"rings": 2})
 				main.shake(3.0)
 		"screech":
 			_enraged = true
@@ -170,31 +183,34 @@ func _strike(player: Node2D) -> void:
 			sprite.self_modulate = Color(1.5, 0.75, 0.75)
 			_pose_pulse(1.28, 0.4)   # the enrage swells through her
 			if main:
+				main.telegraphs.beams(global_position, Vector2.RIGHT,
+						{"count": 12, "spread": TAU, "converge_dist": 5.5 * TILE, "dur": 0.6})
+				main.fx.aura(self, Color(1.0, 0.28, 0.16), {"radius": 26.0, "dur": 3.0})
 				main.damage_number(global_position + Vector2(0, -30), 0, Color("ff6a4a"), "ENRAGED!")
 				main.play_sfx("boss_screech", global_position, -4.0)
 				main.shake(3.0)
+				main.post.pulse(0.7)
 		"breath":
 			_strike_recoil(-_attack_dir, 0.8)   # rears back as the fire pours out
 			if main:
+				main.fx.ribbon_arc(global_position + _attack_dir * 0.8 * TILE, _attack_dir,
+						{"span": 1.6, "width": 16.0, "color": Color(1.0, 0.5, 0.15)})
 				main.spawn_fire_field(_dive_target, 4.0 * TILE, 6.0, 6.0 * dmg_scale)
 
 func _telegraph_circle(at: Vector2, radius: float, dur: float) -> void:
-	var t := Telegraph.new()
-	t.kind = Telegraph.Kind.CIRCLE
-	t.radius = radius
-	t.duration = dur
-	t.global_position = at
-	get_parent().add_child(t)
+	var main := get_tree().get_first_node_in_group("main")
+	if main:
+		main.telegraphs.ring(at, radius, dur)
 
 func _telegraph_line(to: Vector2) -> void:
-	var t := Telegraph.new()
-	t.kind = Telegraph.Kind.LINE
-	t.direction = to - global_position
-	t.length = (to - global_position).length()
-	t.width = 44.0
-	t.duration = 0.4
-	t.global_position = global_position
-	get_parent().add_child(t)
+	# Talon Dive → red converging BEAMS (spec §3): wedges advance inward along the
+	# dive corridor onto the landing point before she commits.
+	var main := get_tree().get_first_node_in_group("main")
+	if main == null:
+		return
+	var path := to - global_position
+	main.telegraphs.beams(to, (-path).normalized(), {"count": 5, "spread": 1.1,
+			"converge_dist": clampf(path.length() * 0.55, 90.0, 200.0), "dur": 0.4})
 
 func _die() -> void:
 	var main := get_tree().get_first_node_in_group("main")

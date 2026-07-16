@@ -92,4 +92,16 @@ func _strike(player: Node2D) -> void:
 	_strike_recoil(-dir, 0.7)   # the orb kicks back as the bolt leaves it
 	var main := get_tree().get_first_node_in_group("main")
 	if main:
+		# Muzzle swirl as the bolt leaves the orb (spec §3), element-tinted. The
+		# short danger ring is fired by the base _begin_windup; the bolt's ribbon
+		# trail is owned by projectile.gd (self-attaches) — no trail_attach here,
+		# or the bolt would carry two trails.
+		var muzzle_col := Color(0.68, 0.5, 1.0)   # umbral violet (default)
+		match element:
+			"ember":
+				muzzle_col = Color(1.0, 0.55, 0.25)
+			"frost":
+				muzzle_col = Color(0.6, 0.9, 1.0)
+		main.fx.orbital(global_position + dir * 6.0,
+				{"count": 4, "radius": 4.0, "life": 0.2, "color": muzzle_col})
 		main.play_sfx("bolt", global_position, -10.0)

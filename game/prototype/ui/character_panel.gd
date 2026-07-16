@@ -44,7 +44,7 @@ var _sk_detail: PanelContainer
 var _sk_detail_box: VBoxContainer
 
 func _ready() -> void:
-	layer = 4
+	layer = 14   # spec §2.0: above post(5)/damage(6)/HUD(10)/minimap(12)
 	visible = false
 	var panel := PanelContainer.new()
 	panel.theme = ProtoTheme.get_theme()

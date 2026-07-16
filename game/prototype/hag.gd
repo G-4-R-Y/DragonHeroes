@@ -9,7 +9,6 @@ class_name ProtoHag
 extends ProtoCreature
 
 const HexProjectile := preload("res://prototype/projectile.gd")
-const Telegraph := preload("res://prototype/telegraph.gd")
 
 const MIRE_COLOR := Color(0.5, 0.85, 0.3, 0.35)
 
@@ -122,13 +121,10 @@ func _cast(skill: String, player: Node2D) -> void:
 		"mire":
 			_timer = 0.5
 			_skill_cd["mire"] = 10.0 * _cd_scale
-			var tg := Telegraph.new()
-			tg.kind = Telegraph.Kind.CIRCLE
-			tg.radius = 3.5 * TILE
-			tg.duration = 0.5
-			tg.color = MIRE_COLOR
-			tg.global_position = _cast_target
-			get_parent().add_child(tg)
+			var main := get_tree().get_first_node_in_group("main")
+			if main:
+				main.telegraphs.ring(_cast_target, 3.5 * TILE, 0.5,
+						Color(MIRE_COLOR.r, MIRE_COLOR.g, MIRE_COLOR.b, 1.0))
 		"curse":
 			_timer = 0.4
 	_anticipate(_attack_dir, _timer)   # she gathers herself before every cast
@@ -155,6 +151,8 @@ func _strike(player: Node2D) -> void:
 				get_parent().add_child(p)
 			_strike_recoil(-_attack_dir, 0.8)   # the volley shoves her backward
 			if main:
+				main.fx.orbital(global_position + _attack_dir * 10.0,
+						{"count": 4, "radius": 5.0, "life": 0.24, "color": Color(0.68, 0.5, 1.0)})
 				main.play_sfx("bolt", global_position, -8.0)
 		"blink":
 			_blink(player, main)
@@ -172,10 +170,14 @@ func _strike(player: Node2D) -> void:
 			sprite.self_modulate = _base_tint * Color(1.4, 0.75, 1.1)
 			_pose_pulse(1.28, 0.4)
 			if main:
+				main.telegraphs.beams(global_position, Vector2.RIGHT,
+						{"count": 12, "spread": TAU, "converge_dist": 5.0 * TILE, "dur": 0.6})
+				main.fx.aura(self, Color(1.0, 0.3, 0.18), {"radius": 24.0, "dur": 3.0})
 				main.damage_number(global_position + Vector2(0, -30), 0,
 						Color("cf9dff"), "CURSED SHRIEK!")
 				main.play_sfx("boss_screech", global_position, -4.0)
 				main.shake(3.0)
+				main.post.pulse(0.6)
 
 # Void Step, hag-flavored: 4 m hop away from the hunter (walkability-checked),
 # violet bursts at both ends. The landing recovery is punishable.
@@ -185,17 +187,25 @@ func _blink(player: Node2D, main: Node) -> void:
 	var dest := global_position + away.rotated(randf_range(-0.5, 0.5)) * 4.0 * TILE
 	if world and not world.is_walkable(dest):
 		dest = world.random_walkable_in_ring(global_position, 3.0 * TILE, 4.5 * TILE)
+	var vanish := global_position
 	if main:
+		# void-warp IMPLODE: a violet streak collapses into the vanish point
+		main.fx.ribbon_streak(vanish + Vector2(0, -30), vanish,
+				{"color": Color(0.68, 0.5, 1.0), "width": 6.0, "life": 0.18})
 		main.fx.burst(global_position, {"amount": 10, "lifetime": 0.3, "v_min": 40.0,
 				"v_max": 120.0, "s_min": 0.8, "s_max": 1.8,
 				"color": Color(0.65, 0.45, 1.0, 0.8)})
 	global_position = dest
 	_pose_punch(Vector2(0.55, 1.4), 0.0, 0.3)   # re-forms tall out of the void
 	if main:
+		# void-warp EXPLODE: a violet streak bursts up out of the arrival point
+		main.fx.ribbon_streak(dest, dest + Vector2(0, -30),
+				{"color": Color(0.68, 0.5, 1.0), "width": 6.0, "life": 0.22})
 		main.fx.burst(global_position, {"amount": 10, "lifetime": 0.3, "v_min": 40.0,
 				"v_max": 120.0, "s_min": 0.8, "s_max": 1.8,
 				"color": Color(0.65, 0.45, 1.0, 0.8)})
 		main.play_sfx("swing", global_position, -10.0)
+		main.post.pulse(0.4)
 
 func _summon(main: Node) -> void:
 	var world := get_tree().get_first_node_in_group("world")
@@ -208,6 +218,8 @@ func _summon(main: Node) -> void:
 		get_parent().add_child(w)
 		_wisplings.append(w)
 		if main:
+			main.fx.orbital(w.global_position, {"count": 5, "radius": 8.0, "life": 0.3,
+					"color": Color(0.55, 0.95, 0.6)})
 			main.fx.burst(w.global_position, {"amount": 8, "lifetime": 0.35,
 					"v_min": 30.0, "v_max": 90.0, "s_min": 0.7, "s_max": 1.4,
 					"color": Color(0.55, 0.95, 0.6, 0.75)})

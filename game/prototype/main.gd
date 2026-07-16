@@ -92,6 +92,9 @@ var legendary_boss: Variant = null
 var _legendary_name := ""        # hint line flavor while the legendary stands
 var camera: Camera2D
 var fx: ProtoFx                  # pooled elemental VFX (fx.gd): bursts/lightning
+var post: ProtoPost              # full-frame post-process (spec §2.3, CanvasLayer 5)
+var telegraphs: ProtoTelegraphs  # pooled danger telegraphs + aura (spec §2.4, z=-2)
+var _dmg: ProtoDamage            # pooled punchy damage numbers (spec §2.5, layer 6)
 var _bosses: Array = []          # every boss node: hag, duo pair, Matriarch
 var _shake := 0.0
 var _fields: Array = []          # {pos, radius, until, dps, tick, kind, glow}
@@ -148,6 +151,21 @@ func _ready() -> void:
 	fx = ProtoFx.new()   # pooled one-shot emitters — nothing allocates mid-fight
 	add_child(fx)
 
+	# Spectacle-VFX hosts (spec §2.0). CanvasLayer stack: post grades world+fx+
+	# ribbons+telegraphs from its own layer 5; damage numbers ride layer 6 ABOVE
+	# post so pixel text stays crisp; telegraphs live on the DEFAULT canvas at
+	# z=-2 so _cycle tints them (in-world read) and post still grades them. All
+	# pools are sized for the HIGH ceiling at load — intensity gates usage only.
+	post = ProtoPost.new()
+	add_child(post)
+	telegraphs = ProtoTelegraphs.new()
+	add_child(telegraphs)
+	_dmg = ProtoDamage.new()
+	add_child(_dmg)
+	# Master quality knob (spec §4): ProtoFx.intensity is the static master, mobile
+	# default MED (0.5); sync the post pass to it. No separate quality setting exists.
+	post.set_intensity(ProtoFx.intensity)
+
 	# OPT-IN Vulkan/Metal HDR glow (canon §4): under forward_plus/mobile the
 	# additive "emissive" sprites feed a real WorldEnvironment bloom. Nothing
 	# changes on gl_compatibility (project.godot still ships it) — the only way
@@ -164,6 +182,12 @@ func _ready() -> void:
 		var we := WorldEnvironment.new()
 		we.environment = env
 		add_child(we)
+		# Vulkan seam (spec §1): dial the faked over-bright toward 0 so real HDR
+		# WorldEnvironment glow takes over without stacking into a blown frame.
+		post.set_hdr_mode(true)
+	else:
+		# gl_compatibility: full faked additive bloom via the post over-bright term.
+		post.set_hdr_mode(false)
 
 	# day/night: CanvasModulate tints the world canvas only — HUD CanvasLayers escape it
 	_cycle = CanvasModulate.new()
@@ -175,7 +199,7 @@ func _ready() -> void:
 	for pet_data in Session.pets:   # every bonded pet joins every hunt (3 slots)
 		_spawn_pet(pet_data, world.random_walkable_in_ring(
 				player.global_position, TILE, 2.5 * TILE))
-	add_child(AmbientScene.new())   # spores + vignette (before HUD: same canvas layer)
+	add_child(AmbientScene.new())   # drifting spores (vignette now lives in the post pass, §2.7)
 	_build_hud()
 	add_child(MinimapScene.new())
 	_char_panel = CharacterPanelScene.new()
@@ -447,12 +471,10 @@ func spawn_field(at: Vector2, radius: float, duration: float, dps: float,
 	glow.position = at
 	glow.z_index = 2
 	add_child(glow)
-	var tg := ProtoTelegraph.new()
-	tg.radius = radius
-	tg.duration = 0.45
-	tg.color = k.tele
-	tg.position = at
-	add_child(tg)
+	# Pooled landing telegraph (spec §2.8, retires per-cast ProtoTelegraph.new())
+	# + a per-kind ignition swirl tinted to the field edge.
+	telegraphs.ring(at, radius, 0.45, k.tele)
+	fx.orbital(at, {"count": 5, "radius": radius * 0.45, "life": 0.3, "color": k.edge})
 	match kind:
 		"fire":
 			fx.flame_cone(at, Vector2.UP)
@@ -495,50 +517,28 @@ func _draw_fields() -> void:
 
 # ---- combat feedback -------------------------------------------------------
 
-func hitstop() -> void:
-	Engine.time_scale = 0.15
-	await get_tree().create_timer(0.045, true, false, true).timeout
+func hitstop(scale := 0.15, dur := 0.045) -> void:
+	Engine.time_scale = scale
+	await get_tree().create_timer(dur, true, false, true).timeout
 	Engine.time_scale = 1.0
 
 func shake(amount: float) -> void:
 	_shake = maxf(_shake, amount)
 
 func hit_spark(at: Vector2, color: Color) -> void:
-	# two-tone: the passed-through hue plus a few hot white pixels
-	_spark_burst(at, color, 12, 60.0, 140.0, 1.0, 2.5)
-	_spark_burst(at, Color(1, 1, 1, 0.95), 5, 90.0, 180.0, 0.7, 1.4)
+	# Pooled two-tone spark (spec §2.8): the passed-through hue plus a few hot
+	# white pixels, routed through fx.burst() — no per-hit CPUParticles2D + timer.
+	fx.burst(at, {"amount": 12, "lifetime": 0.35, "v_min": 60.0, "v_max": 140.0,
+			"gravity": Vector2(0, 220), "s_min": 1.0, "s_max": 2.5, "color": color})
+	fx.burst(at, {"amount": 5, "lifetime": 0.35, "v_min": 90.0, "v_max": 180.0,
+			"gravity": Vector2(0, 220), "s_min": 0.7, "s_max": 1.4,
+			"color": Color(1, 1, 1, 0.95)})
 
-func _spark_burst(at: Vector2, color: Color, amount: int, v_min: float, v_max: float,
-		s_min: float, s_max: float) -> void:
-	var p := CPUParticles2D.new()
-	p.global_position = at
-	p.one_shot = true
-	p.explosiveness = 1.0
-	p.amount = amount
-	p.lifetime = 0.35
-	p.direction = Vector2.UP
-	p.spread = 180.0
-	p.initial_velocity_min = v_min
-	p.initial_velocity_max = v_max
-	p.gravity = Vector2(0, 220)
-	p.scale_amount_min = s_min
-	p.scale_amount_max = s_max
-	p.color = color
-	add_child(p)
-	p.emitting = true
-	get_tree().create_timer(0.6).timeout.connect(p.queue_free)
-
-func damage_number(at: Vector2, amount: float, color: Color, text := "") -> void:
-	var label := Label.new()
-	label.text = text if text != "" else str(int(round(amount)))
-	label.modulate = color
-	label.z_index = 50
-	label.position = at + Vector2(randf_range(-6, 6), 0)
-	add_child(label)
-	var tw := label.create_tween()
-	tw.tween_property(label, "position:y", label.position.y - 24.0, 0.6)
-	tw.parallel().tween_property(label, "modulate:a", 0.0, 0.6)
-	tw.tween_callback(label.queue_free)
+# Pooled punchy numbers (spec §2.5) — delegates to ProtoDamage. The optional
+# `crit` flag (default false) keeps the ~41 existing call sites unchanged.
+func damage_number(at: Vector2, amount: float, color: Color, text := "", crit := false) -> void:
+	if is_instance_valid(_dmg):
+		_dmg.number(at, amount, color, text, crit)
 
 # ---- procedural SFX (sfx.gd static cache; 8 positional players, round-robin) ---
 
@@ -690,7 +690,7 @@ func _return_to_haven() -> void:
 
 func _build_confirm() -> void:
 	_confirm = CanvasLayer.new()
-	_confirm.layer = 5
+	_confirm.layer = 15   # spec §2.0: topmost UI (was 5, now taken by post)
 	_confirm.visible = false
 	add_child(_confirm)
 	var pc := PanelContainer.new()
@@ -728,6 +728,14 @@ func on_creature_died(c: ProtoCreature) -> void:
 	hit_spark(c.global_position, Color("6b4f8f"))
 	fx.explosion(c.global_position, Color(0.55, 0.35, 0.85))   # umbral death bloom
 	fx.debris(c.global_position)
+	# tier-scaled death punctuation (spec §3): fat ring + a small ribbon burst
+	var death_col := Color(0.55, 0.35, 0.85)
+	if c.elite:
+		fx.shockwave(c.global_position, death_col, 48.0, {"rings": 3})
+		fx.orbital(c.global_position, {"count": 6, "radius": 16.0, "life": 0.4, "color": death_col})
+	else:
+		fx.shockwave(c.global_position, death_col, 30.0, {"rings": 2})
+		fx.orbital(c.global_position, {"count": 3, "radius": 12.0, "life": 0.32, "color": death_col})
 	play_sfx("hit", c.global_position, -5.0)   # heavier death thud
 	shake(1.5)
 	_drop(c.global_position, "gold", randi_range(c.gold_min, c.gold_max))
@@ -748,6 +756,17 @@ func on_creature_died(c: ProtoCreature) -> void:
 	_sync_session()
 	refresh_hud()
 
+# Big death finisher (spec §3): orbital finale + fat shockwave + post pulse/flash
+# + a beefed hitstop. `tier` scales the whole thing (legendary = largest). Additive
+# to each handler's existing explosion/debris/lightning flourish.
+func _boss_finisher(at: Vector2, color: Color, tier := 1.0) -> void:
+	fx.orbital(at, {"count": int(round(16 * tier)), "turns": 2.0,
+			"radius": 90.0 * tier, "life": 0.7, "color": color})
+	fx.shockwave(at, color, 110.0 * tier, {"rings": 3})
+	post.pulse(1.0)
+	post.flash(Color(1, 1, 1), clampf(0.6 * tier, 0.0, 1.0))
+	hitstop(0.08, 0.09)   # deeper + longer than the standard per-hit stop
+
 func on_boss_died(b: ProtoBoss) -> void:
 	hit_spark(b.global_position, Color("ff7a33"))
 	fx.explosion(b.global_position, Color(1.0, 0.55, 0.18), true)
@@ -756,6 +775,7 @@ func on_boss_died(b: ProtoBoss) -> void:
 	fx.lightning(b.global_position + Vector2(26, -8))
 	play_ui("victory", -4.0)
 	shake(8.0)
+	_boss_finisher(b.global_position, b.bar_color, 1.0)
 	# Signature drop: the Emberfang Blade minted as a REAL legendary instance
 	# (implicit fire roll + 4 affixes). Elite item/rune rolls run in on_creature_died.
 	_drop_item(ProtoItems.roll_item("emberfang_blade", "legendary", Session.level, 0.35),
@@ -777,6 +797,7 @@ func on_hag_died(h: Node2D) -> void:
 	fx.explosion(h.global_position, Color(0.62, 0.42, 0.9), true)
 	play_ui("victory", -6.0)
 	shake(6.0)
+	_boss_finisher(h.global_position, h.bar_color, 0.8)
 	damage_number(h.global_position + Vector2(0, -40), 0, Color("cf9dff"),
 			ProtoLang.t("msg_fenwitch"))
 
@@ -795,6 +816,7 @@ func on_duo_boss_died(b: ProtoDuoBoss) -> void:
 	var mate: Variant = b.partner
 	if is_instance_valid(mate) and not mate.dead:
 		mate.avenge()   # the Duologue dies with the fallen; fury remains
+		_boss_finisher(b.global_position, b.bar_color, 0.7)   # partial — one still stands
 		damage_number(b.global_position + Vector2(0, -40), 0, Color("ffd166"),
 				ProtoLang.t("msg_one_falls"))
 		_hud.hint.text = ProtoLang.t("msg_duo_hint")
@@ -802,6 +824,7 @@ func on_duo_boss_died(b: ProtoDuoBoss) -> void:
 		fx.lightning(b.global_position + Vector2(-22, 0))
 		fx.lightning(b.global_position + Vector2(26, -8))
 		play_ui("victory", -4.0)
+		_boss_finisher(b.global_position, b.bar_color, 1.0)   # the real victory
 		damage_number(b.global_position + Vector2(0, -40), 0, Color("ffd166"),
 				ProtoLang.t("msg_duo_falls"))
 		_hud.hint.text = ProtoLang.t("msg_victory_duo")
@@ -818,6 +841,7 @@ func on_legendary_died(b) -> void:
 	fx.lightning(b.global_position + Vector2(26, -8))
 	play_ui("victory", -4.0)
 	shake(8.0)
+	_boss_finisher(b.global_position, b.bar_color, 1.2)   # the grandest finisher
 	var r := randf()
 	var rarity := "rare"
 	if r < 0.10:
@@ -894,6 +918,13 @@ func _grant_level_ups() -> void:
 	shake(3.0)
 	fx.lightning(player.global_position)   # the sky marks the hunter
 	hit_spark(player.global_position, Color("ffd166"))
+	# ascension flourish (spec §3): rising gold aura + orbiting gold column + flash.
+	# Short dur so rapid 1→100 dings self-release and never pin-starve the ribbons.
+	var gold_col := Color("ffd166")
+	fx.aura(player, gold_col, {"dur": 1.0})
+	fx.orbital(player.global_position, {"count": 8, "radius": 20.0, "turns": 1.5,
+			"life": 0.5, "color": gold_col})
+	post.flash(gold_col, 0.3)
 	damage_number(player.global_position + Vector2(0, -36), 0, Color("ffd166"),
 			ProtoLang.t("msg_level_up") % new_level)
 	damage_number(player.global_position + Vector2(0, -24), 0, Color("ffe9d0"),
@@ -994,6 +1025,7 @@ func _hint_text() -> String:
 
 func _build_hud() -> void:
 	var canvas := CanvasLayer.new()
+	canvas.layer = 10   # spec §2.0: above post(5)/damage(6) so the HUD stays crisp
 	add_child(canvas)
 	var hp_bg := ColorRect.new()
 	hp_bg.color = Color(0, 0, 0, 0.55)
@@ -1299,7 +1331,7 @@ func _update_pet_chips() -> void:
 # K — keybind reference card (its own overlay, separate from the hint line).
 func _build_keybinds() -> void:
 	_kb_overlay = CanvasLayer.new()
-	_kb_overlay.layer = 4
+	_kb_overlay.layer = 14   # spec §2.0: above post/damage/HUD/minimap
 	_kb_overlay.visible = false
 	add_child(_kb_overlay)
 	var pc := PanelContainer.new()

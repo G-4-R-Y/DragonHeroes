@@ -1,7 +1,7 @@
 # PROTOTYPE HARNESS — ambient life: drifting bioluminescent spores that follow
-# the camera, plus a soft vignette. The shipping path is GPU-driven particles with
-# explicit budgets (docs/design/17); CPUParticles2D here because the prototype
-# renders with gl_compatibility.
+# the camera. (The vignette moved to the post shader — spec §2.7.) The shipping
+# path is GPU-driven particles with explicit budgets (docs/design/17);
+# CPUParticles2D here because the prototype renders with gl_compatibility.
 class_name ProtoAmbient
 extends Node2D
 
@@ -35,18 +35,8 @@ func _ready() -> void:
 	_spores.color_ramp = ramp
 	add_child(_spores)
 	_spores.emitting = true
-
-	# vignette — dark corners framing the luminous world
-	var canvas := CanvasLayer.new()
-	add_child(canvas)
-	var v := TextureRect.new()
-	v.texture = ProtoSprites.vignette_tex()
-	v.stretch_mode = TextureRect.STRETCH_SCALE
-	v.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	v.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
-	v.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	canvas.add_child(v)
-	v.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	# vignette removed (spec §2.7): the post shader owns the vignette now, with
+	# ProtoSprites.vignette_tex() retained as ProtoPost's intensity<0.15 fallback.
 
 func _process(_delta: float) -> void:
 	var p := get_tree().get_first_node_in_group("player") as Node2D

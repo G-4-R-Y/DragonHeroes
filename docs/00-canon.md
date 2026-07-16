@@ -475,3 +475,29 @@ Still open:
    locale: ProtoLang (EN/PT chrome table + _pt data twins, user://settings
    .json, menu + Haven toggles), skill trees fully bilingual; EN stays the
    default. Registry PT twins for the CODEX: planned.
+23. **Spectacle VFX vocabulary (2026-07-15, Ricardo).** Reference: three
+   commercial-ARPG screenshots (orbital ribbon trails, screen-filling novas,
+   damage-number storm, post-processing). Full authoritative build spec:
+   docs/design/18-spectacle-vfx-spec.md. Landed as the prototype's spectacle
+   layer: screen-filling orbital ribbon trails (pooled MultiMesh2D, 640 inst /
+   1 draw call), a full-frame post shader (chromatic aberration + vignette +
+   over-bright), pooled converging-beam/danger-ring telegraphs, a
+   protective/enrage aura, and pooled punchy damage numbers. Budget: ~5 fixed
+   draw calls on bounded pools, < 120 draw calls/frame, additive overdraw
+   < 4x screen, locked 60 FPS on gl_compatibility (fx_stress gate measured
+   ribbons 40/40, labels 48/48, telegraphs 20/24, 0 nodes after warmup,
+   5.9 ms/frame). One intensity in [0,1] (mobile default MED) gates usage,
+   never allocation; telegraphs exempt. **Engine decision** (deep-research,
+   verified): stay on Godot — genre (Brotato, Halls of Torment) and our exact
+   Godot+C++-sim+MultiMesh architecture are proven in production; the bloom
+   wall was a renderer setting, not an engine limit. **Renderer split
+   ("Layered now + Vulkan-ready", Ricardo's call):** the full look ships on
+   the gl_compatibility default with faked additive bloom; the Vulkan opt-in
+   (tools/run_vulkan.sh) adds real HDR WorldEnvironment glow on top via the
+   single ProtoPost.set_hdr_mode() seam inside the existing renderer branch —
+   the gate CONDITION is unchanged (a Vulkan window once crashed the dev's X;
+   only the dev tests that flip on real hardware). Mid-range mobile 60 FPS on
+   Godot's Vulkan path is unproven (not disproven) and must be measured
+   first-party. Four per-event allocators (damage_number, _spark_burst,
+   telegraph.gd nodes, per-bolt projectile trail) converted to pools in the
+   same pass; net node/tween count DROPS while on-screen density rises.
