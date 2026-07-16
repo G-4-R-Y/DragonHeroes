@@ -40,7 +40,8 @@ from genforge.pipeline import __version__ as PIPELINE_VERSION
 from genforge.pipeline.assemble import Assembler
 from genforge.pipeline.poses import PoseLibrary, available_pose_libraries
 from genforge.pipeline.skeletons import Skeleton, available_skeletons
-from genforge.pipeline.stub_provider import GenerationRequest, StubPartsProvider
+from genforge.pipeline.providers import get_parts_provider
+from genforge.pipeline.stub_provider import GenerationRequest
 
 GENFORGE_ROOT = Path(__file__).resolve().parents[1]
 CANDIDATES_ROOT = GENFORGE_ROOT / "candidates"
@@ -52,7 +53,7 @@ app = FastAPI(
     version=PIPELINE_VERSION,
 )
 
-_PROVIDER = StubPartsProvider()
+_PROVIDER = get_parts_provider()   # GENFORGE_PROVIDER: 'stub' (default) | 'model'
 
 
 class CreatureGenRequest(BaseModel):

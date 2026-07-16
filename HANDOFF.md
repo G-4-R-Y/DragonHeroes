@@ -86,8 +86,12 @@ UNCHANGED — dev tests the Vulkan flip on real hardware; never auto-flip).
 
 1. **Measure Godot Vulkan mid-mobile 60 FPS** (unproven per research) + confirm the
    dev's X-crash is gone on current 4.6 before defaulting to the Vulkan renderer.
-2. **Real gen-AI image provider** into the GenForge seam (stub provider today);
-   tile/texture bundles so terrain gets the same treatment as actors.
+2. **Gen-AI image provider: SEAM WIRED (2026-07-15)** — provider-agnostic
+   image_backend.py + OpenAI (gpt-image-1) + ModelPartsProvider behind the
+   PartsProvider seam; `GENFORGE_PROVIDER=model` + OPENAI_API_KEY to enable
+   (default stub). REMAINING: template-layout or segmentation so generated
+   figures become SKELETAL animated bundles (not just static concept sprites);
+   VFX-frame + tile/texture generation reuse the same backend.
 3. **Paper-doll**: equipped gear visible on the hero sprite (+ per-slot particles).
 4. **Sixth class** (design/10 names six at launch; five are live) + per-class
    resources beyond Attunement/Combo charges.

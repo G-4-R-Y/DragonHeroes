@@ -501,3 +501,17 @@ Still open:
    first-party. Four per-event allocators (damage_number, _spark_burst,
    telegraph.gd nodes, per-bolt projectile trail) converted to pools in the
    same pass; net node/tween count DROPS while on-screen density rises.
+24. **Real gen-AI image provider — provider-agnostic (2026-07-15, Ricardo).**
+   GenForge's PartsProvider seam gains a real model path. New provider-agnostic
+   image backend (genforge/pipeline/image_backend.py): stdlib-HTTP, NO SDK
+   coupling, one `ImageBackend.generate(prompt) -> [Image]` interface with an
+   OpenAI backend (gpt-image-1, transparent-PNG sprites) selected by env; a new
+   backend is one class + registry entry. ModelPartsProvider (model_provider.py)
+   sits behind the SAME seam as the stub; `GENFORGE_PROVIDER=model` swaps it in,
+   default stays 'stub' so nothing spends API budget by accident. Key is read
+   from OPENAI_API_KEY at call time — never hardcoded/logged/committed. v1 emits
+   a single full-figure concept sprite (one 'body' region); turning generated
+   figures into SKELETAL animated bundles needs template-layout generation or a
+   segmentation pass + matching rig (next step, ties into the image->3D->render
+   route). Mocked tests (no network) cover backend/provider/factory. The backend
+   is general — it will also drive VFX-frame and concept-art generation.
