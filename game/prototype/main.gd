@@ -760,9 +760,9 @@ func on_creature_died(c: ProtoCreature) -> void:
 # + a beefed hitstop. `tier` scales the whole thing (legendary = largest). Additive
 # to each handler's existing explosion/debris/lightning flourish.
 func _boss_finisher(at: Vector2, color: Color, tier := 1.0) -> void:
-	fx.orbital(at, {"count": int(round(16 * tier)), "turns": 2.0,
-			"radius": 90.0 * tier, "life": 0.7, "color": color})
-	fx.shockwave(at, color, 110.0 * tier, {"rings": 3})
+	fx.orbital(at, {"count": int(round(9 * tier)), "turns": 2.0,
+			"radius": 52.0 * tier, "life": 0.4, "color": color})
+	fx.shockwave(at, color, 92.0 * tier, {"rings": 3})
 	post.pulse(1.0)
 	post.flash(Color(1, 1, 1), clampf(0.6 * tier, 0.0, 1.0))
 	hitstop(0.08, 0.09)   # deeper + longer than the standard per-hit stop

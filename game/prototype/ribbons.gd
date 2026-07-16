@@ -18,6 +18,10 @@ enum Mode { ORBIT, CRESCENT, STREAK, STREAK_FOLLOW, RADIAL }
 
 const MAX_RIBBONS := 40
 const SEG := 16                       # segments per ribbon (== instances per ribbon)
+# Peak per-ribbon opacity. Kept well under 1 so ADD-blend overlaps read as
+# translucent light that the hero stays visible THROUGH — not an opaque cloud
+# that buries him. Spectacle = a fast wispy flash, not a wall (Ricardo 2026-07-15).
+const PEAK_ALPHA := 0.62
 
 # Per-ribbon state. Pre-allocated MAX_RIBBONS times in _ready(); reused forever.
 # The spine is a ring buffer of SEG+1 world points (the swept trail history);
@@ -147,7 +151,7 @@ func spawn_orbit(center: Vector2, cfg: Dictionary) -> void:
 	var r0 := float(cfg.get("radius", 24.0))
 	var jitter := float(cfg.get("radius_jitter", 0.0))
 	var turns := float(cfg.get("turns", 2.0))
-	var life := float(cfg.get("life", 0.5))
+	var life := float(cfg.get("life", 0.32))   # was 0.5 — a whoosh, not a lingering ring
 	var width := float(cfg.get("width", 5.0))
 	var color: Color = cfg.get("color", Color(0.7, 0.9, 1.0))
 	var owner: Node2D = cfg.get("owner", null)
@@ -201,7 +205,7 @@ func spawn_streak(from: Vector2, to: Vector2, cfg: Dictionary) -> void:
 func spawn_radial(center: Vector2, cfg: Dictionary) -> void:
 	var count := maxi(1, int(cfg.get("count", 12)))
 	var radius := float(cfg.get("radius", 40.0))
-	var life := float(cfg.get("life", 0.4))
+	var life := float(cfg.get("life", 0.26))   # was 0.4 — radial petals snap out and clear
 	var width := float(cfg.get("width", 5.0))
 	var color: Color = cfg.get("color", Color(0.7, 0.9, 1.0))
 	for n in count:
@@ -334,11 +338,16 @@ func _ease_out(x: float) -> float:
 	var c := clampf(x, 0.0, 1.0)
 	return 1.0 - (1.0 - c) * (1.0 - c)
 
-# Fast fade-in over the first ~15% of life, gentle fade-out across the rest.
+# Blink profile: a hard snap-in over the first ~8% of life, then a FAST quadratic
+# decay so the sweep flashes and clears rather than lingering as a bright cloud.
+# Capped at PEAK_ALPHA so ADD-blend overlaps never blow out to solid (Ricardo:
+# effects happen in the blink of an eye, and the hero must stay readable).
 func _fade(f: float) -> float:
-	if f < 0.15:
-		return clampf(f / 0.15, 0.0, 1.0)
-	return clampf(1.0 - (f - 0.15) / 0.85, 0.0, 1.0)
+	if f < 0.08:
+		return (f / 0.08) * PEAK_ALPHA
+	var o := (f - 0.08) / 0.92                 # 0..1 across the remaining life
+	var falloff := (1.0 - o) * (1.0 - o)        # fast quadratic fade-out
+	return clampf(falloff, 0.0, 1.0) * PEAK_ALPHA
 
 func _pool_debug() -> Dictionary:
 	return {"size": MAX_RIBBONS, "peak_in_use": _peak}

@@ -467,7 +467,7 @@ func _shadow_rend(main: Node) -> void:
 	main.fx.explosion(global_position, Color(0.62, 0.38, 1.0))   # umbral nova
 	main.fx.ring(global_position, Color(0.7, 0.45, 1.0, 0.9), rend_reach)
 	# §3 signature: screen-filling umbral orbital + big violet cleave + shockwave + post kick
-	main.fx.orbital(global_position, {"count": 12, "turns": 1.5, "radius": 70.0, "color": Color(0.62, 0.38, 1.0)})
+	main.fx.orbital(global_position, {"count": 7, "turns": 1.5, "radius": 44.0, "life": 0.34, "color": Color(0.62, 0.38, 1.0)})
 	main.fx.ribbon_arc(global_position + _rend_dir * rend_reach * 0.6, _rend_dir, {"span": 2.1, "width": 10, "color": Color(0.7, 0.45, 1.0, 0.95)})
 	main.fx.shockwave(global_position, Color(0.62, 0.38, 1.0), 80.0)
 	if main.get("post") != null:
@@ -515,7 +515,7 @@ func _whirlwind() -> void:
 		main.fx.tornado(global_position)
 		main.fx.ring(global_position, Color(0.85, 0.95, 1.0, 0.8), 2.6 * TILE)
 		# §3: orbital vortex tracking the hero + impact shockwave
-		main.fx.orbital(global_position, {"count": int(lerp(6.0, 20.0, ProtoFx.intensity)), "turns": 2.5, "radius": 26.0, "radius_jitter": 8.0, "life": 0.5, "owner": self})
+		main.fx.orbital(global_position, {"count": int(lerp(5.0, 13.0, ProtoFx.intensity)), "turns": 2.5, "radius": 26.0, "radius_jitter": 8.0, "life": 0.34, "owner": self})
 		main.fx.shockwave(global_position, Color(0.85, 0.95, 1.0), 60.0)
 		if hit_any:
 			main.hitstop()
