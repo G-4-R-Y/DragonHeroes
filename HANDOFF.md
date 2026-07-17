@@ -18,18 +18,23 @@ technique catalog (radiance cascades, normal-mapped sprites, dual-grid
 autotiling etc.) is summarized in the session log + memory; structural
 candidates queued below.
 
-STRUCTURAL-OVERHAUL QUEUE (the "like the lighting fix" list, ROI-ranked):
-1. Terrain art system: dual-grid/blob autotiling + biome edge blending +
-   macro variation — the square tile grid is the last "prototype" tell.
-2. Sprite lighting integration: normal-mapped pixel sprites (auto-generate
-   normals in the GenForge bake) + directional shading from our own light
-   holes — makes bodies feel 3D-lit like Dead Cells.
-3. Animation authoring: smear/anticipation frames via the GenForge skeletal
-   template pipeline (the "their animation is WAY better" gap).
-4. UI/typography: pixel-perfect bitmap-font HUD pass (giant desktop fonts in
-   captures read amateur next to the new world).
-5. Vulkan flip on Ricardo's hardware: real HDR bloom over every emissive
-   pixel (ProtoPost.set_hdr_mode seam is ready; only he can test).
+STRUCTURAL-OVERHAUL QUEUE — now research-ranked; full catalog with names,
+feasibility and effort: docs/design/19-visual-om-catalog.md:
+1. Raymarched SDF 2D lighting (occlusion/soft shadows — light currently
+   passes through walls; JFA work is reused by Radiance Cascades later),
+   with Bayer dithering on the falloffs in the same pass.
+2. Normal-mapped sprites + AUTOMATED normal gen (Laigter/bevel+Sobel in
+   genforge) + cel-quantized light() — the Dead Cells stack, one milestone.
+3. "Procgen stops looking procgen" sprint: dual-grid autotiling + macro
+   variation tint + Poisson scatter doctrine (+ chunk stamps later).
+4. Cohesion sprint: per-biome 3D LUT grading + master-palette discipline
+   (OKLAB quantize in CI) + pixel-perfect bitmap-font UI (PT-BR diacritics!).
+5. VFX anatomy doctrine (anticipation/climax/dissipate composer as data) +
+   trauma-shake/tiered-hitstop envelopes (2-3 days, do anytime).
+BIG BETS to schedule deliberately: Radiance Cascades (profile mid-Android
+first); faux-verticality height fields (CANON FLAG: decide flat-vs-height
+BEFORE the C++ procgen port hardens); 3D-to-sprite animation pipeline
+(after master palette). Vulkan flip remains Ricardo-only.
 
 ## v0.1.13 delta (2026-07-17) — 2D lighting model + the capture loop
 
