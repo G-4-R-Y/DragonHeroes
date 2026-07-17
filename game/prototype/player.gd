@@ -105,6 +105,9 @@ func _ready() -> void:
 	sprite.position.y = -12.0
 	sprite.play("idle")
 	add_child(sprite)
+	# soft warm pool under the hero (lights.gd) — the cheapest "sits IN the
+	# world" read there is. Deferred: main is still assembling fx at class cast.
+	call_deferred("_attach_ground_glow")
 	match str(Session.class_id):   # class cast (full class art: design/10/17)
 		"core.class.emberkin":
 			sprite.self_modulate = Color(1.15, 0.9, 0.8)
@@ -459,6 +462,12 @@ func _attack() -> void:
 		if _kit != "rogue":   # §3: cleave impact shockwave on connect
 			main.fx.shockwave(global_position + _swing_dir * attack_reach * 0.6, Color(0.85, 0.92, 1.0, 0.9), 24.0)
 
+func _attach_ground_glow() -> void:
+	var m := get_tree().get_first_node_in_group("main")
+	if m != null and m.get("fx") != null:
+		m.fx.light_attach(self, {"radius": 30.0, "color": Color(1.0, 0.86, 0.6),
+				"alpha": 0.16})
+
 # Shadow Rend — the bestial skill slot (Q): heavier umbral cleave, violet flash.
 func _shadow_rend(main: Node) -> void:
 	_rend_cd = rend_cd_s
@@ -476,6 +485,9 @@ func _shadow_rend(main: Node) -> void:
 	# §3 signature: screen-filling umbral orbital + big violet cleave + shockwave + post kick
 	main.fx.shader_burst("vortex", global_position, {"size": 150.0, "life": 0.5,
 			"dir": _rend_dir, "color": Color(0.42, 0.12, 0.95)})
+	# the actual DARKNESS: mix-blend umbral smoke that occludes, rims in violet
+	main.fx.shader_burst("umbra", global_position + _rend_dir * rend_reach * 0.4,
+			{"size": 170.0, "life": 0.8})
 	main.fx.shader_burst("slash", global_position + _rend_dir * rend_reach * 0.6,
 			{"size": 110.0, "life": 0.32, "dir": _rend_dir, "color": Color(0.7, 0.45, 1.0)})
 	main.fx.shockwave(global_position, Color(0.62, 0.38, 1.0), 80.0)
@@ -763,6 +775,11 @@ func _detonate_pop(at: Vector2, total: float, radius: float, main: Node) -> void
 		main.fx.shader_burst("firestorm", at + Vector2(0, -radius * 0.5),
 				{"size": radius * 2.6, "life": 0.55})
 		main.fx.shader_burst("impact", at, {"size": 40.0, "color": Color(1.0, 0.7, 0.3)})
+		# the blast heats the air and lights the ground (post haze + lights pool)
+		if main.get("post") != null:
+			main.post.haze(at, radius * 1.3, 2.6, 0.7)
+		main.fx.light_at(at, {"radius": radius * 1.6, "color": Color(1.0, 0.55, 0.2),
+				"alpha": 0.5, "life": 0.6, "flicker": 0.5, "rate": 18.0})
 		main.play_sfx("hit", at, -6.0)
 	for n in get_tree().get_nodes_in_group("creatures"):
 		if n.dead:

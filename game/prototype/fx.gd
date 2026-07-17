@@ -39,6 +39,7 @@ var _gi := 0
 
 var _ribbons: ProtoRibbons          # orbital / sweeping-trail MultiMesh (ribbons.gd)
 var _shader_fx: ProtoShaderFx       # pooled procedural-shader quads (shader_fx.gd)
+var _lights: ProtoLights            # ground light pools (lights.gd) — under entities
 var _aura_seq := 0
 var _auras: Dictionary = {}         # handle -> {tele:int, ribbons:Array[int]}
 
@@ -48,6 +49,8 @@ func _ready() -> void:
 	add_child(_ribbons)
 	_shader_fx = ProtoShaderFx.new()  # vfx_lab shader effects, pooled quads
 	add_child(_shader_fx)
+	_lights = ProtoLights.new()       # ground light pools, ONE MultiMesh draw
+	add_child(_lights)
 	for i in ADD_POOL:
 		_add.append(_mk(true))
 	for i in NORM_POOL:
@@ -314,8 +317,24 @@ func trail_detach(id: int) -> void:
 
 # ---- procedural-shader effects (vfx_lab): slash / nova / vortex / firestorm /
 # impact — hi-res fragment math on pooled quads; see shader_fx.gd -------------
-func shader_burst(kind: String, at: Vector2, cfg: Dictionary = {}) -> void:
-	_shader_fx.burst(kind, at, cfg)
+func shader_burst(kind: String, at: Vector2, cfg: Dictionary = {}) -> int:
+	return _shader_fx.burst(kind, at, cfg)
+
+# Early fade for a persistent shader burst (lava fusion consumes a field).
+func shader_kill(id: int) -> void:
+	_shader_fx.kill(id)
+
+# ---- ground light pools (lights.gd): soft additive ellipses UNDER entities —
+# the "effects light the world" layer. cfg: radius, color, alpha, life
+# (<0 = until detach), flicker, rate, offset (attach only) ---------------------
+func light_at(at: Vector2, cfg: Dictionary = {}) -> int:
+	return _lights.place(at, cfg)
+
+func light_attach(node: Node2D, cfg: Dictionary = {}) -> int:
+	return _lights.attach(node, cfg)
+
+func light_detach(id: int) -> void:
+	_lights.detach(id)
 
 # ---- shockwave: fat multi-ring impact / nova / death nova -----------------------
 # cfg: rings (default 3, staggered radii + phase), width (thicker than ring's 2.5),
@@ -372,4 +391,5 @@ func aura_detach(handle: int) -> void:
 # round-robin; the ribbon sub-pool reports its live peak).
 func _pool_debug() -> Dictionary:
 	var rb: Dictionary = _ribbons._pool_debug() if _ribbons != null else {"size": 0, "peak_in_use": 0}
-	return {"ribbons": rb, "add_pool": ADD_POOL, "ring_pool": RING_POOL}
+	var lt: Dictionary = _lights._pool_debug() if _lights != null else {"size": 0, "peak_in_use": 0}
+	return {"ribbons": rb, "lights": lt, "add_pool": ADD_POOL, "ring_pool": RING_POOL}

@@ -10,6 +10,13 @@ uniform float progress : hint_range(0.0, 1.0) = 0.0;  // effect life 0..1
 uniform vec4  color : source_color = vec4(1.0, 1.0, 1.0, 1.0); // tint * master opacity
 uniform vec2  dir = vec2(0.0, -1.0);                  // plume travel dir (screen up)
 uniform float seed = 3.0;                             // per-cast variation
+// Medium params (lab parity). Advection is TIME-based, NOT progress-based, so a
+// 10 s ground-fire field burns at the same speed as a 0.6 s burst instead of
+// playing in syrup slow-mo. hold = progress where decay starts (fields ~0.88);
+// flash_amt lets persistent field quads skip the ignition pop.
+uniform float hold : hint_range(0.05, 0.95) = 0.25;
+uniform float flow = 4.5;                             // advection speed (units/s)
+uniform float flash_amt : hint_range(0.0, 1.0) = 1.0;
 
 // ---- hash / value noise / fbm (inlined, mobile-cheap) --------------------
 float hash2(vec2 p) {
@@ -90,15 +97,16 @@ void fragment() {
     float x   = dot(rel, vec2(-d.y, d.x));   // perpendicular offset
     vec2 luv = vec2(x, yup);
 
-    // --- life envelope: hard snap-in, quick front-loaded decay ---
+    // --- life envelope: hard snap-in, sustain to `hold`, front-loaded decay ---
     float rise = clamp(progress / 0.10, 0.0, 1.0);
     rise = rise * rise * (3.0 - 2.0 * rise);
-    float fall = 1.0 - clamp((progress - 0.25) / 0.75, 0.0, 1.0);
+    float fall = 1.0 - clamp((progress - hold) / max(1.0 - hold, 0.001), 0.0, 1.0);
     fall = fall * fall;
     float env = rise * fall;
     float fall_s = sqrt(fall);
     float reach = 0.28 + 0.54 * rise * (0.5 + 0.5 * fall_s);   // shoot up, burn down
-    float scroll = 3.2 * progress;
+    // TIME-based advection; mod keeps sin() hash args in float32-precise range
+    float scroll = mod(TIME * flow, 240.0) + seed * 13.0;
     float warp_amt = 0.55 + 0.45 * env;
 
     // --- flame field (base + chromatic-offset R/B) ---
@@ -136,9 +144,10 @@ void fragment() {
     rgb.b += clamp(-edge, 0.0, 1.0) * 0.85 * intensity;
 
     // --- trailing smoke wisps: dark, translucent, rise & outlive the flame ---
+    float s0 = max(hold, 0.32);
     float smk_env = clamp(progress / 0.22, 0.0, 1.0)
-                  * pow(1.0 - clamp((progress - 0.32) / 0.68, 0.0, 1.0), 1.3);
-    float ss = 2.6 * progress + 0.4;
+                  * pow(1.0 - clamp((progress - s0) / max(1.0 - s0, 0.001), 0.0, 1.0), 1.3);
+    float ss = scroll * 0.55 + 11.0;   // coherent with the flame flow
     float sn = fbm_flame(vec2(x * 4.0 + 31.0, yup * 2.6 - ss));
     float s_reach = 0.30 + 0.55 * clamp(progress / 0.5, 0.0, 1.0);
     float sh = clamp(yup / s_reach, 0.0, 1.0);
@@ -152,7 +161,7 @@ void fragment() {
 
     // --- ignition flash: radial white pop, very front-loaded ---
     float fl = clamp(1.0 - abs(progress - 0.06) / 0.10, 0.0, 1.0);
-    fl *= fl;
+    fl *= fl * flash_amt;
     float fd = x * x + (yup - 0.02) * (yup - 0.02);
     float flash = exp(-fd / (0.09 * 0.09)) * fl;
     rgb += flash * vec3(2.0, 1.7, 1.2);
@@ -163,14 +172,14 @@ void fragment() {
         float ex0   = (hash1(fi + 1.0) - 0.5) * 0.34;
         float speed = 0.55 + hash1(fi + 9.0) * 0.9;
         float loff  = hash1(fi + 3.0);
-        float phase = fract(progress * speed + loff);
+        float phase = fract((TIME * 0.85 + loff * 7.0) * speed);   // TIME-based rise
         float ey = phase * 0.62;
         float ex = ex0 + 0.05 * sin((phase * 6.0 + fi) * 3.14159) * phase;
         float sz = 0.006 + hash1(fi + 5.0) * 0.010;
         float stre = 2.0 + 1.5 * speed;               // vertical motion streak
         vec2 dd = vec2(x - ex, (yup - ey) / stre);
         float spark = exp(-dot(dd, dd) / (sz * sz));
-        float flick = 0.5 + 0.5 * sin(progress * 40.0 + fi * 2.3);
+        float flick = 0.5 + 0.5 * sin(TIME * 26.0 + fi * 2.3);
         float bright = env * (1.0 - phase) * (0.6 + 0.4 * flick);
         float eheat = 1.0 - 0.7 * phase;
         rgb += spark * bright * vec3(1.9, 0.9 + 0.7 * eheat, 0.25 + 0.55 * eheat);

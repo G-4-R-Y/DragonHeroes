@@ -1,7 +1,32 @@
-# Handoff — running state (updated 2026-07-16, v0.1.11)
+# Handoff — running state (updated 2026-07-17, v0.1.12)
 
 Read `CLAUDE.md` + `docs/00-canon.md` first (decisions log §12 is current through
-item 26). This file is the delta: exactly where work stopped and what's next.
+item 27). This file is the delta: exactly where work stopped and what's next.
+
+## v0.1.12 delta (2026-07-17) — media-grade VFX: fire/darkness as MEDIA
+
+Ricardo: v0.1.11 effects still "hard shapes on top of the rest instead of
+actual fire and darkness aura"; asked about an engine swap. RE-ANSWERED: no
+overhaul (canon §12.27) — the read was authorship (flat-tint SDFs, additive-
+only blending, no scene lighting), not engine. Built instead:
+- firestorm = persistent medium: TIME-based advection + `hold`/`flash_amt`
+  uniforms; fire/lava fields BURN their whole duration (persist quads, stolen
+  last, shader_fx.kill() on lava fusion). Lab has burst + field contact sheets.
+- NEW umbra.gdshader (lab: genforge/vfx_lab/umbra): first MIX-BLEND medium —
+  occluding violet-black smoke, erosion dissolve, narrow violet rim + motes.
+  Wired: Shadow Rend, umbral creature deaths, legendary deaths (rim-tinted).
+- NEW lights.gd (ProtoLights): 32 pooled additive ground ellipses, ONE
+  MultiMesh, z=-3. Fields flicker light, energy bolts glow, hero/legendaries/
+  bosses stand in their own light; level-up gold bloom; Cinderburst pop.
+- Heat haze INSIDE the existing post pass (vec4[6] world-tracked sources,
+  zero extra copies): fire fields + Cinderburst shimmer the air.
+- Gates: FXSTRESS OK (lights 32/32 clamped, umbra over-fire, 2 persistent
+  flames, haze eviction; 13.78 ms worst, 0 nodes after warmup), hunt boot x2
+  clean, CLICKTEST ALL PASS, content validate 0 problems.
+- NEXT EYES-ON (Ricardo): do fields read as burning? Does Shadow Rend read as
+  darkness? Then: umbral wisp bolts could trail umbra puffs; mire/earth field
+  pools; torch/glowshroom PROPS (decor system still doesn't exist); moodier
+  global grade; Vulkan flip (real bloom) remains the biggest pound-for-pound.
 
 ## v0.1.11 delta (2026-07-16) — Phantom Tower reference pass
 

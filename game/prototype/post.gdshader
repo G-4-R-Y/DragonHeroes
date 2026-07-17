@@ -16,6 +16,12 @@ uniform float vig_outer = 1.25;      // dist where vignette bottoms out
 uniform float bright_boost = 0.28;   // over-bright gain (0 under Vulkan HDR)
 uniform vec2 kick_center = vec2(0.5, 0.5);
 uniform float intensity = 0.5;       // <0.15 = safety passthrough (rect also hidden)
+// Heat-haze sources (fire fields, cinder bursts) — registered world-side by
+// post.gd, converted to screen space per frame. Riding THIS pass costs zero
+// extra backbuffer copies. xy = screen uv, z = radius (height units),
+// w = strength (texels). Off below the fake-bloom floor like everything else.
+uniform int haze_count = 0;
+uniform vec4 haze_src[6];
 
 void fragment() {
 	vec2 uv = SCREEN_UV;
@@ -26,6 +32,18 @@ void fragment() {
 	if (intensity < 0.15) {
 		col = texture(screen_tex, uv).rgb;
 	} else {
+		// Heat haze: gaussian-falloff shimmer around each source. Distances are
+		// height-normalized (dd.x * aspect) so pools stay round on 16:9.
+		float aspect = SCREEN_PIXEL_SIZE.y / SCREEN_PIXEL_SIZE.x;
+		for (int i = 0; i < haze_count; i++) {
+			vec2 dd = uv - haze_src[i].xy;
+			dd.x *= aspect;
+			float fall = exp(-dot(dd, dd) / max(haze_src[i].z * haze_src[i].z, 1e-6));
+			float w1 = sin(uv.y * 140.0 + TIME * 9.0 + float(i) * 2.7)
+					+ 0.55 * sin(uv.y * 291.0 - TIME * 14.0 + float(i));
+			float w2 = sin(uv.x * 120.0 + TIME * 6.5 + float(i) * 1.3);
+			uv += vec2(w1, 0.45 * w2) * fall * haze_src[i].w * SCREEN_PIXEL_SIZE;
+		}
 		vec2 d = uv - kick_center;
 		float dist = length(d);
 		// Radial chromatic aberration — offsets in texel units, growing toward the rim.

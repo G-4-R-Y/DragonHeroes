@@ -547,3 +547,31 @@ Still open:
    boss chassis (bar color), hunt legendaries (magenta), materials cached
    per color (ProtoGlow.rim_material). Renderer previews and shaders kept
    in exact parity (same constants edited in both).
+27. **Media-grade VFX: fire/darkness are MEDIA, effects light the world
+   (2026-07-17, Ricardo).** Ricardo's verdict on v0.1.11: effects still read
+   as "hard shapes on top of the rest instead of actual fire and darkness
+   aura" — and he asked whether to swap engines. Engine question RE-ANSWERED,
+   decision unchanged: NO overhaul. The hard-shape read is authorship, not
+   engine — (a) crisp SDF bands with one flat tint instead of advected media,
+   (b) additive-only blending (additive DARKNESS is physically impossible),
+   (c) effects casting no light on the scene. The same math renders equally
+   hard in Unreal/Unity; Hades-grade fire is media shaders + scene lighting,
+   all expressible on gl_compatibility. Built ground-up instead (v0.1.12):
+   (1) firestorm upgraded to a persistent medium — TIME-based advection (a
+   10 s field burns at burst speed, never syrup slow-mo), `hold` sustain
+   envelope, `flash_amt`; fire/lava fields now BURN their whole duration
+   (persist-flagged pool quads, stolen last, faded early on lava fusion).
+   (2) NEW umbra.gdshader — the first MIX-BLEND medium: occluding near-black
+   violet smoke (alpha<=0.90), erosion dissolve (threshold rises — the cloud
+   burns off in patches, never alpha-fades), narrow violet rim + motes;
+   wired to Shadow Rend, umbral creature deaths, legendary deaths (lab:
+   genforge/vfx_lab/umbra). (3) NEW lights.gd (ProtoLights): ONE MultiMesh,
+   32 pooled additive ground ellipses at z=-3 (under entities, above field
+   decals, below telegraph rings) — fire fields flicker light onto the
+   ground, energy bolts carry glow pools, the hero/legendaries/bosses stand
+   in their own light; intensity gates usage, never allocation. (4) Heat
+   haze folded into the EXISTING post pass (uniform vec4[6], world-tracked
+   sources, ZERO extra backbuffer copies) — fire fields and Cinderburst
+   shimmer the air. fx_stress extended (lights 32-clamp, umbra over-fire,
+   persistent flames, haze eviction past HAZE_MAX): 13.78 ms worst frame,
+   0 nodes after warmup, all pools clamped.

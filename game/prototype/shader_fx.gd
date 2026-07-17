@@ -24,10 +24,11 @@ const SHADERS := {
 	"vortex": preload("res://prototype/shaders/vortex.gdshader"),
 	"firestorm": preload("res://prototype/shaders/firestorm.gdshader"),
 	"impact": preload("res://prototype/shaders/impact.gdshader"),
+	"umbra": preload("res://prototype/shaders/umbra.gdshader"),
 }
 # sensible default life (s) per kind — a blink, not a lingering cloud
 const LIVES := {"slash": 0.28, "nova": 0.5, "vortex": 0.55,
-		"firestorm": 0.6, "impact": 0.3}
+		"firestorm": 0.6, "impact": 0.3, "umbra": 0.8}
 
 var _sprites: Array[Sprite2D] = []
 var _mats := {}                  # kind -> Array[ShaderMaterial] (one per slot):
@@ -37,6 +38,8 @@ var _mats := {}                  # kind -> Array[ShaderMaterial] (one per slot):
 var _cur: Array[ShaderMaterial] = []
 var _age: Array[float] = []
 var _life: Array[float] = []
+var _persist: Array[bool] = []   # long-lived quads (field flames): stolen LAST
+var _gen: Array[int] = []        # per-slot generation — burst() ids for kill()
 var _idx := 0
 var _peak := 0
 var _active := 0
@@ -65,14 +68,17 @@ func _ready() -> void:
 		_cur.append(null)
 		_age.append(0.0)
 		_life.append(1.0)
+		_persist.append(false)
+		_gen.append(0)
 
 # One pooled shader effect. cfg (all optional): size (world px, quad side),
-# color, dir (Vector2), life, seed, plus raw uniform passthroughs under
-# cfg.uniforms (e.g. {"intensity": 2.0, "core_color": Color(...)}).
-func burst(kind: String, at: Vector2, cfg: Dictionary = {}) -> void:
+# color, dir (Vector2), life, seed, persist (steal-last, for field flames),
+# plus raw uniform passthroughs under cfg.uniforms (e.g. {"intensity": 2.0}).
+# Returns a stable id for kill() (-1 on unknown kind).
+func burst(kind: String, at: Vector2, cfg: Dictionary = {}) -> int:
 	if not SHADERS.has(kind):
 		push_warning("shader_fx: unknown kind '%s'" % kind)
-		return
+		return -1
 	var i := _claim()
 	var s := _sprites[i]
 	var m: ShaderMaterial = _mats[kind][i]
@@ -92,16 +98,51 @@ func burst(kind: String, at: Vector2, cfg: Dictionary = {}) -> void:
 		m.set_shader_parameter(u, cfg.uniforms[u])
 	_age[i] = 0.0
 	_life[i] = maxf(float(cfg.get("life", LIVES.get(kind, 0.4))), 0.05)
+	_persist[i] = bool(cfg.get("persist", false))
+	_gen[i] += 1
 	s.visible = true
+	return _gen[i] * POOL + i
+
+# Early fade-out for a long-lived burst (field consumed by a lava fusion).
+# The slot fades over ~0.45 s: with a high `hold` the progress jump stays in
+# the sustain plateau, so there is no visible pop — just the decay tail.
+func kill(id: int) -> void:
+	if id < 0:
+		return
+	var i := id % POOL
+	if _gen[i] * POOL + i != id or not _sprites[i].visible:
+		return   # slot was recycled since — nothing to kill
+	_persist[i] = false
+	if _life[i] - _age[i] > 0.45:
+		_life[i] = _age[i] + 0.45
 
 func _claim() -> int:
-	# round-robin; the oldest slot is simply recycled (effects are sub-second)
-	var i := _idx
-	_idx = (_idx + 1) % POOL
-	if not _sprites[i].visible:
-		_active += 1
-		_peak = maxi(_peak, mini(_active, POOL))
-	return i
+	# 1) any invisible slot (scan from _idx so rotation stays fair)
+	for k in POOL:
+		var i := (_idx + k) % POOL
+		if not _sprites[i].visible:
+			_idx = (i + 1) % POOL
+			_active += 1
+			_peak = maxi(_peak, mini(_active, POOL))
+			return i
+	# 2) all live: steal the quad closest to death — non-persist first, so a
+	# 10 s field flame is never eaten by the 13th sub-second burst
+	var best := -1
+	var best_p := -1
+	var rem_best := INF
+	var rem_best_p := INF
+	for i in POOL:
+		var rem := _life[i] - _age[i]
+		if _persist[i]:
+			if rem < rem_best_p:
+				rem_best_p = rem
+				best_p = i
+		elif rem < rem_best:
+			rem_best = rem
+			best = i
+	var pick := best if best >= 0 else best_p
+	_idx = (pick + 1) % POOL
+	return pick
 
 func _process(dt: float) -> void:
 	var live := 0
@@ -111,6 +152,7 @@ func _process(dt: float) -> void:
 		_age[i] += dt
 		if _age[i] >= _life[i]:
 			_sprites[i].visible = false
+			_persist[i] = false
 			continue
 		live += 1
 		if _cur[i] != null:

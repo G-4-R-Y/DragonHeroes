@@ -81,11 +81,35 @@ func _drive_load() -> void:
 					{"count": 6, "spread": 1.2, "dur": 3.0})
 		for i in 10:
 			telegraphs.ring(c + Vector2(float(i) * 4.0, 0.0), 40.0, 3.0)
-	# Procedural-shader FX (vfx_lab) — over-fire ALL kinds; 12-quad pool must recycle
+	# Procedural-shader FX (vfx_lab) — over-fire ALL kinds (incl. the mix-blend
+	# umbra); 12-quad pool must recycle around the two persistent field flames.
+	if _frame == WARMUP:
+		for i in 2:
+			fx.shader_burst("firestorm", c + Vector2(float(i) * 90.0 - 45.0, 40.0),
+					{"size": 120.0, "life": 10.0, "persist": true,
+					"uniforms": {"hold": 0.88, "flash_amt": 0.0}})
 	if _frame % 4 == 0:
-		for kind in ["slash", "nova", "vortex", "firestorm", "impact"]:
+		for kind in ["slash", "nova", "vortex", "firestorm", "impact", "umbra"]:
 			fx.shader_burst(kind, c + Vector2(randf_range(-50, 50), randf_range(-30, 30)),
 					{"size": 80.0, "dir": Vector2.RIGHT})
+	# Ground light pools — worst case: hero+legendary follows, a field, and a
+	# hail of one-shot pops; the 32-slot pool must clamp, steal one-shots first.
+	if _frame == WARMUP:
+		for k in _knives:
+			fx.light_attach(k, {"radius": 26.0, "color": Color(0.8, 0.6, 1.0),
+					"alpha": 0.3})
+		fx.light_at(c, {"radius": 90.0, "color": Color(1.0, 0.55, 0.2),
+				"alpha": 0.4, "life": 10.0, "flicker": 0.4})
+	if _frame % 2 == 0:
+		for i in 3:
+			fx.light_at(c + Vector2(randf_range(-80, 80), randf_range(-50, 50)),
+					{"radius": 34.0, "color": Color(1.0, 0.7, 0.3), "alpha": 0.4,
+					"life": 0.5, "flicker": 0.5})
+	# Heat-haze sources — spam past HAZE_MAX; post must evict, never grow.
+	if _frame % 10 == 0:
+		for i in 8:
+			post.haze(c + Vector2(randf_range(-90, 90), randf_range(-60, 60)),
+					46.0, 2.2, 1.2)
 	# Damage-number storm — 12/frame, ~0.8 s life → far over the 48 pool concurrently,
 	# so the round-robin recycle must hold peak at 48.
 	for i in 12:
@@ -104,12 +128,15 @@ func _sample() -> void:
 func _evaluate() -> void:
 	_done = true
 	var rb := int((fx._pool_debug().get("ribbons", {}) as Dictionary).get("peak_in_use", 0))
+	var lt := int((fx._pool_debug().get("lights", {}) as Dictionary).get("peak_in_use", 0))
 	var tg := int(telegraphs._pool_debug().get("peak_in_use", 0))
 	var dm := int(_dmg._pool_debug().get("peak_in_use", 0))
 	var nodes_after: int = _peak_nodes - _baseline_nodes
 	var fail: Array[String] = []
 	if rb > 40:
 		fail.append("ribbons_peak=%d>40" % rb)
+	if lt > 32:
+		fail.append("lights_peak=%d>32" % lt)
 	if tg > 24:
 		fail.append("telegraphs_peak=%d>24" % tg)
 	if dm > 48:
@@ -121,9 +148,10 @@ func _evaluate() -> void:
 	if _peak_ms >= 16.6:
 		fail.append("frame_ms=%.2f>=16.6" % _peak_ms)
 	if fail.is_empty():
-		print(("FXSTRESS OK ribbons_peak<=40(%d) telegraphs_peak<=24(%d) " +
-				"labels_peak<=48(%d) nodes_created_after_warmup=0 draws<120(%d) " +
-				"frame_ms<16.6(%.2f)") % [rb, tg, dm, _peak_draws, _peak_ms])
+		print(("FXSTRESS OK ribbons_peak<=40(%d) lights_peak<=32(%d) " +
+				"telegraphs_peak<=24(%d) labels_peak<=48(%d) " +
+				"nodes_created_after_warmup=0 draws<120(%d) " +
+				"frame_ms<16.6(%.2f)") % [rb, lt, tg, dm, _peak_draws, _peak_ms])
 		get_tree().quit(0)
 	else:
 		print("FXSTRESS FAIL " + ", ".join(fail))

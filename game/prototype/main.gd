@@ -457,6 +457,8 @@ func spawn_field(at: Vector2, radius: float, duration: float, dps: float,
 					and f.pos.distance_to(at) < (f.radius + radius) * 0.75:
 				var mid: Vector2 = (f.pos + at) * 0.5
 				f.until = 0.0   # consumed by the fusion
+				fx.shader_kill(int(f.get("flame_id", -1)))   # flame fades, no orphan burn
+				fx.light_detach(int(f.get("light_id", -1)))
 				if is_instance_valid(f.get("glow")):
 					f.glow.queue_free()
 				fx.explosion(mid, Color(1.0, 0.4, 0.08), true)
@@ -475,9 +477,22 @@ func spawn_field(at: Vector2, radius: float, duration: float, dps: float,
 	# + a per-kind ignition swirl tinted to the field edge.
 	telegraphs.ring(at, radius, 0.45, k.tele)
 	fx.orbital(at, {"count": 5, "radius": radius * 0.45, "life": 0.3, "color": k.edge})
-	if kind == "fire" or kind == "lava":   # vfx_lab firestorm ignition plume
+	var flame_id := -1
+	var light_id := -1
+	if kind == "fire" or kind == "lava":
+		# ignition pop + a PERSISTENT flame (TIME-advected medium, canon §12.27):
+		# the field BURNS for its whole duration instead of a 0.55 s puff, casts
+		# a flickering pool of light on the ground, and shimmers the air above.
 		fx.shader_burst("firestorm", at + Vector2(0, -radius * 0.4),
 				{"size": radius * 2.2, "life": 0.55})
+		flame_id = fx.shader_burst("firestorm", at + Vector2(0, -radius * 0.55),
+				{"size": radius * 2.6, "life": duration, "persist": true,
+				"uniforms": {"hold": 0.88, "flash_amt": 0.0}})
+		light_id = fx.light_at(at, {"radius": radius * 1.9,
+				"color": Color(1.0, 0.55, 0.18) if kind == "fire" else Color(1.0, 0.42, 0.10),
+				"alpha": 0.42, "life": duration, "flicker": 0.4})
+		if post != null:
+			post.haze(at + Vector2(0, -radius * 0.5), radius * 1.5, 2.2, duration)
 	match kind:
 		"fire":
 			fx.flame_cone(at, Vector2.UP)
@@ -492,7 +507,8 @@ func spawn_field(at: Vector2, radius: float, duration: float, dps: float,
 					"color": Color(0.5, 0.9, 0.4, 0.6)})
 	_fields.append({"pos": at, "radius": radius,
 			"until": Time.get_ticks_msec() / 1000.0 + duration, "dps": dps, "tick": 0.0,
-			"glow": glow, "kind": kind, "friendly": friendly})
+			"glow": glow, "kind": kind, "friendly": friendly,
+			"flame_id": flame_id, "light_id": light_id})
 
 # The Duologue is only live while BOTH Legendary duo bosses stand (canon §4).
 func _duo_combo_active() -> bool:
@@ -932,6 +948,8 @@ func _grant_level_ups() -> void:
 			{"size": 60.0, "color": Color(1.0, 0.85, 0.4), "uniforms": {"intensity": 1.4}})
 	fx.orbital(player.global_position, {"count": 8, "radius": 20.0, "turns": 1.5,
 			"life": 0.5, "color": gold_col})
+	fx.light_at(player.global_position, {"radius": 64.0, "color": gold_col,
+			"alpha": 0.5, "life": 0.9})   # the ground blooms gold under the ding
 	post.flash(gold_col, 0.3)
 	damage_number(player.global_position + Vector2(0, -36), 0, Color("ffd166"),
 			ProtoLang.t("msg_level_up") % new_level)

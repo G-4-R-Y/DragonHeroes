@@ -93,6 +93,7 @@ func _ready() -> void:
 	sprite.play("idle")
 	add_child(sprite)
 	_apply_rim()
+	call_deferred("_apply_presence_glow")
 	if name_tag != "":   # elite title floats above the sprite
 		var tag := Label.new()
 		tag.text = name_tag
@@ -128,6 +129,23 @@ func _apply_rim() -> void:
 		sprite.material = ProtoGlow.rim_material(get("bar_color"), 1.3)
 	elif elite and _AFFIX_RIM.has(elite_affix):
 		sprite.material = ProtoGlow.rim_material(_AFFIX_RIM[elite_affix])
+
+# Legendaries and bosses light the ground they stand on (lights.gd pool) — a
+# followed ellipse in their signature color. Deferred: creatures can spawn
+# while main is still assembling its fx child. Commons/elites skip it (32-pool
+# is for the few things that MATTER; elites already carry the rim).
+func _apply_presence_glow() -> void:
+	var main := get_tree().get_first_node_in_group("main")
+	if main == null or main.get("fx") == null:
+		return
+	if not legendary_entry.is_empty():
+		main.fx.light_attach(self, {"radius": maxf(body_radius * 4.5, 34.0),
+				"color": Color(0.85, 0.4, 1.0), "alpha": 0.30,
+				"flicker": 0.25, "rate": 7.0})
+	elif get("bar_color") != null:
+		main.fx.light_attach(self, {"radius": maxf(body_radius * 4.0, 40.0),
+				"color": get("bar_color"), "alpha": 0.26,
+				"flicker": 0.2, "rate": 6.0})
 
 # Spawn-table variety (call BEFORE add_child). Archetypes reshape the base kit;
 # elite affixes mark pack leaders with boosted loot (elite=true). All proposals;
@@ -677,6 +695,15 @@ func _die() -> void:
 	var main := get_tree().get_first_node_in_group("main")
 	if main:
 		main.on_creature_died(self)
+	# Umbral things die INTO darkness: mix-blend smoke puff (umbra.gdshader) —
+	# legendaries get a big rim-tinted void regardless of element.
+	if main and main.get("fx") != null:
+		if not legendary_entry.is_empty():
+			main.fx.shader_burst("umbra", global_position,
+					{"size": 120.0, "life": 0.9, "color": Color(0.88, 0.4, 1.0)})
+		elif str(_entry.get("element", "")) == "umbral":
+			main.fx.shader_burst("umbra", global_position,
+					{"size": maxf(body_radius * 7.0, 56.0), "life": 0.7})
 	remove_from_group("creatures")
 	set_physics_process(false)
 	queue_redraw()   # hides the health bar (guarded by `dead` in _draw)

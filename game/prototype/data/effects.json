@@ -361,13 +361,31 @@
         {
           "key": "shader_fx",
           "name": "Procedural shader FX (vfx_lab)",
-          "desc": "Five pure-math canvas_item fragment effects — slash, nova, vortex, firestorm, impact (SDF + fBm + chromatic dispersion) — authored as numpy previews (genforge/vfx_lab) and ported 1:1. Pooled 12-quad system (shader_fx.gd), ALL materials pre-compiled at load; canvas_items stretch renders them at WINDOW resolution: smooth hi-res effects over the pixel world.",
+          "desc": "Six pure-math canvas_item fragment effects — slash, nova, vortex, firestorm, impact (additive) and umbra (MIX-blend darkness) — authored as numpy previews (genforge/vfx_lab) and ported 1:1. Pooled 12-quad system (shader_fx.gd), ALL materials pre-compiled at load; persist-flagged quads (field flames) are stolen last and support early kill(). firestorm advects on TIME with a `hold` sustain envelope, so ground fires BURN for their whole duration. canvas_items stretch renders at WINDOW resolution.",
           "status": "live"
         },
         {
           "key": "rim_glow",
           "name": "Elite rim glow",
           "desc": "Colored silhouette outline (rim_glow.gdshader, 8-tap alpha edge) on elites (affix color), boss chassis (bar color) and hunt legendaries (magenta) — the Phantom Tower / Hades elite read; materials shared per color.",
+          "status": "live"
+        },
+        {
+          "key": "umbra_smoke",
+          "name": "Umbral darkness smoke",
+          "desc": "Mix-blend occluding medium (umbra.gdshader): near-black violet smoke (alpha<=0.90) with erosion dissolve (density threshold rises over life — the cloud burns off in patches) and a narrow violet rim + drifting motes. Additive darkness is impossible; this DARKENS the scene. Fired by Shadow Rend, umbral creature deaths, legendary deaths.",
+          "status": "live"
+        },
+        {
+          "key": "ground_light_pools",
+          "name": "Ground light pools",
+          "desc": "ProtoLights (lights.gd): ONE MultiMesh of 32 pooled additive radial-gradient ellipses at z=-3 (under entities, above field decals, below telegraph rings) — the 'effects light the world' layer. Fire/lava fields flicker light on the ground, energy bolts carry follow glows, hero/bosses/legendaries stand in their own light. Intensity gates usage, never allocation.",
+          "status": "live"
+        },
+        {
+          "key": "heat_haze",
+          "name": "Heat-haze shimmer",
+          "desc": "Displacement stage inside the EXISTING post pass (post.gdshader uniform vec4[6]; zero extra backbuffer copies). World-tracked sources ease in/out and self-expire (post.haze()); fire/lava fields and Cinderburst detonations shimmer the air above them. Off below the fake-bloom intensity floor.",
           "status": "live"
         }
       ]

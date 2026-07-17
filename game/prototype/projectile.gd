@@ -28,6 +28,7 @@ var impact_ring := true  # steel opts out — the knife fan would starve the poo
 var _spr: Sprite2D
 var _t := 0.0
 var _trail_id := -1       # pooled ribbon trail (fx.trail_attach), -1 = none
+var _light_id := -1       # pooled ground glow (fx.light_attach), -1 = none
 
 func set_violet() -> void:
 	dmg_type = "umbral"
@@ -82,6 +83,12 @@ func _ready() -> void:
 		_trail_id = main.fx.trail_attach(self, {
 				"color": trail_a, "width": maxf(radius * 1.1, 3.5),
 				"life": lifetime + 0.3})
+		# Energy bolts cast light on the ground beneath them (lights.gd);
+		# thrown steel (pulse_amp 0) is not a light source.
+		if pulse_amp > 0.0:
+			_light_id = main.fx.light_attach(self, {
+					"radius": maxf(radius * 7.0, 22.0), "color": trail_a,
+					"alpha": 0.34, "life": lifetime + 0.3})
 
 func _physics_process(delta: float) -> void:
 	# in-flight juice: pure transform math, zero allocation (60 FPS hard rule)
@@ -139,12 +146,17 @@ func _impact() -> void:
 	_release_trail()
 	queue_free()
 
-# Detach the pooled ribbon trail on either exit path. Cheap idempotent no-op if
-# never attached; the ribbon's own `life` fallback covers any path we miss.
+# Detach the pooled ribbon trail + ground glow on either exit path. Cheap
+# idempotent no-op if never attached; both pools' own `life` fallbacks cover
+# any path we miss.
 func _release_trail() -> void:
-	if _trail_id == -1:
+	if _trail_id == -1 and _light_id == -1:
 		return
 	var main := get_tree().get_first_node_in_group("main")
 	if main != null and main.get("fx") != null:
-		main.fx.trail_detach(_trail_id)
+		if _trail_id != -1:
+			main.fx.trail_detach(_trail_id)
+		if _light_id != -1:
+			main.fx.light_detach(_light_id)
 	_trail_id = -1
+	_light_id = -1

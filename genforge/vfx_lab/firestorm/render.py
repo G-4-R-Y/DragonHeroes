@@ -12,6 +12,16 @@ W = H = 256          # per-frame resolution
 FRAMES = [0.0, 0.2, 0.4, 0.6, 0.8, 1.0]
 SEED = 3.0
 
+# Medium parameters (mirrored as shader uniforms). Advection is TIME-based —
+# NOT progress-based — so a 10 s ground-fire field burns at the same speed as
+# a 0.6 s burst instead of playing in syrup slow-mo. HOLD is the progress
+# point where decay starts: bursts 0.25, persistent fields ~0.88.
+LIFE = 0.6           # seconds this preview burst lives (T = p * LIFE)
+HOLD = 0.25          # sustain until this progress, then front-loaded decay
+FLOW = 4.5           # advection speed (domain units / second)
+FLASH_AMT = 1.0      # ignition pop gain (fields pass 0 — they get a separate
+                     # short ignition burst; the persistent quad never flashes)
+
 # ---------------------------------------------------------------- noise
 def hash2(ix, iy):
     """Vectorized GLSL-style hash of integer lattice -> [0,1)."""
@@ -91,15 +101,16 @@ def render_flame(p):
     x = (gx - ox)
     yup = (oy - gy)
 
-    # --- life envelope: hard snap-in, quick front-loaded decay ---
+    # --- life envelope: hard snap-in, sustain to HOLD, front-loaded decay ---
+    T = p * LIFE                                   # absolute seconds (shader: TIME)
     rise = np.clip(p / 0.10, 0, 1)
     rise = rise * rise * (3 - 2 * rise)
-    fall = 1.0 - np.clip((p - 0.25) / 0.75, 0, 1)
+    fall = 1.0 - np.clip((p - HOLD) / max(1.0 - HOLD, 1e-3), 0, 1)
     fall = fall * fall
     env = rise * fall
     fall_s = np.sqrt(fall)
     reach = 0.28 + 0.54 * rise * (0.5 + 0.5 * fall_s)  # shoots up, then burns down/shortens
-    scroll = 3.2 * p
+    scroll = (T * FLOW) % 240.0 + SEED * 13.0      # TIME-based advection (see header)
     warp_amt = 0.55 + 0.45 * env
 
     chroma = 0.011 * (0.4 + 0.6 * env)              # R/B split magnitude
@@ -139,9 +150,11 @@ def render_flame(p):
     alpha = np.clip(intensity * 1.35 + base_hot * vis * 0.6, 0, 1)
 
     # --- trailing smoke wisps: dark, translucent, rise & outlive the flame ---
-    smk_env = np.clip(p / 0.22, 0, 1) * (1.0 - np.clip((p - 0.32) / 0.68, 0, 1)) ** 1.3
+    s0 = max(HOLD, 0.32)
+    smk_env = np.clip(p / 0.22, 0, 1) \
+        * (1.0 - np.clip((p - s0) / max(1.0 - s0, 1e-3), 0, 1)) ** 1.3
     if smk_env > 0.01:
-        ss = 2.6 * p + 0.4
+        ss = scroll * 0.55 + 11.0                  # coherent with the flame flow
         sn = fbm(x * 4.0 + 31.0, yup * 2.6 - ss, 4)
         s_reach = 0.30 + 0.55 * np.clip(p / 0.5, 0, 1)
         sh = np.clip(yup / s_reach, 0, 1)
@@ -155,7 +168,7 @@ def render_flame(p):
         alpha = np.clip(alpha + smoke * 0.35, 0, 1)
 
     # --- ignition flash: radial white pop, very front-loaded ---
-    fl = np.clip(1.0 - abs(p - 0.06) / 0.10, 0, 1) ** 2
+    fl = (np.clip(1.0 - abs(p - 0.06) / 0.10, 0, 1) ** 2) * FLASH_AMT
     if fl > 0:
         d2 = (x ** 2 + (yup - 0.02) ** 2)
         flash = np.exp(-d2 / (0.09 ** 2)) * fl
@@ -163,7 +176,7 @@ def render_flame(p):
         alpha = np.clip(alpha + flash * 0.8, 0, 1)
 
     # --- rising ember specks ---
-    emb_rgb, emb_a = embers(x, yup, p, env)
+    emb_rgb, emb_a = embers(x, yup, T, env)
     rgb = rgb + emb_rgb
     alpha = np.clip(alpha + emb_a, 0, 1)
 
@@ -173,8 +186,8 @@ def smooth01(v, a, b):
     t = np.clip((v - a) / (b - a), 0, 1)
     return t * t * (3 - 2 * t)
 
-def embers(x, yup, p, env):
-    """Bright points advected upward with flicker."""
+def embers(x, yup, T, env):
+    """Bright points advected upward with flicker (T = absolute seconds)."""
     rgb = np.zeros((H, W, 3))
     a = np.zeros((H, W))
     n_emb = 26
@@ -183,7 +196,7 @@ def embers(x, yup, p, env):
         ex0 = (rng.random() - 0.5) * 0.34
         speed = 0.55 + rng.random() * 0.9
         life_off = rng.random()
-        phase = (p * speed + life_off) % 1.0
+        phase = ((T * 0.85 + life_off * 7.0) * speed) % 1.0   # TIME-based rise
         ey = phase * 0.62                       # rises from origin
         # horizontal drift sway
         ex = ex0 + 0.05 * np.sin((phase * 6.0 + i) * 3.14) * phase
@@ -192,7 +205,7 @@ def embers(x, yup, p, env):
         stretch = 2.0 + 1.5 * speed
         d2 = ((x - ex) ** 2 + ((yup - ey) / stretch) ** 2) / (size ** 2)
         spark = np.exp(-d2)
-        flick = 0.5 + 0.5 * np.sin((p * 40 + i * 2.3))
+        flick = 0.5 + 0.5 * np.sin((T * 26.0 + i * 2.3))
         bright = env * (1.0 - phase) * (0.6 + 0.4 * flick)
         # hottest sparks are near-white, cooling to orange as they rise
         heat = 1.0 - 0.7 * phase

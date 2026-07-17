@@ -18,6 +18,7 @@ const BASE_ABERRATION := 1.0     # texels (spec: base <= 1.5)
 const BASE_BRIGHT := 0.28
 const PULSE_DECAY := 0.25         # seconds
 const FLASH_DUR := 0.35
+const HAZE_MAX := 6               # shader uniform array size (post.gdshader)
 
 var _bbc: BackBufferCopy
 var _rect: ColorRect
@@ -31,6 +32,8 @@ var _pulse := 0.0                 # transient aberration+bright kick, decays in 
 var _flash_t := 0.0
 var _flash_strength := 0.0
 var _hdr := false
+var _haze: Array = []             # heat-haze sources, WORLD coords (converted to
+                                  # screen uv per frame so camera pans track)
 
 func _ready() -> void:
 	layer = 5
@@ -103,6 +106,23 @@ func set_hdr_mode(on: bool) -> void:
 	_hdr = on
 	_apply_uniforms()
 
+# Heat-haze shimmer around a WORLD position (fire fields, cinder bursts, lava).
+# Rides the existing post pass — zero extra backbuffer copies. Sources ease
+# in/out and self-expire; at HAZE_MAX the one closest to expiry is evicted.
+func haze(world_pos: Vector2, radius_px := 46.0, strength := 2.2, life := 0.6) -> void:
+	var now := Time.get_ticks_msec() / 1000.0
+	if _haze.size() >= HAZE_MAX:
+		var bi := 0
+		var brem := INF
+		for k in _haze.size():
+			var rem: float = _haze[k].until - now
+			if rem < brem:
+				brem = rem
+				bi = k
+		_haze.remove_at(bi)
+	_haze.append({"pos": world_pos, "radius_px": radius_px, "strength": strength,
+			"t0": now, "until": now + maxf(life, 0.1)})
+
 # ---- internals ------------------------------------------------------------------
 
 func _process(dt: float) -> void:
@@ -112,6 +132,39 @@ func _process(dt: float) -> void:
 	if _flash_t > 0.0:
 		_flash_t = maxf(0.0, _flash_t - dt)
 		_flash_rect.color.a = (_flash_t / FLASH_DUR) * _flash_strength
+	_update_haze()
+
+# World -> screen-uv conversion every frame (sources track camera pans); the
+# uniform array is tiny, so re-uploading it per frame is noise.
+func _update_haze() -> void:
+	if _haze.is_empty() and _mat.get_shader_parameter("haze_count") == 0:
+		return
+	var now := Time.get_ticks_msec() / 1000.0
+	var vp := get_viewport()
+	if vp == null:
+		return
+	var ct := vp.get_canvas_transform()
+	var vps := vp.get_visible_rect().size
+	var packed := PackedColorArray()
+	var k := 0
+	while k < _haze.size():
+		var h: Dictionary = _haze[k]
+		if now >= float(h.until):
+			_haze.remove_at(k)
+			continue
+		var ease_in: float = clampf((now - float(h.t0)) / 0.25, 0.0, 1.0)
+		var ease_out: float = clampf((float(h.until) - now) / 0.3, 0.0, 1.0)
+		var s: float = float(h.strength) * ease_in * ease_out * lerpf(0.4, 1.0, _intensity)
+		var sp: Vector2 = ct * (h.pos as Vector2)
+		var uv := sp / vps
+		# radius in HEIGHT units (shader normalizes x by aspect)
+		packed.append(Color(uv.x, uv.y, float(h.radius_px) / vps.y, s))
+		k += 1
+	_mat.set_shader_parameter("haze_count", packed.size())
+	if packed.size() > 0:
+		while packed.size() < HAZE_MAX:   # fixed-size upload for the array uniform
+			packed.append(Color(0, 0, 0, 0))
+		_mat.set_shader_parameter("haze_src", packed)
 
 func _apply_uniforms() -> void:
 	var iscale := lerpf(0.4, 1.0, _intensity)
