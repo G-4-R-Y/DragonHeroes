@@ -475,6 +475,9 @@ func spawn_field(at: Vector2, radius: float, duration: float, dps: float,
 	# + a per-kind ignition swirl tinted to the field edge.
 	telegraphs.ring(at, radius, 0.45, k.tele)
 	fx.orbital(at, {"count": 5, "radius": radius * 0.45, "life": 0.3, "color": k.edge})
+	if kind == "fire" or kind == "lava":   # vfx_lab firestorm ignition plume
+		fx.shader_burst("firestorm", at + Vector2(0, -radius * 0.4),
+				{"size": radius * 2.2, "life": 0.55})
 	match kind:
 		"fire":
 			fx.flame_cone(at, Vector2.UP)
@@ -760,9 +763,12 @@ func on_creature_died(c: ProtoCreature) -> void:
 # + a beefed hitstop. `tier` scales the whole thing (legendary = largest). Additive
 # to each handler's existing explosion/debris/lightning flourish.
 func _boss_finisher(at: Vector2, color: Color, tier := 1.0) -> void:
-	fx.orbital(at, {"count": int(round(9 * tier)), "turns": 2.0,
+	fx.shader_burst("nova", at, {"size": 250.0 * tier, "life": 0.6, "color": color,
+			"uniforms": {"core_color": Color(1, 1, 1)}})
+	fx.shader_burst("impact", at, {"size": 70.0 * tier, "color": color,
+			"uniforms": {"intensity": 1.6}})
+	fx.orbital(at, {"count": int(round(7 * tier)), "turns": 2.0,
 			"radius": 52.0 * tier, "life": 0.4, "color": color})
-	fx.shockwave(at, color, 92.0 * tier, {"rings": 3})
 	post.pulse(1.0)
 	post.flash(Color(1, 1, 1), clampf(0.6 * tier, 0.0, 1.0))
 	hitstop(0.08, 0.09)   # deeper + longer than the standard per-hit stop
@@ -922,6 +928,8 @@ func _grant_level_ups() -> void:
 	# Short dur so rapid 1→100 dings self-release and never pin-starve the ribbons.
 	var gold_col := Color("ffd166")
 	fx.aura(player, gold_col, {"dur": 1.0})
+	fx.shader_burst("impact", player.global_position + Vector2(0, -10),
+			{"size": 60.0, "color": Color(1.0, 0.85, 0.4), "uniforms": {"intensity": 1.4}})
 	fx.orbital(player.global_position, {"count": 8, "radius": 20.0, "turns": 1.5,
 			"life": 0.5, "color": gold_col})
 	post.flash(gold_col, 0.3)

@@ -92,7 +92,8 @@
         {"key": "protective_aura", "name": "Protective / Enrage Aura", "desc": "Persistent glowing ring + orbiting ribbons following an owner. Green = player buff protection; red/orange = boss enrage.", "status": "live"},
         {"key": "punchy_numbers", "name": "Punchy Damage Numbers", "desc": "Pooled 48-label ring, scale-pop + crit grammar + vertical stacking, one shared _process, zero per-hit allocation.", "status": "live"},
         {"key": "shockwave", "name": "Shockwave", "desc": "Fat multi-ring additive nova for impacts, novas, and deaths (RING_POOL 12).", "status": "live"},
-        {"key": "vfx_intensity", "name": "Intensity knob", "desc": "Single ProtoFx.intensity in [0,1] (LOW/MED/HIGH = 0.15/0.5/1.0, mobile default MED) gates per-frame usage only, never allocation; telegraphs exempt (gameplay clarity).", "status": "live"}
+        {"key": "vfx_intensity", "name": "Intensity knob", "desc": "Single ProtoFx.intensity in [0,1] (LOW/MED/HIGH = 0.15/0.5/1.0, mobile default MED) gates per-frame usage only, never allocation; telegraphs exempt (gameplay clarity).", "status": "live"},
+        {"key": "shader_fx", "name": "Procedural shader FX (vfx_lab)", "desc": "Five pure-math canvas_item fragment effects — slash, nova, vortex, firestorm, impact (SDF + fBm + chromatic dispersion) — authored as numpy previews (genforge/vfx_lab) and ported 1:1. Pooled 12-quad system (shader_fx.gd), ALL materials pre-compiled at load; canvas_items stretch renders them at WINDOW resolution: smooth hi-res effects over the pixel world.", "status": "live"}
       ]
     },
     {

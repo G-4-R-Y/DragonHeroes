@@ -515,3 +515,22 @@ Still open:
    segmentation pass + matching rig (next step, ties into the image->3D->render
    route). Mocked tests (no network) cover backend/provider/factory. The backend
    is general — it will also drive VFX-frame and concept-art generation.
+25. **Shader-art VFX land in-game (2026-07-16, Ricardo).** Ricardo's bar:
+   effects read in the blink of an eye and match modern references (Children
+   of Morta et al.); pure shader math can hit it. The five vfx_lab effects —
+   slash, nova, vortex, firestorm, impact (SDF + fBm + domain-warp +
+   chromatic dispersion) — were authored as numpy contact-sheet previews
+   (sources + re-renderable previews now IN-REPO at genforge/vfx_lab/), ported
+   1:1 to canvas_item shaders (game/prototype/shaders/), and wired through a
+   pooled 12-quad system (shader_fx.gd, fx.shader_burst): melee/executor
+   slashes, frost/skill novas, Whirlwind + Shadow Rend vortices, Cinderburst/
+   fire-field firestorm plumes, crit/slam/finisher impact stars. KEY RENDERING
+   FACT: canvas_items stretch evaluates fragments at WINDOW resolution, so
+   these composite as smooth hi-res effects over the chunky pixel world — the
+   Children-of-Morta layering with zero extra viewport machinery. Perf: all
+   5x12 materials pre-compiled at load (a mid-fight shader swap spiked frame
+   time 21.7 ms in the fx_stress gate — caught and fixed; gate now 13.4 ms
+   under over-fire). Review verdict on the lab: vortex/firestorm/impact clear
+   the bar, nova good, slash flagged for a sharpen pass. Lab outputs must
+   live IN-REPO (a /tmp cleanup deleted the originals; recovered by replaying
+   64 Write/Edit ops from agent transcripts).

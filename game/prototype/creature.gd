@@ -467,7 +467,9 @@ func _strike(player: Node2D) -> void:
 		_pose_punch(Vector2(1.3, 0.72), 0.0, 0.32)   # landing squash
 		if main:
 			main.shake(5.0)
-			main.fx.shockwave(global_position, _base_tint, 48.0)   # fat impact nova (spec §3)
+			main.fx.shockwave(global_position, _base_tint, 48.0)
+			main.fx.shader_burst("impact", global_position,
+					{"size": 64.0, "color": Color(0.9, 0.7, 0.45)})   # fat impact nova (spec §3)
 			main.fx.debris(global_position)
 			main.fx.dust(global_position, 1.5)   # dust rolls out of the slam
 			main.play_sfx("hit", global_position, -6.0)

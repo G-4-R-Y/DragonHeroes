@@ -81,6 +81,11 @@ func _drive_load() -> void:
 					{"count": 6, "spread": 1.2, "dur": 3.0})
 		for i in 10:
 			telegraphs.ring(c + Vector2(float(i) * 4.0, 0.0), 40.0, 3.0)
+	# Procedural-shader FX (vfx_lab) — over-fire ALL kinds; 12-quad pool must recycle
+	if _frame % 4 == 0:
+		for kind in ["slash", "nova", "vortex", "firestorm", "impact"]:
+			fx.shader_burst(kind, c + Vector2(randf_range(-50, 50), randf_range(-30, 30)),
+					{"size": 80.0, "dir": Vector2.RIGHT})
 	# Damage-number storm — 12/frame, ~0.8 s life → far over the 48 pool concurrently,
 	# so the round-robin recycle must hold peak at 48.
 	for i in 12:

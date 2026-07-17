@@ -38,6 +38,7 @@ var _ri := 0
 var _gi := 0
 
 var _ribbons: ProtoRibbons          # orbital / sweeping-trail MultiMesh (ribbons.gd)
+var _shader_fx: ProtoShaderFx       # pooled procedural-shader quads (shader_fx.gd)
 var _aura_seq := 0
 var _auras: Dictionary = {}         # handle -> {tele:int, ribbons:Array[int]}
 
@@ -45,6 +46,8 @@ func _ready() -> void:
 	z_index = 18
 	_ribbons = ProtoRibbons.new()   # ONE MultiMesh, one draw call; sized for HIGH
 	add_child(_ribbons)
+	_shader_fx = ProtoShaderFx.new()  # vfx_lab shader effects, pooled quads
+	add_child(_shader_fx)
 	for i in ADD_POOL:
 		_add.append(_mk(true))
 	for i in NORM_POOL:
@@ -308,6 +311,11 @@ func trail_attach(node: Node2D, cfg: Dictionary = {}) -> int:
 
 func trail_detach(id: int) -> void:
 	_ribbons.detach(id)
+
+# ---- procedural-shader effects (vfx_lab): slash / nova / vortex / firestorm /
+# impact — hi-res fragment math on pooled quads; see shader_fx.gd -------------
+func shader_burst(kind: String, at: Vector2, cfg: Dictionary = {}) -> void:
+	_shader_fx.burst(kind, at, cfg)
 
 # ---- shockwave: fat multi-ring impact / nova / death nova -----------------------
 # cfg: rings (default 3, staggered radii + phase), width (thicker than ring's 2.5),

@@ -1,7 +1,24 @@
-# Handoff — running state (updated 2026-07-15, v0.1.9)
+# Handoff — running state (updated 2026-07-16, v0.1.10)
 
 Read `CLAUDE.md` + `docs/00-canon.md` first (decisions log §12 is current through
-item 23). This file is the delta: exactly where work stopped and what's next.
+item 25). This file is the delta: exactly where work stopped and what's next.
+
+## v0.1.10 delta (2026-07-16) — shader-art VFX in-game
+
+- vfx_lab (5 pure-math effects: slash/nova/vortex/firestorm/impact) is IN-REPO:
+  genforge/vfx_lab/<effect>/{render.py, notes.md, contact_sheet.png} previews +
+  game/prototype/shaders/*.gdshader (compile-verified; nova/impact had PI/TAU
+  built-in redefinitions — fixed). shader_fx.gd = pooled 12-quad system, ALL
+  5x12 materials pre-compiled at load (mid-fight shader swap = 21.7ms spike,
+  caught by fx_stress; now 13.4ms). canvas_items stretch = fragments at WINDOW
+  res -> hi-res effects over pixel world (Children-of-Morta layering, free).
+- Wired: melee/exec slashes, frost+skill novas, Whirlwind/Shadow Rend vortex,
+  Cinderburst + fire-field firestorm, crit/brute-slam/finisher/level-up impact.
+- Review: vortex/firestorm/impact clear the reference bar; nova good (slightly
+  clock-like spokes); SLASH flagged blobby -> sharpen pass is next iteration.
+- OpenAI image provider wired earlier same arc (GENFORGE_PROVIDER=model).
+- LESSON: lab/agent outputs go IN-REPO, never /tmp (originals were wiped;
+  recovered by replaying Write/Edit ops from agent transcripts).
 
 ## v0.1.9 delta (2026-07-15) — spectacle VFX overhaul
 

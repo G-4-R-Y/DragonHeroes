@@ -398,6 +398,10 @@ func _arc_hit(dir: Vector2, reach: float, arc_deg: float, dmg: float,
 		if to_c.length() <= reach + c.body_radius \
 				and to_c.normalized().dot(dir) >= cos_half:
 			c.take_damage(dmg, dir, spark)
+			if crit and main:   # vfx_lab impact: the crit star-flash pop
+				main.fx.shader_burst("impact", c.global_position,
+						{"size": 46.0, "color": Color(1.0, 0.86, 0.55),
+						"uniforms": {"intensity": 1.5}})
 			hit_any = true
 			if _class_fx == "ignite" and randf() < 0.2:   # Emberkin cast
 				c.ignite(2.0 * _skill_mult, 2.0)
@@ -435,11 +439,14 @@ func _attack() -> void:
 		main.play_sfx("swing", global_position, -10.0)
 		main.fx.arc_slash(global_position + _swing_dir * attack_reach * 0.6,
 				_swing_dir, Color(0.85, 0.92, 1.0, 0.9))
-		if _kit == "rogue":   # §3: fast twin steel flick
-			main.fx.ribbon_arc(global_position + _swing_dir * attack_reach * 0.6, _swing_dir, {"life": 0.12, "width": 4, "color": Color(0.85, 0.92, 1.0, 0.9)})
-			main.fx.ribbon_arc(global_position + _swing_dir * attack_reach * 0.6, _swing_dir.rotated(0.16), {"life": 0.12, "width": 4, "color": Color(0.85, 0.92, 1.0, 0.9)})
-		else:   # §3: melee cleave crescent
-			main.fx.ribbon_arc(global_position + _swing_dir * attack_reach * 0.6, _swing_dir, {"span": 2.1, "width": 6, "color": Color(0.85, 0.92, 1.0, 0.9)})
+		if _kit == "rogue":   # twin steel flicks — vfx_lab slash, short + tight
+			main.fx.shader_burst("slash", global_position + _swing_dir * attack_reach * 0.5,
+					{"size": 60.0, "life": 0.16, "dir": _swing_dir, "color": Color(0.85, 0.92, 1.0)})
+			main.fx.shader_burst("slash", global_position + _swing_dir * attack_reach * 0.5,
+					{"size": 52.0, "life": 0.2, "dir": _swing_dir.rotated(0.22), "color": Color(0.8, 0.88, 1.0)})
+		else:   # cleave crescent — vfx_lab slash (drawn-with-light, hi-res)
+			main.fx.shader_burst("slash", global_position + _swing_dir * attack_reach * 0.55,
+					{"size": 88.0, "dir": _swing_dir, "color": Color(0.85, 0.9, 1.0)})
 	var hit_any := _arc_hit(_swing_dir, attack_reach, attack_arc_deg,
 			attack_damage, Color("cfd6ff"), _rune_cleave)
 	if _rune_cleave == "rune_of_echoes":
@@ -467,8 +474,10 @@ func _shadow_rend(main: Node) -> void:
 	main.fx.explosion(global_position, Color(0.62, 0.38, 1.0))   # umbral nova
 	main.fx.ring(global_position, Color(0.7, 0.45, 1.0, 0.9), rend_reach)
 	# §3 signature: screen-filling umbral orbital + big violet cleave + shockwave + post kick
-	main.fx.orbital(global_position, {"count": 7, "turns": 1.5, "radius": 44.0, "life": 0.34, "color": Color(0.62, 0.38, 1.0)})
-	main.fx.ribbon_arc(global_position + _rend_dir * rend_reach * 0.6, _rend_dir, {"span": 2.1, "width": 10, "color": Color(0.7, 0.45, 1.0, 0.95)})
+	main.fx.shader_burst("vortex", global_position, {"size": 150.0, "life": 0.5,
+			"dir": _rend_dir, "color": Color(0.42, 0.12, 0.95)})
+	main.fx.shader_burst("slash", global_position + _rend_dir * rend_reach * 0.6,
+			{"size": 110.0, "life": 0.32, "dir": _rend_dir, "color": Color(0.7, 0.45, 1.0)})
 	main.fx.shockwave(global_position, Color(0.62, 0.38, 1.0), 80.0)
 	if main.get("post") != null:
 		main.post.pulse(0.8)
@@ -515,7 +524,9 @@ func _whirlwind() -> void:
 		main.fx.tornado(global_position)
 		main.fx.ring(global_position, Color(0.85, 0.95, 1.0, 0.8), 2.6 * TILE)
 		# §3: orbital vortex tracking the hero + impact shockwave
-		main.fx.orbital(global_position, {"count": int(lerp(5.0, 13.0, ProtoFx.intensity)), "turns": 2.5, "radius": 26.0, "radius_jitter": 8.0, "life": 0.34, "owner": self})
+		main.fx.shader_burst("vortex", global_position, {"size": 128.0, "life": 0.55,
+				"dir": _swing_dir, "color": Color(0.55, 0.75, 1.0),
+				"uniforms": {"gain": 2.6}})
 		main.fx.shockwave(global_position, Color(0.85, 0.95, 1.0), 60.0)
 		if hit_any:
 			main.hitstop()
@@ -580,8 +591,9 @@ func _frost_nova() -> void:
 				"s_min": 0.8, "s_max": 1.8, "emission_radius": 10.0,
 				"color": Color(0.75, 0.95, 1.0, 0.85)})
 		# §3: triple frost shockwave + radial ribbon petals
-		main.fx.shockwave(global_position, Color(0.7, 0.92, 1.0), 2.8 * TILE, {"rings": 3})
-		main.fx.ribbon_radial(global_position, {"count": 12, "radius": 2.8 * TILE, "color": Color(0.7, 0.92, 1.0)})
+		main.fx.shader_burst("nova", global_position, {"size": 2.8 * TILE * 2.6,
+				"color": Color(0.35, 0.72, 1.0)})
+		main.fx.shockwave(global_position, Color(0.7, 0.92, 1.0), 2.8 * TILE, {"rings": 1})
 		if hit_any:
 			main.shake(2.5)
 
@@ -748,8 +760,9 @@ func _detonate_pop(at: Vector2, total: float, radius: float, main: Node) -> void
 		main.fx.explosion(at, Color(1.0, 0.5, 0.15))
 		main.fx.ring(at, Color(1.0, 0.55, 0.2, 0.85), radius)
 		# §3 Cinderburst detonate: fire shockwave + orbital burst
-		main.fx.shockwave(at, Color(1.0, 0.5, 0.15), radius)
-		main.fx.orbital(at, {"count": 6, "radius": 10.0, "life": 0.35, "color": Color(1.0, 0.55, 0.2)})
+		main.fx.shader_burst("firestorm", at + Vector2(0, -radius * 0.5),
+				{"size": radius * 2.6, "life": 0.55})
+		main.fx.shader_burst("impact", at, {"size": 40.0, "color": Color(1.0, 0.7, 0.3)})
 		main.play_sfx("hit", at, -6.0)
 	for n in get_tree().get_nodes_in_group("creatures"):
 		if n.dead:
@@ -781,8 +794,9 @@ func _exec_arc(def: Dictionary, p: Dictionary, aim: Vector2, dmg: float,
 		if melee:
 			main.play_sfx("swing", global_position, -8.0)
 			main.fx.arc_slash(global_position + aim * reach * 0.6, aim, col)
-			# §3 melee_arc: element-tinted crescent
-			main.fx.ribbon_arc(global_position + aim * reach * 0.6, aim, {"span": 2.1, "width": 6, "color": col})
+			# element-tinted crescent — vfx_lab slash shader
+			main.fx.shader_burst("slash", global_position + aim * reach * 0.55,
+					{"size": maxf(reach * 2.4, 72.0), "dir": aim, "color": col})
 		else:
 			main.play_sfx("bolt", global_position, -8.0)
 			if str(p.get("element", "ember")) == "ember":
@@ -793,8 +807,13 @@ func _exec_arc(def: Dictionary, p: Dictionary, aim: Vector2, dmg: float,
 						"spread": float(p.get("arc_deg", 50.0)) * 0.5,
 						"v_min": 140.0, "v_max": 240.0, "gravity": Vector2.ZERO,
 						"s_min": 1.2, "s_max": 2.6, "color": col})
-			# §3 cone: wide element-tinted ribbon sheet
-			main.fx.ribbon_arc(global_position + aim * 8.0, aim, {"span": 1.6, "width": 14, "color": col})
+			# cone spray — vfx_lab: flame plume for ember, wide light-sheet otherwise
+			if str(p.get("element", "ember")) == "ember":
+				main.fx.shader_burst("firestorm", global_position + aim * reach * 0.5,
+						{"size": maxf(reach * 2.0, 80.0), "dir": aim, "life": 0.5})
+			else:
+				main.fx.shader_burst("slash", global_position + aim * reach * 0.5,
+						{"size": maxf(reach * 2.2, 80.0), "life": 0.34, "dir": aim, "color": col})
 	if hit:
 		if melee:
 			var lp := leech_pct + _buff_add("leech")
@@ -826,9 +845,9 @@ func _exec_nova(def: Dictionary, p: Dictionary, dmg: float, col: Color,
 		main.fx.burst(global_position, {"amount": 24, "lifetime": 0.4,
 				"v_min": 60.0, "v_max": 190.0, "gravity": Vector2.ZERO,
 				"s_min": 0.8, "s_max": 1.8, "emission_radius": 10.0, "color": col})
-		# §3 nova: triple shockwave + radial ribbon petals
-		main.fx.shockwave(global_position, col, radius, {"rings": 3})
-		main.fx.ribbon_radial(global_position, {"count": 12, "radius": radius, "color": col})
+		# vfx_lab nova: expanding chromatic ring + shards + core flash
+		main.fx.shader_burst("nova", global_position, {"size": radius * 2.6, "color": col})
+		main.fx.shockwave(global_position, col, radius, {"rings": 1})
 		if hit:
 			main.shake(2.5)
 			main.refresh_hud()
