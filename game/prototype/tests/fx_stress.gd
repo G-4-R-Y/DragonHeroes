@@ -38,6 +38,16 @@ func _ready() -> void:
 	telegraphs = ProtoTelegraphs.new(); add_child(telegraphs)
 	post = ProtoPost.new(); add_child(post)
 	_dmg = ProtoDamage.new(); add_child(_dmg)
+	# darkness needs a live camera; include it so its per-frame hole gathering
+	# and uniform uploads are inside the frame_ms budget
+	var cam := Camera2D.new()
+	cam.position = Vector2(320, 180)
+	add_child(cam)
+	cam.make_current()
+	var dark := ProtoDarkness.new()
+	add_child(dark)
+	for i in 20:
+		dark.add_static(Vector2(randf() * 640.0, randf() * 360.0), 30.0, 0.6, 0.4)
 	# Fan-of-Knives owners: created DURING warmup so they never count as
 	# "nodes created after warmup"; repositioned and reused every load frame.
 	for i in 5:

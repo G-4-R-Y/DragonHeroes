@@ -107,6 +107,10 @@ void fragment() {
     float shard = pow(shard_phase, 9.0);
     float svar = anoise(angp, 0.0, seed + 5.0, nshards / 3.0);
     shard *= 0.35 + 0.9 * svar;
+    // radial break-up: shards fragment into beads that travel OUTWARD with the
+    // blast — kills the straight-ray "clock face" read at large sizes
+    float bead = vnoise(vec2(angp * 4.0 + seed * 7.0, r * 9.0 - progress * 6.0), seed + 11.0);
+    shard *= 0.45 + 0.85 * bead;
     float reach = R * 1.0 + 0.04;
     float shard_body = smstep(reach, reach - 0.34, r) * smstep(0.02, 0.18, r);
     rgb += (shard * shard_body * 1.9 * shards_life) * COL * vec3(0.8, 1.0, 1.25);

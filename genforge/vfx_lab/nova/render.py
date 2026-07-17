@@ -92,6 +92,10 @@ def nova(uv, p, seed=SEED):
     shard = shard_phase ** 9.0
     var = angular_noise(ang, 0.0, seed + 5.0, scale=n_shards / 3.0)
     shard *= 0.35 + 0.9 * var
+    # radial break-up: shards fragment into beads traveling outward (kills the
+    # straight-ray "clock face" read at large sizes) — shader parity
+    bead = value_noise(ang * 4.0 + seed * 7.0, r * 9.0 - p * 6.0, seed + 11.0)
+    shard *= 0.45 + 0.85 * bead
     shard_reach = R * 1.0 + 0.04
     # short band behind the front (not a full center-star)
     shard_body = smoothstep(shard_reach, shard_reach - 0.34, r) * smoothstep(0.02, 0.18, r)

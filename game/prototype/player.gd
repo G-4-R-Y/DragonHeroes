@@ -465,8 +465,10 @@ func _attack() -> void:
 func _attach_ground_glow() -> void:
 	var m := get_tree().get_first_node_in_group("main")
 	if m != null and m.get("fx") != null:
-		m.fx.light_attach(self, {"radius": 30.0, "color": Color(1.0, 0.86, 0.6),
-				"alpha": 0.16})
+		# the hero's LANTERN: with the darkness model live this is the player's
+		# guaranteed pool of visibility, not just a cosmetic tint
+		m.fx.light_attach(self, {"radius": 46.0, "color": Color(1.0, 0.86, 0.6),
+				"alpha": 0.30, "flicker": 0.12, "rate": 3.0})
 
 # Shadow Rend — the bestial skill slot (Q): heavier umbral cleave, violet flash.
 func _shadow_rend(main: Node) -> void:
@@ -480,9 +482,9 @@ func _shadow_rend(main: Node) -> void:
 	sprite.frame = 0
 	_swing_lean(_rend_dir, 1.35)   # the bestial cleave throws the whole body
 	main.play_sfx("swing", global_position, -4.0)
-	main.fx.explosion(global_position, Color(0.62, 0.38, 1.0))   # umbral nova
-	main.fx.ring(global_position, Color(0.7, 0.45, 1.0, 0.9), rend_reach)
-	# §3 signature: screen-filling umbral orbital + big violet cleave + shockwave + post kick
+	# Over the DARK world (canon §12.28) fewer layers read as MORE: vortex +
+	# umbra + slash + one shockwave. The old bright-ground recipe also stacked
+	# an explosion burst + a fat ring and now just blows out to white.
 	main.fx.shader_burst("vortex", global_position, {"size": 150.0, "life": 0.5,
 			"dir": _rend_dir, "color": Color(0.42, 0.12, 0.95)})
 	# the actual DARKNESS: mix-blend umbral smoke that occludes, rims in violet

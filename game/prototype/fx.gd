@@ -178,7 +178,12 @@ func ring(at: Vector2, color: Color, radius: float, duration := 0.35, width := 2
 	_reuse(_ring_tw, _ri)
 	var slot := _ri
 	_ri = (_ri + 1) % RING_POOL
-	r.width = width
+	# Line2D width is LOCAL-space: the radius tween below scales the node, so an
+	# uncompensated width=5 at radius 60 rendered a ~300 px thick annulus — the
+	# "blinding disc of triangles" over the dark world. Dividing by the FINAL
+	# scale caps the world thickness at `width` px: rings start quarter-width
+	# and reach full width fully expanded — thin, elegant, Phantom-Tower-like.
+	r.width = width / maxf(radius, 1.0)
 	var pts := PackedVector2Array()
 	for i in 26:
 		pts.append(Vector2.from_angle(TAU * i / 26.0))
@@ -317,7 +322,23 @@ func trail_detach(id: int) -> void:
 
 # ---- procedural-shader effects (vfx_lab): slash / nova / vortex / firestorm /
 # impact — hi-res fragment math on pooled quads; see shader_fx.gd -------------
+# Per-kind auto light-halo under shader bursts: every explosion/flame lights
+# the ground it happens over (darkness holes + warm tint pool). Sub-second
+# lives so the one-shot pool churns freely; umbra is darkness and slash is a
+# blade streak — neither casts light.
+const _BURST_HALO := {
+	"nova": Color(0.55, 0.8, 1.0), "firestorm": Color(1.0, 0.6, 0.22),
+	"impact": Color(1.0, 0.8, 0.45), "vortex": Color(0.7, 0.45, 1.0),
+}
+
 func shader_burst(kind: String, at: Vector2, cfg: Dictionary = {}) -> int:
+	if _BURST_HALO.has(kind) and not cfg.get("no_halo", false):
+		var life := float(cfg.get("life",
+				ProtoShaderFx.LIVES.get(kind, 0.4)))
+		var col: Color = cfg.get("color", _BURST_HALO[kind])
+		_lights.place(at, {"radius": float(cfg.get("size", 64.0)) * 0.38,
+				"color": col, "alpha": 0.16, "life": minf(life + 0.15, 1.4),
+				"flicker": 0.35, "rate": 16.0, "hole": 0.5})
 	return _shader_fx.burst(kind, at, cfg)
 
 # Early fade for a persistent shader burst (lava fusion consumes a field).
@@ -335,6 +356,10 @@ func light_attach(node: Node2D, cfg: Dictionary = {}) -> int:
 
 func light_detach(id: int) -> void:
 	_lights.detach(id)
+
+# Darkness-hole candidates for ProtoDarkness (pos, radius, strength per light).
+func light_holes() -> Array:
+	return _lights.holes()
 
 # ---- shockwave: fat multi-ring impact / nova / death nova -----------------------
 # cfg: rings (default 3, staggered radii + phase), width (thicker than ring's 2.5),

@@ -575,3 +575,31 @@ Still open:
    shimmer the air. fx_stress extended (lights 32-clamp, umbra over-fire,
    persistent flames, haze eviction past HAZE_MAX): 13.78 ms worst frame,
    0 nodes after warmup, all pools clamped.
+28. **The 2D lighting model + the capture loop (2026-07-17, Ricardo).**
+   Ricardo: v0.1.12 still "far from the presented examples — push to the
+   limits, otherwise full overhaul." Breakthrough #1: the CAPTURE HARNESS
+   (tests/vfx_showcase.tscn boots the real hunt, fires signature moments,
+   saves viewport PNGs; tests/vfx_iso.tscn isolates single systems;
+   SHOWCASE_NULL=1 bisects environmental paint) — for the first time the
+   COMPOSITED frame is reviewable in-loop, not just isolated lab sheets.
+   First capture diagnosed the real gap in minutes: the WORLD WAS FLAT-
+   BRIGHT — no amount of effect polish can make effects read as light
+   sources over a uniformly lit scene. Built ProtoDarkness (darkness.gd,
+   z=10 camera-glued multiplicative quad): dark blue-violet ambient + up to
+   16 nearest light holes (fed by the ground-light pools + static
+   glowshroom sources registered by world_gen). Everything above z=10
+   (pool tints 11, fx 18+, shader quads 21) reads as LIGHT. Plus: hero
+   lantern pool, split-tone grade in post (cool shadows / warm highlights),
+   soft breathing field edges (hard vector ring killed), per-kind auto
+   light-halos under bursts (tight "hole" scale so a skill pop doesn't
+   spotlight-reveal the map), telegraph alphas rebalanced ~x0.55 for the
+   dark world + per-wedge beam alpha normalized by count. Breakthrough #2,
+   found VIA the capture loop ("blinding disc of triangles", Ricardo):
+   fx.ring() scaled a Line2D node to the target radius, but Line2D width
+   is LOCAL-space — every shockwave since v0.1.5 rendered as a ~300 px
+   thick annulus, masked until now by the bright world. Fixed (width /
+   final scale): shockwaves are thin elegant expanding circles. Nova
+   shards bead-eroded radially (no more clock face). Ricardo verdict
+   in-session: "NOW we are talking. Things are actually beautiful."
+   LESSON (permanent): review the COMPOSITE through captures after every
+   visual change; lab sheets validate effects, captures validate frames.

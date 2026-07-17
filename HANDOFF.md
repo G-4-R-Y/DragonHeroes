@@ -1,7 +1,33 @@
-# Handoff — running state (updated 2026-07-17, v0.1.12)
+# Handoff — running state (updated 2026-07-17, v0.1.13)
 
 Read `CLAUDE.md` + `docs/00-canon.md` first (decisions log §12 is current through
-item 27). This file is the delta: exactly where work stopped and what's next.
+item 28). This file is the delta: exactly where work stopped and what's next.
+
+## v0.1.13 delta (2026-07-17) — 2D lighting model + the capture loop
+
+Ricardo: "still far from the examples — push to the limits or full overhaul";
+after this pass, live: "NOW we are talking. Things are actually beautiful."
+- CAPTURE LOOP (the new standing method — canon §12.28 lesson): vfx_showcase
+  .tscn boots the REAL hunt, fires signature moments, saves PNGs to
+  tests/captures/ (windowed GL, never headless, never Vulkan); vfx_iso.tscn =
+  minimal isolation; SHOWCASE_NULL=1 = bisect env vs player paint. Review the
+  COMPOSITE after every visual change — lab sheets are not frames.
+- ProtoDarkness (z=10 multiply quad, camera-glued): dark ambient + 16 nearest
+  light holes from ProtoLights records + world_gen glowshroom statics. Pools
+  moved to z=11 (tint OVER darkness). Hero lantern (46px, 0.30). Split-tone
+  grade in post. Field edges = soft breathing arcs. Burst auto-halos with
+  tight `hole` scale. Telegraph alphas ~x0.55 + beam alpha /count.
+- THE RING BUG (since v0.1.5, masked by the bright world): fx.ring() scaled a
+  Line2D; width is LOCAL-space -> every shockwave was a ~300px annulus (the
+  "blinding triangles disc"). Fixed: width / final scale. Nova shards now
+  bead-eroded radially (clock face gone).
+- Gates: FXSTRESS OK 7.96ms (darkness + 20 statics in scene), hunt boot x2
+  clean, CLICKTEST ALL PASS, validate 0 problems, pytest 31.
+- NEXT AESTHETIC ITEMS (in rough ROI order): ambient/night-cycle coupling
+  (darkness.set_ambient from _cycle); water tiles flat under darkness; damage
+  number typography; HUD hint-bar size; nova at boss-finisher scale re-check
+  via showcase; creature visibility floor in deep dark (pack-leader ember
+  lights?); Vulkan flip = real bloom on all of this (Ricardo's hardware only).
 
 ## v0.1.12 delta (2026-07-17) — media-grade VFX: fire/darkness as MEDIA
 

@@ -54,6 +54,15 @@ void fragment() {
 		col = vec3(r, g.g, b);
 		// Over-bright grade: the "additive over a dark scene" pop (mild gain).
 		col += col * bright_boost;
+		// Split-tone grade (the CoM / Phantom Tower palette unifier): shadows
+		// pull cool blue-violet, highlights stay warm — plus a mild S-curve.
+		// Runs under the darkness model, so "shadows" is most of the frame and
+		// the tint reads as atmosphere, not a filter.
+		float lum = dot(col, vec3(0.299, 0.587, 0.114));
+		vec3 tint = mix(vec3(0.80, 0.85, 1.14), vec3(1.06, 1.01, 0.93),
+				smoothstep(0.0, 0.55, lum));
+		col *= tint;
+		col = mix(col, col * col * (3.0 - 2.0 * col), 0.18);
 		// Vignette — folds in and replaces ambient.gd's old static vignette.
 		float vig = 1.0 - smoothstep(vig_inner, vig_outer, dist);
 		col *= vig;

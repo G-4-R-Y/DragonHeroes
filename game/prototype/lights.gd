@@ -33,6 +33,11 @@ class Rec:
 	var phase := 0.0
 	var life := -1.0              # <0 = until detach / target freed
 	var age := 0.0
+	var eff := 0.0                # this frame's effective alpha (envelope+flicker)
+	                              # — read by ProtoDarkness for the light holes
+	var hole := 1.0               # darkness-hole radius scale: 1.0 = the standard
+	                              # 1.7x pool radius; bursts pass ~0.5 so a skill
+	                              # pop doesn't spotlight-reveal half the screen
 
 static var _tex_cache: ImageTexture = null
 
@@ -44,7 +49,9 @@ var _zero := Transform2D(Vector2.ZERO, Vector2.ZERO, Vector2.ZERO)
 
 func _ready() -> void:
 	z_as_relative = false
-	z_index = -3
+	z_index = 11        # ABOVE the darkness quad (z=10): pools tint the darkened
+	                    # scene (and whoever stands in them) — the darkness holes
+	                    # supply the luminance, these supply the color
 	texture_filter = TEXTURE_FILTER_LINEAR   # global filter is NEAREST
 	_mm = MultiMesh.new()
 	_mm.transform_format = MultiMesh.TRANSFORM_2D
@@ -118,6 +125,7 @@ func _spawn(target: Node2D, at: Vector2, cfg: Dictionary) -> int:
 	rec.phase = randf() * TAU
 	rec.life = float(cfg.get("life", -1.0))
 	rec.age = 0.0
+	rec.hole = float(cfg.get("hole", 1.0))
 	return rec.id
 
 func _claim() -> int:
@@ -177,6 +185,7 @@ func _process(dt: float) -> void:
 		used += 1
 		if used > cap:                        # intensity gate: usage, not allocation
 			_mm.set_instance_transform_2d(i, _zero)
+			rec.eff = 0.0
 			continue
 		var a := rec.alpha * clampf(rec.age / FADE_IN, 0.0, 1.0)
 		if rec.life >= 0.0:
@@ -185,6 +194,7 @@ func _process(dt: float) -> void:
 			var f := sin(rec.age * rec.rate + rec.phase) * 0.6 \
 					+ sin(rec.age * rec.rate * 2.7 + rec.phase * 1.7) * 0.4
 			a *= 1.0 + rec.flicker * 0.35 * f
+		rec.eff = a
 		var s := rec.radius * 2.0
 		_mm.set_instance_transform_2d(i,
 				Transform2D(Vector2(s, 0), Vector2(0, s * SQUASH), rec.pos))
@@ -192,6 +202,19 @@ func _process(dt: float) -> void:
 		col.a = clampf(a, 0.0, 1.0)
 		_mm.set_instance_color(i, col)
 	_peak = maxi(_peak, used)
+
+# Current live sources as darkness-hole candidates: [pos, hole_radius, strength].
+# Holes are wider than the visible tint pool (the darkness shoulder does the
+# shaping) and stronger than the pool alpha (they carry the LUMINANCE).
+func holes() -> Array:
+	var out: Array = []
+	for i in POOL:
+		var rec: Rec = _recs[i]
+		if not rec.active or rec.eff <= 0.01:
+			continue
+		out.append([rec.pos, rec.radius * 1.7 * rec.hole,
+				clampf(rec.eff * 1.45, 0.0, 1.0)])
+	return out
 
 func _pool_debug() -> Dictionary:
 	return {"size": POOL, "peak_in_use": _peak}

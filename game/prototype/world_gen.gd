@@ -14,6 +14,7 @@ const T_ROCK := 3
 
 var chunks := {}          # Vector2i(cx,cy) -> PackedByteArray (tiles)
 var _layer: TileMapLayer
+var _shroom_pos: Array = []   # glowshroom prop positions -> darkness light holes
 var _spawn_cache := Vector2.ZERO
 var _spawn_valid := false
 
@@ -100,6 +101,7 @@ func _scatter_props() -> void:
 			var gy: int = key.y * CHUNK + (i / CHUNK)
 			var h := ProtoSprites._speck(gx, gy, 4177)
 			var tex: Texture2D = null
+			var shroom := false
 			if t == T_FOREST and h < 0.06:
 				tex = ProtoSprites.prop_tex(
 						"tree_a" if ProtoSprites._speck(gx, gy, 5501) < 0.5 else "tree_b")
@@ -107,6 +109,7 @@ func _scatter_props() -> void:
 				tex = ProtoSprites.prop_tex("rock")
 			elif h > 0.985:
 				tex = ProtoSprites.prop_tex("glowshroom")
+				shroom = true
 			if tex == null:
 				continue
 			var pos := Vector2((gx + 0.5) * TILE, (gy + 0.5) * TILE)
@@ -119,6 +122,22 @@ func _scatter_props() -> void:
 			s.offset = Vector2(0.0, -tex.get_height() / 2.0 + 1.0)  # base sits on origin
 			s.position = pos
 			props.add_child(s)
+			if shroom:
+				_shroom_pos.append(pos)
+	# Glowshrooms become environment LIGHT SOURCES in the darkness model —
+	# registered deferred (main assembles its darkness node after world gen).
+	if not _shroom_pos.is_empty():
+		call_deferred("_register_shroom_lights")
+
+func _register_shroom_lights() -> void:
+	# darkness statics only — NO ProtoLights pool entries (a map scatters dozens
+	# of shrooms; indefinite pool lights would flood the 32-slot gameplay pool).
+	# The hole reveals the ground and the sprite itself supplies the cyan.
+	var m := get_tree().get_first_node_in_group("main")
+	if m == null or m.get("darkness") == null:
+		return
+	for pos in _shroom_pos:
+		m.darkness.add_static(pos, 34.0, 0.55, 0.5, 2.2)
 
 func _near_rock(tx: int, ty: int) -> bool:
 	return _tile_grid(tx + 1, ty) == T_ROCK or _tile_grid(tx - 1, ty) == T_ROCK \

@@ -387,6 +387,18 @@
           "name": "Heat-haze shimmer",
           "desc": "Displacement stage inside the EXISTING post pass (post.gdshader uniform vec4[6]; zero extra backbuffer copies). World-tracked sources ease in/out and self-expire (post.haze()); fire/lava fields and Cinderburst detonations shimmer the air above them. Off below the fake-bloom intensity floor.",
           "status": "live"
+        },
+        {
+          "key": "darkness_2d_lighting",
+          "name": "2D lighting model (darkness + light holes)",
+          "desc": "ProtoDarkness (darkness.gd + darkness.gdshader): ONE camera-glued multiplicative quad at z=10 drops the whole world into a dark blue-violet ambient; up to 16 nearest LIGHT HOLES (fed per frame by the ground-light pools and by static environment sources like glowshrooms) punch through to full brightness. Everything above z=10 (light-pool tints, ribbons, shader FX) composites over the darkened scene and reads as light. The Children-of-Morta/Phantom Tower foundation: effects can only read as light sources when the world is dark.",
+          "status": "live"
+        },
+        {
+          "key": "showcase_capture",
+          "name": "VFX showcase capture harness",
+          "desc": "tests/vfx_showcase.tscn boots the REAL hunt, fires the signature moments and saves viewport PNGs to tests/captures/ (windowed GL only); tests/vfx_iso.tscn is the minimal-isolation variant. Composite-level visual review loop: capture, compare against reference games, tune, recapture. SHOWCASE_NULL=1 skips the player-cast effects for bisecting environmental paint.",
+          "status": "live"
         }
       ]
     },

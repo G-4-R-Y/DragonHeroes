@@ -93,6 +93,7 @@ var _legendary_name := ""        # hint line flavor while the legendary stands
 var camera: Camera2D
 var fx: ProtoFx                  # pooled elemental VFX (fx.gd): bursts/lightning
 var post: ProtoPost              # full-frame post-process (spec §2.3, CanvasLayer 5)
+var darkness: ProtoDarkness      # 2D lighting model — dark ambient + light holes (z=10)
 var telegraphs: ProtoTelegraphs  # pooled danger telegraphs + aura (spec §2.4, z=-2)
 var _dmg: ProtoDamage            # pooled punchy damage numbers (spec §2.5, layer 6)
 var _bosses: Array = []          # every boss node: hag, duo pair, Matriarch
@@ -150,6 +151,13 @@ func _ready() -> void:
 
 	fx = ProtoFx.new()   # pooled one-shot emitters — nothing allocates mid-fight
 	add_child(fx)
+
+	# THE 2D LIGHTING MODEL (canon §12.28): one multiplicative quad at z=10 —
+	# the world falls into dark ambient, light holes (fed by fx's light pools +
+	# world_gen's glowshrooms) punch through. Everything above z=10 (light-pool
+	# tints 11, fx 18+, shader quads 21) reads as LIGHT over the darkened scene.
+	darkness = ProtoDarkness.new()
+	add_child(darkness)
 
 	# Spectacle-VFX hosts (spec §2.0). CanvasLayer stack: post grades world+fx+
 	# ribbons+telegraphs from its own layer 5; damage numbers ride layer 6 ABOVE
@@ -523,10 +531,16 @@ func spawn_scorch(at: Vector2) -> void:
 	_scorches.append({"pos": at, "until": Time.get_ticks_msec() / 1000.0 + 0.8})
 
 func _draw_fields() -> void:
+	var tsec := Time.get_ticks_msec() / 1000.0
 	for f in _fields:
 		var k: Dictionary = FIELD_KINDS[f.kind]
 		_fields_node.draw_circle(f.pos, f.radius, k.fill)
-		_fields_node.draw_arc(f.pos, f.radius, 0, TAU, 40, k.edge, 2.0)
+		# soft BREATHING ember edge — the old hard full-alpha 2 px vector ring
+		# read as UI stamped on the world (the "hard shapes" sin); the area
+		# boundary stays readable, it just stops screaming
+		var e: Color = k.edge
+		e.a *= 0.38 + 0.12 * sin(tsec * 5.0 + f.pos.x * 0.13)
+		_fields_node.draw_arc(f.pos, f.radius - 1.0, 0, TAU, 40, e, 1.2)
 	var now := Time.get_ticks_msec() / 1000.0
 	for s in _scorches:
 		var a := clampf((s.until - now) / 0.8, 0.0, 1.0)

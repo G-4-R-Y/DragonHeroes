@@ -209,19 +209,22 @@ func _draw_base() -> void:
 		var f := clampf(d.t / d.duration, 0.0, 1.0) if d.duration > 0.0 else 1.0
 		match d.kind:
 			Kind.RING:
-				_base.draw_circle(d.pos, d.radius, Color(c.r, c.g, c.b, 0.16))
-				_base.draw_circle(d.pos, d.radius * f, Color(c.r, c.g, c.b, 0.32))
+				# alphas rebalanced for the dark world (canon §12.28): over the
+				# multiplied ambient the old bright-ground values read as a
+				# solid neon wall; danger info needs far less paint now
+				_base.draw_circle(d.pos, d.radius, Color(c.r, c.g, c.b, 0.11))
+				_base.draw_circle(d.pos, d.radius * f, Color(c.r, c.g, c.b, 0.22))
 			Kind.LINE:
 				var dd := d.dir
 				var nn := dd.orthogonal() * d.width * 0.5
 				var tip := d.pos + dd * d.length
 				_base.draw_colored_polygon(
 						PackedVector2Array([d.pos - nn, tip - nn, tip + nn, d.pos + nn]),
-						Color(c.r, c.g, c.b, 0.16))
+						Color(c.r, c.g, c.b, 0.11))
 				var ftip := d.pos + dd * d.length * f
 				_base.draw_colored_polygon(
 						PackedVector2Array([d.pos - nn, ftip - nn, ftip + nn, d.pos + nn]),
-						Color(c.r, c.g, c.b, 0.3))
+						Color(c.r, c.g, c.b, 0.2))
 
 func _draw_glow() -> void:
 	for s in CAP:
@@ -232,12 +235,12 @@ func _draw_glow() -> void:
 		var f := clampf(d.t / d.duration, 0.0, 1.0) if d.duration > 0.0 else 1.0
 		match d.kind:
 			Kind.RING:
-				_glow.draw_arc(d.pos, d.radius, 0, TAU, 48, Color(c.r, c.g, c.b, 0.9), 2.0)
+				_glow.draw_arc(d.pos, d.radius, 0, TAU, 48, Color(c.r, c.g, c.b, 0.55), 2.0)
 			Kind.LINE:
 				var dd := d.dir
 				var nn := dd.orthogonal() * d.width * 0.5
 				var tip := d.pos + dd * d.length
-				var edge := Color(c.r, c.g, c.b, 0.9)
+				var edge := Color(c.r, c.g, c.b, 0.55)
 				_glow.draw_line(d.pos - nn, tip - nn, edge, 2.0)
 				_glow.draw_line(d.pos + nn, tip + nn, edge, 2.0)
 			Kind.BEAMS:
@@ -245,8 +248,8 @@ func _draw_glow() -> void:
 			Kind.AURA:
 				var op := d.owner.global_position if is_instance_valid(d.owner) else d.pos
 				var pr := d.radius + sin(d.t * 6.0) * 2.0
-				_glow.draw_arc(op, pr, 0, TAU, 40, Color(c.r, c.g, c.b, 0.85), 2.5)
-				_glow.draw_arc(op, pr * 0.68, 0, TAU, 28, Color(c.r, c.g, c.b, 0.4), 1.5)
+				_glow.draw_arc(op, pr, 0, TAU, 40, Color(c.r, c.g, c.b, 0.55), 2.5)
+				_glow.draw_arc(op, pr * 0.68, 0, TAU, 28, Color(c.r, c.g, c.b, 0.28), 1.5)
 
 func _draw_beams(d: Desc, f: float, c: Color) -> void:
 	var full := d.spread >= TAU - 0.001
@@ -254,7 +257,11 @@ func _draw_beams(d: Desc, f: float, c: Color) -> void:
 	var far_d := d.converge + 40.0
 	var near_d := lerpf(d.converge, 12.0, f)   # near ends advance inward as t->1
 	var wide := 11.0
-	var a := clampf(0.3 + 0.6 * f, 0.0, 1.0)
+	# per-wedge alpha normalized by count: a 24-beam converging cast must carry
+	# roughly the same total light as a 6-beam one, or the additive overlap at
+	# the apex white-walls the whole zone (seen on legendary casts in captures)
+	var a := clampf(0.2 + 0.35 * f, 0.0, 1.0) \
+			* clampf(6.0 / float(maxi(d.count, 1)), 0.3, 1.0)
 	var col := Color(c.r, c.g, c.b, a)
 	for kk in d.count:
 		var ba: float
