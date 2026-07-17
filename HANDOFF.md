@@ -1,7 +1,38 @@
-# Handoff — running state (updated 2026-07-17, v0.1.14)
+# Handoff — running state (updated 2026-07-17, v0.1.15 + program in flight)
 
 Read `CLAUDE.md` + `docs/00-canon.md` first (decisions log §12 is current through
-item 29). This file is the delta: exactly where work stopped and what's next.
+item 30). This file is the delta: exactly where work stopped and what's next.
+
+## THE FIVE-OVERHAUL PROGRAM (canon §12.30 — Ricardo: "do all of those, and
+## also radiance cascades"; code must stay reusable/decoupled)
+
+Phase 1 LANDED (v0.1.15, e1419ec): light registry as shader globals
+(dh_light_tex 16x2 RGBAF + dh_light_count, packed by darkness.gd — one gather,
+N consumer shaders), SDF shadows (world_gen chamfer bake over T_ROCK,
+sphere-traced soft penumbras, caster flags on lantern/fields/legendaries,
+intensity-gated 0/4/6), world-anchored 4x4 Bayer banding on all falloffs.
+VERIFY IN-GAME: shadow direction near rock ridges (no rock was adjacent to
+fire in the captures — if shadows look wrong, suspect sdf_origin or the y*1.55
+ellipse interacting with the march).
+
+Phase 2 IN FLIGHT (4 file-partitioned agents, workflow wxs0envr3):
+- normals-pipeline: genforge/pipeline/normal_gen.py (bevel+Sobel) + batch
+  *_n.png over game/prototype/art/. INTEGRATION AFTER: sprite N·L shader
+  reading dh_light_tex + cel-quantized response, wired into ProtoBundleArt.
+- terrain: macro variation (variant-bias noise + macro-tint quad z=-8) then
+  dual-grid autotiling (16 procedural corner-mask tiles, display layer).
+- cohesion-lut: 2D-strip LUT infra in post (analytic path kept as fallback),
+  genforge lut_gen.py, veilands_default + ember_hollows biome LUTs.
+- pixel-ui: pixel font w/ PT-BR diacritic verification (click test guards
+  SAIR/Talho) or AA-off doctrine fallback; damage-number typography.
+Integration owner (main context): sprite N·L shader, captures, gates, commit.
+
+Phase 3 SCHEDULED: Radiance Cascades — fragment-only port (fad Shadertoy /
+jason.today / Yaazarai refs), light field at 320x180, marches the SAME baked
+SDF; MUST profile mid-Android before commitment (no published benchmark).
+Master-palette discipline (OKLAB quantize in CI) follows the LUT landing;
+3D-to-sprite pipeline after palette; faux-verticality decision before the
+C++ procgen port (canon flag).
 
 ## v0.1.14 delta (2026-07-17) — atmosphere layers (canon §12.29)
 

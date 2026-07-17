@@ -624,3 +624,25 @@ Still open:
    darkness(10) < light tints(11) < fog(12) < motes(13) < fx(18+) <
    post(L5) < damage(L6) < HUD(L10+). Gates: FXSTRESS OK 7.66 ms, boots
    clean, CLICKTEST ALL PASS.
+30. **The five-overhaul program (2026-07-17, Ricardo: "do all of those,
+   and also radiance cascades" + "keep the code reusable and decoupled").**
+   Executing docs/design/19-visual-om-catalog.md top-5 in dependency order.
+   LANDED v0.1.15 (Phase 1): (a) THE LIGHT REGISTRY — darkness.gd packs the
+   gathered holes into a 16x2 RGBAF data texture published as shader
+   GLOBALS dh_light_tex/dh_light_count (row0 x,y,radius,strength; row1
+   rgb,casts). One gather, many consumers — fog already migrated; water
+   glints and sprite N·L shading read the same registry next; consumers
+   are fully decoupled from the gatherer. (b) SDF SHADOWS — world_gen
+   bakes a tile-res chamfer distance field over T_ROCK per hunt;
+   caster-flagged lights (lantern/fields/legendaries/bosses) sphere-trace
+   it (12 steps, penumbra k=9, dithered start); caster count rides
+   intensity 0/4/6. Light no longer crosses walls. The SDF is the literal
+   substrate Radiance Cascades marches later. (c) ORDERED DITHER — 4x4
+   Bayer (branchless) anchored to world pixels quantizes falloffs into
+   authored bands (steps=7); replaces hash dither. IN FLIGHT via
+   file-partitioned agents: automated normal-map gen (genforge bevel+
+   Sobel) for the Dead Cells sprite-lighting stack; macro variation +
+   dual-grid autotiling; 3D-LUT grading (2D-strip, per-biome data);
+   pixel-crisp typography (PT-BR diacritics gated). Radiance Cascades is
+   a scheduled bet: fragment-only port at 320x180 light field, must be
+   profiled on mid-Android before commitment (no published benchmark).
