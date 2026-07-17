@@ -82,6 +82,7 @@ func _build_world(data: Dictionary) -> void:
 		chunks[Vector2i(cx, cy)] = packed
 	_scatter_props()
 	_build_water_overlay()
+	call_deferred("_bake_light_sdf")
 	set_process(true)
 
 # Foliage sway needs the hero's position once per frame (walk-through push).
@@ -204,6 +205,67 @@ func _build_water_overlay() -> void:
 				1.0 if _tile_grid(t.x + 1, t.y) != T_WATER else 0.0,
 				1.0 if _tile_grid(t.x, t.y + 1) != T_WATER else 0.0,
 				1.0 if _tile_grid(t.x - 1, t.y) != T_WATER else 0.0))
+
+# Static world occlusion SDF for shadow-caster lights (canon §12.30): a
+# tile-resolution distance field over the impassable T_ROCK cells, baked once
+# per hunt with a two-pass chamfer transform and handed to ProtoDarkness. The
+# same field is the marching substrate for Radiance Cascades later. Deferred:
+# main assembles darkness after world gen.
+func _bake_light_sdf() -> void:
+	var m := get_tree().get_first_node_in_group("main")
+	if m == null or m.get("darkness") == null or chunks.is_empty():
+		return
+	var kmin := Vector2i(1 << 20, 1 << 20)
+	var kmax := Vector2i(-(1 << 20), -(1 << 20))
+	for key in chunks:
+		kmin = Vector2i(mini(kmin.x, key.x), mini(kmin.y, key.y))
+		kmax = Vector2i(maxi(kmax.x, key.x), maxi(kmax.y, key.y))
+	var tw := (kmax.x - kmin.x + 1) * CHUNK
+	var th := (kmax.y - kmin.y + 1) * CHUNK
+	const BIG := 1e9
+	var dist := PackedFloat32Array()
+	dist.resize(tw * th)
+	for ty in th:
+		for tx in tw:
+			dist[ty * tw + tx] = 0.0 if _tile_grid(kmin.x * CHUNK + tx,
+					kmin.y * CHUNK + ty) == T_ROCK else BIG
+	# chamfer distance transform (3-4 mask ~ 1 / 1.4 tile units), two passes
+	for ty in th:
+		for tx in tw:
+			var i := ty * tw + tx
+			if dist[i] == 0.0:
+				continue
+			var d: float = dist[i]
+			if tx > 0:
+				d = minf(d, dist[i - 1] + 1.0)
+			if ty > 0:
+				d = minf(d, dist[i - tw] + 1.0)
+				if tx > 0:
+					d = minf(d, dist[i - tw - 1] + 1.4)
+				if tx < tw - 1:
+					d = minf(d, dist[i - tw + 1] + 1.4)
+			dist[i] = d
+	for ty in range(th - 1, -1, -1):
+		for tx in range(tw - 1, -1, -1):
+			var i := ty * tw + tx
+			var d: float = dist[i]
+			if tx < tw - 1:
+				d = minf(d, dist[i + 1] + 1.0)
+			if ty < th - 1:
+				d = minf(d, dist[i + tw] + 1.0)
+				if tx < tw - 1:
+					d = minf(d, dist[i + tw + 1] + 1.4)
+				if tx > 0:
+					d = minf(d, dist[i + tw - 1] + 1.4)
+			dist[i] = d
+	var img := Image.create(tw, th, false, Image.FORMAT_R8)
+	for ty in th:
+		for tx in tw:
+			var px := clampf(dist[ty * tw + tx] * TILE, 0.0, 500.0) / 500.0
+			img.set_pixel(tx, ty, Color(px, 0, 0))
+	m.darkness.set_sdf(ImageTexture.create_from_image(img),
+			Vector2(kmin.x * CHUNK, kmin.y * CHUNK) * TILE,
+			Vector2(tw, th) * TILE)
 
 func _near_rock(tx: int, ty: int) -> bool:
 	return _tile_grid(tx + 1, ty) == T_ROCK or _tile_grid(tx - 1, ty) == T_ROCK \

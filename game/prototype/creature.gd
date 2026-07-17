@@ -141,11 +141,11 @@ func _apply_presence_glow() -> void:
 	if not legendary_entry.is_empty():
 		main.fx.light_attach(self, {"radius": maxf(body_radius * 4.5, 34.0),
 				"color": Color(0.85, 0.4, 1.0), "alpha": 0.30,
-				"flicker": 0.25, "rate": 7.0})
+				"flicker": 0.25, "rate": 7.0, "casts": true})
 	elif get("bar_color") != null:
 		main.fx.light_attach(self, {"radius": maxf(body_radius * 4.0, 40.0),
 				"color": get("bar_color"), "alpha": 0.26,
-				"flicker": 0.2, "rate": 6.0})
+				"flicker": 0.2, "rate": 6.0, "casts": true})
 
 # Spawn-table variety (call BEFORE add_child). Archetypes reshape the base kit;
 # elite affixes mark pack leaders with boosted loot (elite=true). All proposals;

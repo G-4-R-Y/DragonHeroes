@@ -8,10 +8,12 @@ render_mode blend_mix, unshaded;
 
 uniform vec4 tint : source_color = vec4(0.52, 0.58, 0.80, 1.0);
 uniform float density : hint_range(0.0, 1.0) = 0.22;
-uniform int light_count = 0;
-uniform vec4 lights[16];          // xy world px, z radius px, w strength
 uniform vec2 origin = vec2(0.0);
 uniform vec2 size = vec2(640.0, 360.0);
+
+// the shared light registry (packed by darkness.gd — canon §12.30)
+global uniform sampler2D dh_light_tex;
+global uniform int dh_light_count;
 
 float hash12(vec2 p) {
 	return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
@@ -40,13 +42,15 @@ void fragment() {
 	float q = fbm3(p + vec2(t * 0.7, -t * 0.3));
 	float f = fbm3(p * 1.9 + (q - 0.5) * 1.4 + vec2(-t, t * 0.4));
 	float d = smoothstep(0.35, 0.78, f * 0.75 + q * 0.25) * density;
-	// light burns fog off (same holes the darkness pass lifts)
+	// light burns fog off (same registry holes the darkness pass lifts)
 	float lit = 0.0;
-	for (int i = 0; i < light_count; i++) {
-		vec2 dd = world - lights[i].xy;
+	int n = min(dh_light_count, 16);
+	for (int i = 0; i < n; i++) {
+		vec4 L = texelFetch(dh_light_tex, ivec2(i, 0), 0);
+		vec2 dd = world - L.xy;
 		dd.y *= 1.55;
-		float r = max(lights[i].z * 1.25, 1.0);
-		lit += lights[i].w * exp(-dot(dd, dd) / (r * r));
+		float r = max(L.z * 1.25, 1.0);
+		lit += L.w * exp(-dot(dd, dd) / (r * r));
 	}
 	d *= 1.0 - clamp(lit, 0.0, 1.0) * 0.75;
 	COLOR = vec4(tint.rgb, d);

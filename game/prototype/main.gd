@@ -513,7 +513,7 @@ func spawn_field(at: Vector2, radius: float, duration: float, dps: float,
 				"uniforms": {"hold": 0.88, "flash_amt": 0.0}})
 		light_id = fx.light_at(at, {"radius": radius * 1.9,
 				"color": Color(1.0, 0.55, 0.18) if kind == "fire" else Color(1.0, 0.42, 0.10),
-				"alpha": 0.42, "life": duration, "flicker": 0.4})
+				"alpha": 0.42, "life": duration, "flicker": 0.4, "casts": true})
 		if post != null:
 			post.haze(at + Vector2(0, -radius * 0.5), radius * 1.5, 2.2, duration)
 	match kind:

@@ -26,10 +26,19 @@ var _mat: ShaderMaterial
 var _static: Array = []                 # env holes: [pos, radius, strength, phase, rate]
 var _t := 0.0
 
-# Last frame's uploaded holes — shared with ProtoFog (fog thins where light is)
-# so the gather+sort work happens exactly once per frame.
-var last_count := 0
-var last_packed := PackedColorArray()
+# THE LIGHT REGISTRY (canon §12.30): the gathered holes are packed into a
+# 16x2 RGBAF data texture published as the `dh_light_tex`/`dh_light_count`
+# shader GLOBALS — darkness, fog, water and the sprite N·L shaders all read
+# the same registry with zero coupling to this node. Row 0: x, y, radius,
+# strength. Row 1: r, g, b, casts_shadows.
+var _light_img: Image
+var _light_tex: ImageTexture
+
+# Static world SDF (baked by world_gen from impassable tiles): shadow-caster
+# lights cone-march it so light stops passing through walls.
+var _sdf_tex: ImageTexture = null
+var _sdf_origin := Vector2.ZERO
+var _sdf_px := Vector2.ZERO
 
 func _ready() -> void:
 	z_as_relative = false
@@ -44,7 +53,19 @@ func _ready() -> void:
 	_mat.shader = preload("res://prototype/shaders/darkness.gdshader")
 	_quad.material = _mat
 	add_child(_quad)
+	_light_img = Image.create(MAX_HOLES, 2, false, Image.FORMAT_RGBAF)
+	_light_tex = ImageTexture.create_from_image(_light_img)
+	RenderingServer.global_shader_parameter_set("dh_light_tex", _light_tex)
 	set_process(true)
+
+# World occlusion field for shadow marching. origin/size in world px.
+func set_sdf(tex: ImageTexture, origin_px: Vector2, size_px: Vector2) -> void:
+	_sdf_tex = tex
+	_sdf_origin = origin_px
+	_sdf_px = size_px
+	_mat.set_shader_parameter("sdf_tex", tex)
+	_mat.set_shader_parameter("sdf_origin", origin_px)
+	_mat.set_shader_parameter("sdf_size", size_px)
 
 # Environment light source (glowshrooms, future torches/braziers). Unbounded —
 # the per-frame shader upload picks the nearest MAX_HOLES.
@@ -72,6 +93,7 @@ func _process(dt: float) -> void:
 	_mat.set_shader_parameter("ambient", ambient)
 
 	# gather candidate holes: dynamic light pools + static environment sources
+	# — entries are [pos, radius, strength, color, casts_shadows]
 	var cand: Array = []
 	var m := get_tree().get_first_node_in_group("main")
 	if m != null and m.get("fx") != null:
@@ -83,21 +105,27 @@ func _process(dt: float) -> void:
 			continue                        # cheap cull before the sort
 		var w1: float = sin(_t * s[4] + s[3]) * 0.6 + sin(_t * s[4] * 2.3 + s[3] * 1.7) * 0.4
 		var stg: float = s[2] * (1.0 + float(s[5]) * 0.3 * w1)
-		cand.append([pos, s[1], clampf(stg, 0.0, 1.0)])
+		cand.append([pos, s[1], clampf(stg, 0.0, 1.0), Color(0.45, 0.95, 1.0), false])
 	if cand.size() > MAX_HOLES:
 		cand.sort_custom(func(a, b) -> bool:
 			return a[0].distance_squared_to(center) < b[0].distance_squared_to(center))
 		cand.resize(MAX_HOLES)
-	var packed := PackedColorArray()
-	for c in cand:
-		packed.append(Color(c[0].x, c[0].y, c[1], c[2]))
-	last_count = packed.size()
-	_mat.set_shader_parameter("light_count", packed.size())
-	if packed.size() > 0:
-		while packed.size() < MAX_HOLES:
-			packed.append(Color(0, 0, 0, 0))
-		_mat.set_shader_parameter("lights", packed)
-	last_packed = packed
+	# publish the registry: pack into the global data texture (one gather,
+	# many consumer shaders — darkness/fog/water/sprites stay decoupled)
+	for i in MAX_HOLES:
+		if i < cand.size():
+			var c: Array = cand[i]
+			_light_img.set_pixel(i, 0, Color(c[0].x, c[0].y, c[1], c[2]))
+			var col: Color = c[3]
+			_light_img.set_pixel(i, 1, Color(col.r, col.g, col.b, 1.0 if c[4] else 0.0))
+		else:
+			_light_img.set_pixel(i, 0, Color(0, 0, 0, 0))
+			_light_img.set_pixel(i, 1, Color(0, 0, 0, 0))
+	_light_tex.update(_light_img)
+	RenderingServer.global_shader_parameter_set("dh_light_count", cand.size())
+	# shadow quality follows the master intensity knob (usage, not allocation)
+	_mat.set_shader_parameter("shadow_casters",
+			0 if ProtoFx.intensity < 0.2 else (4 if ProtoFx.intensity < 0.75 else 6))
 
 func _pool_debug() -> Dictionary:
 	return {"size": MAX_HOLES, "peak_in_use": mini(_static.size(), MAX_HOLES)}

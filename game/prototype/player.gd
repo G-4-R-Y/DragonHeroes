@@ -468,7 +468,7 @@ func _attach_ground_glow() -> void:
 		# the hero's LANTERN: with the darkness model live this is the player's
 		# guaranteed pool of visibility, not just a cosmetic tint
 		m.fx.light_attach(self, {"radius": 46.0, "color": Color(1.0, 0.86, 0.6),
-				"alpha": 0.30, "flicker": 0.12, "rate": 3.0})
+				"alpha": 0.30, "flicker": 0.12, "rate": 3.0, "casts": true})
 
 # Shadow Rend — the bestial skill slot (Q): heavier umbral cleave, violet flash.
 func _shadow_rend(main: Node) -> void:

@@ -42,13 +42,8 @@ func _process(_dt: float) -> void:
 	_mat.set_shader_parameter("origin", center - vs * 0.52)
 	_mat.set_shader_parameter("size", vs * 1.04)
 	_mat.set_shader_parameter("density", density * lerpf(0.5, 1.0, ProtoFx.intensity))
-	# ride the darkness pass's already-gathered holes (tree order guarantees
-	# ProtoDarkness._process ran first — it is added to main before this node)
-	var m := get_tree().get_first_node_in_group("main")
-	if m != null and m.get("darkness") != null:
-		_mat.set_shader_parameter("light_count", m.darkness.last_count)
-		if m.darkness.last_count > 0:
-			_mat.set_shader_parameter("lights", m.darkness.last_packed)
+	# lights come from the GLOBAL registry texture darkness.gd publishes —
+	# nothing to copy here (canon §12.30: one gather, many consumers)
 
 func _pool_debug() -> Dictionary:
 	return {"size": 1, "peak_in_use": 1}

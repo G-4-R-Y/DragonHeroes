@@ -34,3 +34,18 @@ window/stretch/scale_mode="integer"
 renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"
 textures/canvas_textures/default_texture_filter=0
+
+[shader_globals]
+
+; The ONE light registry (canon §12.30): darkness.gd packs the active light
+; holes into a 16x2 RGBAF data texture each frame (row 0: xy,radius,strength;
+; row 1: rgb,casts_shadows). Darkness, fog, and the sprite N.L shaders all
+; read the same texture — one gather, many consumers.
+dh_light_tex={
+"type": "sampler2D",
+"value": ""
+}
+dh_light_count={
+"type": "int",
+"value": 0
+}

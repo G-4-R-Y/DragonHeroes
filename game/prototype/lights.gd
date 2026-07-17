@@ -38,6 +38,9 @@ class Rec:
 	var hole := 1.0               # darkness-hole radius scale: 1.0 = the standard
 	                              # 1.7x pool radius; bursts pass ~0.5 so a skill
 	                              # pop doesn't spotlight-reveal half the screen
+	var casts := false            # shadow caster: this light's hole cone-marches
+	                              # the world SDF (fields, lantern, legendaries —
+	                              # NOT sub-second burst halos)
 
 static var _tex_cache: ImageTexture = null
 
@@ -126,6 +129,7 @@ func _spawn(target: Node2D, at: Vector2, cfg: Dictionary) -> int:
 	rec.life = float(cfg.get("life", -1.0))
 	rec.age = 0.0
 	rec.hole = float(cfg.get("hole", 1.0))
+	rec.casts = bool(cfg.get("casts", false))
 	return rec.id
 
 func _claim() -> int:
@@ -203,9 +207,11 @@ func _process(dt: float) -> void:
 		_mm.set_instance_color(i, col)
 	_peak = maxi(_peak, used)
 
-# Current live sources as darkness-hole candidates: [pos, hole_radius, strength].
-# Holes are wider than the visible tint pool (the darkness shoulder does the
-# shaping) and stronger than the pool alpha (they carry the LUMINANCE).
+# Current live sources as darkness-hole candidates:
+# [pos, hole_radius, strength, color, casts_shadows]. Holes are wider than the
+# visible tint pool (the darkness shoulder does the shaping) and stronger than
+# the pool alpha (they carry the LUMINANCE); color + casts feed the shared
+# light registry texture (darkness/fog/sprite shaders).
 func holes() -> Array:
 	var out: Array = []
 	for i in POOL:
@@ -213,7 +219,7 @@ func holes() -> Array:
 		if not rec.active or rec.eff <= 0.01:
 			continue
 		out.append([rec.pos, rec.radius * 1.7 * rec.hole,
-				clampf(rec.eff * 1.45, 0.0, 1.0)])
+				clampf(rec.eff * 1.45, 0.0, 1.0), rec.color, rec.casts])
 	return out
 
 func _pool_debug() -> Dictionary:
