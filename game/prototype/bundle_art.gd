@@ -75,6 +75,12 @@ static func _build(actor: String) -> SpriteFrames:
 	var img := _sheet_image(dir + "/" + str(atlas.get("combined_sheet", "sheet.png")))
 	if img == null:
 		return null
+	# Optional normal-map sibling (genforge/pipeline/normal_gen.py --batch bakes
+	# sheet_n.png next to every sheet). Frames become CanvasTextures so the
+	# sprite-lit shader reads NORMAL for per-pixel N·L sculpting; actors without
+	# a map degrade gracefully to flat normals.
+	var sheet_name := str(atlas.get("combined_sheet", "sheet.png"))
+	var nimg := _sheet_image(dir + "/" + sheet_name.get_basename() + "_n.png")
 	var sf := SpriteFrames.new()
 	for anim_name in anims:
 		var a: Variant = anims[anim_name]
@@ -90,10 +96,18 @@ static func _build(actor: String) -> SpriteFrames:
 		sf.set_animation_speed(anim_name, float(a.get("fps", 8.0)))
 		sf.set_animation_loop(anim_name, bool(a.get("loop", true)))
 		for i in count:
-			var frame := img.get_region(Rect2i(i * fw, row * fh, fw, fh))
-			var tex := ImageTexture.create_from_image(frame)
+			var rect := Rect2i(i * fw, row * fh, fw, fh)
+			var tex := ImageTexture.create_from_image(img.get_region(rect))
 			tex.set_size_override(lsize)   # hi-res detail at logical world size
-			sf.add_frame(anim_name, tex)
+			if nimg != null and rect.end.x <= nimg.get_width() \
+					and rect.end.y <= nimg.get_height():
+				var ct := CanvasTexture.new()   # diffuse+normal bundle: the
+				ct.diffuse_texture = tex        # sprite-lit shader reads NORMAL
+				ct.normal_texture = ImageTexture.create_from_image(
+						nimg.get_region(rect))
+				sf.add_frame(anim_name, ct)
+			else:
+				sf.add_frame(anim_name, tex)
 	return sf
 
 # Imported texture first (the path that works in exported packs), raw PNG as

@@ -25,7 +25,17 @@ static func add_material() -> CanvasItemMaterial:
 # silhouette. Cached PER COLOR — same-tier actors share one material, so a pack
 # of Brutal elites costs one compile and zero per-spawn allocation.
 const _RIM_SHADER := preload("res://prototype/shaders/rim_glow.gdshader")
+const _LIT_SHADER := preload("res://prototype/shaders/sprite_lit.gdshader")
 static var _rim_cache := {}
+static var _lit_mat: ShaderMaterial = null
+
+# ONE shared material for per-pixel N·L sprite lighting (sprite_lit.gdshader):
+# every actor reads the global light registry, so nothing is per-instance.
+static func lit_material() -> ShaderMaterial:
+	if _lit_mat == null:
+		_lit_mat = ShaderMaterial.new()
+		_lit_mat.shader = _LIT_SHADER
+	return _lit_mat
 
 static func rim_material(color: Color, strength := 1.15) -> ShaderMaterial:
 	var key := color.to_html() + str(snappedf(strength, 0.05))

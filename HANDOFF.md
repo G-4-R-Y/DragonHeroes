@@ -15,7 +15,11 @@ VERIFY IN-GAME: shadow direction near rock ridges (no rock was adjacent to
 fire in the captures — if shadows look wrong, suspect sdf_origin or the y*1.55
 ellipse interacting with the march).
 
-Phase 2 IN FLIGHT (4 file-partitioned agents, workflow wxs0envr3):
+Phase 2 LANDED (v0.1.16 303774a + v0.1.17): all four agents delivered with
+green gates; integration done (HUD sizes -> 8px grid; bundle frames are now
+CanvasTextures carrying _n.png normals; sprite_lit.gdshader cel-quantized N·L
+from the registry on hero+commons — rim material still wins on elites/bosses).
+Original partition plans (for reference):
 - normals-pipeline: genforge/pipeline/normal_gen.py (bevel+Sobel) + batch
   *_n.png over game/prototype/art/. INTEGRATION AFTER: sprite N·L shader
   reading dh_light_tex + cel-quantized response, wired into ProtoBundleArt.

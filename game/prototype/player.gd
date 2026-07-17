@@ -104,6 +104,7 @@ func _ready() -> void:
 	sprite.sprite_frames = ProtoSprites.hero_frames()
 	sprite.position.y = -12.0
 	sprite.play("idle")
+	sprite.material = ProtoGlow.lit_material()   # N·L from the light registry
 	add_child(sprite)
 	# soft warm pool under the hero (lights.gd) — the cheapest "sits IN the
 	# world" read there is. Deferred: main is still assembling fx at class cast.

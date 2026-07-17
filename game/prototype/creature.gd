@@ -87,6 +87,10 @@ func _ready() -> void:
 	add_child(_shadow)
 	sprite = AnimatedSprite2D.new()
 	sprite.sprite_frames = _make_frames()
+	# per-pixel N·L lighting from the light registry (bundle actors carry
+	# CanvasTexture normal maps; others degrade to flat). Elites/bosses get
+	# this REPLACED by their rim material in _apply_rim — identity read wins.
+	sprite.material = ProtoGlow.lit_material()
 	sprite.position.y = -_sprite_lift()
 	sprite.self_modulate = _base_tint
 	sprite.scale = Vector2.ONE * _scale
