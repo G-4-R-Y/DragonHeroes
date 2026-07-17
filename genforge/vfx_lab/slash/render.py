@@ -25,7 +25,7 @@ DIR_ANGLE  = np.radians(-22.0)      # slash facing (down-right cleave)
 SPAN       = np.radians(120.0)      # total arc swept
 HALF_SPAN  = SPAN * 0.5
 R_MEAN     = 0.66                   # mean radius of the arc (in [-1,1] frame units)
-THICK      = 0.24                   # max half-thickness of the blade band at arc center
+THICK      = 0.15                   # max half-thickness of the blade band at arc center
 COLOR      = np.array([0.62, 0.30, 1.00])   # violet element tint
 STONE      = np.array([0.125, 0.141, 0.172])# ~#20242c
 
@@ -90,7 +90,7 @@ def render_field(p):
 
     # expansion: band drifts outward and puffs as it dissipates
     R_eff = R_MEAN + 0.14 * decay
-    thick = THICK * (1.0 + 0.9 * decay)
+    thick = THICK * (1.0 + 0.45 * decay)
 
     # blade thickness taper (fat middle, pointy tips)
     half_thick = np.maximum(thick * np.sqrt(np.clip(1.0 - t * t, 0, 1)), 0.010)
@@ -103,7 +103,7 @@ def render_field(p):
     nz = fbm(t * 6.0 + 3.1, ncross * 2.2 + 7.0, oct=4)
 
     # across-band profiles: crisp centerline core + soft outer glow
-    across_core = np.exp(-(ncross ** 2) / (2 * 0.34 ** 2))
+    across_core = np.exp(-(ncross ** 2) / (2 * 0.20 ** 2))
     across_glow = np.exp(-(ncross ** 2) / (2 * 0.72 ** 2))
 
     # angular: lead sweeps +1 -> -1, so covered region is t >= lead_t (already passed)
@@ -123,7 +123,7 @@ def render_field(p):
     keep = (1.0 - decay) + decay * erosion
 
     # --- body: a solid bright smear, gently turbulent, with filaments ADDED on top
-    smear = trail * (0.75 * across_core + 0.40 * across_glow)
+    smear = trail * (0.95 * across_core + 0.20 * across_glow)
     turb  = 0.80 + 0.40 * nz                              # gentle modulation (high floor)
     fil_add = trail * across_core * fil * 0.55            # additive striations
     body = (smear * turb + fil_add) * tip_fade * env * keep

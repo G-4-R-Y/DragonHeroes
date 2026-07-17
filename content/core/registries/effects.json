@@ -5,172 +5,659 @@
     {
       "name": "Damage types (canon §4)",
       "entries": [
-        {"key": "physical", "name": "Physical", "desc": "mitigated by armor: reduction = armor/(armor+150)", "status": "live"},
-        {"key": "fire", "name": "Fire", "desc": "resist-mitigated; fuels Ignite and fire fields", "status": "live"},
-        {"key": "frost", "name": "Frost", "desc": "resist-mitigated; frost bolts apply Chill", "status": "live"},
-        {"key": "storm", "name": "Storm", "desc": "resist-mitigated; shock/chain themes", "status": "planned"},
-        {"key": "venom", "name": "Venom", "desc": "resist-mitigated; stacking DoT themes", "status": "planned"},
-        {"key": "umbral", "name": "Umbral", "desc": "resist-mitigated; the Gloom's own element (Shadow Rend, wisp bolts)", "status": "live"},
-        {"key": "blood", "name": "Blood", "desc": "resist-mitigated; leech/sacrifice themes (blood_price keystone leeches)", "status": "live"}
+        {
+          "key": "physical",
+          "name": "Physical",
+          "desc": "mitigated by armor: reduction = armor/(armor+150)",
+          "status": "live"
+        },
+        {
+          "key": "fire",
+          "name": "Fire",
+          "desc": "resist-mitigated; fuels Ignite and fire fields",
+          "status": "live"
+        },
+        {
+          "key": "frost",
+          "name": "Frost",
+          "desc": "resist-mitigated; frost bolts apply Chill",
+          "status": "live"
+        },
+        {
+          "key": "storm",
+          "name": "Storm",
+          "desc": "resist-mitigated; shock/chain themes",
+          "status": "planned"
+        },
+        {
+          "key": "venom",
+          "name": "Venom",
+          "desc": "resist-mitigated; stacking DoT themes",
+          "status": "planned"
+        },
+        {
+          "key": "umbral",
+          "name": "Umbral",
+          "desc": "resist-mitigated; the Gloom's own element (Shadow Rend, wisp bolts)",
+          "status": "live"
+        },
+        {
+          "key": "blood",
+          "name": "Blood",
+          "desc": "resist-mitigated; leech/sacrifice themes (blood_price keystone leeches)",
+          "status": "live"
+        }
       ]
     },
     {
       "name": "Statuses & conditions",
       "entries": [
-        {"key": "ignite", "name": "Ignite", "desc": "fire DoT, 0.5 s ticks; refreshed on re-application (Rune of Cinders: 3/s for 3 s)", "status": "live"},
-        {"key": "chill", "name": "Chill", "desc": "-35% move speed for 1.2 s (frost wisp bolts); icy tint on the hero", "status": "live"},
-        {"key": "bleed", "name": "Bleed", "desc": "stacking physical DoT (max 5 stacks, ~8% melee dmg/stack/s, 4 s, 0.5 s ticks); refreshed on re-application — Reaver/Veilblade skill trees", "status": "live"},
-        {"key": "expose", "name": "Expose", "desc": "+20% damage taken from ALL sources for 4 s (Sunder Armor, Unravel, Mark the Vein); pallid tint", "status": "live"},
-        {"key": "stagger", "name": "Stagger", "desc": "0.5 s stun — the creature's state machine freezes; DoTs keep ticking (Bull Rush, Winter's Grip)", "status": "live"},
-        {"key": "enrage", "name": "Enrage", "desc": "+30% move speed 5 s on a resisted Soul Snare; red tint", "status": "live"},
-        {"key": "knockback", "name": "Knockback", "desc": "impulse displacement on the hero (boss Wing Gust)", "status": "live"},
-        {"key": "shove", "name": "Shove", "desc": "instant displacement on creatures (Rune of the Gale burst)", "status": "live"},
-        {"key": "hitstop", "name": "Hitstop", "desc": "45 ms global 0.15x time-scale punch on melee connect", "status": "live"},
-        {"key": "dodge_displacement", "name": "Dodge displacement", "desc": "4 m dash, 3 charges, 1.5 s refill each, NO i-frames — position is the defense", "status": "live"},
-        {"key": "pet_rest", "name": "Pet Rest", "desc": "pets at 0 HP rest 15 s then return — they never die; they respawn with the hunter", "status": "live"},
-        {"key": "death_penalty", "name": "Death penalty", "desc": "lose 25% of carried gold on death (full owner rules: design/12)", "status": "live"}
+        {
+          "key": "ignite",
+          "name": "Ignite",
+          "desc": "fire DoT, 0.5 s ticks; refreshed on re-application (Rune of Cinders: 3/s for 3 s)",
+          "status": "live"
+        },
+        {
+          "key": "chill",
+          "name": "Chill",
+          "desc": "-35% move speed for 1.2 s (frost wisp bolts); icy tint on the hero",
+          "status": "live"
+        },
+        {
+          "key": "bleed",
+          "name": "Bleed",
+          "desc": "stacking physical DoT (max 5 stacks, ~8% melee dmg/stack/s, 4 s, 0.5 s ticks); refreshed on re-application — Reaver/Veilblade skill trees",
+          "status": "live"
+        },
+        {
+          "key": "expose",
+          "name": "Expose",
+          "desc": "+20% damage taken from ALL sources for 4 s (Sunder Armor, Unravel, Mark the Vein); pallid tint",
+          "status": "live"
+        },
+        {
+          "key": "stagger",
+          "name": "Stagger",
+          "desc": "0.5 s stun — the creature's state machine freezes; DoTs keep ticking (Bull Rush, Winter's Grip)",
+          "status": "live"
+        },
+        {
+          "key": "enrage",
+          "name": "Enrage",
+          "desc": "+30% move speed 5 s on a resisted Soul Snare; red tint",
+          "status": "live"
+        },
+        {
+          "key": "knockback",
+          "name": "Knockback",
+          "desc": "impulse displacement on the hero (boss Wing Gust)",
+          "status": "live"
+        },
+        {
+          "key": "shove",
+          "name": "Shove",
+          "desc": "instant displacement on creatures (Rune of the Gale burst)",
+          "status": "live"
+        },
+        {
+          "key": "hitstop",
+          "name": "Hitstop",
+          "desc": "45 ms global 0.15x time-scale punch on melee connect",
+          "status": "live"
+        },
+        {
+          "key": "dodge_displacement",
+          "name": "Dodge displacement",
+          "desc": "4 m dash, 3 charges, 1.5 s refill each, NO i-frames — position is the defense",
+          "status": "live"
+        },
+        {
+          "key": "pet_rest",
+          "name": "Pet Rest",
+          "desc": "pets at 0 HP rest 15 s then return — they never die; they respawn with the hunter",
+          "status": "live"
+        },
+        {
+          "key": "death_penalty",
+          "name": "Death penalty",
+          "desc": "lose 25% of carried gold on death (full owner rules: design/12)",
+          "status": "live"
+        }
       ]
     },
     {
       "name": "Rune effects (canon §4 — one socket per skill)",
       "entries": [
-        {"key": "rune_of_echoes", "name": "Rune of Echoes", "desc": "the skill repeats at 40% damage 0.25 s later", "status": "live"},
-        {"key": "rune_of_cinders", "name": "Rune of Cinders", "desc": "hits Ignite (3/s scaled by Intellect, 3 s) and scorch the ground", "status": "live"},
-        {"key": "rune_of_the_gale", "name": "Rune of the Gale", "desc": "dodging leaves a wind burst: 10 damage + shove within 1.5 m", "status": "live"}
+        {
+          "key": "rune_of_echoes",
+          "name": "Rune of Echoes",
+          "desc": "the skill repeats at 40% damage 0.25 s later",
+          "status": "live"
+        },
+        {
+          "key": "rune_of_cinders",
+          "name": "Rune of Cinders",
+          "desc": "hits Ignite (3/s scaled by Intellect, 3 s) and scorch the ground",
+          "status": "live"
+        },
+        {
+          "key": "rune_of_the_gale",
+          "name": "Rune of the Gale",
+          "desc": "dodging leaves a wind burst: 10 damage + shove within 1.5 m",
+          "status": "live"
+        }
       ]
     },
     {
       "name": "Enchantments (Spirit Essences)",
       "entries": [
-        {"key": "umbral_edge", "name": "Umbral Edge", "desc": "Abyssal Remnant on weapon/amulet: +4-10% umbral damage (rolled); REPLACES the previous enchant", "status": "live"},
-        {"key": "enchant_safe", "name": "Safe enchanting", "desc": "enchanting NEVER destroys gear (Ricardo 2026-07-10) — the essence is the only cost", "status": "live"}
+        {
+          "key": "umbral_edge",
+          "name": "Umbral Edge",
+          "desc": "Abyssal Remnant on weapon/amulet: +4-10% umbral damage (rolled); REPLACES the previous enchant",
+          "status": "live"
+        },
+        {
+          "key": "enchant_safe",
+          "name": "Safe enchanting",
+          "desc": "enchanting NEVER destroys gear (Ricardo 2026-07-10) — the essence is the only cost",
+          "status": "live"
+        }
       ]
     },
     {
       "name": "Elite affixes (pack leaders)",
       "entries": [
-        {"key": "brutal", "name": "Brutal", "desc": "+50% damage; red-tinted", "status": "live"},
-        {"key": "swift", "name": "Swift", "desc": "+40% move speed, -25% attack cooldown; cyan-tinted", "status": "live"},
-        {"key": "fiery", "name": "Fiery", "desc": "strikes add a +50% fire packet; ember-tinted", "status": "live"},
-        {"key": "bulwark", "name": "Bulwark", "desc": "+80% max HP; gold-tinted", "status": "live"}
+        {
+          "key": "brutal",
+          "name": "Brutal",
+          "desc": "+50% damage; red-tinted",
+          "status": "live"
+        },
+        {
+          "key": "swift",
+          "name": "Swift",
+          "desc": "+40% move speed, -25% attack cooldown; cyan-tinted",
+          "status": "live"
+        },
+        {
+          "key": "fiery",
+          "name": "Fiery",
+          "desc": "strikes add a +50% fire packet; ember-tinted",
+          "status": "live"
+        },
+        {
+          "key": "bulwark",
+          "name": "Bulwark",
+          "desc": "+80% max HP; gold-tinted",
+          "status": "live"
+        }
       ]
     },
     {
       "name": "Creature archetypes & variants",
       "entries": [
-        {"key": "stalker", "name": "Gloamfen Stalker", "desc": "baseline pack melee; capturable (Abyssal family)", "status": "live"},
-        {"key": "lunger", "name": "Lunger", "desc": "fast and frail: +45% speed, -35% HP; POUNCES 3 m onto you from mid-range (sidestep the flash)", "status": "live"},
-        {"key": "brute", "name": "Brute", "desc": "slow wall: +90% HP, +70% damage, double gold; radial ground SLAM with a telegraph circle — dodge OUT", "status": "live"},
-        {"key": "wisp_umbral", "name": "Gloamfen Wisp (umbral)", "desc": "kiting caster, violet bolts", "status": "live"},
-        {"key": "wisp_ember", "name": "Ember Wisp", "desc": "hotter bolts (fire, 12 damage)", "status": "live"},
-        {"key": "wisp_frost", "name": "Frost Wisp", "desc": "weaker bolts (8) that Chill the hero", "status": "live"},
-        {"key": "emberwing_matriarch", "name": "Emberwing Matriarch", "desc": "5-skill Elite boss: Ember Bolt, Talon Dive, Wing Gust, Ember Screech (60%), Magma Breath fields (30%)", "status": "live"},
-        {"key": "fenwitch_hag", "name": "Fenwitch Hag", "desc": "Elite mid-boss (pack 8): Hex Bolt volley, Blink, Wispling Call (summons), Creeping Mire slow fields, Shrieking Curse enrage below 40%", "status": "live"},
-        {"key": "legendary_duo", "name": "Pyre Sovereign + Terravore Colossus", "desc": "LEGENDARY duo (pack 11): Meteor Call, Cinder Breath, gusts + Earthshatter, Stone Spikes, earth fields; the survivor enrages when its partner falls; epic+ loot each", "status": "live"}
+        {
+          "key": "stalker",
+          "name": "Gloamfen Stalker",
+          "desc": "baseline pack melee; capturable (Abyssal family)",
+          "status": "live"
+        },
+        {
+          "key": "lunger",
+          "name": "Lunger",
+          "desc": "fast and frail: +45% speed, -35% HP; POUNCES 3 m onto you from mid-range (sidestep the flash)",
+          "status": "live"
+        },
+        {
+          "key": "brute",
+          "name": "Brute",
+          "desc": "slow wall: +90% HP, +70% damage, double gold; radial ground SLAM with a telegraph circle — dodge OUT",
+          "status": "live"
+        },
+        {
+          "key": "wisp_umbral",
+          "name": "Gloamfen Wisp (umbral)",
+          "desc": "kiting caster, violet bolts",
+          "status": "live"
+        },
+        {
+          "key": "wisp_ember",
+          "name": "Ember Wisp",
+          "desc": "hotter bolts (fire, 12 damage)",
+          "status": "live"
+        },
+        {
+          "key": "wisp_frost",
+          "name": "Frost Wisp",
+          "desc": "weaker bolts (8) that Chill the hero",
+          "status": "live"
+        },
+        {
+          "key": "emberwing_matriarch",
+          "name": "Emberwing Matriarch",
+          "desc": "5-skill Elite boss: Ember Bolt, Talon Dive, Wing Gust, Ember Screech (60%), Magma Breath fields (30%)",
+          "status": "live"
+        },
+        {
+          "key": "fenwitch_hag",
+          "name": "Fenwitch Hag",
+          "desc": "Elite mid-boss (pack 8): Hex Bolt volley, Blink, Wispling Call (summons), Creeping Mire slow fields, Shrieking Curse enrage below 40%",
+          "status": "live"
+        },
+        {
+          "key": "legendary_duo",
+          "name": "Pyre Sovereign + Terravore Colossus",
+          "desc": "LEGENDARY duo (pack 11): Meteor Call, Cinder Breath, gusts + Earthshatter, Stone Spikes, earth fields; the survivor enrages when its partner falls; epic+ loot each",
+          "status": "live"
+        }
       ]
     },
     {
       "name": "Bestiary & spawn rules (catalog-driven population)",
       "entries": [
-        {"key": "bestiary_normal", "name": "Bestiary — normals", "desc": "1000 data-defined creatures (bestiary_normal.json): family bundle x element x tint x scale x stat rolls; pure data, weekly-extensible", "status": "live"},
-        {"key": "bestiary_legendary", "name": "Bestiary — legendaries", "desc": "100 named legendaries (bestiary_legendary.json) over dragon/colossus/hag chassis with elemental kits and lore", "status": "live"},
-        {"key": "species_roster", "name": "Species roster", "desc": "each hunt samples 6-10 species from the 1000; packs read as one species with a 25% stray chance per member", "status": "live"},
-        {"key": "hunt_legendary", "name": "Hunt legendary", "desc": "one sampled legendary per hunt (pack 13): chassis by base, NORMALIZED HP budget (x1.4-3.0 of the 900 reference — flow over sponge, threat comes from dmg x1.3-2.2), guaranteed rare+ drop (60/30/10 rare/epic/legendary) rolled at quality 0.5, 10% Soul Snare shower; magenta diamond on the minimap", "status": "live"},
-        {"key": "hitbox_scale", "name": "Hitbox scaling", "desc": "collision radius follows the sprite: bestiary scale multiplies body_radius; lungers 8.0 / brutes 11.5 base", "status": "live"},
-        {"key": "power_scale_normal", "name": "Power scaling — normals", "desc": "read at spawn from hunter level: HP +2%/level, damage +1%/level, gold rides the damage curve", "status": "live"},
-        {"key": "power_scale_boss", "name": "Power scaling — bosses", "desc": "all bosses incl. hunt legendaries: HP +6%/level, damage +3%/level (also scales every scripted boss skill packet)", "status": "live"},
-        {"key": "wisp_element_flavor", "name": "Wisp element mapping", "desc": "bestiary element -> bolt flavor: fire->ember, frost->frost, others->umbral (until 7-type bolts land)", "status": "live"}
+        {
+          "key": "bestiary_normal",
+          "name": "Bestiary — normals",
+          "desc": "1000 data-defined creatures (bestiary_normal.json): family bundle x element x tint x scale x stat rolls; pure data, weekly-extensible",
+          "status": "live"
+        },
+        {
+          "key": "bestiary_legendary",
+          "name": "Bestiary — legendaries",
+          "desc": "100 named legendaries (bestiary_legendary.json) over dragon/colossus/hag chassis with elemental kits and lore",
+          "status": "live"
+        },
+        {
+          "key": "species_roster",
+          "name": "Species roster",
+          "desc": "each hunt samples 6-10 species from the 1000; packs read as one species with a 25% stray chance per member",
+          "status": "live"
+        },
+        {
+          "key": "hunt_legendary",
+          "name": "Hunt legendary",
+          "desc": "one sampled legendary per hunt (pack 13): chassis by base, NORMALIZED HP budget (x1.4-3.0 of the 900 reference — flow over sponge, threat comes from dmg x1.3-2.2), guaranteed rare+ drop (60/30/10 rare/epic/legendary) rolled at quality 0.5, 10% Soul Snare shower; magenta diamond on the minimap",
+          "status": "live"
+        },
+        {
+          "key": "hitbox_scale",
+          "name": "Hitbox scaling",
+          "desc": "collision radius follows the sprite: bestiary scale multiplies body_radius; lungers 8.0 / brutes 11.5 base",
+          "status": "live"
+        },
+        {
+          "key": "power_scale_normal",
+          "name": "Power scaling — normals",
+          "desc": "read at spawn from hunter level: HP +2%/level, damage +1%/level, gold rides the damage curve",
+          "status": "live"
+        },
+        {
+          "key": "power_scale_boss",
+          "name": "Power scaling — bosses",
+          "desc": "all bosses incl. hunt legendaries: HP +6%/level, damage +3%/level (also scales every scripted boss skill packet)",
+          "status": "live"
+        },
+        {
+          "key": "wisp_element_flavor",
+          "name": "Wisp element mapping",
+          "desc": "bestiary element -> bolt flavor: fire->ember, frost->frost, others->umbral (until 7-type bolts land)",
+          "status": "live"
+        }
       ]
     },
     {
       "name": "VFX systems (spectacle pass — Ricardo 2026-07-15)",
       "entries": [
-        {"key": "orbital_ribbon", "name": "Orbital Ribbon Trails", "desc": "Pooled MultiMesh2D swept-quad ribbons (40x16=640 inst, 1 draw call, shared ADD material). Orbit/crescent/streak/radial modes drive whirlwind vortices, cleaves, dash streaks, projectile trails, death finales.", "status": "live"},
-        {"key": "screen_postfx", "name": "Screen Post-FX", "desc": "One full-frame canvas shader (chromatic aberration + vignette + over-bright) on a dedicated CanvasLayer(5). pulse() kicks aberration on signature hits; skipped below intensity 0.15. gl_compatibility fake-bloom; Vulkan adds HDR glow on top via set_hdr_mode.", "status": "live"},
-        {"key": "converging_beams", "name": "Converging Beam Telegraph", "desc": "Red tapered wedges converging inward before a boss impact (dive, screech, meteor, spikes, enrage). Pooled telegraph descriptor, never intensity-scaled.", "status": "live"},
-        {"key": "danger_ring", "name": "Ground Danger Ring", "desc": "Pooled amber filling ring under every dangerous windup (24-descriptor telegraph layer, 2 draw calls). Replaces per-cast telegraph nodes.", "status": "live"},
-        {"key": "protective_aura", "name": "Protective / Enrage Aura", "desc": "Persistent glowing ring + orbiting ribbons following an owner. Green = player buff protection; red/orange = boss enrage.", "status": "live"},
-        {"key": "punchy_numbers", "name": "Punchy Damage Numbers", "desc": "Pooled 48-label ring, scale-pop + crit grammar + vertical stacking, one shared _process, zero per-hit allocation.", "status": "live"},
-        {"key": "shockwave", "name": "Shockwave", "desc": "Fat multi-ring additive nova for impacts, novas, and deaths (RING_POOL 12).", "status": "live"},
-        {"key": "vfx_intensity", "name": "Intensity knob", "desc": "Single ProtoFx.intensity in [0,1] (LOW/MED/HIGH = 0.15/0.5/1.0, mobile default MED) gates per-frame usage only, never allocation; telegraphs exempt (gameplay clarity).", "status": "live"},
-        {"key": "shader_fx", "name": "Procedural shader FX (vfx_lab)", "desc": "Five pure-math canvas_item fragment effects — slash, nova, vortex, firestorm, impact (SDF + fBm + chromatic dispersion) — authored as numpy previews (genforge/vfx_lab) and ported 1:1. Pooled 12-quad system (shader_fx.gd), ALL materials pre-compiled at load; canvas_items stretch renders them at WINDOW resolution: smooth hi-res effects over the pixel world.", "status": "live"}
+        {
+          "key": "orbital_ribbon",
+          "name": "Orbital Ribbon Trails",
+          "desc": "Pooled MultiMesh2D swept-quad ribbons (40x16=640 inst, 1 draw call, shared ADD material). Orbit/crescent/streak/radial modes drive whirlwind vortices, cleaves, dash streaks, projectile trails, death finales.",
+          "status": "live"
+        },
+        {
+          "key": "screen_postfx",
+          "name": "Screen Post-FX",
+          "desc": "One full-frame canvas shader (chromatic aberration + vignette + over-bright) on a dedicated CanvasLayer(5). pulse() kicks aberration on signature hits; skipped below intensity 0.15. gl_compatibility fake-bloom; Vulkan adds HDR glow on top via set_hdr_mode.",
+          "status": "live"
+        },
+        {
+          "key": "converging_beams",
+          "name": "Converging Beam Telegraph",
+          "desc": "Red tapered wedges converging inward before a boss impact (dive, screech, meteor, spikes, enrage). Pooled telegraph descriptor, never intensity-scaled.",
+          "status": "live"
+        },
+        {
+          "key": "danger_ring",
+          "name": "Ground Danger Ring",
+          "desc": "Pooled amber filling ring under every dangerous windup (24-descriptor telegraph layer, 2 draw calls). Replaces per-cast telegraph nodes.",
+          "status": "live"
+        },
+        {
+          "key": "protective_aura",
+          "name": "Protective / Enrage Aura",
+          "desc": "Persistent glowing ring + orbiting ribbons following an owner. Green = player buff protection; red/orange = boss enrage.",
+          "status": "live"
+        },
+        {
+          "key": "punchy_numbers",
+          "name": "Punchy Damage Numbers",
+          "desc": "Pooled 48-label ring, scale-pop + crit grammar + vertical stacking, one shared _process, zero per-hit allocation.",
+          "status": "live"
+        },
+        {
+          "key": "shockwave",
+          "name": "Shockwave",
+          "desc": "Fat multi-ring additive nova for impacts, novas, and deaths (RING_POOL 12).",
+          "status": "live"
+        },
+        {
+          "key": "vfx_intensity",
+          "name": "Intensity knob",
+          "desc": "Single ProtoFx.intensity in [0,1] (LOW/MED/HIGH = 0.15/0.5/1.0, mobile default MED) gates per-frame usage only, never allocation; telegraphs exempt (gameplay clarity).",
+          "status": "live"
+        },
+        {
+          "key": "shader_fx",
+          "name": "Procedural shader FX (vfx_lab)",
+          "desc": "Five pure-math canvas_item fragment effects — slash, nova, vortex, firestorm, impact (SDF + fBm + chromatic dispersion) — authored as numpy previews (genforge/vfx_lab) and ported 1:1. Pooled 12-quad system (shader_fx.gd), ALL materials pre-compiled at load; canvas_items stretch renders them at WINDOW resolution: smooth hi-res effects over the pixel world.",
+          "status": "live"
+        },
+        {
+          "key": "rim_glow",
+          "name": "Elite rim glow",
+          "desc": "Colored silhouette outline (rim_glow.gdshader, 8-tap alpha edge) on elites (affix color), boss chassis (bar color) and hunt legendaries (magenta) — the Phantom Tower / Hades elite read; materials shared per color.",
+          "status": "live"
+        }
       ]
     },
     {
       "name": "Fields & ground effects (tile interaction system)",
       "entries": [
-        {"key": "fire_field", "name": "Fire field", "desc": "burning ground, DoT ticks every 0.25 s; glows and telegraphs on landing", "status": "live"},
-        {"key": "earth_field", "name": "Earth field", "desc": "Terravore rubble ground — the fuel half of the lava combo", "status": "live"},
-        {"key": "mire_field", "name": "Creeping Mire", "desc": "Fenwitch slow-field: heavy Chill re-applied every tick while inside", "status": "live"},
-        {"key": "scorch", "name": "Scorch", "desc": "brief ground decal from Cinders hits (visual)", "status": "live"},
-        {"key": "lava_combo", "name": "Lava (Duologue)", "desc": "while BOTH duo bosses live, fire over earth fuses into LAVA — 14 dps, 10 s, the hottest glow in the game (registries/fields.json made playable)", "status": "live"}
+        {
+          "key": "fire_field",
+          "name": "Fire field",
+          "desc": "burning ground, DoT ticks every 0.25 s; glows and telegraphs on landing",
+          "status": "live"
+        },
+        {
+          "key": "earth_field",
+          "name": "Earth field",
+          "desc": "Terravore rubble ground — the fuel half of the lava combo",
+          "status": "live"
+        },
+        {
+          "key": "mire_field",
+          "name": "Creeping Mire",
+          "desc": "Fenwitch slow-field: heavy Chill re-applied every tick while inside",
+          "status": "live"
+        },
+        {
+          "key": "scorch",
+          "name": "Scorch",
+          "desc": "brief ground decal from Cinders hits (visual)",
+          "status": "live"
+        },
+        {
+          "key": "lava_combo",
+          "name": "Lava (Duologue)",
+          "desc": "while BOTH duo bosses live, fire over earth fuses into LAVA — 14 dps, 10 s, the hottest glow in the game (registries/fields.json made playable)",
+          "status": "live"
+        }
       ]
     },
     {
       "name": "Skill trees (five classes — skill_trees.json, 1 point per level)",
       "entries": [
-        {"key": "tree_scope", "name": "Tree scope", "desc": "every class: 20 actives + 8 passives (1 keystone w/ tradeoff) + free root = 29 nodes, 145 total; ONE generic executor runs all actives from data — weekly skills never require engine work", "status": "live"},
-        {"key": "skill_kinds", "name": "Active kinds", "desc": "projectile / nova / cone / melee_arc / dash_strike / buff / field / chain — param-driven (count, radius, element, duration, mults)", "status": "live"},
-        {"key": "skill_bar", "name": "Skill bar 1-4", "desc": "keys 1-4 cast learned class-tree actives assigned in CHARACTER -> Skills; loadout persists per character; cooldowns per node, scaled by cooldown_reduction passives", "status": "live"},
-        {"key": "bonus_vs", "name": "Status payoff", "desc": "skills declare bonus_vs {status: mult} — e.g. Shatter deals x2 to Chilled prey; consumes [status] spends the mark on hit", "status": "live"},
-        {"key": "ignite_spread", "name": "Ignite spread", "desc": "Emberwake: a struck creature's burn leaps to packmates within 2.5 m", "status": "live"},
-        {"key": "ignite_detonate", "name": "Ignite detonation", "desc": "Cinderburst / Heart of the Pyre: consumes the target's remaining burn and pops it as instant fire AoE (x1.2-1.5)", "status": "live"},
-        {"key": "attunement", "name": "Attunement (Gloam Mage)", "desc": "arcane builders +1 stack (max 5); release skills spend all stacks for +25% damage each", "status": "live"},
-        {"key": "combo", "name": "Combo (Veilblade)", "desc": "stab-tagged builders +1 stack (max 5); spender skills release all stacks for +25% damage each", "status": "live"},
-        {"key": "friendly_field", "name": "Friendly field", "desc": "player-cast ground effects (Earthsplitter, Scorched Earth, Mirefen Call) tick CREATURES, never the hunter, and never fuse into Duologue lava", "status": "live"},
-        {"key": "root_cleave", "name": "Cleave (root)", "desc": "the Reaver class active; learned from the start", "status": "live"},
-        {"key": "whirlwind", "name": "Whirlwind (E)", "desc": "Reaver signature: full-circle strike at 0.8x melee + shove, 4 s cooldown", "status": "live"},
-        {"key": "blood_price", "name": "Blood Price (keystone)", "desc": "+10% blood leech on melee, -15 armor — a real tradeoff", "status": "live"}
+        {
+          "key": "tree_scope",
+          "name": "Tree scope",
+          "desc": "every class: 20 actives + 8 passives (1 keystone w/ tradeoff) + free root = 29 nodes, 145 total; ONE generic executor runs all actives from data — weekly skills never require engine work",
+          "status": "live"
+        },
+        {
+          "key": "skill_kinds",
+          "name": "Active kinds",
+          "desc": "projectile / nova / cone / melee_arc / dash_strike / buff / field / chain — param-driven (count, radius, element, duration, mults)",
+          "status": "live"
+        },
+        {
+          "key": "skill_bar",
+          "name": "Skill bar 1-4",
+          "desc": "keys 1-4 cast learned class-tree actives assigned in CHARACTER -> Skills; loadout persists per character; cooldowns per node, scaled by cooldown_reduction passives",
+          "status": "live"
+        },
+        {
+          "key": "bonus_vs",
+          "name": "Status payoff",
+          "desc": "skills declare bonus_vs {status: mult} — e.g. Shatter deals x2 to Chilled prey; consumes [status] spends the mark on hit",
+          "status": "live"
+        },
+        {
+          "key": "ignite_spread",
+          "name": "Ignite spread",
+          "desc": "Emberwake: a struck creature's burn leaps to packmates within 2.5 m",
+          "status": "live"
+        },
+        {
+          "key": "ignite_detonate",
+          "name": "Ignite detonation",
+          "desc": "Cinderburst / Heart of the Pyre: consumes the target's remaining burn and pops it as instant fire AoE (x1.2-1.5)",
+          "status": "live"
+        },
+        {
+          "key": "attunement",
+          "name": "Attunement (Gloam Mage)",
+          "desc": "arcane builders +1 stack (max 5); release skills spend all stacks for +25% damage each",
+          "status": "live"
+        },
+        {
+          "key": "combo",
+          "name": "Combo (Veilblade)",
+          "desc": "stab-tagged builders +1 stack (max 5); spender skills release all stacks for +25% damage each",
+          "status": "live"
+        },
+        {
+          "key": "friendly_field",
+          "name": "Friendly field",
+          "desc": "player-cast ground effects (Earthsplitter, Scorched Earth, Mirefen Call) tick CREATURES, never the hunter, and never fuse into Duologue lava",
+          "status": "live"
+        },
+        {
+          "key": "root_cleave",
+          "name": "Cleave (root)",
+          "desc": "the Reaver class active; learned from the start",
+          "status": "live"
+        },
+        {
+          "key": "whirlwind",
+          "name": "Whirlwind (E)",
+          "desc": "Reaver signature: full-circle strike at 0.8x melee + shove, 4 s cooldown",
+          "status": "live"
+        },
+        {
+          "key": "blood_price",
+          "name": "Blood Price (keystone)",
+          "desc": "+10% blood leech on melee, -15 armor — a real tradeoff",
+          "status": "live"
+        }
       ]
     },
     {
       "name": "Classes (class-lite pass; full kits in design/10)",
       "entries": [
-        {"key": "class_reaver", "name": "Reaver", "desc": "the balanced blade — umbral Shadow Rend, no tradeoffs", "status": "live"},
-        {"key": "class_emberkin", "name": "Emberkin", "desc": "+12% fire on every hit and 20% Ignite chance — but -10% max HP", "status": "live"},
-        {"key": "class_frostbinder", "name": "Frostbinder", "desc": "+15% max HP and every hit Chills — but -8% damage", "status": "live"},
-        {"key": "class_mage", "name": "Gloam Mage", "desc": "ranged Arcane Bolts (LMB) + Frost Nova (E: radial chill), +15% skill damage — but -20% HP", "status": "live"},
-        {"key": "class_rogue", "name": "Veilblade (rogue)", "desc": "Swift Stab (LMB: 60-degree 0.25 s cadence) + Fan of Knives (E: 5 steel fans), +10% crit and move — but -15% HP", "status": "live"},
-        {"key": "arcane_bolt", "name": "Arcane Bolt", "desc": "friendly umbral projectile, 0.9x melee stat, 13 m/s", "status": "live"},
-        {"key": "frost_nova", "name": "Frost Nova", "desc": "2.8 m radial burst, 0.7x skill-scaled + 1.5 s hard Chill", "status": "live"},
-        {"key": "fan_of_knives", "name": "Fan of Knives", "desc": "five 0.5x piercing knives in a 56-degree fan", "status": "live"},
-        {"key": "classes_full", "name": "Six launch classes", "desc": "full distinct kits, trees and resources (docs/design/10)", "status": "planned"}
+        {
+          "key": "class_reaver",
+          "name": "Reaver",
+          "desc": "the balanced blade — umbral Shadow Rend, no tradeoffs",
+          "status": "live"
+        },
+        {
+          "key": "class_emberkin",
+          "name": "Emberkin",
+          "desc": "+12% fire on every hit and 20% Ignite chance — but -10% max HP",
+          "status": "live"
+        },
+        {
+          "key": "class_frostbinder",
+          "name": "Frostbinder",
+          "desc": "+15% max HP and every hit Chills — but -8% damage",
+          "status": "live"
+        },
+        {
+          "key": "class_mage",
+          "name": "Gloam Mage",
+          "desc": "ranged Arcane Bolts (LMB) + Frost Nova (E: radial chill), +15% skill damage — but -20% HP",
+          "status": "live"
+        },
+        {
+          "key": "class_rogue",
+          "name": "Veilblade (rogue)",
+          "desc": "Swift Stab (LMB: 60-degree 0.25 s cadence) + Fan of Knives (E: 5 steel fans), +10% crit and move — but -15% HP",
+          "status": "live"
+        },
+        {
+          "key": "arcane_bolt",
+          "name": "Arcane Bolt",
+          "desc": "friendly umbral projectile, 0.9x melee stat, 13 m/s",
+          "status": "live"
+        },
+        {
+          "key": "frost_nova",
+          "name": "Frost Nova",
+          "desc": "2.8 m radial burst, 0.7x skill-scaled + 1.5 s hard Chill",
+          "status": "live"
+        },
+        {
+          "key": "fan_of_knives",
+          "name": "Fan of Knives",
+          "desc": "five 0.5x piercing knives in a 56-degree fan",
+          "status": "live"
+        },
+        {
+          "key": "classes_full",
+          "name": "Six launch classes",
+          "desc": "full distinct kits, trees and resources (docs/design/10)",
+          "status": "planned"
+        }
       ]
     },
     {
       "name": "Localization",
       "entries": [
-        {"key": "localization", "name": "Localization", "name_pt": "Localização", "desc": "chrome and content text carry _pt twins; ProtoLang picks by user language (user://settings.json, toggle in the main menu + Haven); skill trees fully bilingual (409 PT fields)", "status": "live"},
-        {"key": "content_pt_twins", "name": "Registry PT twins", "desc": "give every registry group/entry name_pt/desc_pt so the CODEX follows the language — data-only, zero engine work", "status": "planned"}
+        {
+          "key": "localization",
+          "name": "Localization",
+          "name_pt": "Localização",
+          "desc": "chrome and content text carry _pt twins; ProtoLang picks by user language (user://settings.json, toggle in the main menu + Haven); skill trees fully bilingual (409 PT fields)",
+          "status": "live"
+        },
+        {
+          "key": "content_pt_twins",
+          "name": "Registry PT twins",
+          "desc": "give every registry group/entry name_pt/desc_pt so the CODEX follows the language — data-only, zero engine work",
+          "status": "planned"
+        }
       ]
     },
     {
       "name": "Mounts (walking + flying)",
       "entries": [
-        {"key": "gloam_strider", "name": "Gloam Strider", "desc": "walking mount, x1.6 speed; sold by the Haven vendor (400 g)", "status": "live"},
-        {"key": "emberwing_drakeling", "name": "Emberwing Drakeling", "desc": "FLYING mount, x1.9 speed, crosses water/rock; bonds when the Matriarch falls", "status": "live"},
-        {"key": "mount_rules", "name": "Saddle rules", "desc": "M mounts/dismounts; no combat from the saddle; damage knocks you off; flyers must land on solid ground", "status": "live"}
+        {
+          "key": "gloam_strider",
+          "name": "Gloam Strider",
+          "desc": "walking mount, x1.6 speed; sold by the Haven vendor (400 g)",
+          "status": "live"
+        },
+        {
+          "key": "emberwing_drakeling",
+          "name": "Emberwing Drakeling",
+          "desc": "FLYING mount, x1.9 speed, crosses water/rock; bonds when the Matriarch falls",
+          "status": "live"
+        },
+        {
+          "key": "mount_rules",
+          "name": "Saddle rules",
+          "desc": "M mounts/dismounts; no combat from the saddle; damage knocks you off; flyers must land on solid ground",
+          "status": "live"
+        }
       ]
     },
     {
       "name": "Pets & bonds",
       "entries": [
-        {"key": "capture", "name": "Soul Snare capture", "desc": "F on a <35% HP stalker within 3 m; chance 0.25 + 0.6 x missing-HP", "status": "live"},
-        {"key": "instance_roll", "name": "Instance roll", "desc": "2-3 skills from the family pool (~70:30 signature:shared) + 70-110% attribute roll", "status": "live"},
-        {"key": "stables", "name": "Stables", "desc": "overflow captures stable the OLDEST bond — pets are never abandoned; swap in CHARACTER → Pets", "status": "live"},
-        {"key": "pet_trade", "name": "Pet marketplace", "desc": "pets fully tradable; perfect rolls are chase assets (web-only marketplace)", "status": "planned"}
+        {
+          "key": "capture",
+          "name": "Soul Snare capture",
+          "desc": "F on a <35% HP stalker within 3 m; chance 0.25 + 0.6 x missing-HP",
+          "status": "live"
+        },
+        {
+          "key": "instance_roll",
+          "name": "Instance roll",
+          "desc": "2-3 skills from the family pool (~70:30 signature:shared) + 70-110% attribute roll",
+          "status": "live"
+        },
+        {
+          "key": "stables",
+          "name": "Stables",
+          "desc": "overflow captures stable the OLDEST bond — pets are never abandoned; swap in CHARACTER → Pets",
+          "status": "live"
+        },
+        {
+          "key": "pet_trade",
+          "name": "Pet marketplace",
+          "desc": "pets fully tradable; perfect rolls are chase assets (web-only marketplace)",
+          "status": "planned"
+        }
       ]
     },
     {
       "name": "Forge & economy",
       "entries": [
-        {"key": "forge_upgrade", "name": "Forge upgrade", "desc": "+10% to all affix values per tier, max +5; cost 50 x 2^tier gold", "status": "live"},
-        {"key": "forge_fail", "name": "Forge fail risk", "desc": "attempts into +4/+5 fail 25%/40% — gold burns, the item survives", "status": "live"},
-        {"key": "loot_level_scaling", "name": "Loot level scaling", "desc": "items roll at the hunter's level (ilvl): every stat roll grows 4%/level (~x5 at 100); boss drops quality-floored to the upper roll band", "status": "live"},
-        {"key": "vendor_sell", "name": "Vendor sell", "desc": "price scales with rarity and tier (gold sink); per-rarity sell-all chips clear junk in one click", "status": "live"},
-        {"key": "haven_chest", "name": "Haven chest", "desc": "120-slot stash at the Haven; bag <-> chest moves are free, stacks travel whole", "status": "live"},
-        {"key": "stacking", "name": "Item stacking", "desc": "materials (Spirit Essences) stack into one slot with a qty badge; consuming/selling is stack-aware", "status": "live"},
-        {"key": "marketplace", "name": "Player marketplace", "desc": "real-money player-to-player trade via Pix — WEB-ONLY, never in mobile apps (hard rule)", "status": "planned"}
+        {
+          "key": "forge_upgrade",
+          "name": "Forge upgrade",
+          "desc": "+10% to all affix values per tier, max +5; cost 50 x 2^tier gold",
+          "status": "live"
+        },
+        {
+          "key": "forge_fail",
+          "name": "Forge fail risk",
+          "desc": "attempts into +4/+5 fail 25%/40% — gold burns, the item survives",
+          "status": "live"
+        },
+        {
+          "key": "loot_level_scaling",
+          "name": "Loot level scaling",
+          "desc": "items roll at the hunter's level (ilvl): every stat roll grows 4%/level (~x5 at 100); boss drops quality-floored to the upper roll band",
+          "status": "live"
+        },
+        {
+          "key": "vendor_sell",
+          "name": "Vendor sell",
+          "desc": "price scales with rarity and tier (gold sink); per-rarity sell-all chips clear junk in one click",
+          "status": "live"
+        },
+        {
+          "key": "haven_chest",
+          "name": "Haven chest",
+          "desc": "120-slot stash at the Haven; bag <-> chest moves are free, stacks travel whole",
+          "status": "live"
+        },
+        {
+          "key": "stacking",
+          "name": "Item stacking",
+          "desc": "materials (Spirit Essences) stack into one slot with a qty badge; consuming/selling is stack-aware",
+          "status": "live"
+        },
+        {
+          "key": "marketplace",
+          "name": "Player marketplace",
+          "desc": "real-money player-to-player trade via Pix — WEB-ONLY, never in mobile apps (hard rule)",
+          "status": "planned"
+        }
       ]
     }
   ]

@@ -86,7 +86,8 @@ def nova(uv, p, seed=SEED):
     # ---------- 2. radial energy shards (band racing behind the ring front) ----------
     shards_life = life ** 1.5                  # fade faster than the ring
     n_shards = 13.0
-    base = np.sin(ang * n_shards + seed * 2.0)
+    awarp = 0.9 * np.sin(ang * 2.0 + seed * 3.1) + 0.5 * np.sin(ang * 5.0 - seed * 1.7)
+    base = np.sin(ang * n_shards + awarp + seed * 2.0)
     shard_phase = 0.5 + 0.5 * base
     shard = shard_phase ** 9.0
     var = angular_noise(ang, 0.0, seed + 5.0, scale=n_shards / 3.0)

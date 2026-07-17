@@ -21,6 +21,22 @@ static func add_material() -> CanvasItemMaterial:
 		_add_mat.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
 	return _add_mat
 
+# Rim-glow outline material (shaders/rim_glow.gdshader): the Phantom-Tower elite
+# silhouette. Cached PER COLOR — same-tier actors share one material, so a pack
+# of Brutal elites costs one compile and zero per-spawn allocation.
+const _RIM_SHADER := preload("res://prototype/shaders/rim_glow.gdshader")
+static var _rim_cache := {}
+
+static func rim_material(color: Color, strength := 1.15) -> ShaderMaterial:
+	var key := color.to_html() + str(snappedf(strength, 0.05))
+	if not _rim_cache.has(key):
+		var m := ShaderMaterial.new()
+		m.shader = _RIM_SHADER
+		m.set_shader_parameter("rim_color", color)
+		m.set_shader_parameter("rim_strength", strength)
+		_rim_cache[key] = m
+	return _rim_cache[key]
+
 # radius_px = world-space glow radius. amp <= 0 disables the pulse (static glow).
 static func make(color: Color, radius_px: float, alpha := 0.5, speed := 3.0,
 		amp := 0.18) -> ProtoGlow:

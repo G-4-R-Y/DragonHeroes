@@ -534,3 +534,16 @@ Still open:
    the bar, nova good, slash flagged for a sharpen pass. Lab outputs must
    live IN-REPO (a /tmp cleanup deleted the originals; recovered by replaying
    64 Write/Edit ops from agent transcripts).
+26. **Phantom Tower reference pass (2026-07-16, Ricardo).** Phantom Tower
+   (Steam 3988410) confirmed as THE reference (it is the game in Ricardo's
+   original spectacle screenshots; Hades named as the ceiling). Its language,
+   decoded from store screenshots: THIN crisp blade-light slashes (not fat
+   smears), colored RIM-GLOW silhouettes on elites, dark world where effects
+   are the light source. Applied: slash sharpened (band 0.24->0.15, core
+   sigma 0.34->0.20, halo smear halved, decay-ballooning halved — now reads
+   as knife-light, verified on the re-rendered contact sheet); nova shards
+   de-symmetrized (seeded low-freq angular warp — no more clock face); NEW
+   rim_glow.gdshader (8-tap alpha-edge outline) on elites (affix color),
+   boss chassis (bar color), hunt legendaries (magenta), materials cached
+   per color (ProtoGlow.rim_material). Renderer previews and shaders kept
+   in exact parity (same constants edited in both).

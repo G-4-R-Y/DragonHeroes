@@ -92,6 +92,7 @@ func _ready() -> void:
 	sprite.scale = Vector2.ONE * _scale
 	sprite.play("idle")
 	add_child(sprite)
+	_apply_rim()
 	if name_tag != "":   # elite title floats above the sprite
 		var tag := Label.new()
 		tag.text = name_tag
@@ -113,6 +114,20 @@ func _ready() -> void:
 		tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		add_child(tag)
 	hp = max_hp
+
+# Rim-glow silhouette (shaders/rim_glow.gdshader, Phantom-Tower elite read):
+# legendaries magenta, boss chassis their bar color, elites their affix color.
+# Materials are shared per color (ProtoGlow cache) — a pack costs one material.
+const _AFFIX_RIM := {"Brutal": Color(1.0, 0.36, 0.32), "Swift": Color(0.5, 0.95, 1.0),
+		"Fiery": Color(1.0, 0.68, 0.28), "Bulwark": Color(1.0, 0.85, 0.42)}
+
+func _apply_rim() -> void:
+	if not legendary_entry.is_empty():
+		sprite.material = ProtoGlow.rim_material(Color("e05aff"), 1.4)
+	elif get("bar_color") != null:            # boss chassis (Matriarch/Hag/duo)
+		sprite.material = ProtoGlow.rim_material(get("bar_color"), 1.3)
+	elif elite and _AFFIX_RIM.has(elite_affix):
+		sprite.material = ProtoGlow.rim_material(_AFFIX_RIM[elite_affix])
 
 # Spawn-table variety (call BEFORE add_child). Archetypes reshape the base kit;
 # elite affixes mark pack leaders with boosted loot (elite=true). All proposals;

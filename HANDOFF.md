@@ -1,7 +1,20 @@
-# Handoff — running state (updated 2026-07-16, v0.1.10)
+# Handoff — running state (updated 2026-07-16, v0.1.11)
 
 Read `CLAUDE.md` + `docs/00-canon.md` first (decisions log §12 is current through
-item 25). This file is the delta: exactly where work stopped and what's next.
+item 26). This file is the delta: exactly where work stopped and what's next.
+
+## v0.1.11 delta (2026-07-16) — Phantom Tower reference pass
+
+Phantom Tower (Steam 3988410) = THE reference (it IS Ricardo's original
+screenshots; Hades = ceiling). Decoded from store shots and applied:
+- Slash SHARPENED (thin band 0.15, crisp core, halo halved) — knife-light,
+  verified on the re-rendered in-repo contact sheet.
+- Nova de-symmetrized (seeded angular warp on the 13 shards).
+- NEW rim_glow.gdshader: colored silhouette outlines — elites (affix color),
+  boss chassis (bar_color), legendaries (magenta); ProtoGlow.rim_material
+  per-color cache. The single biggest "modern engine" read at zero cost.
+- Still open from the PT language: prop light halos (torches/shrooms as local
+  light sources), void-dot orbital bullets, darker/moodier global grade.
 
 ## v0.1.10 delta (2026-07-16) — shader-art VFX in-game
 

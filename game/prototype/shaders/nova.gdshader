@@ -102,7 +102,8 @@ void fragment() {
     // ---------- 2. radial energy shards (band behind the ring front) ----------
     float shards_life = pow(life, 1.5);           // fade faster than the ring
     float nshards = 13.0;
-    float shard_phase = 0.5 + 0.5 * sin(angp * nshards + seed * 2.0);
+    float awarp = 0.9 * sin(angp * 2.0 + seed * 3.1) + 0.5 * sin(angp * 5.0 - seed * 1.7);
+    float shard_phase = 0.5 + 0.5 * sin(angp * nshards + awarp + seed * 2.0);
     float shard = pow(shard_phase, 9.0);
     float svar = anoise(angp, 0.0, seed + 5.0, nshards / 3.0);
     shard *= 0.35 + 0.9 * svar;

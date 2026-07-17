@@ -13,7 +13,7 @@ uniform vec4  color       : source_color = vec4(0.62, 0.30, 1.00, 1.0); // eleme
 uniform vec2  dir         = vec2(0.927, -0.375); // slash facing (unit); default ~-22deg
 uniform float seed        = 7.0;    // noise offset for per-cast variation
 uniform float arc_radius  = 0.66;   // mean radius of the band, in half-quad units [0..1]
-uniform float arc_thick   = 0.24;   // max half-thickness at arc centre
+uniform float arc_thick   = 0.15;   // max half-thickness at arc centre
 uniform float arc_span    = 2.0944; // total swept angle (rad). 2.0944 = 120deg
 
 // ---- hash / value-noise / fbm (match render.py) ------------------------------
@@ -66,7 +66,7 @@ void fragment() {
 
     // expansion: band drifts outward and puffs as it dissipates
     float R_eff = arc_radius + 0.14 * decay;
-    float thick = arc_thick * (1.0 + 0.9 * decay);
+    float thick = arc_thick * (1.0 + 0.45 * decay);
 
     // blade thickness taper (fat middle, pointy tips)
     float half_thick = max(thick * sqrt(clamp(1.0 - t * t, 0.0, 1.0)), 0.010);
@@ -79,7 +79,7 @@ void fragment() {
     float nz = fbm(vec2(t * 6.0 + 3.1 + seed, ncross * 2.2 + 7.0));
 
     // across-band profiles: crisp centreline core + soft outer glow
-    float across_core = exp(-(ncross * ncross) / (2.0 * 0.34 * 0.34));
+    float across_core = exp(-(ncross * ncross) / (2.0 * 0.20 * 0.20));
     float across_glow = exp(-(ncross * ncross) / (2.0 * 0.72 * 0.72));
 
     // angular: covered region is t >= lead_t (already passed)
@@ -98,7 +98,7 @@ void fragment() {
     float keep = (1.0 - decay) + decay * erosion;
 
     // body: solid bright smear, gently turbulent, filaments added on top
-    float smear   = trail * (0.75 * across_core + 0.40 * across_glow);
+    float smear   = trail * (0.95 * across_core + 0.20 * across_glow);
     float turb    = 0.80 + 0.40 * nz;
     float fil_add = trail * across_core * fil * 0.55;
     float body = (smear * turb + fil_add) * tip_fade * env * keep;
