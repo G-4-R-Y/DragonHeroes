@@ -36,6 +36,8 @@ func _ready() -> void:
 # whole screen in place — same trick as the main menu.
 func _build() -> void:
 	theme = ProtoTheme.get_theme()
+	# display text (screen + panel titles) rides the 16 px pixel font; body stays 8
+	var big := ProtoTheme.font_big()
 	Session.request_save()   # entering the Haven checkpoints the character
 	var bg := ColorRect.new()
 	bg.color = Color("0e1319")
@@ -54,12 +56,14 @@ func _build() -> void:
 
 	var title := Label.new()
 	title.text = ProtoLang.t("hv_welcome_title") % Session.player_name
-	title.add_theme_font_size_override("font_size", 20)
+	if big != null:
+		title.add_theme_font_override("font", big)
+	title.add_theme_font_size_override("font_size", ProtoTheme.SIZE_TITLE)
 	title.add_theme_color_override("font_color", EMBER)
 	vb.add_child(title)
 
 	_stats_label = Label.new()
-	_stats_label.add_theme_font_size_override("font_size", 10)
+	_stats_label.add_theme_font_size_override("font_size", ProtoTheme.SIZE_BODY)
 	_stats_label.add_theme_color_override("font_color", PALE)
 	_stats_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	vb.add_child(_stats_label)
@@ -77,13 +81,14 @@ func _build() -> void:
 
 	var hunt := _btn(buttons, ProtoLang.t("hv_go_hunting"), _go_hunting)
 	hunt.add_theme_color_override("font_color", EMBER)
-	hunt.add_theme_font_size_override("font_size", 12)
+	hunt.add_theme_font_size_override("font_size", ProtoTheme.SIZE_BODY)
 	hunt.custom_minimum_size = Vector2(0, 24)
 	# 2-wide grid: eleven stacked buttons overflowed the 360 px viewport and
-	# cropped QUIT half off-screen (Ricardo 2026-07-12). PT-BR labels run
-	# longer ("ENCANTADOR"), so the nav font drops to 8 in pt — the 93 px
-	# cells hold and QUIT/SAIR stays inside the viewport (click test guard).
-	var nav_font := 9 if ProtoLang.lang == "en" else 8
+	# cropped QUIT half off-screen (Ricardo 2026-07-12). Nav labels sit on the
+	# pixel body grid (8) in every language — the widest PT-BR label
+	# ("ENCANTADOR") still holds in the 93 px cells and QUIT/SAIR stays inside
+	# the viewport (click test guard).
+	var nav_font := ProtoTheme.SIZE_BODY
 	var grid := GridContainer.new()
 	grid.columns = 2
 	grid.add_theme_constant_override("h_separation", 4)
@@ -114,7 +119,12 @@ func _build() -> void:
 	panel.add_child(pv)
 
 	_panel_title = Label.new()
-	_panel_title.add_theme_font_size_override("font_size", 14)
+	if big != null:
+		_panel_title.add_theme_font_override("font", big)
+	_panel_title.add_theme_font_size_override("font_size", ProtoTheme.SIZE_TITLE)
+	# localized kiosk titles (esp. PT-BR) can run long at the 16 px display width;
+	# wrap inside the bounded panel rather than spill past the border
+	_panel_title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_panel_title.add_theme_color_override("font_color", EMBER)
 	pv.add_child(_panel_title)
 
@@ -150,7 +160,7 @@ func _open(title: String) -> void:
 		_panel_body.remove_child(c)
 		c.queue_free()
 
-func _line(text: String, color := PALE, font_size := 10) -> Label:
+func _line(text: String, color := PALE, font_size := ProtoTheme.SIZE_BODY) -> Label:
 	var l := Label.new()
 	l.text = text
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -161,12 +171,12 @@ func _line(text: String, color := PALE, font_size := 10) -> Label:
 	return l
 
 func _header(text: String) -> Label:
-	return _line(text, EMBER, 12)
+	return _line(text, EMBER)
 
 # Quiet section break + small ember section header — every flow reads the same.
 func _section(text: String) -> void:
 	_panel_body.add_child(HSeparator.new())
-	_line(text.to_upper(), EMBER, 10)
+	_line(text.to_upper(), EMBER)
 
 # "core.skill.abyssal_maw" -> "Abyssal Maw"
 func _pretty_id(content_id: String) -> String:
@@ -207,7 +217,7 @@ func _find_gear(uid: int) -> Dictionary:
 
 func _show_welcome() -> void:
 	_open(ProtoLang.t("hv_title"))
-	_line(ProtoLang.t("hv_welcome_line"), PALE, 11)
+	_line(ProtoLang.t("hv_welcome_line"), PALE)
 	_line(ProtoLang.t("hv_welcome_body"), DIM)
 	# language toggle mirrored from the main menu — switches live and persists
 	var lb := Button.new()
@@ -248,30 +258,30 @@ func _show_skills() -> void:
 			learned += 1
 	_line(ProtoLang.t("hv_skills_summary")
 			% [Session.class_display(), actives, passives, learned]
-			+ ProtoLang.t("hv_skills_banked") % Session.skill_points, PALE, 11)
+			+ ProtoLang.t("hv_skills_banked") % Session.skill_points, PALE)
 	var charge: Dictionary = Session.class_charge()
 	if not charge.is_empty():
 		_line("◈ %s — %s" % [ProtoLang.pick(charge, "name"),
-				ProtoLang.pick(charge, "desc")], VIOLET, 11)
+				ProtoLang.pick(charge, "desc")], VIOLET)
 	for br in Session.class_branches():
 		var names: Array[String] = []
 		for n in br.get("nodes", []):
 			if int(n.get("cost", 1)) > 0:
 				names.append(ProtoLang.pick(n, "name", "?"))
 		if not names.is_empty():
-			_line("- %s: %s" % [ProtoLang.pick(br, "name", "?"), ", ".join(names)], DIM, 10)
-	_line(ProtoLang.t("hv_skills_open_tree"), PALE, 11)
+			_line("- %s: %s" % [ProtoLang.pick(br, "name", "?"), ", ".join(names)], DIM)
+	_line(ProtoLang.t("hv_skills_open_tree"), PALE)
 	var cleave := Session.load_content("cleave")
 	var n: Dictionary = cleave.get("numbers", {})
 	_header(ProtoLang.t("hv_cleave_header") % str(cleave.get("id", "core.skill.cleave")))
 	_line(ProtoLang.t("hv_cleave_stats") % [
 			float(n.get("damage_coeff", 0.0)), float(n.get("reach_m", 0.0)),
 			int(n.get("arc_deg", 0)), int(n.get("cooldown_s", 0)),
-			ProtoLang.term("dt", str(cleave.get("damage_type", "physical")))], PALE, 11)
+			ProtoLang.term("dt", str(cleave.get("damage_type", "physical")))], PALE)
 	_header(ProtoLang.t("hv_runes_header"))
 	for def in ProtoItems.rune_defs():
 		_line("- %s — %s" % [str(def.get("name", "?")), str(def.get("desc", ""))],
-				VIOLET, 11)
+				VIOLET)
 	_line(ProtoLang.t("hv_runes_drop"), DIM)
 
 func _show_pets() -> void:
@@ -281,29 +291,29 @@ func _show_pets() -> void:
 	for pet in Session.pets:
 		_header(str(pet.get("name", "?")))
 		_line(ProtoLang.t("hv_pets_roll") % [int(pet.get("roll_pct", 100)),
-				str(pet.get("species", ""))], PALE, 11)
+				str(pet.get("species", ""))], PALE)
 		for s in pet.get("skills", []):
-			_line("- %s  (%s)" % [_pretty_id(str(s)), str(s)], GOLD, 11)
+			_line("- %s  (%s)" % [_pretty_id(str(s)), str(s)], GOLD)
 	if not Session.stables.is_empty():
 		_header(ProtoLang.t("hv_stables_header") % Session.stables.size())
 		for pet in Session.stables:
 			_line(ProtoLang.t("hv_stables_row") % [str(pet.get("name", "?")),
 					int(pet.get("roll_pct", 100)),
-					(pet.get("skills", []) as Array).size()], PALE, 11)
+					(pet.get("skills", []) as Array).size()], PALE)
 		_line(ProtoLang.t("hv_stables_manage"), DIM)
 	_line(ProtoLang.t("hv_pets_rules"), DIM)
 	var fam := Session.load_content("abyssal")
 	_line(str(fam.get("lore", "")), DIM)
 	_header(ProtoLang.t("hv_family_skills"))
 	for s in fam.get("family_shared_skills", []):
-		_line("- %s  (%s)" % [_pretty_id(str(s)), str(s)], PALE, 11)
+		_line("- %s  (%s)" % [_pretty_id(str(s)), str(s)], PALE)
 	_header(ProtoLang.t("hv_species"))
 	for sp in fam.get("species", []):
 		var sigs: Array[String] = []
 		for s in sp.get("signature_skills", []):
 			sigs.append(_pretty_id(str(s)))
 		_line(ProtoLang.t("hv_species_row") % [
-				_pretty_id(str(sp.get("creature", "?"))), ", ".join(sigs)], PALE, 11)
+				_pretty_id(str(sp.get("creature", "?"))), ", ".join(sigs)], PALE)
 	var rules: Dictionary = fam.get("roll_rules", {})
 	var roll_range: Dictionary = rules.get("attribute_roll_range", {})
 	_line(ProtoLang.t("hv_roll_rules") % [
@@ -314,7 +324,7 @@ func _show_pets() -> void:
 func _show_attributes() -> void:
 	_open(ProtoLang.t("hv_attr_title"))
 	_attr_labels.clear()
-	_points_label = _line(ProtoLang.t("unspent_points") % Session.attribute_points, GOLD, 11)
+	_points_label = _line(ProtoLang.t("unspent_points") % Session.attribute_points, GOLD)
 	for attr in Session.ATTRIBUTES:
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 6)
@@ -323,12 +333,12 @@ func _show_attributes() -> void:
 		nl.text = "%s  (%s)" % [ProtoLang.t("attr_" + str(attr)),
 				ProtoLang.t("fx_" + str(attr))]
 		nl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		nl.add_theme_font_size_override("font_size", 10)
+		nl.add_theme_font_size_override("font_size", ProtoTheme.SIZE_BODY)
 		nl.add_theme_color_override("font_color", PALE)
 		row.add_child(nl)
 		var vl := Label.new()
 		vl.text = str(Session.attributes[attr])
-		vl.add_theme_font_size_override("font_size", 11)
+		vl.add_theme_font_size_override("font_size", ProtoTheme.SIZE_BODY)
 		vl.add_theme_color_override("font_color", GOLD)
 		row.add_child(vl)
 		_attr_labels[attr] = vl
@@ -362,16 +372,16 @@ func _adjust_attribute(attr: String, delta: int) -> void:
 # and the rules explainer sit below them.
 func _show_forge() -> void:
 	_open(ProtoLang.t("hv_forge_title"))
-	_line(ProtoLang.t("gold_line") % Session.gold, GOLD, 11)
+	_line(ProtoLang.t("gold_line") % Session.gold, GOLD)
 	if _forge_msg != "":
-		_line(_forge_msg, EMBER, 11)
+		_line(_forge_msg, EMBER)
 	var gear := _gear_list()
 	if gear.is_empty():
 		_line(ProtoLang.t("hv_forge_none"), DIM)
 		return
 	var item := _find_gear(_forge_uid)
 	if item.is_empty():
-		_line(ProtoLang.t("hv_forge_pick_hint"), DIM, 10)
+		_line(ProtoLang.t("hv_forge_pick_hint"), DIM)
 	else:
 		var tier := int(item.get("upgrade_tier", 0))
 		_header(ProtoLang.t("hv_forge_before_after") % _iname(item))
@@ -383,7 +393,7 @@ func _show_forge() -> void:
 				var nxt := float(a.get("value", 0)) * (1.0 + 0.1 * (tier + 1))
 				_line("%s: +%.0f → +%.0f" % [
 						ProtoItems.stat_name(str(a.get("stat", "?"))), cur, nxt],
-						PALE, 11)
+						PALE)
 			var en: Variant = item.get("enchant")
 			if en is Dictionary and not (en as Dictionary).is_empty():
 				_line(ProtoLang.t("hv_forge_enchant_note") % [
@@ -398,9 +408,9 @@ func _show_forge() -> void:
 			b2.add_theme_color_override("font_color", EMBER)
 			b2.disabled = Session.gold < cost
 			if Session.gold < cost:
-				_line(ProtoLang.t("hv_no_gold"), RED, 10)
+				_line(ProtoLang.t("hv_no_gold"), RED)
 	_section(ProtoLang.t("hv_forge_pick_section"))
-	_line(ProtoLang.t("hv_forge_rules"), DIM, 9)
+	_line(ProtoLang.t("hv_forge_rules"), DIM)
 	for entry in gear:
 		var it: Dictionary = entry[0]
 		var picked := int(it.get("uid", -1)) == _forge_uid
@@ -409,7 +419,7 @@ func _show_forge() -> void:
 				int(it.get("upgrade_tier", 0)), ProtoLang.t("where_" + str(entry[1]))],
 				_forge_pick.bind(int(it.get("uid", -1))))
 		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
-		b.add_theme_font_size_override("font_size", 10)
+		b.add_theme_font_size_override("font_size", ProtoTheme.SIZE_BODY)
 		b.add_theme_color_override("font_color",
 				ProtoItems.rarity_color(str(it.get("rarity", "common"))))
 
@@ -442,28 +452,28 @@ func _show_enchant() -> void:
 	for it in Session.inventory:
 		if str(it.get("slot", "")) == "material":
 			ess_count += int(it.get("qty", 1))
-	_line(ProtoLang.t("hv_ench_count") % ess_count, CYAN, 11)
+	_line(ProtoLang.t("hv_ench_count") % ess_count, CYAN)
 	if _ench_msg != "":
-		_line(_ench_msg, EMBER, 11)
+		_line(_ench_msg, EMBER)
 	if ess_count == 0:
 		_line(ProtoLang.t("hv_ench_none"), DIM)
 		return
 	var item := _find_gear(_ench_uid)
 	if item.is_empty() or not ProtoItems.can_enchant(item):
-		_line(ProtoLang.t("hv_ench_pick_hint"), DIM, 10)
+		_line(ProtoLang.t("hv_ench_pick_hint"), DIM)
 	else:
 		_header(_iname(item))
 		var en: Variant = item.get("enchant")
 		if en is Dictionary and not (en as Dictionary).is_empty():
 			_line(ProtoLang.t("hv_ench_current") % [
 					float(en.get("value", 0)),
-					ProtoItems.stat_name(str(en.get("stat", "?")))], PALE, 11)
+					ProtoItems.stat_name(str(en.get("stat", "?")))], PALE)
 		else:
-			_line(ProtoLang.t("hv_ench_none_yet"), PALE, 11)
+			_line(ProtoLang.t("hv_ench_none_yet"), PALE)
 		var b2 := _btn(_panel_body, ProtoLang.t("hv_ench_apply"), _ench_do)
 		b2.add_theme_color_override("font_color", CYAN)
 	_section(ProtoLang.t("hv_ench_pick_section"))
-	_line(ProtoLang.t("hv_ench_rules"), DIM, 9)
+	_line(ProtoLang.t("hv_ench_rules"), DIM)
 	var any := false
 	for entry in _gear_list():
 		var it: Dictionary = entry[0]
@@ -476,7 +486,7 @@ func _show_enchant() -> void:
 				ProtoLang.t("where_" + str(entry[1]))],
 				_ench_pick.bind(int(it.get("uid", -1))))
 		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
-		b.add_theme_font_size_override("font_size", 10)
+		b.add_theme_font_size_override("font_size", ProtoTheme.SIZE_BODY)
 		b.add_theme_color_override("font_color",
 				ProtoItems.rarity_color(str(it.get("rarity", "common"))))
 	if not any:
@@ -520,9 +530,9 @@ func _consume_essence(essence: Dictionary) -> void:
 # Selling (the primary action) renders first; the stable-master sits below.
 func _show_vendor() -> void:
 	_open(ProtoLang.t("hv_vendor_title"))
-	_line(ProtoLang.t("gold_line") % Session.gold, GOLD, 11)
+	_line(ProtoLang.t("gold_line") % Session.gold, GOLD)
 	# message line ALWAYS renders so rows never shift under the cursor mid-spree
-	_line(_vendor_msg if _vendor_msg != "" else " ", EMBER, 11)
+	_line(_vendor_msg if _vendor_msg != "" else " ", EMBER)
 	if Session.inventory.is_empty():
 		_line(ProtoLang.t("hv_bag_empty"), DIM)
 	else:
@@ -543,7 +553,7 @@ func _show_vendor() -> void:
 			var sa := _btn(chips, ProtoLang.t("hv_sell_all_chip") % [
 					ProtoLang.term("rarity", rar), uids.size(), total],
 					_sell_all.bind(uids))
-			sa.add_theme_font_size_override("font_size", 9)
+			sa.add_theme_font_size_override("font_size", ProtoTheme.SIZE_BODY)
 			sa.add_theme_color_override("font_color", ProtoItems.rarity_color(rar))
 		for it in Session.inventory:
 			var qty := int(it.get("qty", 1))
@@ -553,7 +563,7 @@ func _show_vendor() -> void:
 			b.alignment = HORIZONTAL_ALIGNMENT_LEFT
 			b.icon = ProtoSprites.item_icon(str(it.get("sprite_key", "sword")),
 					str(it.get("rarity", "common")))
-			b.add_theme_font_size_override("font_size", 10)
+			b.add_theme_font_size_override("font_size", ProtoTheme.SIZE_BODY)
 			b.add_theme_color_override("font_color",
 					ProtoItems.rarity_color(str(it.get("rarity", "common"))))
 	_section(ProtoLang.t("hv_stable_master"))
@@ -564,8 +574,8 @@ func _show_vendor() -> void:
 		mb.add_theme_color_override("font_color", CYAN)
 		mb.disabled = Session.gold < 400
 	if not Session.owns_mount("emberwing_drakeling"):
-		_line(ProtoLang.t("hv_no_fly_sale"), DIM, 9)
-	_line(ProtoLang.t("hv_market_note"), DIM, 9)
+		_line(ProtoLang.t("hv_no_fly_sale"), DIM)
+	_line(ProtoLang.t("hv_market_note"), DIM)
 
 func _buy_strider() -> void:
 	if Session.gold < 400 or Session.owns_mount("gloam_strider"):
@@ -602,7 +612,7 @@ func _chest_row(it: Dictionary, fmt: String, cb: Callable) -> void:
 	b.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	b.icon = ProtoSprites.item_icon(str(it.get("sprite_key", "sword")),
 			str(it.get("rarity", "common")))
-	b.add_theme_font_size_override("font_size", 10)
+	b.add_theme_font_size_override("font_size", ProtoTheme.SIZE_BODY)
 	b.add_theme_color_override("font_color",
 			ProtoItems.rarity_color(str(it.get("rarity", "common"))))
 
@@ -632,7 +642,7 @@ func _show_codex() -> void:
 			_line("- %s — %s%s" % [ProtoLang.pick(e, "name", "?"),
 					ProtoLang.pick(e, "desc"),
 					"" if live else ProtoLang.t("hv_codex_planned")],
-					PALE if live else DIM, 10)
+					PALE if live else DIM)
 
 func _sell_all(uids: Array) -> void:
 	var got := 0

@@ -61,7 +61,7 @@ func _ready() -> void:
 	var title := Label.new()
 	title.text = ProtoLang.t("cp_title")
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	title.add_theme_font_size_override("font_size", 11)
+	title.add_theme_font_size_override("font_size", ProtoTheme.SIZE_BODY)
 	title.add_theme_color_override("font_color", EMBER)
 	bar.add_child(title)
 	var hint := Label.new()
@@ -108,7 +108,7 @@ func _build_skills_tab() -> Control:
 	head.add_theme_constant_override("separation", 6)
 	root.add_child(head)
 	_sk_points = Label.new()
-	_sk_points.add_theme_font_size_override("font_size", 12)
+	_sk_points.add_theme_font_size_override("font_size", ProtoTheme.SIZE_BODY)
 	_sk_points.add_theme_color_override("font_color", GOLD)
 	head.add_child(_sk_points)
 	_sk_class = Label.new()
@@ -118,7 +118,7 @@ func _build_skills_tab() -> Control:
 	_sk_class.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
 	head.add_child(_sk_class)
 	_sk_charge = Label.new()
-	_sk_charge.add_theme_font_size_override("font_size", 9)
+	_sk_charge.add_theme_font_size_override("font_size", ProtoTheme.SIZE_BODY)
 	_sk_charge.add_theme_color_override("font_color", VIOLET)
 	_sk_charge.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
 	_sk_charge.mouse_filter = Control.MOUSE_FILTER_STOP   # hover shows the mechanic
@@ -183,7 +183,7 @@ func _clear(vb: Container) -> void:
 		vb.remove_child(c)
 		c.queue_free()
 
-func _line(vb: Container, text: String, color := PALE, font_size := 10) -> Label:
+func _line(vb: Container, text: String, color := PALE, font_size := ProtoTheme.SIZE_BODY) -> Label:
 	var l := Label.new()
 	l.text = text
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -197,7 +197,7 @@ func _btn(parent: Container, text: String, cb: Callable, color := PALE) -> Butto
 	var b := Button.new()
 	b.text = text
 	b.focus_mode = Control.FOCUS_NONE
-	b.add_theme_font_size_override("font_size", 10)
+	b.add_theme_font_size_override("font_size", ProtoTheme.SIZE_BODY)
 	b.add_theme_color_override("font_color", color)
 	b.pressed.connect(cb)
 	parent.add_child(b)
@@ -247,16 +247,16 @@ func _refresh_gear() -> void:
 	var vb: VBoxContainer = _boxes["Gear"]
 	_clear(vb)
 	_line(vb, ProtoLang.t("cp_gear_header") % [Session.player_name,
-			Session.class_display(), Session.level], EMBER, 12)
+			Session.class_display(), Session.level], EMBER)
 	var s := ProtoStats.compute(Session)
 	for sl in ProtoStats.summary_lines(s):
-		_line(vb, sl, DIM, 9)
+		_line(vb, sl, DIM)
 	for slot in ProtoItems.GEAR_SLOTS:
 		var it: Dictionary = Session.equipment[slot]
 		var b := Button.new()
 		b.focus_mode = Control.FOCUS_NONE
 		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
-		b.add_theme_font_size_override("font_size", 10)
+		b.add_theme_font_size_override("font_size", ProtoTheme.SIZE_BODY)
 		if it.is_empty():
 			b.text = ProtoLang.t("cp_slot_empty") % ProtoLang.term("slot", str(slot))
 			b.add_theme_color_override("font_color", DIM)
@@ -271,19 +271,19 @@ func _refresh_gear() -> void:
 	if _sel_slot != "":
 		var it: Dictionary = Session.equipment.get(_sel_slot, {})
 		if not it.is_empty():
-			_line(vb, "— %s —" % _iname(it), _rcolor(it), 11)
+			_line(vb, "— %s —" % _iname(it), _rcolor(it))
 			_line(vb, ProtoLang.t("cp_item_meta") % [
 					ProtoLang.term("rarity", str(it.get("rarity", "?"))),
 					ProtoLang.term("slot", str(it.get("slot", "?"))).to_lower(),
-					ProtoItems.sell_price(it)], DIM, 9)
+					ProtoItems.sell_price(it)], DIM)
 			for d in ProtoItems.describe(it):
-				_line(vb, str(d), PALE, 10)
+				_line(vb, str(d), PALE)
 			var hb := HBoxContainer.new()
 			hb.add_theme_constant_override("separation", 6)
 			vb.add_child(hb)
 			_btn(hb, ProtoLang.t("cp_unequip"), _do_unequip.bind(_sel_slot), GOLD)
 			if Session.inventory.size() >= ProtoItems.INVENTORY_CAP:
-				_line(vb, ProtoLang.t("cp_bag_full"), RED, 9)
+				_line(vb, ProtoLang.t("cp_bag_full"), RED)
 
 func _select_slot(slot: String) -> void:
 	_sel_slot = "" if _sel_slot == slot else slot
@@ -301,7 +301,7 @@ func _refresh_bag() -> void:
 	var vb: VBoxContainer = _boxes["Bag"]
 	_clear(vb)
 	_line(vb, ProtoLang.t("cp_bag_header") % [Session.inventory.size(),
-			ProtoItems.INVENTORY_CAP, _gold()], EMBER, 12)
+			ProtoItems.INVENTORY_CAP, _gold()], EMBER)
 	if Session.inventory.is_empty():
 		_line(vb, ProtoLang.t("cp_bag_empty"), DIM)
 		return
@@ -314,7 +314,7 @@ func _refresh_bag() -> void:
 		var fb := Button.new()
 		fb.text = ProtoLang.t(str(f[1]))
 		fb.focus_mode = Control.FOCUS_NONE
-		fb.add_theme_font_size_override("font_size", 9)
+		fb.add_theme_font_size_override("font_size", ProtoTheme.SIZE_BODY)
 		if _bag_filter == str(f[0]):
 			fb.add_theme_color_override("font_color", GOLD)
 		fb.pressed.connect(_set_bag_filter.bind(str(f[0])))
@@ -327,7 +327,7 @@ func _refresh_bag() -> void:
 		sb2.text = ProtoLang.t(str(srt[1]))
 		sb2.focus_mode = Control.FOCUS_NONE
 		sb2.tooltip_text = ProtoLang.t("cp_sort_tip") % ProtoLang.t(str(srt[1]))
-		sb2.add_theme_font_size_override("font_size", 9)
+		sb2.add_theme_font_size_override("font_size", ProtoTheme.SIZE_BODY)
 		sb2.add_theme_color_override("font_color", DIM)
 		sb2.pressed.connect(_sort_bag.bind(str(srt[0])))
 		bar.add_child(sb2)
@@ -395,15 +395,15 @@ func _sort_bag(key: String) -> void:
 
 # Inspect popup: affixes, enchant, vs-equipped stat diff, equip/sell actions.
 func _bag_detail(vb: VBoxContainer, item: Dictionary) -> void:
-	_line(vb, "— %s —" % _iname(item), _rcolor(item), 11)
+	_line(vb, "— %s —" % _iname(item), _rcolor(item))
 	_line(vb, "%s %s" % [ProtoLang.term("rarity", str(item.get("rarity", "?"))),
-			ProtoLang.term("slot", str(item.get("slot", "?"))).to_lower()], DIM, 9)
+			ProtoLang.term("slot", str(item.get("slot", "?"))).to_lower()], DIM)
 	var slot := str(item.get("slot", ""))
 	var equipped: Dictionary = Session.equipment.get(slot, {}) \
 			if ProtoItems.GEAR_SLOTS.has(slot) else {}
 	if equipped.is_empty() or int(equipped.get("uid", -1)) == int(item.get("uid", -2)):
 		for d in ProtoItems.describe(item):
-			_line(vb, str(d), PALE, 10)
+			_line(vb, str(d), PALE)
 	else:
 		# side-by-side comparison: the pick vs what you're wearing
 		var cols := HBoxContainer.new()
@@ -423,7 +423,7 @@ func _bag_detail(vb: VBoxContainer, item: Dictionary) -> void:
 			var nm := Label.new()
 			nm.text = ProtoLang.t("cp_pw") % [_iname(it2), ProtoItems.power(it2)]
 			nm.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-			nm.add_theme_font_size_override("font_size", 9)
+			nm.add_theme_font_size_override("font_size", ProtoTheme.SIZE_BODY)
 			nm.add_theme_color_override("font_color", _rcolor(it2))
 			col.add_child(nm)
 			for d in ProtoItems.describe(it2):
@@ -450,13 +450,13 @@ func _bag_detail(vb: VBoxContainer, item: Dictionary) -> void:
 				continue
 			any = true
 			_line(vb, ProtoLang.t("cp_vs_diff") % [ProtoLang.t(str(r[0])), d],
-					GREEN if d > 0.0 else RED, 9)
+					GREEN if d > 0.0 else RED)
 		if not any:
-			_line(vb, ProtoLang.t("cp_no_change"), DIM, 9)
+			_line(vb, ProtoLang.t("cp_no_change"), DIM)
 	elif slot == "rune":
-		_line(vb, ProtoLang.t("cp_rune_hint"), VIOLET, 9)
+		_line(vb, ProtoLang.t("cp_rune_hint"), VIOLET)
 	elif slot == "material":
-		_line(vb, ProtoLang.t("cp_mat_hint"), CYAN, 9)
+		_line(vb, ProtoLang.t("cp_mat_hint"), CYAN)
 	var hb := HBoxContainer.new()
 	hb.add_theme_constant_override("separation", 6)
 	vb.add_child(hb)
@@ -488,8 +488,8 @@ func _do_sell(uid: int) -> void:
 func _refresh_attributes() -> void:
 	var vb: VBoxContainer = _boxes["Attributes"]
 	_clear(vb)
-	_line(vb, ProtoLang.t("cp_attr_header") % Session.attribute_points, EMBER, 12)
-	_line(vb, ProtoLang.t("cp_attr_note") % [Session.BASE_ATTRIBUTE], DIM, 9)
+	_line(vb, ProtoLang.t("cp_attr_header") % Session.attribute_points, EMBER)
+	_line(vb, ProtoLang.t("cp_attr_note") % [Session.BASE_ATTRIBUTE], DIM)
 	for attr in Session.ATTRIBUTES:
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 4)
@@ -498,12 +498,12 @@ func _refresh_attributes() -> void:
 		nl.text = "%s  (%s)" % [ProtoLang.t("attr_" + str(attr)),
 				ProtoLang.t("fxs_" + str(attr))]
 		nl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		nl.add_theme_font_size_override("font_size", 9)
+		nl.add_theme_font_size_override("font_size", ProtoTheme.SIZE_BODY)
 		nl.add_theme_color_override("font_color", PALE)
 		row.add_child(nl)
 		var vl := Label.new()
 		vl.text = str(Session.attributes[attr])
-		vl.add_theme_font_size_override("font_size", 11)
+		vl.add_theme_font_size_override("font_size", ProtoTheme.SIZE_BODY)
 		vl.add_theme_color_override("font_color", GOLD)
 		row.add_child(vl)
 		var minus := Button.new()
@@ -548,7 +548,7 @@ func _refresh_skills() -> void:
 	var vb: VBoxContainer = _boxes["Skills"]
 	_clear(vb)
 	_build_tree(vb, s)
-	_line(vb, ProtoLang.t("cp_tree_legend"), DIM, 7)
+	_line(vb, ProtoLang.t("cp_tree_legend"), DIM)
 	_build_base_kit(vb, s)
 	_refresh_detail(s)
 
@@ -589,7 +589,7 @@ func _build_tree(vb: Container, s: Dictionary) -> void:
 			continue
 		branches.append(br)
 	if branches.is_empty():
-		_line(vb, ProtoLang.t("cp_no_tree"), DIM, 9)
+		_line(vb, ProtoLang.t("cp_no_tree"), DIM)
 		return
 	var cols := branches.size()
 	var col_w := floorf(TREE_W / cols)
@@ -617,7 +617,7 @@ func _build_tree(vb: Container, s: Dictionary) -> void:
 		hl.size = Vector2(col_w - 2.0, 10.0)
 		hl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		hl.clip_text = true
-		hl.add_theme_font_size_override("font_size", 7)
+		hl.add_theme_font_size_override("font_size", ProtoTheme.SIZE_BODY)
 		hl.add_theme_color_override("font_color", EMBER)
 		hl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		canvas.add_child(hl)
@@ -710,7 +710,7 @@ func _tree_chip(canvas: TreeCanvas, node: Dictionary, s: Dictionary, rect: Rect2
 	nl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	nl.clip_text = true
 	nl.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-	nl.add_theme_font_size_override("font_size", 7)
+	nl.add_theme_font_size_override("font_size", ProtoTheme.SIZE_BODY)
 	nl.add_theme_color_override("font_color",
 			GOLD if st.learned else (Color(0.93, 0.91, 0.84) if st.learnable
 			else (PALE if st.open else DIM)))
@@ -737,7 +737,7 @@ func _tree_chip(canvas: TreeCanvas, node: Dictionary, s: Dictionary, rect: Rect2
 	micro.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	micro.clip_text = true
 	micro.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-	micro.add_theme_font_size_override("font_size", 7)
+	micro.add_theme_font_size_override("font_size", ProtoTheme.SIZE_BODY)
 	micro.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	b.add_child(micro)
 	return st
@@ -814,7 +814,7 @@ func _refresh_detail(s: Dictionary) -> void:
 	head.add_child(icon)
 	var nm := Label.new()
 	nm.text = ProtoLang.pick(node, "name", "?")
-	nm.add_theme_font_size_override("font_size", 11)
+	nm.add_theme_font_size_override("font_size", ProtoTheme.SIZE_BODY)
 	nm.add_theme_color_override("font_color", accent)
 	head.add_child(nm)
 	var kind_l := Label.new()
@@ -832,14 +832,14 @@ func _refresh_detail(s: Dictionary) -> void:
 	# live numbers (this character's StatBlock) or passive stat mods
 	if active:
 		var bits := _active_bits(node, s)
-		_detail_line(" · ".join(bits), PALE, 9)
+		_detail_line(" · ".join(bits), PALE, ProtoTheme.SIZE_BODY)
 	else:
 		var mods: Array[String] = []
 		for m in node.get("stat_mods", []):
 			mods.append("%s %+d" % [str(m.get("stat", "?")).replace("_", " "),
 					int(m.get("value", 0))])
 		if not mods.is_empty():
-			_detail_line(" · ".join(mods), PALE, 9)
+			_detail_line(" · ".join(mods), PALE, ProtoTheme.SIZE_BODY)
 	var d := _detail_line(ProtoLang.pick(node, "desc"), DIM, 8)
 	d.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	d.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
@@ -888,7 +888,7 @@ func _refresh_detail(s: Dictionary) -> void:
 		lb.text = ProtoLang.t("cp_learn_btn") % st.cost
 		lb.tooltip_text = "learn " + id   # stable hook (click test) — stays EN
 		lb.focus_mode = Control.FOCUS_NONE
-		lb.add_theme_font_size_override("font_size", 9)
+		lb.add_theme_font_size_override("font_size", ProtoTheme.SIZE_BODY)
 		lb.add_theme_color_override("font_color", GOLD)
 		lb.disabled = not st.learnable
 		lb.pressed.connect(_do_learn.bind(id, st.cost))
@@ -908,7 +908,7 @@ func _refresh_detail(s: Dictionary) -> void:
 			ab.text = str(i + 1)
 			ab.focus_mode = Control.FOCUS_NONE
 			ab.custom_minimum_size = Vector2(22, 0)
-			ab.add_theme_font_size_override("font_size", 9)
+			ab.add_theme_font_size_override("font_size", ProtoTheme.SIZE_BODY)
 			ab.add_theme_color_override("font_color", GOLD if here else DIM)
 			if here:
 				ab.add_theme_stylebox_override("normal", ProtoTheme.chip_box(GOLD, 0.16))
@@ -945,7 +945,7 @@ func _status_chip(parent: Container, text: String, color: Color, tip := "") -> v
 		pc.mouse_filter = Control.MOUSE_FILTER_STOP
 	var l := Label.new()
 	l.text = text
-	l.add_theme_font_size_override("font_size", 7)
+	l.add_theme_font_size_override("font_size", ProtoTheme.SIZE_BODY)
 	l.add_theme_color_override("font_color", color.lerp(Color.WHITE, 0.35))
 	pc.add_child(l)
 	parent.add_child(pc)
@@ -954,7 +954,7 @@ func _status_chip(parent: Container, text: String, color: Color, tip := "") -> v
 func _build_base_kit(vb: Container, s: Dictionary) -> void:
 	var m := _main()
 	var owns_rend: bool = Session.stones >= 1 or (m != null and m.stones >= 1)
-	_line(vb, ProtoLang.t("cp_base_kit"), EMBER, 9)
+	_line(vb, ProtoLang.t("cp_base_kit"), EMBER)
 	match str(s.get("class_kit", "melee")):   # each class wears its own kit
 		"mage":
 			_skill_card(vb, "cleave", ProtoLang.t("kit_arcane_bolt"), Color("b48cff"),
@@ -989,7 +989,7 @@ func _build_base_kit(vb: Container, s: Dictionary) -> void:
 		_line(vb, ProtoLang.t("cp_rend_stone_note"), DIM, 8)
 	if _socket_for != "":
 		_socket_chooser(vb)
-	_line(vb, ProtoLang.t("cp_runes_drop_note"), DIM, 7)
+	_line(vb, ProtoLang.t("cp_runes_drop_note"), DIM)
 
 # Live numbers for an active: damage from the CURRENT StatBlock, then geometry.
 func _active_bits(node: Dictionary, s: Dictionary) -> Array[String]:
@@ -1055,20 +1055,20 @@ func _skill_card(vb: Container, skill_key: String, title: String, color: Color,
 	hb.add_child(left)
 	var t := Label.new()
 	t.text = title + (ProtoLang.t("cp_locked") if locked else "")
-	t.add_theme_font_size_override("font_size", 11)
+	t.add_theme_font_size_override("font_size", ProtoTheme.SIZE_BODY)
 	t.add_theme_color_override("font_color", DIM if locked else color)
 	left.add_child(t)
 	var nums := Label.new()
 	nums.text = numbers
 	nums.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	nums.add_theme_font_size_override("font_size", 9)
+	nums.add_theme_font_size_override("font_size", ProtoTheme.SIZE_BODY)
 	nums.add_theme_color_override("font_color", DIM)
 	left.add_child(nums)
 	if skill_key != "" and not locked:
 		var r: Dictionary = Session.skill_runes.get(skill_key, {})
 		var sb := Button.new()
 		sb.focus_mode = Control.FOCUS_NONE
-		sb.add_theme_font_size_override("font_size", 9)
+		sb.add_theme_font_size_override("font_size", ProtoTheme.SIZE_BODY)
 		sb.custom_minimum_size = Vector2(96, 0)
 		if r.is_empty():
 			sb.text = ProtoLang.t("cp_socket_rune_chip")
@@ -1084,7 +1084,7 @@ func _skill_card(vb: Container, skill_key: String, title: String, color: Color,
 # Chooser: opened from a card's socket chip; lists bag runes + remove option.
 func _socket_chooser(vb: VBoxContainer) -> void:
 	var r: Dictionary = Session.skill_runes.get(_socket_for, {})
-	_line(vb, ProtoLang.t("cp_socket_on") % ProtoLang.term("sock", _socket_for), VIOLET, 10)
+	_line(vb, ProtoLang.t("cp_socket_on") % ProtoLang.term("sock", _socket_for), VIOLET)
 	if not r.is_empty():
 		_btn(vb, ProtoLang.t("cp_remove_rune") % str(r.get("name", "?")),
 				_do_unsocket_pick, RED)
@@ -1097,7 +1097,7 @@ func _socket_chooser(vb: VBoxContainer) -> void:
 				str(it.get("rune_key", ""))).get("desc", ""))],
 				_do_socket_pick.bind(int(it.get("uid", -1))), VIOLET)
 	if not any and r.is_empty():
-		_line(vb, ProtoLang.t("cp_no_runes"), DIM, 9)
+		_line(vb, ProtoLang.t("cp_no_runes"), DIM)
 
 func _open_socket_chooser(skill: String) -> void:
 	_socket_for = "" if _socket_for == skill else skill
@@ -1126,7 +1126,7 @@ func _refresh_pets() -> void:
 	var vb: VBoxContainer = _boxes["Pets"]
 	_clear(vb)
 	_line(vb, ProtoLang.t("cp_pets_header") % [Session.pets.size(), Session.MAX_PETS],
-			EMBER, 12)
+			EMBER)
 	if Session.pets.is_empty():
 		_line(vb, ProtoLang.t("cp_pets_none"), DIM)
 	for pet in Session.pets:
@@ -1146,7 +1146,7 @@ func _refresh_pets() -> void:
 		nl.text = "%s   %s" % [str(pet.get("name", "?")),
 				ProtoLang.t("cp_resting") if resting else ProtoLang.t("cp_on_hunt")]
 		nl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		nl.add_theme_font_size_override("font_size", 11)
+		nl.add_theme_font_size_override("font_size", ProtoTheme.SIZE_BODY)
 		nl.add_theme_color_override("font_color",
 				Color("ff8a7a") if resting else CYAN)
 		hb.add_child(nl)
@@ -1158,12 +1158,12 @@ func _refresh_pets() -> void:
 		det.text = ProtoLang.t("cp_pet_roll") % [int(pet.get("roll_pct", 100)),
 				" · ".join(skills)]
 		det.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		det.add_theme_font_size_override("font_size", 9)
+		det.add_theme_font_size_override("font_size", ProtoTheme.SIZE_BODY)
 		det.add_theme_color_override("font_color", PALE)
 		cv.add_child(det)
 	# The stables (Ricardo: pets are NEVER abandoned) — overflow captures land here.
 	if not Session.stables.is_empty():
-		_line(vb, ProtoLang.t("cp_stables_header") % Session.stables.size(), EMBER, 11)
+		_line(vb, ProtoLang.t("cp_stables_header") % Session.stables.size(), EMBER)
 		var room := Session.pets.size() < Session.MAX_PETS
 		for pet in Session.stables:
 			var card := PanelContainer.new()
@@ -1179,7 +1179,7 @@ func _refresh_pets() -> void:
 					int(pet.get("roll_pct", 100)), " · ".join(skills)]
 			nl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 			nl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			nl.add_theme_font_size_override("font_size", 9)
+			nl.add_theme_font_size_override("font_size", ProtoTheme.SIZE_BODY)
 			nl.add_theme_color_override("font_color", PALE)
 			hb.add_child(nl)
 			var b := _btn(hb, ProtoLang.t("cp_make_active"),
@@ -1187,7 +1187,7 @@ func _refresh_pets() -> void:
 			b.disabled = not room
 			if not room:
 				b.tooltip_text = ProtoLang.t("cp_pack_full_tip")
-	_line(vb, ProtoLang.t("cp_stables_note"), DIM, 9)
+	_line(vb, ProtoLang.t("cp_stables_note"), DIM)
 
 func _do_stable(uid: int) -> void:
 	for pet in Session.pets:
@@ -1216,7 +1216,7 @@ func _do_activate(uid: int) -> void:
 func _refresh_mounts() -> void:
 	var vb: VBoxContainer = _boxes["Mounts"]
 	_clear(vb)
-	_line(vb, ProtoLang.t("cp_mounts_header"), EMBER, 12)
+	_line(vb, ProtoLang.t("cp_mounts_header"), EMBER)
 	if Session.mounts.is_empty():
 		_line(vb, ProtoLang.t("cp_mounts_none"), DIM)
 		return
@@ -1232,13 +1232,13 @@ func _refresh_mounts() -> void:
 				float(m.get("speed_mult", 1.0)),
 				ProtoLang.t("cp_active_tag") if active else ""]
 		nl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		nl.add_theme_font_size_override("font_size", 10)
+		nl.add_theme_font_size_override("font_size", ProtoTheme.SIZE_BODY)
 		nl.add_theme_color_override("font_color",
 				ProtoItems.rarity_color(str(m.get("rarity", "common"))))
 		hb.add_child(nl)
 		if not active:
 			_btn(hb, ProtoLang.t("cp_select"), _do_select_mount.bind(int(m.get("uid", -1))), CYAN)
-	_line(vb, ProtoLang.t("cp_mounts_note"), DIM, 9)
+	_line(vb, ProtoLang.t("cp_mounts_note"), DIM)
 
 func _do_select_mount(uid: int) -> void:
 	Session.active_mount = uid

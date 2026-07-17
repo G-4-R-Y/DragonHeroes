@@ -30,6 +30,12 @@ Original partition plans (for reference):
 - pixel-ui: pixel font w/ PT-BR diacritic verification (click test guards
   SAIR/Talho) or AA-off doctrine fallback; damage-number typography.
 Integration owner (main context): sprite N·L shader, captures, gates, commit.
+Typography migration COMPLETE (v0.1.18, Ricardo: "fonts overflowing… page
+decentralized"): main_menu/haven/character_panel/main.gd all on the grid via
+ProtoTheme.SIZE_BODY/SIZE_TITLE + guarded font_big(); menu class cards became
+name-chips (five per-card kit labels can't fit 640 at pixel widths — kit line
+now renders once under the row); tests/ui_capture.tscn is the reusable menu
+capture harness (UI_SCENE/UI_TAG env; haven/panel tags pre-seed Session).
 
 Phase 3 SCHEDULED: Radiance Cascades — fragment-only port (fad Shadertoy /
 jason.today / Yaazarai refs), light field at 320x180, marches the SAME baked

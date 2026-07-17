@@ -11,6 +11,7 @@ const DIM := Color(0.55, 0.54, 0.5)
 var _name_edit: LineEdit
 var _class_pick := "core.class.reaver"
 var _class_btns := {}
+var _class_kit: Label
 var _class_desc: Label
 
 # class-lite roster (proposal): shared kit, distinct casts. Full kits: design/10.
@@ -57,30 +58,40 @@ func _build() -> void:
 	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(bg)
 
-	# soft ember halo behind the title (glow.gd fake-bloom)
+	# soft ember halo behind the title (glow.gd fake-bloom); positioned onto the
+	# title after the container's first layout pass (end of _build)
 	var halo := ProtoGlow.make(Color(1.0, 0.55, 0.2), 120.0, 0.16, 1.6, 0.25)
-	halo.position = Vector2(320, 148)
+	halo.position = Vector2(320, 110)
 	add_child(halo)
 
 	_add_embers()
 
 	var vb := VBoxContainer.new()
 	vb.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	# side gutters so autowrapping labels (class desc, saved-hunters) never
+	# touch the window edges
+	vb.offset_left = 24.0
+	vb.offset_right = -24.0
 	vb.alignment = BoxContainer.ALIGNMENT_CENTER
 	vb.add_theme_constant_override("separation", 8)
 	add_child(vb)
 
+	# Pixel-grid typography (ProtoTheme doctrine): display text rides the 16 px
+	# font at integer multiples; body text stays on the themed 8 px grid.
+	var big := ProtoTheme.font_big()
 	var title := Label.new()
 	title.text = "DRAGON HEROES"
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.add_theme_font_size_override("font_size", 40)
+	if big != null:
+		title.add_theme_font_override("font", big)
+	title.add_theme_font_size_override("font_size", ProtoTheme.SIZE_TITLE * 2)
 	title.add_theme_color_override("font_color", EMBER)
 	vb.add_child(title)
 
 	var sub := Label.new()
 	sub.text = ProtoLang.t("menu_subtitle")
 	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	sub.add_theme_font_size_override("font_size", 12)
+	sub.add_theme_font_size_override("font_size", ProtoTheme.SIZE_BODY)
 	sub.add_theme_color_override("font_color", DIM)
 	vb.add_child(sub)
 
@@ -91,8 +102,10 @@ func _build() -> void:
 
 	vb.add_child(_spacer(4.0))
 
-	# class selection (new characters; existing saves keep their class) — small
-	# cards: class name in its accent color + the actual LMB/E kit line under it
+	# class selection (new characters; existing saves keep their class) — name
+	# chips in the class accent; the selected class's LMB/E kit + tradeoff line
+	# render once under the row (five per-card kit labels can't fit the 640 grid
+	# at pixel-font widths — that was the title-screen overflow).
 	var class_row := HBoxContainer.new()
 	class_row.alignment = BoxContainer.ALIGNMENT_CENTER
 	class_row.add_theme_constant_override("separation", 6)
@@ -102,33 +115,24 @@ func _build() -> void:
 		var cb := Button.new()
 		cb.toggle_mode = true
 		cb.focus_mode = Control.FOCUS_NONE
-		cb.custom_minimum_size = Vector2(104, 32)
+		cb.text = str(card["name"])
+		if big != null:
+			cb.add_theme_font_override("font", big)
+		cb.add_theme_font_size_override("font_size", ProtoTheme.SIZE_TITLE)
+		cb.add_theme_color_override("font_color", card["accent"])
+		cb.add_theme_color_override("font_hover_color", card["accent"])
+		cb.add_theme_color_override("font_pressed_color", card["accent"])
 		cb.pressed.connect(_pick_class.bind(str(cid)))
-		var col := VBoxContainer.new()
-		col.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-		col.alignment = BoxContainer.ALIGNMENT_CENTER
-		col.add_theme_constant_override("separation", 0)
-		col.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		cb.add_child(col)
-		var nm := Label.new()
-		nm.text = str(card["name"])
-		nm.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		nm.add_theme_font_size_override("font_size", 10)
-		nm.add_theme_color_override("font_color", card["accent"])
-		nm.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		col.add_child(nm)
-		var kit := Label.new()
-		kit.text = ProtoLang.pick(card, "kit")
-		kit.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		kit.add_theme_font_size_override("font_size", 7)
-		kit.add_theme_color_override("font_color", DIM)
-		kit.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		col.add_child(kit)
 		class_row.add_child(cb)
 		_class_btns[cid] = cb
+	_class_kit = Label.new()
+	_class_kit.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_class_kit.add_theme_font_size_override("font_size", ProtoTheme.SIZE_BODY)
+	vb.add_child(_class_kit)
 	_class_desc = Label.new()
 	_class_desc.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_class_desc.add_theme_font_size_override("font_size", 9)
+	_class_desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_class_desc.add_theme_font_size_override("font_size", ProtoTheme.SIZE_BODY)
 	_class_desc.add_theme_color_override("font_color", DIM)
 	vb.add_child(_class_desc)
 	_update_class_ui()
@@ -151,7 +155,8 @@ func _build() -> void:
 		var cont := Label.new()
 		cont.text = ProtoLang.t("menu_saved") % " · ".join(names)
 		cont.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		cont.add_theme_font_size_override("font_size", 9)
+		cont.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		cont.add_theme_font_size_override("font_size", ProtoTheme.SIZE_BODY)
 		cont.add_theme_color_override("font_color", Color("7fe7ff"))
 		vb.add_child(cont)
 
@@ -160,7 +165,7 @@ func _build() -> void:
 	foot.position = Vector2(0, 344)
 	foot.size = Vector2(640, 14)
 	foot.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	foot.add_theme_font_size_override("font_size", 10)
+	foot.add_theme_font_size_override("font_size", ProtoTheme.SIZE_BODY)
 	foot.add_theme_color_override("font_color", DIM)
 	add_child(foot)
 
@@ -169,10 +174,17 @@ func _build() -> void:
 	var lang_btn := Button.new()
 	lang_btn.text = ProtoLang.t("lang_toggle")
 	lang_btn.focus_mode = Control.FOCUS_NONE
-	lang_btn.add_theme_font_size_override("font_size", 8)
+	lang_btn.add_theme_font_size_override("font_size", ProtoTheme.SIZE_BODY)
 	lang_btn.position = Vector2(8, 330)
 	lang_btn.pressed.connect(_toggle_lang)
 	add_child(lang_btn)
+
+	# glue the halo to wherever the centered VBox actually lands the title
+	# (content height shifts with the saves list / language). Guards cover the
+	# rebuild-on-language-toggle freeing these nodes mid-await.
+	await get_tree().process_frame
+	if is_instance_valid(halo) and is_instance_valid(title):
+		halo.position = title.get_global_rect().get_center()
 
 func _toggle_lang() -> void:
 	ProtoLang.set_lang("pt" if ProtoLang.lang == "en" else "en")
@@ -237,8 +249,11 @@ func _update_class_ui() -> void:
 	for cid in _class_btns:
 		var on: bool = cid == _class_pick
 		_class_btns[cid].button_pressed = on
-		_class_btns[cid].modulate = Color(1, 1, 1, 1.0 if on else 0.75)
-	_class_desc.text = ProtoLang.pick(CLASSES[_class_pick], "desc")
+		_class_btns[cid].modulate = Color(1, 1, 1, 1.0 if on else 0.62)
+	var card: Dictionary = CLASSES[_class_pick]
+	_class_kit.text = ProtoLang.pick(card, "kit")
+	_class_kit.add_theme_color_override("font_color", card["accent"])
+	_class_desc.text = ProtoLang.pick(card, "desc")
 
 func _enter() -> void:
 	var pname := _name_edit.text.strip_edges()
