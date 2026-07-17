@@ -102,74 +102,139 @@ static func _anim(sf: SpriteFrames, anim_name: String, fps: float, loops: bool, 
 
 # ---- tile atlas: 4 types x 4 variants (column = type*4+variant) ---------------
 
+static var _tile_bases: Array[Color] = [
+		Color("0e242c"), Color("24402c"), Color("18291e"), Color("31353e")]
+static var _tile_accents: Array[Color] = [
+		Color("17414d"), Color("35563b"), Color("243f2c"), Color("434a57")]
+
 static func make_tile_atlas() -> ImageTexture:
 	if _tex_cache.has("tile_atlas"):
 		return _tex_cache["tile_atlas"]
 	var img := _img(TILE * 16, TILE)
-	var bases := [Color("0e242c"), Color("24402c"), Color("18291e"), Color("31353e")]
-	var accents := [Color("17414d"), Color("35563b"), Color("243f2c"), Color("434a57")]
 	for t in 4:
 		for v in 4:
 			var col := t * 4 + v
-			var base: Color = bases[t]
-			if t == 0:
-				base = base.lightened(0.035 * v)         # variants: brightness steps
-			elif t == 2:
-				base = base.darkened(0.05 * v)           # variants: deeper forest
 			for y in TILE:
 				for x in TILE:
-					var ax := x + col * TILE
-					var c := base
-					var s := _speck(ax, y, 7 + col)
-					var dither := (x + y) & 1
-					match t:
-						0:  # water — dithered ripple bands phased per variant, rare glint
-							if (y + v * 2) % 6 == 0 and dither == 0:
-								c = base.lerp(accents[0], 0.8)
-							elif (y + v * 2) % 6 == 1 and dither == 1:
-								c = base.lerp(accents[0], 0.35)
-							if s < 0.05:
-								c = Color("0a1b21")
-							if s > 0.972 - 0.004 * v:
-								c = Color("245a66")
-							if v >= 2 and s > 0.996:
-								c = base.lerp(Color("59d6e6"), 0.55)  # rare bright glint
-						1:  # grass — dithered tone patches, 2 px blades, luminous fleck
-							if dither == 0 and _speck(ax >> 2, y >> 2, 51) > 0.55:
-								c = base.lerp(accents[1], 0.4)
-							var bl := 0.952 - 0.01 * v
-							if s > bl:
-								c = Color("3a5a3c")                   # blade root
-							if y < TILE - 1 and _speck(ax, y + 1, 7 + col) > bl:
-								c = Color("4d7a4a")                   # blade tip above root
-							if s > 0.996:
-								c = base.lerp(Color("57ff9a"), 0.5)
-						2:  # forest — blocky dark mottle, bioluminescent moss flecks
-							var m := _speck(ax >> 2, y >> 2, 33)
-							if m > 0.62:
-								c = base.darkened(0.22)
-							elif m < 0.2 and dither == 0:
-								c = base.lerp(accents[2], 0.5)
-							if s > 0.9 - 0.02 * v:
-								c = accents[2]
-							if s > 0.958:
-								c = base.lerp(Color("57ff9a"), 0.3)
-						3:  # rock — top-lit shading, cracks, moss-capped stones
-							c = base.darkened(0.12 * float(y) / TILE)
-							if dither == 0 and s > 0.6:
-								c = c.lerp(accents[3], 0.3)
-							if (x + y * 2 + v * 7) % 19 == 0 and s > 0.3:
-								c = Color("1e2127")
-							var b := _speck(ax >> 2, y >> 2, 87)
-							if b > 0.84:                              # embedded stones
-								c = Color("4c5260") if (y & 3) < 2 else Color("3b414c")
-								if v >= 1 and (y & 3) == 0 and s > 0.5:
-									c = Color("31543a")               # moss caps the stone
-							if s > 0.988 - 0.008 * v:
-								c = Color("5a6170")
-					img.set_pixel(ax, y, c)
+					img.set_pixel(x + col * TILE, y, _tile_px_at(t, v, x, y, x + col * TILE))
 	var tex := _tex(img)
 	_tex_cache["tile_atlas"] = tex
+	return tex
+
+# One ground pixel of tile type t / variant v. (x, y) are tile-local; ax is the
+# speckle-space x (the base atlas passes its column offset so every variant's
+# noise stays unique). SINGLE SOURCE of the ground look — the base atlas and the
+# dual-grid transition atlas below both draw through here, so boundary tiles
+# reuse EXACTLY the biome pixels they sit between.
+static func _tile_px_at(t: int, v: int, x: int, y: int, ax: int) -> Color:
+	var base: Color = _tile_bases[t]
+	if t == 0:
+		base = base.lightened(0.035 * v)         # variants: brightness steps
+	elif t == 2:
+		base = base.darkened(0.05 * v)           # variants: deeper forest
+	var c := base
+	var s := _speck(ax, y, 7 + t * 4 + v)
+	var dither := (x + y) & 1
+	match t:
+		0:  # water — dithered ripple bands phased per variant, rare glint
+			if (y + v * 2) % 6 == 0 and dither == 0:
+				c = base.lerp(_tile_accents[0], 0.8)
+			elif (y + v * 2) % 6 == 1 and dither == 1:
+				c = base.lerp(_tile_accents[0], 0.35)
+			if s < 0.05:
+				c = Color("0a1b21")
+			if s > 0.972 - 0.004 * v:
+				c = Color("245a66")
+			if v >= 2 and s > 0.996:
+				c = base.lerp(Color("59d6e6"), 0.55)  # rare bright glint
+		1:  # grass — dithered tone patches, 2 px blades, luminous fleck
+			if dither == 0 and _speck(ax >> 2, y >> 2, 51) > 0.55:
+				c = base.lerp(_tile_accents[1], 0.4)
+			var bl := 0.952 - 0.01 * v
+			if s > bl:
+				c = Color("3a5a3c")                   # blade root
+			if y < TILE - 1 and _speck(ax, y + 1, 7 + t * 4 + v) > bl:
+				c = Color("4d7a4a")                   # blade tip above root
+			if s > 0.996:
+				c = base.lerp(Color("57ff9a"), 0.5)
+		2:  # forest — blocky dark mottle, bioluminescent moss flecks
+			var m := _speck(ax >> 2, y >> 2, 33)
+			if m > 0.62:
+				c = base.darkened(0.22)
+			elif m < 0.2 and dither == 0:
+				c = base.lerp(_tile_accents[2], 0.5)
+			if s > 0.9 - 0.02 * v:
+				c = _tile_accents[2]
+			if s > 0.958:
+				c = base.lerp(Color("57ff9a"), 0.3)
+		3:  # rock — top-lit shading, cracks, moss-capped stones
+			c = base.darkened(0.12 * float(y) / TILE)
+			if dither == 0 and s > 0.6:
+				c = c.lerp(_tile_accents[3], 0.3)
+			if (x + y * 2 + v * 7) % 19 == 0 and s > 0.3:
+				c = Color("1e2127")
+			var b := _speck(ax >> 2, y >> 2, 87)
+			if b > 0.84:                              # embedded stones
+				c = Color("4c5260") if (y & 3) < 2 else Color("3b414c")
+				if v >= 1 and (y & 3) == 0 and s > 0.5:
+					c = Color("31543a")               # moss caps the stone
+			if s > 0.988 - 0.008 * v:
+				c = Color("5a6170")
+	return c
+
+# ---- macro variation: low-frequency value noise over the tile grid -------------
+# Bilinear value noise from _speck lattice samples, smoothstep-eased. freq is
+# per TILE (default 0.02 ~= 50-tile features). Deterministic from world coords —
+# world_gen biases each region's variant pick through it so atlas repetition
+# breaks into organic patches (mossy vs worn) instead of uniform confetti.
+static func macro_noise(gx: int, gy: int, salt: int, freq := 0.02) -> float:
+	var fx := gx * freq
+	var fy := gy * freq
+	var ix := floori(fx)
+	var iy := floori(fy)
+	var ux := fx - ix
+	var uy := fy - iy
+	ux = ux * ux * (3.0 - 2.0 * ux)
+	uy = uy * uy * (3.0 - 2.0 * uy)
+	return lerpf(
+			lerpf(_speck(ix, iy, salt), _speck(ix + 1, iy, salt), ux),
+			lerpf(_speck(ix, iy + 1, salt), _speck(ix + 1, iy + 1, salt), ux), uy)
+
+# ---- dual-grid transition atlas (Oskar Stålberg corner tiles) ------------------
+# 16 corner-mask tiles PER BIOME PAIR (column = pair*16 + mask). The tiles live
+# on the HALF-TILE-SHIFTED display grid: each one straddles four world tiles,
+# and mask bit0=TL bit1=TR bit2=BL bit3=BR marks which corners the OVERLAY biome
+# owns. The 0.5 iso-contour of the bilinear corner field draws the rounded
+# organic boundary arc, a per-pixel hash jitter dithers the edge, and a darkened
+# band on the overlay side reads as ledge/canopy shadow. Both sides render
+# through _tile_px_at, so the art IS the two biomes' base pixels (mid variant).
+# `pairs` = Array of [overlay_type, under_type] — world_gen owns the semantics.
+static func make_transition_atlas(pairs: Array) -> ImageTexture:
+	var key := "trans_atlas_%s" % [str(pairs)]
+	if _tex_cache.has(key):
+		return _tex_cache[key]
+	var img := _img(TILE * 16 * pairs.size(), TILE)
+	for p in pairs.size():
+		var ta := int(pairs[p][0])
+		var tb := int(pairs[p][1])
+		for m in 16:
+			var col := p * 16 + m
+			for y in TILE:
+				for x in TILE:
+					# bilinear corner field: 1 where the overlay owns the corner
+					var u := (float(x) + 0.5) / TILE
+					var w := (float(y) + 0.5) / TILE
+					var fld := lerpf(
+							lerpf(float(m & 1), float((m >> 1) & 1), u),
+							lerpf(float((m >> 2) & 1), float((m >> 3) & 1), u), w)
+					var jit := (_speck(x + col * TILE, y, 173) - 0.5) * 0.26
+					var t := ta if fld + jit > 0.5 else tb
+					var c := _tile_px_at(t, 1, x, y, x + (t * 4 + 1) * TILE)
+					if t == ta and fld < 0.62:
+						c = c.darkened(0.18)      # edge shade — ledge shadow
+					img.set_pixel(col * TILE + x, y, c)
+	var tex := _tex(img)
+	_tex_cache[key] = tex
 	return tex
 
 # ---- HERO (drawn facing right; flip_h on the node for left) --------------------

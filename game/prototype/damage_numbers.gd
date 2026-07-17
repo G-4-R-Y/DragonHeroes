@@ -35,8 +35,12 @@ var _since_spawn := 1.0
 func _ready() -> void:
 	layer = 6
 	_settings = LabelSettings.new()
-	_settings.font_size = 16
-	_settings.outline_size = 5
+	# typography doctrine (ui/theme.gd): the 16 px-native pixel font at its
+	# native grid — normal hits settle small/crisp; crits settle ~1.6x via the
+	# pop-scale below. A null font (doctrine-only mode) = engine default.
+	_settings.font = ProtoTheme.font_big()
+	_settings.font_size = ProtoTheme.SIZE_DAMAGE
+	_settings.outline_size = 2
 	_settings.outline_color = Color(0.02, 0.02, 0.03, 0.95)
 	_settings.shadow_size = 2
 	_settings.shadow_color = Color(0, 0, 0, 0.55)
@@ -87,7 +91,7 @@ func number(at: Vector2, amount: float, color: Color, text := "", crit := false)
 	_crit[slot] = 1 if crit else 0
 
 	var l := _labels[slot]
-	l.text = text if text != "" else str(int(round(amount)))
+	l.text = text if text != "" else _abbr(int(round(amount)))
 	l.reset_size()
 	l.pivot_offset = l.size * 0.5
 	l.modulate = color
@@ -97,6 +101,16 @@ func number(at: Vector2, amount: float, color: Color, text := "", crit := false)
 		var m := get_tree().get_first_node_in_group("main")
 		if m != null and m.get("post") != null:
 			m.post.pulse(0.25)
+
+# Thousands abbreviate so late-game hits stay readable: 12437 -> "12.4k",
+# 2000 -> "2k" (trailing .0 dropped). Below 1k numbers print verbatim.
+static func _abbr(v: int) -> String:
+	if v < 1000:
+		return str(v)
+	var tenths := roundi(v / 100.0)        # 12437 -> 124 tenths-of-k
+	if tenths % 10 == 0:
+		return "%dk" % (tenths / 10)
+	return "%d.%dk" % [tenths / 10, tenths % 10]
 
 func _process(dt: float) -> void:
 	_since_spawn += dt
@@ -117,17 +131,21 @@ func _process(dt: float) -> void:
 		var eased := 1.0 - (1.0 - f) * (1.0 - f)
 		var off := Vector2(_scatter[s] * f, -26.0 * eased - _stagger[s])
 		var pos := base + off
-		# scale pop: 0.2 -> peak -> settle to 1.0
+		# scale pop: 0.2 -> peak -> settle. Normal hits settle at 1.0 (native
+		# pixel grid = crisp); crits KEEP ~1.6x — the size hierarchy rides this
+		# existing pop-scale path, no extra state.
+		var settle := 1.6 if _crit[s] == 1 else 1.0
 		var sc: float
 		if f < 0.18:
 			sc = lerpf(0.2, _peakscale[s], f / 0.18)
 		else:
-			sc = lerpf(_peakscale[s], 1.0, clampf((f - 0.18) / 0.30, 0.0, 1.0))
+			sc = lerpf(_peakscale[s], settle, clampf((f - 0.18) / 0.30, 0.0, 1.0))
 		var a := 1.0
 		if f > 0.7:
 			a = clampf(1.0 - (f - 0.7) / 0.3, 0.0, 1.0)
 		l.scale = Vector2.ONE * sc
-		l.position = pos - l.size * 0.5
+		# floor to whole canvas pixels — settled text sits ON the art grid
+		l.position = (pos - l.size * 0.5).floor()
 		var c := _color[s]
 		l.modulate = Color(c.r, c.g, c.b, a)
 	_peak = maxi(_peak, used)

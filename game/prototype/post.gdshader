@@ -1,7 +1,8 @@
 // PROTOTYPE HARNESS — full-frame screen post pass (spec §2.3). First .gdshader in
-// the repo. One fragment pass, ~5 taps over 230k px: radial chromatic aberration +
-// vignette + over-bright grade. NO gaussian bloom — "bloom" is faked by the additive
-// ribbon/glow layer (no multi-pass blur on the gl_compatibility fill budget).
+// the repo. One fragment pass, ~5 taps over 230k px (+2-4 tiny LUT taps when a
+// baked grade is bound): radial chromatic aberration + vignette + over-bright +
+// color grade. NO gaussian bloom — "bloom" is faked by the additive ribbon/glow
+// layer (no multi-pass blur on the gl_compatibility fill budget).
 //
 // All aberration offsets are expressed in SCREEN_PIXEL_SIZE texel units (= (1/640,
 // 1/360)); the integer 2x upscale is a post-render blit the shader never sees.
@@ -22,6 +23,30 @@ uniform float intensity = 0.5;       // <0.15 = safety passthrough (rect also hi
 // w = strength (texels). Off below the fake-bloom floor like everything else.
 uniform int haze_count = 0;
 uniform vec4 haze_src[6];
+// 3D-LUT color grade baked to a 2D strip (genforge/pipeline/lut_gen.py):
+// 256x256 = 16x16 grid of 16x16 tiles; R -> x in tile, G -> y in tile,
+// B -> tile index. Per-biome grades are pure data (Hades color scripting).
+// lut_amount == 0 keeps the analytic split-tone path in fragment() alive,
+// so a missing texture can never regress the frame. lut_blend crossfades
+// toward lut_tex2 (biome hand-offs, driven by post.gd::set_lut). GLES3-safe:
+// no sampler3D anywhere, just two 2D fetches mixed by the B fraction.
+uniform sampler2D lut_tex : filter_linear, repeat_disable;
+uniform sampler2D lut_tex2 : filter_linear, repeat_disable;
+uniform float lut_amount : hint_range(0.0, 1.0) = 0.0;
+uniform float lut_blend : hint_range(0.0, 1.0) = 0.0;
+
+// Strip sampler for a CLAMPED [0,1] color: bilinear R/G inside one tile — the
+// half-texel inset keeps the linear filter from bleeding across tile seams —
+// plus two whole-tile fetches mixed by the B fraction (the third LUT axis).
+vec3 lut_grade(sampler2D lut, vec3 c) {
+	float slice = c.b * 255.0;
+	float s0 = floor(slice);
+	float s1 = min(s0 + 1.0, 255.0);
+	vec2 inner = (c.rg * 15.0 + 0.5) / 256.0;
+	vec2 uv0 = vec2(mod(s0, 16.0), floor(s0 / 16.0)) / 16.0 + inner;
+	vec2 uv1 = vec2(mod(s1, 16.0), floor(s1 / 16.0)) / 16.0 + inner;
+	return mix(texture(lut, uv0).rgb, texture(lut, uv1).rgb, slice - s0);
+}
 
 void fragment() {
 	vec2 uv = SCREEN_UV;
@@ -54,15 +79,29 @@ void fragment() {
 		col = vec3(r, g.g, b);
 		// Over-bright grade: the "additive over a dark scene" pop (mild gain).
 		col += col * bright_boost;
-		// Split-tone grade (the CoM / Phantom Tower palette unifier): shadows
-		// pull cool blue-violet, highlights stay warm — plus a mild S-curve.
-		// Runs under the darkness model, so "shadows" is most of the frame and
-		// the tint reads as atmosphere, not a filter.
-		float lum = dot(col, vec3(0.299, 0.587, 0.114));
-		vec3 tint = mix(vec3(0.80, 0.85, 1.14), vec3(1.06, 1.01, 0.93),
-				smoothstep(0.0, 0.55, lum));
-		col *= tint;
-		col = mix(col, col * col * (3.0 - 2.0 * col), 0.18);
+		// Color grade (the CoM / Phantom Tower palette unifier), AFTER the
+		// over-bright term. Two paths on a uniform branch (no divergence):
+		if (lut_amount > 0.0) {
+			// Baked LUT strip(s): per-biome grades as pure data. The LUT eats
+			// [0,1]; the over-bright excess (col > 1 from bright_boost) is
+			// re-added on top so vignetted edges keep the analytic path's pop.
+			vec3 base = clamp(col, vec3(0.0), vec3(1.0));
+			vec3 graded = lut_grade(lut_tex, base);
+			if (lut_blend > 0.0) {
+				graded = mix(graded, lut_grade(lut_tex2, base), lut_blend);
+			}
+			col = mix(col, graded + (col - base), lut_amount);
+		} else {
+			// Analytic fallback (the exact grade veilands_default.png bakes):
+			// shadows pull cool blue-violet, highlights stay warm — plus a
+			// mild S-curve. Runs under the darkness model, so "shadows" is
+			// most of the frame and the tint reads as atmosphere, not a filter.
+			float lum = dot(col, vec3(0.299, 0.587, 0.114));
+			vec3 tint = mix(vec3(0.80, 0.85, 1.14), vec3(1.06, 1.01, 0.93),
+					smoothstep(0.0, 0.55, lum));
+			col *= tint;
+			col = mix(col, col * col * (3.0 - 2.0 * col), 0.18);
+		}
 		// Vignette — folds in and replaces ambient.gd's old static vignette.
 		float vig = 1.0 - smoothstep(vig_inner, vig_outer, dist);
 		col *= vig;

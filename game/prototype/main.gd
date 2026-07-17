@@ -1124,7 +1124,7 @@ func _build_hud() -> void:
 	var q_label := Label.new()
 	q_label.text = "Q"
 	q_label.position = Vector2(56, 22)
-	q_label.add_theme_font_size_override("font_size", 10)
+	q_label.add_theme_font_size_override("font_size", 8)
 	canvas.add_child(q_label)
 	var q_bg := ColorRect.new()
 	q_bg.color = Color(0, 0, 0, 0.55)
@@ -1140,7 +1140,7 @@ func _build_hud() -> void:
 	var e_label := Label.new()
 	e_label.text = "E"
 	e_label.position = Vector2(110, 22)
-	e_label.add_theme_font_size_override("font_size", 10)
+	e_label.add_theme_font_size_override("font_size", 8)
 	canvas.add_child(e_label)
 	var e_bg := ColorRect.new()
 	e_bg.color = Color(0, 0, 0, 0.55)
@@ -1161,7 +1161,7 @@ func _build_hud() -> void:
 		var s_key := Label.new()
 		s_key.text = str(i + 1)
 		s_key.position = Vector2(x, 38)
-		s_key.add_theme_font_size_override("font_size", 10)
+		s_key.add_theme_font_size_override("font_size", 8)
 		canvas.add_child(s_key)
 		var s_bg := ColorRect.new()
 		s_bg.color = Color(0, 0, 0, 0.55)
@@ -1177,19 +1177,19 @@ func _build_hud() -> void:
 		s_name.position = Vector2(x + 12, 52)
 		s_name.size = Vector2(42, 9)
 		s_name.clip_text = true
-		s_name.add_theme_font_size_override("font_size", 7)
+		s_name.add_theme_font_size_override("font_size", 8)
 		s_name.modulate = Color(1, 1, 1, 0.6)
 		canvas.add_child(s_name)
 		slots.append({"key": s_key, "bar": s_bar, "name": s_name})
 	# class charge chip (Veilblade Combo / Gloam Mage Attunement) — after slot 4
 	var charge := Label.new()
 	charge.position = Vector2(278, 43)
-	charge.add_theme_font_size_override("font_size", 9)
+	charge.add_theme_font_size_override("font_size", 8)
 	charge.add_theme_color_override("font_color", Color("cf9dff"))
 	canvas.add_child(charge)
 	var stats := Label.new()
 	stats.position = Vector2(12, 62)
-	stats.add_theme_font_size_override("font_size", 10)
+	stats.add_theme_font_size_override("font_size", 8)
 	stats.modulate = Color(1, 1, 1, 0.92)
 	canvas.add_child(stats)
 	var hint := Label.new()
@@ -1197,7 +1197,7 @@ func _build_hud() -> void:
 	hint.position = Vector2(12, 334)
 	hint.size = Vector2(616, 24)
 	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	hint.add_theme_font_size_override("font_size", 10)
+	hint.add_theme_font_size_override("font_size", 8)
 	hint.modulate = Color(1, 1, 1, 0.75)
 	canvas.add_child(hint)
 	# Boss bar(s): the label names the nearest engaged boss; a Legendary duo

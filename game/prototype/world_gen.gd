@@ -1,7 +1,10 @@
 # PROTOTYPE HARNESS — renders the REAL dh-procgen world (chunks.json is dumped by
 # `dh-server --dump-chunks`, docs/tech/24). No worldgen logic lives engine-side.
 # Tile variants + prop scatter are deterministic coordinate hashes — pure dressing,
-# never gameplay (props are visual only and do not affect walkability).
+# never gameplay (props are visual only and do not affect walkability). The same
+# rule covers the anti-procgen-look layers: macro variant patches, the macro tint
+# quad and the dual-grid boundary layer are ALL visual-only — walkability always
+# reads the raw world grid.
 class_name ProtoWorld
 extends Node2D
 
@@ -11,6 +14,10 @@ const T_WATER := 0
 const T_GRASS := 1
 const T_FOREST := 2
 const T_ROCK := 3
+
+# Dual-grid boundary dressing (Oskar Stålberg corners) — flip off to fall back
+# to hard tile edges for A/B comparison captures.
+const DUAL_GRID := true
 
 var chunks := {}          # Vector2i(cx,cy) -> PackedByteArray (tiles)
 var _layer: TileMapLayer
@@ -77,13 +84,76 @@ func _build_world(data: Dictionary) -> void:
 			var gx := cx * CHUNK + (i % CHUNK)
 			@warning_ignore("integer_division")
 			var gy := cy * CHUNK + (i / CHUNK)
-			var variant := int(ProtoSprites._speck(gx, gy, 91) * 3.999)
-			_layer.set_cell(Vector2i(gx, gy), 0, Vector2i(t * 4 + variant, 0))
+			_layer.set_cell(Vector2i(gx, gy), 0, Vector2i(t * 4 + _pick_variant(gx, gy), 0))
 		chunks[Vector2i(cx, cy)] = packed
+	if DUAL_GRID:
+		_build_transitions()
 	_scatter_props()
 	_build_water_overlay()
+	var tint := ProtoMacroTint.new()   # macro brightness/hue drift over the floor
+	tint.name = "MacroTint"
+	add_child(tint)
 	call_deferred("_bake_light_sdf")
 	set_process(true)
+
+# Macro variation: a ~50-tile value noise picks each region's DOMINANT atlas
+# variant and the per-tile hash only jitters around it — texture repetition
+# breaks into organic patches (mossy vs worn regions) instead of the uniform
+# 4-variant confetti that screams procgen.
+func _pick_variant(gx: int, gy: int) -> int:
+	var n := clampf((ProtoSprites.macro_noise(gx, gy, 131) - 0.5) * 1.9 + 0.5, 0.0, 1.0)
+	var jitter := (ProtoSprites._speck(gx, gy, 91) - 0.5) * 1.6
+	return clampi(int(n * 3.999 + jitter), 0, 3)
+
+# Dual-grid autotiling (Oskar Stålberg corners): a HALF-TILE-SHIFTED display
+# TileMapLayer whose every cell straddles four world tiles; mixed grass/forest
+# and grass/rock corner sets repaint with 1 of 16 rounded transition tiles
+# (ProtoSprites.make_transition_atlas), dissolving the hard procgen tile edges.
+# Cells touching water or a forest|rock meeting keep the hard edge (out of the
+# two shipped pairs). Pure dressing — is_walkable still reads the world grid.
+func _build_transitions() -> void:
+	var ts := TileSet.new()
+	ts.tile_size = Vector2i(TILE, TILE)
+	var atlas := TileSetAtlasSource.new()
+	atlas.texture = ProtoSprites.make_transition_atlas(
+			[[T_FOREST, T_GRASS], [T_ROCK, T_GRASS]])
+	atlas.texture_region_size = Vector2i(TILE, TILE)
+	for i in 32:              # 2 pairs x 16 corner masks (column = pair*16+mask)
+		atlas.create_tile(Vector2i(i, 0))
+	ts.add_source(atlas, 0)
+	var layer := TileMapLayer.new()
+	layer.name = "Transitions"
+	layer.tile_set = ts
+	layer.position = Vector2(TILE, TILE) * 0.5   # the dual-grid half-tile shift
+	layer.z_index = -9        # over the base floor (-10), under macro tint (-8)
+	add_child(layer)
+	var bounds := _chunk_bounds()
+	var kmin: Vector2i = bounds[0]
+	var kmax: Vector2i = bounds[1]
+	# row scan carrying the right-edge corners into the next cell (the display
+	# grid shares corners) — this pass touches EVERY cell once per hunt, so it
+	# stays allocation-free: type-presence is a bitmask, not an array
+	const PAIR_FG := (1 << T_FOREST) | (1 << T_GRASS)
+	const PAIR_RG := (1 << T_ROCK) | (1 << T_GRASS)
+	var x0 := kmin.x * CHUNK - 1
+	var x1 := (kmax.x + 1) * CHUNK
+	for gy in range(kmin.y * CHUNK - 1, (kmax.y + 1) * CHUNK):
+		var tl := _tile_grid(x0, gy)              # display cell corners = the
+		var bl := _tile_grid(x0, gy + 1)          # 4 world tiles it straddles
+		for gx in range(x0, x1):
+			var tr := _tile_grid(gx + 1, gy)
+			var br := _tile_grid(gx + 1, gy + 1)
+			var bits := (1 << tl) | (1 << tr) | (1 << bl) | (1 << br)
+			# exactly {forest,grass} or {rock,grass} — anything else (uniform,
+			# touches water, forest meets rock) keeps the hard edge
+			if bits == PAIR_FG or bits == PAIR_RG:
+				var pair := 0 if bits == PAIR_FG else 1
+				var a := T_FOREST if pair == 0 else T_ROCK
+				var mask := (1 if tl == a else 0) | (2 if tr == a else 0) \
+						| (4 if bl == a else 0) | (8 if br == a else 0)
+				layer.set_cell(Vector2i(gx, gy), 0, Vector2i(pair * 16 + mask, 0))
+			tl = tr
+			bl = br
 
 # Foliage sway needs the hero's position once per frame (walk-through push).
 func _process(_dt: float) -> void:
@@ -215,11 +285,9 @@ func _bake_light_sdf() -> void:
 	var m := get_tree().get_first_node_in_group("main")
 	if m == null or m.get("darkness") == null or chunks.is_empty():
 		return
-	var kmin := Vector2i(1 << 20, 1 << 20)
-	var kmax := Vector2i(-(1 << 20), -(1 << 20))
-	for key in chunks:
-		kmin = Vector2i(mini(kmin.x, key.x), mini(kmin.y, key.y))
-		kmax = Vector2i(maxi(kmax.x, key.x), maxi(kmax.y, key.y))
+	var bounds := _chunk_bounds()
+	var kmin: Vector2i = bounds[0]
+	var kmax: Vector2i = bounds[1]
 	var tw := (kmax.x - kmin.x + 1) * CHUNK
 	var th := (kmax.y - kmin.y + 1) * CHUNK
 	const BIG := 1e9
@@ -266,6 +334,15 @@ func _bake_light_sdf() -> void:
 	m.darkness.set_sdf(ImageTexture.create_from_image(img),
 			Vector2(kmin.x * CHUNK, kmin.y * CHUNK) * TILE,
 			Vector2(tw, th) * TILE)
+
+# Chunk-key bounding box of the dumped world: [kmin, kmax], inclusive.
+func _chunk_bounds() -> Array:
+	var kmin := Vector2i(1 << 20, 1 << 20)
+	var kmax := Vector2i(-(1 << 20), -(1 << 20))
+	for key in chunks:
+		kmin = Vector2i(mini(kmin.x, key.x), mini(kmin.y, key.y))
+		kmax = Vector2i(maxi(kmax.x, key.x), maxi(kmax.y, key.y))
+	return [kmin, kmax]
 
 func _near_rock(tx: int, ty: int) -> bool:
 	return _tile_grid(tx + 1, ty) == T_ROCK or _tile_grid(tx - 1, ty) == T_ROCK \
