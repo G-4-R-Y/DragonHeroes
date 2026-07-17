@@ -395,6 +395,30 @@
           "status": "live"
         },
         {
+          "key": "ambient_fog",
+          "name": "Ground mist",
+          "desc": "ProtoFog (fog.gd + fog.gdshader): camera-glued mix-blend quad at z=12 — domain-warped fBm mist scrolled by TIME, density THINNED near the darkness model's light holes (fire burns fog off, shrooms clear pockets) and raised at night. One atmosphere, not a screen overlay.",
+          "status": "live"
+        },
+        {
+          "key": "firefly_motes",
+          "name": "Fireflies / ember motes",
+          "desc": "ProtoMotes (motes.gd): ONE MultiMesh of 40 tiny additive glints (70% warm ember, 30% cold spirit) wandering around the camera at z=13, pulsing and respawning at view edges. Intensity gates visible count. The 'dark is alive' layer.",
+          "status": "live"
+        },
+        {
+          "key": "water_overlay",
+          "name": "Animated water",
+          "desc": "world_gen builds ONE MultiMesh quad per water tile (single draw call per map) with water.gdshader: two scrolling noise layers, thresholded specular glints, and shore foam hugging real coastlines via an INSTANCE_CUSTOM land mask (N/E/S/W neighbors).",
+          "status": "live"
+        },
+        {
+          "key": "foliage_sway",
+          "name": "Foliage sway + walk-through push",
+          "desc": "prop_sway.gdshader (vertex-only, shared material): tree/glowshroom tops sway on a world-phase wind while bases stay pinned; props near the hero bend away (gaussian push, world_gen feeds player_pos per frame). Rocks excluded.",
+          "status": "live"
+        },
+        {
           "key": "showcase_capture",
           "name": "VFX showcase capture harness",
           "desc": "tests/vfx_showcase.tscn boots the REAL hunt, fires the signature moments and saves viewport PNGs to tests/captures/ (windowed GL only); tests/vfx_iso.tscn is the minimal-isolation variant. Composite-level visual review loop: capture, compare against reference games, tune, recapture. SHOWCASE_NULL=1 skips the player-cast effects for bisecting environmental paint.",

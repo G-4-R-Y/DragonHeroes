@@ -15,6 +15,7 @@ const T_ROCK := 3
 var chunks := {}          # Vector2i(cx,cy) -> PackedByteArray (tiles)
 var _layer: TileMapLayer
 var _shroom_pos: Array = []   # glowshroom prop positions -> darkness light holes
+var _sway_mat: ShaderMaterial # shared wind/walk-through material for foliage
 var _spawn_cache := Vector2.ZERO
 var _spawn_valid := false
 
@@ -80,6 +81,16 @@ func _build_world(data: Dictionary) -> void:
 			_layer.set_cell(Vector2i(gx, gy), 0, Vector2i(t * 4 + variant, 0))
 		chunks[Vector2i(cx, cy)] = packed
 	_scatter_props()
+	_build_water_overlay()
+	set_process(true)
+
+# Foliage sway needs the hero's position once per frame (walk-through push).
+func _process(_dt: float) -> void:
+	if _sway_mat == null:
+		return
+	var p := get_tree().get_first_node_in_group("player")
+	if p != null:
+		_sway_mat.set_shader_parameter("player_pos", (p as Node2D).global_position)
 
 # Deterministic prop dressing: trees on forest, rocks on rock-adjacent grass,
 # glowshrooms on grass/forest. Y-sorted so entities walk in front/behind.
@@ -102,14 +113,17 @@ func _scatter_props() -> void:
 			var h := ProtoSprites._speck(gx, gy, 4177)
 			var tex: Texture2D = null
 			var shroom := false
+			var foliage := false
 			if t == T_FOREST and h < 0.06:
 				tex = ProtoSprites.prop_tex(
 						"tree_a" if ProtoSprites._speck(gx, gy, 5501) < 0.5 else "tree_b")
+				foliage = true
 			elif t == T_GRASS and h < 0.04 and _near_rock(gx, gy):
 				tex = ProtoSprites.prop_tex("rock")
 			elif h > 0.985:
 				tex = ProtoSprites.prop_tex("glowshroom")
 				shroom = true
+				foliage = true
 			if tex == null:
 				continue
 			var pos := Vector2((gx + 0.5) * TILE, (gy + 0.5) * TILE)
@@ -121,6 +135,8 @@ func _scatter_props() -> void:
 			s.texture = tex
 			s.offset = Vector2(0.0, -tex.get_height() / 2.0 + 1.0)  # base sits on origin
 			s.position = pos
+			if foliage:   # trees + shrooms sway in the wind / bend from the hero;
+				s.material = _sway_material()   # rocks obviously don't
 			props.add_child(s)
 			if shroom:
 				_shroom_pos.append(pos)
@@ -138,6 +154,56 @@ func _register_shroom_lights() -> void:
 		return
 	for pos in _shroom_pos:
 		m.darkness.add_static(pos, 34.0, 0.55, 0.5, 2.2)
+
+func _sway_material() -> ShaderMaterial:
+	if _sway_mat == null:
+		_sway_mat = ShaderMaterial.new()
+		_sway_mat.shader = preload("res://prototype/shaders/prop_sway.gdshader")
+	return _sway_mat
+
+# Animated water: ONE MultiMesh quad per water tile over the static tile art
+# (one draw call for every lake on the map). INSTANCE_CUSTOM carries the shore
+# mask (land N/E/S/W) so the shader's foam hugs real coastlines. z=-6: above
+# the tile floor, below the field decals (-5) and everything alive.
+func _build_water_overlay() -> void:
+	var water: Array = []
+	for key in chunks:
+		var tiles: PackedByteArray = chunks[key]
+		for i in CHUNK * CHUNK:
+			if tiles[i] != T_WATER:
+				continue
+			@warning_ignore("integer_division")
+			water.append(Vector2i(key.x * CHUNK + (i % CHUNK),
+					key.y * CHUNK + (i / CHUNK)))
+	if water.is_empty():
+		return
+	var mmi := MultiMeshInstance2D.new()
+	mmi.name = "WaterOverlay"
+	mmi.z_as_relative = false
+	mmi.z_index = -6
+	mmi.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	var mm := MultiMesh.new()
+	mm.transform_format = MultiMesh.TRANSFORM_2D
+	mm.use_custom_data = true
+	var q := QuadMesh.new()
+	q.size = Vector2.ONE
+	mm.mesh = q
+	mm.instance_count = water.size()
+	mmi.multimesh = mm
+	var mat := ShaderMaterial.new()
+	mat.shader = preload("res://prototype/shaders/water.gdshader")
+	mmi.material = mat
+	add_child(mmi)
+	for k in water.size():
+		var t: Vector2i = water[k]
+		var pos := Vector2((t.x + 0.5) * TILE, (t.y + 0.5) * TILE)
+		mm.set_instance_transform_2d(k,
+				Transform2D(Vector2(TILE, 0), Vector2(0, TILE), pos))
+		mm.set_instance_custom_data(k, Color(
+				1.0 if _tile_grid(t.x, t.y - 1) != T_WATER else 0.0,
+				1.0 if _tile_grid(t.x + 1, t.y) != T_WATER else 0.0,
+				1.0 if _tile_grid(t.x, t.y + 1) != T_WATER else 0.0,
+				1.0 if _tile_grid(t.x - 1, t.y) != T_WATER else 0.0))
 
 func _near_rock(tx: int, ty: int) -> bool:
 	return _tile_grid(tx + 1, ty) == T_ROCK or _tile_grid(tx - 1, ty) == T_ROCK \

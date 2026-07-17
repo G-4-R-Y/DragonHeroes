@@ -94,6 +94,8 @@ var camera: Camera2D
 var fx: ProtoFx                  # pooled elemental VFX (fx.gd): bursts/lightning
 var post: ProtoPost              # full-frame post-process (spec §2.3, CanvasLayer 5)
 var darkness: ProtoDarkness      # 2D lighting model — dark ambient + light holes (z=10)
+var _fog: ProtoFog               # drifting ground mist, thins near light (z=12)
+var _motes: ProtoMotes           # firefly/ember glints wandering the dark (z=13)
 var telegraphs: ProtoTelegraphs  # pooled danger telegraphs + aura (spec §2.4, z=-2)
 var _dmg: ProtoDamage            # pooled punchy damage numbers (spec §2.5, layer 6)
 var _bosses: Array = []          # every boss node: hag, duo pair, Matriarch
@@ -158,6 +160,13 @@ func _ready() -> void:
 	# tints 11, fx 18+, shader quads 21) reads as LIGHT over the darkened scene.
 	darkness = ProtoDarkness.new()
 	add_child(darkness)
+	# Atmosphere layers riding the lighting model (canon §12.29): drifting
+	# ground mist that burns off near light, and firefly motes in the dark.
+	# Tree order matters — fog reuses darkness's per-frame hole upload.
+	_fog = ProtoFog.new()
+	add_child(_fog)
+	_motes = ProtoMotes.new()
+	add_child(_motes)
 
 	# Spectacle-VFX hosts (spec §2.0). CanvasLayer stack: post grades world+fx+
 	# ribbons+telegraphs from its own layer 5; damage numbers ride layer 6 ABOVE
@@ -406,6 +415,12 @@ func _physics_process(delta: float) -> void:
 	_day_t += delta
 	var night := 0.5 - 0.5 * cos(TAU * _day_t / DAY_CYCLE_S)
 	_cycle.color = Color(1, 1, 1).lerp(NIGHT_COLOR, night)
+	# the lighting model breathes with the cycle: readable dusk by day, deep
+	# night where the fires and shrooms really carry the scene
+	if darkness != null:
+		darkness.set_ambient(Color(0.46, 0.50, 0.66).lerp(Color(0.30, 0.34, 0.55), night))
+	if _fog != null:
+		_fog.density = lerpf(0.18, 0.30, night)
 	_update_gauges(delta)
 	# Elemental fields: the tile field-interaction system's prototype stand-in
 	# (docs/tech/21 §5) — per-kind dps ("status" packets) and slow (Creeping Mire).

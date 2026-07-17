@@ -26,6 +26,11 @@ var _mat: ShaderMaterial
 var _static: Array = []                 # env holes: [pos, radius, strength, phase, rate]
 var _t := 0.0
 
+# Last frame's uploaded holes — shared with ProtoFog (fog thins where light is)
+# so the gather+sort work happens exactly once per frame.
+var last_count := 0
+var last_packed := PackedColorArray()
+
 func _ready() -> void:
 	z_as_relative = false
 	z_index = 10
@@ -86,11 +91,13 @@ func _process(dt: float) -> void:
 	var packed := PackedColorArray()
 	for c in cand:
 		packed.append(Color(c[0].x, c[0].y, c[1], c[2]))
+	last_count = packed.size()
 	_mat.set_shader_parameter("light_count", packed.size())
 	if packed.size() > 0:
 		while packed.size() < MAX_HOLES:
 			packed.append(Color(0, 0, 0, 0))
 		_mat.set_shader_parameter("lights", packed)
+	last_packed = packed
 
 func _pool_debug() -> Dictionary:
 	return {"size": MAX_HOLES, "peak_in_use": mini(_static.size(), MAX_HOLES)}

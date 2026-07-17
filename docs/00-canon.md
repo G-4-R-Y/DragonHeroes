@@ -603,3 +603,24 @@ Still open:
    in-session: "NOW we are talking. Things are actually beautiful."
    LESSON (permanent): review the COMPOSITE through captures after every
    visual change; lab sheets validate effects, captures validate frames.
+29. **Atmosphere layers on the lighting model (2026-07-17, Ricardo:
+   "further polish lighting, perhaps add shaders").** Four systems riding
+   the darkness model, all capture-verified: (1) GROUND MIST — ProtoFog,
+   camera-glued mix-blend quad at z=12, domain-warped fBm scrolled by TIME;
+   density THINS near the same light holes the darkness pass lifts (fire
+   burns fog off) and rises at night — coupled, so it reads as one
+   atmosphere. (2) FIREFLIES — ProtoMotes, ONE MultiMesh of 40 additive
+   glints (70% ember / 30% cold spirit) wandering the camera view at z=13,
+   intensity-gated count. (3) ANIMATED WATER — world_gen builds one
+   MultiMesh quad per water tile (single draw call per map);
+   water.gdshader scrolls two noise layers + specular glints + shore foam
+   hugging real coastlines via an INSTANCE_CUSTOM neighbor mask.
+   (4) FOLIAGE SWAY — vertex-only prop_sway.gdshader on trees/shrooms:
+   wind sway pinned at the base + gaussian bend-away when the hero walks
+   through (shared material, player_pos fed per frame). Plus the night
+   cycle now drives the lighting model (ambient 0.46/0.50/0.66 day ->
+   0.30/0.34/0.55 night; fog 0.18 -> 0.30). Layer map at this point:
+   tilemap < water(-6) < fields(-5) < telegraphs(-2) < entities(0) <
+   darkness(10) < light tints(11) < fog(12) < motes(13) < fx(18+) <
+   post(L5) < damage(L6) < HUD(L10+). Gates: FXSTRESS OK 7.66 ms, boots
+   clean, CLICKTEST ALL PASS.

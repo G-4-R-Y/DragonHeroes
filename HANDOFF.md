@@ -1,7 +1,35 @@
-# Handoff — running state (updated 2026-07-17, v0.1.13)
+# Handoff — running state (updated 2026-07-17, v0.1.14)
 
 Read `CLAUDE.md` + `docs/00-canon.md` first (decisions log §12 is current through
-item 28). This file is the delta: exactly where work stopped and what's next.
+item 29). This file is the delta: exactly where work stopped and what's next.
+
+## v0.1.14 delta (2026-07-17) — atmosphere layers (canon §12.29)
+
+Ricardo ("really liking where this is going... further polish lighting,
+perhaps add shaders?"): four capture-verified systems riding the darkness
+model — ground mist (ProtoFog z=12, thins near light holes, rises at night),
+fireflies (ProtoMotes z=13, 40 glints, ONE MultiMesh), animated water
+(per-water-tile MultiMesh overlay, shore foam from INSTANCE_CUSTOM neighbor
+mask, ONE draw call), foliage sway (vertex shader: wind + hero walk-through
+push on trees/shrooms). Night cycle now drives darkness ambient + fog
+density. Gates: FXSTRESS 7.66 ms, boots x2 clean, CLICKTEST ALL PASS,
+validate 0. A visual-OM research workflow ran the same session — its
+technique catalog (radiance cascades, normal-mapped sprites, dual-grid
+autotiling etc.) is summarized in the session log + memory; structural
+candidates queued below.
+
+STRUCTURAL-OVERHAUL QUEUE (the "like the lighting fix" list, ROI-ranked):
+1. Terrain art system: dual-grid/blob autotiling + biome edge blending +
+   macro variation — the square tile grid is the last "prototype" tell.
+2. Sprite lighting integration: normal-mapped pixel sprites (auto-generate
+   normals in the GenForge bake) + directional shading from our own light
+   holes — makes bodies feel 3D-lit like Dead Cells.
+3. Animation authoring: smear/anticipation frames via the GenForge skeletal
+   template pipeline (the "their animation is WAY better" gap).
+4. UI/typography: pixel-perfect bitmap-font HUD pass (giant desktop fonts in
+   captures read amateur next to the new world).
+5. Vulkan flip on Ricardo's hardware: real HDR bloom over every emissive
+   pixel (ProtoPost.set_hdr_mode seam is ready; only he can test).
 
 ## v0.1.13 delta (2026-07-17) — 2D lighting model + the capture loop
 
