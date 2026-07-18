@@ -3,6 +3,7 @@
 # saves a PNG to tests/captures/, quits. Windowed GL only (no xvfb here).
 #   UI_SCENE=res://prototype/ui/main_menu.tscn  (default)
 #   UI_TAG=menu                                  (capture filename)
+#   UI_WAIT=40                                   (frames before the shot)
 # Reusable for any Control-rooted screen; scenes needing session state can be
 # pre-seeded here per-tag as they come up.
 extends Node
@@ -21,14 +22,35 @@ func _ready() -> void:
 		return
 	# session-backed screens need a logged-in character (read-only: login loads
 	# or claims the slot; nothing here calls save)
-	if tag.begins_with("haven") or tag.begins_with("panel"):
+	if tag.begins_with("haven") or tag.begins_with("panel") or tag.begins_with("hunt"):
 		Session.login("Hunter")
 	add_child(ps.instantiate())
-	_run(tag)
+	var wait := 40
+	if OS.get_environment("UI_WAIT") != "":
+		wait = int(OS.get_environment("UI_WAIT"))
+	_run(tag, wait)
 
-func _run(tag: String) -> void:
-	for i in 40:
+func _run(tag: String, wait: int) -> void:
+	for i in wait:
 		await get_tree().process_frame
+	# hunt_far: jump the hero N chunks east and let the streamer fill the frame
+	# (the v0.2.0 infinite-world verification shot — virgin terrain + minimap)
+	if tag.begins_with("hunt_far"):
+		var p := get_tree().get_first_node_in_group("player") as Node2D
+		if p != null:
+			p.global_position += Vector2(6.0 * 64.0 * 16.0, 0.0)
+		# a cold 25-chunk teleport needs ~700 frames at the apply budget; normal
+		# walking streams the apron incrementally and never sees this
+		for i in 800:
+			await get_tree().process_frame
+	if OS.get_environment("UI_DEBUG_FONTS") == "1":
+		print("DBG fallback_font=", ThemeDB.fallback_font,
+				" size=", ThemeDB.fallback_font_size)
+		var acc: Array = []
+		_labels(self, acc)
+		for l in acc.slice(0, 6):
+			print("DBG label '", (l as Label).text.left(18), "' font=",
+					(l as Label).get_theme_font("font"))
 	var img := get_viewport().get_texture().get_image()
 	var dir := "res://prototype/tests/captures"
 	DirAccess.make_dir_recursive_absolute(dir)
@@ -37,3 +59,9 @@ func _run(tag: String) -> void:
 	print("UI_CAPTURE SAVED ", path, " ", img.get_size())
 	await get_tree().process_frame
 	get_tree().quit(0)
+
+func _labels(n: Node, acc: Array) -> void:
+	if n is Label:
+		acc.append(n)
+	for c in n.get_children():
+		_labels(c, acc)

@@ -32,7 +32,11 @@ const char* arg_str(int argc, char** argv, const char* name) {
 
 // --dump-chunks R --out file.json: emit the base world around the origin as JSON so
 // the Godot prototype renders the REAL dh-procgen output (no engine-side worldgen).
-int dump_chunks(std::uint64_t seed, std::int64_t radius, const char* out_path) {
+// --dump-window "cx0,cy0,cx1,cy1" --out file.json: same schema over any inclusive
+// chunk rect — the prototype's streaming window (docs/tech/29) requests exactly
+// the chunks it is missing; determinism comes free from generate_chunk.
+int dump_rect(std::uint64_t seed, std::int64_t cx0, std::int64_t cy0, std::int64_t cx1,
+              std::int64_t cy1, const char* out_path) {
     std::FILE* f = std::fopen(out_path, "w");
     if (!f) {
         std::fprintf(stderr, "cannot open %s\n", out_path);
@@ -42,8 +46,8 @@ int dump_chunks(std::uint64_t seed, std::int64_t radius, const char* out_path) {
                  static_cast<unsigned long long>(seed), dh::procgen::kChunkSize,
                  dh::procgen::kGeneratorVersion);
     bool first = true;
-    for (std::int64_t cy = -radius; cy <= radius; ++cy) {
-        for (std::int64_t cx = -radius; cx <= radius; ++cx) {
+    for (std::int64_t cy = cy0; cy <= cy1; ++cy) {
+        for (std::int64_t cx = cx0; cx <= cx1; ++cx) {
             const auto chunk = dh::procgen::generate_chunk(seed, cx, cy);
             std::fprintf(f, "%s{\"cx\":%lld,\"cy\":%lld,\"tiles\":[", first ? "" : ",",
                          static_cast<long long>(cx), static_cast<long long>(cy));
@@ -56,9 +60,10 @@ int dump_chunks(std::uint64_t seed, std::int64_t radius, const char* out_path) {
     }
     std::fprintf(f, "]}\n");
     std::fclose(f);
-    std::printf("dumped %lld chunks (radius %lld) to %s\n",
-                static_cast<long long>((2 * radius + 1) * (2 * radius + 1)),
-                static_cast<long long>(radius), out_path);
+    std::printf("dumped %lld chunks (rect %lld,%lld..%lld,%lld) to %s\n",
+                static_cast<long long>((cx1 - cx0 + 1) * (cy1 - cy0 + 1)),
+                static_cast<long long>(cx0), static_cast<long long>(cy0),
+                static_cast<long long>(cx1), static_cast<long long>(cy1), out_path);
     return EXIT_SUCCESS;
 }
 
@@ -71,7 +76,18 @@ int main(int argc, char** argv) {
 
     if (const std::uint64_t radius = arg_u64(argc, argv, "--dump-chunks", 0); radius > 0) {
         const char* out = arg_str(argc, argv, "--out");
-        return dump_chunks(seed, static_cast<std::int64_t>(radius), out ? out : "chunks.json");
+        const auto r = static_cast<std::int64_t>(radius);
+        return dump_rect(seed, -r, -r, r, r, out ? out : "chunks.json");
+    }
+    if (const char* rect = arg_str(argc, argv, "--dump-window"); rect != nullptr) {
+        long long cx0 = 0, cy0 = 0, cx1 = 0, cy1 = 0;
+        if (std::sscanf(rect, "%lld,%lld,%lld,%lld", &cx0, &cy0, &cx1, &cy1) != 4 ||
+            cx1 < cx0 || cy1 < cy0) {
+            std::fprintf(stderr, "--dump-window expects cx0,cy0,cx1,cy1 (inclusive)\n");
+            return EXIT_FAILURE;
+        }
+        const char* out = arg_str(argc, argv, "--out");
+        return dump_rect(seed, cx0, cy0, cx1, cy1, out ? out : "chunks.json");
     }
 
     dh::sim::World world(seed);

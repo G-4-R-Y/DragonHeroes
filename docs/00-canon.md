@@ -646,3 +646,34 @@ Still open:
    pixel-crisp typography (PT-BR diacritics gated). Radiance Cascades is
    a scheduled bet: fragment-only port at 320x180 light field, must be
    profiled on mid-Android before commitment (no published benchmark).
+31. **Typography postscript — the default-theme trap (2026-07-17).** Setting
+   `ThemeDB.fallback_font` is NOT enough to re-font bare Labels: controls
+   with no Theme anywhere in their ancestry (HUD lines on CanvasLayers,
+   world-space nameplates) resolve through the engine DEFAULT THEME, whose
+   built-in vector font wins before the fallback is consulted. The doctrine
+   (ui/theme.gd apply_doctrine) therefore restamps BOTH: fallback_font AND
+   ThemeDB.get_default_theme().default_font/size. Sibling lesson: any
+   system applied "at the menu" must also self-apply on direct boots —
+   main.gd calls apply_doctrine() in _ready (idempotent), so headless
+   gates and capture harnesses see the same frame the player sees. Landed
+   v0.1.18 with the full pixel-grid migration (menu recomposed as name-chip
+   class cards; every override routed through SIZE_BODY/SIZE_TITLE).
+32. **Infinite world (v0.2.0, 2026-07-17, Ricardo: "what do we need for
+   infinite world generation? Work on this for the next patch").** The
+   generator was born infinite (dh-procgen: stateless coordinate hashing,
+   constant-time random access per chunk); the finite parts were the dump
+   CLI and the prototype's one-shot world build. v0.2.0: dh-server gains
+   `--dump-window cx0,cy0,cx1,cy1` (same JSON, any inclusive rect —
+   determinism verified byte-identical against the radius path), and the
+   prototype streams a 5x5-chunk window around the player (load radius 2,
+   unload 3, hysteresis; per-frame apply budgets; SDF/minimap-block/JSON
+   work on a worker thread; walkability outside loaded chunks reads
+   T_ROCK = a self-retreating stream fence). Full architecture + budgets +
+   the STREAMTEST gate: docs/tech/29-infinite-world-streaming.md. The
+   authored hunt (14 packs, bosses, the Matriarch) stays anchored near
+   origin ON PURPOSE — frontier chunks repopulate deterministically with
+   distance-scaled danger instead. Hard line kept: no worldgen logic
+   engine-side — the engine renders windows the C++ generator emits, and
+   the shipping path only swaps the transport (dh-godot in-process instead
+   of subprocess JSON). Streaming windows are also the future AOI story
+   (multiplayer roadmap: docs/design/21).

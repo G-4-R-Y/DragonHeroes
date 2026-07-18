@@ -1,7 +1,27 @@
-# Handoff — running state (updated 2026-07-17, v0.1.15 + program in flight)
+# Handoff — running state (updated 2026-07-17, v0.2.0 in flight)
 
 Read `CLAUDE.md` + `docs/00-canon.md` first (decisions log §12 is current through
-item 30). This file is the delta: exactly where work stopped and what's next.
+item 32). This file is the delta: exactly where work stopped and what's next.
+
+## v0.2.0 — INFINITE WORLD (canon §12.32, Ricardo: "work on this for the next
+## patch"; design law: docs/tech/29-infinite-world-streaming.md)
+
+- dh-server `--dump-window` LANDED + rebuilt, determinism byte-verified.
+- world_gen.gd carries the streaming CONTRACT (signals chunk_loaded/unloaded,
+  can_stream, loaded_bounds, chunk_map_image) — internals being rewritten to
+  the §2 pipeline by the world-core agent (also: darkness statics get handles
+  + remove_static; NEW gate tests/stream_test.tscn must end STREAMTEST OK).
+- minimap window-following + main.gd frontier repopulation/distance despawn:
+  game-systems agent (§3).
+- docs agent: design/20 (v1→v2 retrospective, montage at docs/media/
+  v1-vs-v2.png), design/21 (multiplayer roadmap: co-op on infinite world →
+  PVP → skill-system overhaul per Ricardo's direction), tech/30 (Android
+  export + LAN honesty), README index.
+- Fixed en route: ThemeDB default-theme font trap (canon §12.31) — bare HUD/
+  nameplate Labels now pixel; main.gd self-applies the doctrine on direct
+  boots; reusable tests/ui_capture.tscn harness (UI_SCENE/UI_TAG/UI_WAIT).
+- Ricardo's asks still open after this patch: Android on-device profiling
+  (60 FPS directive) + touch controls decision; multiplayer M-A scoping.
 
 ## THE FIVE-OVERHAUL PROGRAM (canon §12.30 — Ricardo: "do all of those, and
 ## also radiance cascades"; code must stay reusable/decoupled)

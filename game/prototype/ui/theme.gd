@@ -83,6 +83,14 @@ static func apply_doctrine() -> void:
 	if _font_small != null:
 		ThemeDB.fallback_font = _font_small
 		ThemeDB.fallback_font_size = SIZE_BODY
+		# the fallback alone is NOT enough: controls with no theme in their
+		# ancestry (bare HUD/nameplate Labels on CanvasLayers) resolve through
+		# the engine DEFAULT THEME, which carries its own vector font and wins
+		# before the fallback is ever consulted — restamp it too
+		var dt := ThemeDB.get_default_theme()
+		if dt != null:
+			dt.default_font = _font_small
+			dt.default_font_size = SIZE_BODY
 
 # Doctrine-configured pixel fonts for direct consumers (damage numbers, world
 # text). May return null in doctrine-only mode — Label/LabelSettings treat a

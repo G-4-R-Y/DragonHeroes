@@ -53,6 +53,16 @@ const LEGENDARY_SNARE_SHOWER := 0.10   # (proposal) Soul Snare shower on the kil
 const ESSENCE_CHANCE := 0.08     # (proposal) Spirit Essence from abyssal kills
 const RUNE_CHANCE_ELITE := 0.05  # (proposal) rune from Elite+ kills after the first
 
+# Infinite-world streaming consumers (docs/tech/29 §3, all proposal). The authored
+# 14 packs + bosses own the origin 5x5; past it, virgin chunks repopulate with
+# wandering packs as they stream in, and creatures left far behind recycle.
+const STREAM_ORIGIN_RADIUS := 2   # authored 5x5 (LOAD_RADIUS) — frontier skips it
+const STREAM_ELITE_DIST := 8      # frontier pack leaders go elite past this chunk dist
+const STREAM_PACK_ONE := 0.35     # chance a virgin chunk fields a wandering pack
+const STREAM_PACK_TWO := 0.10     # ...and a second joins it
+const STREAM_DESPAWN_PX := 7680.0 # 1.5 windows = 7.5 chunks = 480 tiles: recycle beyond
+const STREAM_DESPAWN_CADENCE := 2.0   # distance-despawn sweep period
+
 # Elemental fields (canon §4 tile field-interaction system, prototype stand-in).
 # Per-kind visuals + slow; dps is per-spawn. Lava is the Duologue payoff: while
 # BOTH duo bosses live, fire over earth (either order) fuses into lava —
@@ -120,8 +130,19 @@ var _sfx_players: Array = []     # 8 positional players, round-robin
 var _sfx_idx := 0
 var _ui_player: AudioStreamPlayer
 
+# Infinite-world streaming (docs/tech/29 §3): deterministic frontier repopulation
+# + distance despawn. _hunt_seed ties rolls to the hunt so revisits are identical.
+var _hunt_seed := 0
+var _origin_chunk := Vector2i.ZERO   # the player's boot chunk — origin of the 5x5
+var _visited_chunks := {}            # Vector2i -> true: frontier chunks already rolled
+var _ground_species: Array = []      # hunt ground roster reused by frontier packs
+var _despawn_t := 0.0                # distance-despawn cadence accumulator
+
 func _ready() -> void:
 	add_to_group("main")
+	# pixel-font doctrine must not depend on the menu having run first (direct
+	# boots: headless gates, capture harnesses, F6) — idempotent, so cheap here
+	ProtoTheme.apply_doctrine()
 	randomize()   # every hunt is a NEW world + fresh packs (Ricardo)
 	y_sort_enabled = true
 
@@ -213,6 +234,7 @@ func _ready() -> void:
 
 	_build_audio()
 	_spawn_packs()
+	_init_frontier()   # docs/tech/29 §3: frontier repopulation + distance despawn
 	for pet_data in Session.pets:   # every bonded pet joins every hunt (3 slots)
 		_spawn_pet(pet_data, world.random_walkable_in_ring(
 				player.global_position, TILE, 2.5 * TILE))
@@ -300,6 +322,7 @@ func _spawn_packs() -> void:
 	var roster := _sample_species()
 	var ground: Array = roster.filter(
 			func(e): return str(e.get("archetype", "")) != "wisp")
+	_ground_species = ground   # reused by frontier repopulation (docs/tech/29 §3)
 	var casters: Array = roster.filter(
 			func(e): return str(e.get("archetype", "")) == "wisp")
 	if not roster.is_empty():
@@ -405,6 +428,109 @@ func _spawn_legendary(anchor: Vector2) -> void:
 	print("[hunt] legendary: %s (%s chassis) of %d" % [
 			_legendary_name, str(entry.get("base", "dragon")), pool.size()])
 
+# ---- infinite-world streaming consumers (docs/tech/29 §3) ---------------------
+
+# Wire frontier repopulation to the streaming contract. The origin chunk is the
+# player's boot chunk (the authored 5x5 window centers there). In the fallback
+# island (no sim binary) there is no streaming, so no frontier — §3 graceful
+# degradation. Distance despawn always runs (harmless on a finite island).
+func _init_frontier() -> void:
+	if world == null:
+		return
+	_origin_chunk = _chunk_of(player.global_position) if player != null else Vector2i.ZERO
+	if not world.can_stream():
+		return   # fallback island: no streaming, no frontier spawns (docs/tech/29 §3)
+	# Tie frontier rolls to the hunt so revisited coordinates are byte-identical
+	# (docs/tech/29 §2). The streamer exposes `seed` when present; otherwise a
+	# per-session seed still makes revisits within the hunt identical.
+	var s: Variant = world.get("seed")
+	_hunt_seed = int(s) if typeof(s) == TYPE_INT or typeof(s) == TYPE_FLOAT else randi()
+	world.chunk_loaded.connect(_on_chunk_loaded)
+
+func _chunk_of(pos: Vector2) -> Vector2i:
+	var span := TILE * ProtoWorld.CHUNK   # px per chunk (16 * 64)
+	return Vector2i(floori(pos.x / span), floori(pos.y / span))
+
+# A chunk finished applying. Virgin frontier chunks (beyond the authored 5x5, not
+# yet rolled this hunt) get their wandering packs; the origin window is authored.
+func _on_chunk_loaded(key: Vector2i) -> void:
+	if _visited_chunks.has(key):
+		return
+	_visited_chunks[key] = true
+	var cheb := maxi(absi(key.x - _origin_chunk.x), absi(key.y - _origin_chunk.y))
+	if cheb <= STREAM_ORIGIN_RADIUS:
+		return   # authored content owns the origin 5x5
+	_frontier_populate(key, cheb)
+
+# Deterministic frontier repopulation: a local RNG seeded off the hunt seed + chunk
+# key (NEVER global randi — revisits must be identical) rolls 0-2 wandering packs.
+# Danger scales with chebyshev chunk distance from origin: +1 pack level per 4
+# chunks (cap +10). The creature kit reads its level from Session.level at spawn
+# (creature.gd _apply_entry) with no per-spawn level hook, so that bias is expressed
+# as a rising elite-affix chance (see the change report).
+func _frontier_populate(key: Vector2i, cheb: int) -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash(str(_hunt_seed, "|", key))
+	var packs := 0
+	if rng.randf() < STREAM_PACK_ONE:
+		packs = 1
+		if rng.randf() < STREAM_PACK_TWO:
+			packs = 2
+	if packs == 0:
+		return
+	@warning_ignore("integer_division")
+	var danger := mini(cheb / 4, 10)   # intended +level per 4 chunks, cap +10
+	var elite_lead := cheb > STREAM_ELITE_DIST
+	var center := (Vector2(key) * ProtoWorld.CHUNK
+			+ Vector2.ONE * (ProtoWorld.CHUNK * 0.5)) * TILE
+	for _p in packs:
+		var anchor := world.random_walkable_in_ring(center, 0.0, 20.0 * TILE)
+		_build_frontier_pack(anchor, rng.randi_range(3, 6), elite_lead, danger, rng)
+
+# Frontier pack builder — a deterministic, lean cousin of _spawn_packs' authored
+# loop. Pulls the hunt's ground roster when it exists (else classic archetypes);
+# `rng` drives every pick so the pack is identical on revisit. `elite_lead` affixes
+# the leader; `danger` raises each member's odds of also being an affixed elite —
+# walking farther IS walking into danger (docs/tech/29 §3).
+func _build_frontier_pack(anchor: Vector2, size: int, elite_lead: bool,
+		danger: int, rng: RandomNumberGenerator) -> void:
+	var member_affix := clampf(danger * 0.04, 0.0, 0.4)   # distance-scaled elite odds
+	var species: Dictionary = {}
+	if not _ground_species.is_empty():
+		species = _ground_species[rng.randi() % _ground_species.size()]
+	for j in size:
+		var c := CreatureScene.new()
+		var affix := ""
+		if (j == 0 and elite_lead) or (j > 0 and rng.randf() < member_affix):
+			affix = ELITE_AFFIXES[rng.randi() % ELITE_AFFIXES.size()]
+		if species.is_empty():
+			c.setup_archetype(ARCHETYPES[rng.randi() % ARCHETYPES.size()], affix)
+		else:
+			var entry := species
+			if j > 0 and rng.randf() < PACK_OFF_SPECIES:   # a stray for texture
+				entry = _ground_species[rng.randi() % _ground_species.size()]
+			c.setup_from_entry(entry, affix)
+		c.global_position = world.random_walkable_in_ring(anchor, 0.0, 3.0 * TILE)
+		c.pack_anchor = anchor
+		add_child(c)
+
+# Distance despawn (docs/tech/29 §3): creatures left ~1.5 windows behind the player
+# recycle, so the entity count is bounded by exploration, not session length.
+# Bosses (main._bosses), the hunt legendary, pets and dead-and-animating corpses
+# are never touched; the radius is huge (480 tiles) vs aggro (7 tiles), so an
+# engaged foe can never be far enough to qualify.
+func _despawn_far_creatures() -> void:
+	if player == null or not is_instance_valid(player):
+		return
+	var here := player.global_position
+	for c in get_tree().get_nodes_in_group("creatures"):
+		if not is_instance_valid(c) or c.dead:
+			continue
+		if _bosses.has(c) or c == legendary_boss or c.is_in_group("pet"):
+			continue
+		if c.global_position.distance_to(here) > STREAM_DESPAWN_PX:
+			c.queue_free()
+
 func _physics_process(delta: float) -> void:
 	# Camera shake decay
 	if _shake > 0.0:
@@ -458,6 +584,12 @@ func _physics_process(delta: float) -> void:
 		_scorches = _scorches.filter(func(s): return now <= s.until)
 	_fields_node.queue_redraw()
 	_update_boss_bar()
+	# Distance despawn on a 2 s cadence (docs/tech/29 §3) — recycle creatures left
+	# far behind as the world streams; bosses/legendary/pets are protected.
+	_despawn_t -= delta
+	if _despawn_t <= 0.0:
+		_despawn_t = STREAM_DESPAWN_CADENCE
+		_despawn_far_creatures()
 
 # Kept as the classic entry point (Matriarch's Magma Breath calls this).
 func spawn_fire_field(at: Vector2, radius: float, duration: float, dps: float) -> void:
@@ -1076,6 +1208,11 @@ func _hint_text() -> String:
 	t += ProtoLang.t("hud_hint_bosses")
 	if _legendary_name != "":
 		t += ProtoLang.t("hud_hint_leg") % _legendary_name
+	if world != null and world.can_stream():
+		# docs/tech/29 §3 flavor: the world is infinite. Inlined EN/PT-BR off the
+		# active locale — lang.gd (the string table) is outside this change's scope.
+		t += " · %s" % ("as matas seguem sem fim" if ProtoLang.lang == "pt" \
+				else "the wilds go on forever")
 	return t
 
 func _build_hud() -> void:

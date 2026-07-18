@@ -4,6 +4,11 @@
 > [canon](../00-canon.md) (§5 PvP & tournaments, §2 monetization, §9 creature AI).
 > Status: v0.1 draft — 2026-07-07.
 
+> **Sequencing (2026-07-17):** PvP is milestone **M-B** in the
+> [multiplayer roadmap](21-multiplayer-roadmap.md) — after co-op exploration and the
+> combat/skill overhaul it depends on. That document orders *when* PvP arrives; **this
+> document stays authoritative for PvP formats and rules**. Nothing here is scheduled yet.
+
 ## Purpose
 
 This document specifies competitive Dragon Heroes: the three PvP modes (1v1 duel, 3v3 arena, and the Gloomfall battle royale), the Trophies ranked system and Glory reward currency, how gear is handled in ranked play, the weekly and seasonal tournament structure with its marketplace-funded prize pools, the legal constraints that shape prize design in Brazil, and the Champion Ghosts feature that turns each week's winner into a challengeable AI opponent. The core stance, inherited from the canon's anti-pay-to-win rules, is that competition must be won with skill and build strategy — never bought — even though the game contains a real-money item marketplace ([economy](../design/15-economy-and-marketplace.md)).

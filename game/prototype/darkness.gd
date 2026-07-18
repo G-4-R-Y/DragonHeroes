@@ -23,7 +23,13 @@ var enabled := true
 
 var _quad: Sprite2D
 var _mat: ShaderMaterial
-var _static: Array = []                 # env holes: [pos, radius, strength, phase, rate]
+# env holes keyed by a monotonic int HANDLE (docs/tech/29 §3): streaming chunks
+# register their glowshrooms on load and retract them by handle on unload, so a
+# Dictionary (not an Array) is the registry — removal is O(1) and stable while
+# other chunks' handles keep their slots. Record: [pos, radius, strength, phase,
+# rate, flicker] (unchanged shape — the gather below still indexes it positionally).
+var _statics := {}
+var _next_static := 0
 var _t := 0.0
 
 # THE LIGHT REGISTRY (canon §12.30): the gathered holes are packed into a
@@ -68,11 +74,19 @@ func set_sdf(tex: ImageTexture, origin_px: Vector2, size_px: Vector2) -> void:
 	_mat.set_shader_parameter("sdf_size", size_px)
 
 # Environment light source (glowshrooms, future torches/braziers). Unbounded —
-# the per-frame shader upload picks the nearest MAX_HOLES.
+# the per-frame shader upload picks the nearest MAX_HOLES. Returns a handle the
+# caller (a streaming chunk) keeps so it can retract this source on unload.
 func add_static(pos: Vector2, radius := 30.0, strength := 0.8,
-		flicker := 0.3, rate := 2.4) -> void:
-	_static.append([pos, radius, strength, randf() * TAU, rate * (0.8 + randf() * 0.4),
-			flicker])
+		flicker := 0.3, rate := 2.4) -> int:
+	var handle := _next_static
+	_next_static += 1
+	_statics[handle] = [pos, radius, strength, randf() * TAU,
+			rate * (0.8 + randf() * 0.4), flicker]
+	return handle
+
+# Retract a static source (chunk unload). Unknown/stale handles are a no-op.
+func remove_static(handle: int) -> void:
+	_statics.erase(handle)
 
 func set_ambient(c: Color) -> void:
 	ambient = c
@@ -99,7 +113,7 @@ func _process(dt: float) -> void:
 	if m != null and m.get("fx") != null:
 		cand.append_array(m.fx.light_holes())
 	var half := vs * 0.62
-	for s in _static:
+	for s in _statics.values():
 		var pos: Vector2 = s[0]
 		if absf(pos.x - center.x) > half.x or absf(pos.y - center.y) > half.y:
 			continue                        # cheap cull before the sort
@@ -128,4 +142,4 @@ func _process(dt: float) -> void:
 			0 if ProtoFx.intensity < 0.2 else (4 if ProtoFx.intensity < 0.75 else 6))
 
 func _pool_debug() -> Dictionary:
-	return {"size": MAX_HOLES, "peak_in_use": mini(_static.size(), MAX_HOLES)}
+	return {"size": MAX_HOLES, "peak_in_use": mini(_statics.size(), MAX_HOLES)}

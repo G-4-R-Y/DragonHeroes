@@ -27,6 +27,10 @@
 | [15-economy-and-marketplace](design/15-economy-and-marketplace.md) | Faucets/sinks, marketplace UX, anti-RMAH design, pets as assets |
 | [16-pvp-and-tournaments](design/16-pvp-and-tournaments.md) | 1v1/3v3/Gloomfall, Trophies/Glory, tournaments, Champion Ghosts |
 | [17-art-direction](design/17-art-direction.md) | Pixel-art identity, palettes, telegraph colors (owner), gen-AI pipeline, 60 FPS budgets |
+| [18-spectacle-vfx-spec](design/18-spectacle-vfx-spec.md) | Spectacle VFX architecture: layer map, pooling contracts, post-FX stack, budgets |
+| [19-visual-om-catalog](design/19-visual-om-catalog.md) | Order-of-magnitude visual techniques catalog: the researched top-5 and sequencing |
+| [20-release-retrospective-v1-v2](design/20-release-retrospective-v1-v2.md) | v1 → v2: first playable snapshot vs today, same engine, the authored-systems delta |
+| [21-multiplayer-roadmap](design/21-multiplayer-roadmap.md) | MP milestones: co-op infinite world (M-A) → PvP (M-B) → the combat/skill overhaul (M-C) |
 | **tech/** | |
 | [20-architecture-overview](tech/20-architecture-overview.md) | System map, one-sim-three-consumers, data flows, decision table |
 | [21-simulation-core](tech/21-simulation-core.md) | C++ sim workspace, entity store, tick pipeline, fields, determinism |
@@ -37,6 +41,8 @@
 | [26-backend-and-services](tech/26-backend-and-services.md) | Nakama, Go economy core, ledgers, PSP integration, liveops |
 | [27-security-anticheat-and-economy-integrity](tech/27-security-anticheat-and-economy-integrity.md) | Threat model, dupes, fraud, kill switches, rollback playbook |
 | [28-generation-service](tech/28-generation-service.md) | GenForge: lore-grounded creature/item/skill candidate generation, curation gates |
+| [29-infinite-world-streaming](tech/29-infinite-world-streaming.md) | Streaming the infinite world as a moving window: AOI budgets, worker threads, STREAMTEST gate |
+| [30-android-and-lan-builds](tech/30-android-and-lan-builds.md) | Exporting the prototype to Android: presets, keystores, adb; honest mobile/LAN caveats |
 | **business/** | |
 | [30-legal-payments-compliance](business/30-legal-payments-compliance.md) | Brazilian gambling/minors law, PSPs, tax, AML, LGPD — **read before launch decisions** |
 | [31-roadmap](business/31-roadmap.md) | M0→M6 milestones, exit gates, parallel tracks, risk register |

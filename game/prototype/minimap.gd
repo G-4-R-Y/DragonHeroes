@@ -1,49 +1,50 @@
-# PROTOTYPE HARNESS — minimap over the dh-procgen chunk dump. Terrain is baked
-# ONCE into a texture (1 px per tile, scaled into a 144x144 widget); entity dots
-# are redrawn ~4x/s. The shipping map/fog system is a dh-sim concern (docs/tech/21).
+# PROTOTYPE HARNESS — window-following minimap over the STREAMING chunk contract
+# (docs/tech/29 §3). No one-shot world bake: a 5x5-chunk composite (320x320, 1 px/
+# tile) follows the player's chunk, rebuilt via Image.blit_rect from the per-chunk
+# blocks world_gen bakes (chunk_map_image) whenever the player crosses a chunk
+# boundary or a window chunk loads/unloads. Unloaded space reads as the void color.
+# Entity dots are redrawn ~4x/s. The shipping map/fog system is a dh-sim concern
+# (docs/tech/21).
 class_name ProtoMinimap
 extends CanvasLayer
 
 const MAP_SIZE := 144.0
-const COLS := [Color("16303b"), Color("2c4a33"), Color("223a2b"), Color("3a3f49")]
+const WINDOW_CHUNKS := 5          # LOAD_RADIUS 2 -> 5x5 live window (docs/tech/29 §2)
+const HALF := 2                   # chunks each side of the player's chunk
+const WINDOW_TILES := 320         # WINDOW_CHUNKS(5) * ProtoWorld.CHUNK(64), 1 px/tile
+const VOID_COL := Color("0c1216") # unloaded/missing blocks (matches world_gen void)
 
+var _world: ProtoWorld
 var _overlay: Node2D
+var _tex: ImageTexture
+var _img: Image
+var _loaded := {}                 # Vector2i -> true: chunks currently applied
+var _center_chunk := Vector2i.ZERO
 var _origin_tile := Vector2i.ZERO
 var _span_tiles := Vector2i.ONE
 var _accum := 0.0
 
 func _ready() -> void:
 	layer = 12   # spec §2.0: above post(5)/damage(6)/HUD(10) — minimap stays crisp
-	var world := get_tree().get_first_node_in_group("world") as ProtoWorld
-	if world == null or world.chunks.is_empty():
+	_world = get_tree().get_first_node_in_group("world") as ProtoWorld
+	if _world == null:
 		return
-	# Compute the tile span dynamically from the dumped chunk keys.
-	var keys: Array = world.chunks.keys()
-	var min_c: Vector2i = keys[0]
-	var max_c: Vector2i = keys[0]
-	for key in keys:
-		min_c.x = mini(min_c.x, key.x)
-		min_c.y = mini(min_c.y, key.y)
-		max_c.x = maxi(max_c.x, key.x)
-		max_c.y = maxi(max_c.y, key.y)
-	_origin_tile = min_c * ProtoWorld.CHUNK
-	_span_tiles = (max_c - min_c + Vector2i.ONE) * ProtoWorld.CHUNK
+	# Streaming contract (docs/tech/29 §2): snapshot the applied chunks, then
+	# follow load/unload deltas.
+	for key in _world.chunks.keys():
+		_loaded[key] = true
+	_world.chunk_loaded.connect(_on_chunk_loaded)
+	_world.chunk_unloaded.connect(_on_chunk_unloaded)
 
-	var img := Image.create_empty(_span_tiles.x, _span_tiles.y, false, Image.FORMAT_RGBA8)
-	img.fill(Color("0c1216"))
-	for key in keys:
-		var tiles: PackedByteArray = world.chunks[key]
-		var bx: int = (key.x - min_c.x) * ProtoWorld.CHUNK
-		var by: int = (key.y - min_c.y) * ProtoWorld.CHUNK
-		for i in tiles.size():
-			@warning_ignore("integer_division")
-			img.set_pixel(bx + (i % ProtoWorld.CHUNK), by + (i / ProtoWorld.CHUNK),
-					COLS[tiles[i]])
+	_span_tiles = Vector2i(WINDOW_TILES, WINDOW_TILES)   # 320x320, 1 px/tile
+	_img = Image.create_empty(WINDOW_TILES, WINDOW_TILES, false, Image.FORMAT_RGBA8)
+	_img.fill(VOID_COL)
+	_tex = ImageTexture.create_from_image(_img)
 
 	var vp := get_viewport().get_visible_rect().size
 	var origin := Vector2(vp.x - MAP_SIZE - 8.0, 8.0)
 	var rect := TextureRect.new()
-	rect.texture = ImageTexture.create_from_image(img)
+	rect.texture = _tex
 	rect.stretch_mode = TextureRect.STRETCH_SCALE
 	rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -57,13 +58,62 @@ func _ready() -> void:
 	add_child(_overlay)
 	_overlay.draw.connect(_draw_overlay)
 
+	_center_chunk = _player_chunk()
+	_rebuild()   # first window composite
+
 func _process(delta: float) -> void:
 	if _overlay == null:
 		return
+	var pc := _player_chunk()
+	if pc != _center_chunk:   # crossed a chunk boundary — re-center the window
+		_center_chunk = pc
+		_rebuild()
 	_accum += delta
 	if _accum >= 0.25:  # dots refresh ~4x/s
 		_accum = 0.0
 		_overlay.queue_redraw()
+
+# --- window compositing (blit_rect/fill only — no per-pixel loops main-thread) ---
+
+func _player_chunk() -> Vector2i:
+	var player := get_tree().get_first_node_in_group("player")
+	if player == null:
+		return _center_chunk
+	var span := float(ProtoWorld.CHUNK * ProtoWorld.TILE)   # px per chunk
+	var pos: Vector2 = (player as Node2D).global_position
+	return Vector2i(floori(pos.x / span), floori(pos.y / span))
+
+func _in_window(key: Vector2i) -> bool:
+	return absi(key.x - _center_chunk.x) <= HALF and absi(key.y - _center_chunk.y) <= HALF
+
+func _on_chunk_loaded(key: Vector2i) -> void:
+	_loaded[key] = true
+	if _in_window(key):
+		_rebuild()
+
+func _on_chunk_unloaded(key: Vector2i) -> void:
+	_loaded.erase(key)
+	if _in_window(key):
+		_rebuild()
+
+# Recomposite the 320x320 window centered on _center_chunk from the per-chunk
+# blocks; missing/unloaded blocks fill the void color. _origin_tile follows the
+# window so _map_pos stays valid (dots logic unchanged).
+func _rebuild() -> void:
+	var top_left := _center_chunk - Vector2i(HALF, HALF)
+	_origin_tile = top_left * ProtoWorld.CHUNK
+	for dy in WINDOW_CHUNKS:
+		for dx in WINDOW_CHUNKS:
+			var key := top_left + Vector2i(dx, dy)
+			var dst := Vector2i(dx, dy) * ProtoWorld.CHUNK
+			var block: Image = _world.chunk_map_image(key) if _loaded.has(key) else null
+			if block != null:
+				_img.blit_rect(block,
+						Rect2i(0, 0, ProtoWorld.CHUNK, ProtoWorld.CHUNK), dst)
+			else:
+				_img.fill_rect(
+						Rect2i(dst, Vector2i(ProtoWorld.CHUNK, ProtoWorld.CHUNK)), VOID_COL)
+	_tex.update(_img)
 
 func _map_pos(world_pos: Vector2) -> Vector2:
 	var px := (world_pos.x / ProtoWorld.TILE - float(_origin_tile.x)) \
