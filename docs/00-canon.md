@@ -677,3 +677,17 @@ Still open:
    the shipping path only swaps the transport (dh-godot in-process instead
    of subprocess JSON). Streaming windows are also the future AOI story
    (multiplayer roadmap: docs/design/21).
+33. **The 3D alternative view experiment (v0.2.1, 2026-07-18, Ricardo:
+   "create an alternative 3D version... reusing our 2d creations, mechanics
+   and stuff. Keep the 2d version").** game/prototype3d/hunt3d.tscn renders
+   the SAME dh-server chunk dump, tile atlas, prop textures and GenForge
+   bundles as a perspective 3D night scene (ground planes from the 2D atlas,
+   T_ROCK extruded to occluding boxes, actors as AnimatedSprite3D billboards
+   fed by frames_for(), real Omni/Directional lights in the 2D palette).
+   ~400 lines, zero edits to the 2D game — the 2D VIEW REMAINS CANON. The
+   experiment's finding (docs/design/22): worldgen/sim/content/art reuse is
+   total because those layers never bound to a renderer; the 2D FX/lighting/
+   combat-feel stack is the actual cost of any 3D product. One adapter
+   exists: bundle frames are CanvasTextures (2D-only type), unwrapped to
+   diffuse for 3D. HD-2D is a plausible future direction, parked without a
+   directional call.

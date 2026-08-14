@@ -31,6 +31,7 @@
 | [19-visual-om-catalog](design/19-visual-om-catalog.md) | Order-of-magnitude visual techniques catalog: the researched top-5 and sequencing |
 | [20-release-retrospective-v1-v2](design/20-release-retrospective-v1-v2.md) | v1 → v2: first playable snapshot vs today, same engine, the authored-systems delta |
 | [21-multiplayer-roadmap](design/21-multiplayer-roadmap.md) | MP milestones: co-op infinite world (M-A) → PvP (M-B) → the combat/skill overhaul (M-C) |
+| [22-3d-alternative-view](design/22-3d-alternative-view.md) | The 3D view experiment: same world/art/data in perspective 3D; reuse scorecard; 2D stays canon |
 | **tech/** | |
 | [20-architecture-overview](tech/20-architecture-overview.md) | System map, one-sim-three-consumers, data flows, decision table |
 | [21-simulation-core](tech/21-simulation-core.md) | C++ sim workspace, entity store, tick pipeline, fields, determinism |

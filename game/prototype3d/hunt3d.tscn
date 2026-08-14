@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://dhhunt3d00001"]
+
+[ext_resource type="Script" path="res://prototype3d/hunt3d.gd" id="1_h3d"]
+
+[node name="Hunt3D" type="Node3D"]
+script = ExtResource("1_h3d")

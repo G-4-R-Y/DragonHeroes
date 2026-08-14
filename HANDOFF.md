@@ -1,7 +1,7 @@
 # Handoff — running state (updated 2026-07-17, v0.2.0 in flight)
 
 Read `CLAUDE.md` + `docs/00-canon.md` first (decisions log §12 is current through
-item 32). This file is the delta: exactly where work stopped and what's next.
+item 33). This file is the delta: exactly where work stopped and what's next.
 
 ## v0.2.0 — INFINITE WORLD (canon §12.32, Ricardo: "work on this for the next
 ## patch"; design law: docs/tech/29-infinite-world-streaming.md)
@@ -292,3 +292,8 @@ Vendor godot-cpp, build `dh-godot` GDExtension, move authority from
   `--import` once. `grep -c` exits 1 on zero matches — never chain gates with `&&`.
 - Git: v0.1 tag → v0.1.5 mass content → 2133327 v0.1.6 tuning → a8f37a4 v0.1.7
   skill trees. Rollback points exist at every step.
+
+## v0.2.1 — 3D view experiment (canon §12.33)
+prototype3d/hunt3d.tscn: same world dump/art/bundles as perspective 3D
+(billboards + extruded rock + real lights). 2D untouched and canon. Verdict
++ reuse scorecard: docs/design/22. Capture: tests/captures/ui_3d.png.
