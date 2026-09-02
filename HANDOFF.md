@@ -1,7 +1,7 @@
 # Handoff — running state (updated 2026-07-17, v0.2.0 in flight)
 
 Read `CLAUDE.md` + `docs/00-canon.md` first (decisions log §12 is current through
-item 33). This file is the delta: exactly where work stopped and what's next.
+item 34). This file is the delta: exactly where work stopped and what's next.
 
 ## v0.2.0 — INFINITE WORLD (canon §12.32, Ricardo: "work on this for the next
 ## patch"; design law: docs/tech/29-infinite-world-streaming.md)
@@ -297,3 +297,8 @@ Vendor godot-cpp, build `dh-godot` GDExtension, move authority from
 prototype3d/hunt3d.tscn: same world dump/art/bundles as perspective 3D
 (billboards + extruded rock + real lights). 2D untouched and canon. Verdict
 + reuse scorecard: docs/design/22. Capture: tests/captures/ui_3d.png.
+
+## Image-to-3D stage (canon §12.34, docs/tech/31)
+mesh_gen.py landed (stub CI green). NEXT ACTION (Ricardo-gated): sudo install
+cuda-toolkit-12-4, then the TripoSR draft-tier runbook (tech/31 §4), then the
+two-creature spike (§5). DH_*_DIR env vars locate adapter checkouts.

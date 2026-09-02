@@ -44,6 +44,7 @@
 | [28-generation-service](tech/28-generation-service.md) | GenForge: lore-grounded creature/item/skill candidate generation, curation gates |
 | [29-infinite-world-streaming](tech/29-infinite-world-streaming.md) | Streaming the infinite world as a moving window: AOI budgets, worker threads, STREAMTEST gate |
 | [30-android-and-lan-builds](tech/30-android-and-lan-builds.md) | Exporting the prototype to Android: presets, keystores, adb; honest mobile/LAN caveats |
+| [31-image-to-3d-local](tech/31-image-to-3d-local.md) | Image-to-3D on open weights: draft tier (RTX 4050) vs max-quality rented tier; mesh_gen stage + runbook |
 | **business/** | |
 | [30-legal-payments-compliance](business/30-legal-payments-compliance.md) | Brazilian gambling/minors law, PSPs, tax, AML, LGPD — **read before launch decisions** |
 | [31-roadmap](business/31-roadmap.md) | M0→M6 milestones, exit gates, parallel tracks, risk register |

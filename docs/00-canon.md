@@ -691,3 +691,21 @@ Still open:
    exists: bundle frames are CanvasTextures (2D-only type), unwrapped to
    diffuse for 3D. HD-2D is a plausible future direction, parked without a
    directional call.
+34. **Image-to-3D: local open weights, two tiers (2026-09-02, Ricardo: "go
+   with the max quality ones which can be run locally").** Character/creature
+   meshes are generated from GenForge CONCEPT RENDERS (never the 52px
+   sprites) by open-weight image-to-3D models under our control — no
+   per-asset SaaS. Hardware audit set the shape: the RTX 4050 (6 GB, CUDA
+   12.8 driver ✓, system nvcc still 11.5) runs the DRAFT tier (TripoSR /
+   Hunyuan3D-2mini shape); MAX QUALITY (TRELLIS(.2) / Hunyuan3D full,
+   16-24 GB) runs the SAME adapters on a rented 24 GB box for single-digit
+   dollars per weekly batch — open weights + our provenance = still "local"
+   in every sense that matters. Stage landed: genforge/pipeline/mesh_gen.py
+   (MeshProvider protocol mirroring the parts pipeline, deterministic CI
+   stub, VRAM-preflighted external adapters in their OWN venvs,
+   candidates/mesh.* provenance; 5 tests green). Payoff loop: one accepted
+   mesh feeds BOTH views — GLB into the 3D scene (design/22) and
+   3D-to-sprite re-renders with TRUE baked normals for the canon 2D game.
+   Spike gate before scaling: fen_boar + gloamfen_stalker, judged in-scene
+   and as sprite re-renders (docs/tech/31 §5). Hero assets (Matriarch,
+   legendaries) stay hand-directed.
