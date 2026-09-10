@@ -39,7 +39,10 @@ def main() -> int:
     with tempfile.TemporaryDirectory() as td:
         cmd = [sys.executable, str(root / "run.py"), str(args.image),
                "--output-dir", td, "--model-save-format", "glb",
-               "--mc-resolution", str(args.mc_resolution), "--bake-texture"]
+               "--mc-resolution", str(args.mc_resolution)]
+        # NOT --bake-texture: TripoSR's bake path builds its sampling grid on
+        # CPU and trips grid_sample's same-device check on torch>=2.6; the
+        # default vertex-colored GLB is what the spike judges anyway
         if has_alpha:
             cmd.append("--no-remove-bg")
         proc = subprocess.run(cmd, cwd=root)
