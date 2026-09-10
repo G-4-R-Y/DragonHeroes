@@ -1,0 +1,10 @@
+[train:cinder_drake] fresh net
+[train:cinder_drake] g0 cand0 fitness=0.514
+[train:cinder_drake] g0 cand1 fitness=-0.022
+[train:cinder_drake] g0 best=0.514 mean=0.246
+[train:cinder_drake] registered v1 (candidate — run the gate)
+[gate] cinder_drake v1: FAIL — fleet stays on previous pin
+   suite_scripted: {'win_rate': 0.0, 'fitness': -0.029, 'pass': False}
+   suite_scripted_sanity: {'mean_loser_hp': 0.0, 'pass': True}
+   suite_native: {'win_rate': 0.0, 'fitness': 0.0, 'pass': False}
+   suite_native_sanity: {'mean_loser_hp': 1.0, 'pass': False}

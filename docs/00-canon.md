@@ -692,20 +692,81 @@ Still open:
    diffuse for 3D. HD-2D is a plausible future direction, parked without a
    directional call.
 34. **Image-to-3D: local open weights, two tiers (2026-09-02, Ricardo: "go
-   with the max quality ones which can be run locally").** Character/creature
-   meshes are generated from GenForge CONCEPT RENDERS (never the 52px
-   sprites) by open-weight image-to-3D models under our control — no
-   per-asset SaaS. Hardware audit set the shape: the RTX 4050 (6 GB, CUDA
-   12.8 driver ✓, system nvcc still 11.5) runs the DRAFT tier (TripoSR /
-   Hunyuan3D-2mini shape); MAX QUALITY (TRELLIS(.2) / Hunyuan3D full,
-   16-24 GB) runs the SAME adapters on a rented 24 GB box for single-digit
-   dollars per weekly batch — open weights + our provenance = still "local"
-   in every sense that matters. Stage landed: genforge/pipeline/mesh_gen.py
-   (MeshProvider protocol mirroring the parts pipeline, deterministic CI
-   stub, VRAM-preflighted external adapters in their OWN venvs,
-   candidates/mesh.* provenance; 5 tests green). Payoff loop: one accepted
-   mesh feeds BOTH views — GLB into the 3D scene (design/22) and
-   3D-to-sprite re-renders with TRUE baked normals for the canon 2D game.
-   Spike gate before scaling: fen_boar + gloamfen_stalker, judged in-scene
-   and as sprite re-renders (docs/tech/31 §5). Hero assets (Matriarch,
-   legendaries) stay hand-directed.
+    with the max quality ones which can be run locally").** Character/creature
+    meshes are generated from GenForge CONCEPT RENDERS (never the 52px
+    sprites) by open-weight image-to-3D models under our control — no
+    per-asset SaaS. Hardware audit set the shape: the RTX 4050 (6 GB, CUDA
+    12.8 driver ✓, system nvcc still 11.5) runs the DRAFT tier (TripoSR /
+    Hunyuan3D-2mini shape); MAX QUALITY (TRELLIS(.2) / Hunyuan3D full,
+    16-24 GB) runs the SAME adapters on a rented 24 GB box for single-digit
+    dollars per weekly batch — open weights + our provenance = still "local"
+    in every sense that matters. Stage landed: genforge/pipeline/mesh_gen.py
+    (MeshProvider protocol mirroring the parts pipeline, deterministic CI
+    stub, VRAM-preflighted external adapters in their OWN venvs,
+    candidates/mesh.* provenance; 5 tests green). Payoff loop: one accepted
+    mesh feeds BOTH views — GLB into the 3D scene (design/22) and
+    3D-to-sprite re-renders with TRUE baked normals for the canon 2D game.
+    Spike gate before scaling: fen_boar + gloamfen_stalker, judged in-scene
+    and as sprite re-renders (docs/tech/31 §5). Hero assets (Matriarch,
+    legendaries) stay hand-directed.
+35. **The Arena: observable self-play + the two policy lineages (2026-09-02,
+    Ricardo: "create the arena system where self-play can be ran and observed...
+    a specific neural net for each creature type... and a global version that
+    learns from every episode... include player models with different builds").**
+    game/arena/ runs creature/creature, build/creature and build/build matches
+    on the prototype combat code — windowed for watching, headless for
+    training (design/23). Two minimal seams make it possible (additive ARENA
+    HOOK patches, hunt behavior unchanged): target_override (creatures/
+    projectiles/pets can hunt a node other than the "player" group) and
+    bot_drive + ProtoBuild (external policies drive bodies; Session-compatible
+    build objects let two geared builds share one scene). EVERY fighter is
+    targeted through one ArenaProxy child. Policy lineages: per-species nets
+    (fine-tuned per creature type) AND one global net with an embedding row
+    per content id learning from all episodes — both load through ONE runtime
+    (arena.obs.v1 schema, 31 obs + 16-dim embedding, versioned). Fairness
+    baked in per §9: 150-250 ms obs delay, aim noise, burst-binding action
+    cap. Episodes log obs+action JSONL (R0 dataset, ml/data/episodes). ml/ is
+    live: numpy policy twin, ES league trainer (bootstrap until dh-env — the
+    registry/gate/schema port unchanged to PufferLib), eval gate whose failure
+    mode is "fleet stays on previous pin". The arena roster (content/core/
+    arena/builds.json + schema) also defines BOUNTY HUNTERS — player-shaped
+    NPCs with class/attributes/rolled gear/runes/skill loadouts/pets and
+    COSMETIC loadouts (element auras, Grand-Chase necklaces, weapon glows —
+    the GenForge cosmetics pack, presentation-only per §2). Gates: ARENA
+    SELFTEST OK, COSMETICS OK, ml pytest 10/10.
+36. **P2P co-op for friends & LAN (2026-09-02, Ricardo: "allow both lan play
+    and lobby play via peer-to-peer… Nakama server will be the way to go
+    futurely… keep things simple for now, just me and friends playing").**
+    game/mp/ lands prototype-grade co-op: ENet P2P (one HOST, up to 3 JOIN by
+    IP — party cap 4 per §4), a lobby (name/class/ready/start), HOST-
+    AUTHORITATIVE hunt (the one real sim runs on the host; clients send 30 Hz
+    inputs and render 20 Hz hand-rolled RPC snapshots — no
+    MultiplayerSynchronizer/Spawner for combat, §6 respected). The world never
+    crosses the wire: the lobby picks the hunt seed and every peer regenerates
+    the identical world (dh-procgen determinism). Remote hunters are real
+    ProtoPlayers via the arena seams (bot_drive + ProtoBuild, auto-rolled from
+    class at party level). SHIPPING architecture unchanged (§6 zones + Nakama
+    matchmaking, design/21 M-A) — this is the friends-and-LAN bridge and M-A
+    de-risking, with honest v1 simplifications (shared party profile: loot/XP
+    are the host's Session; no prediction; no NAT traversal — port-forward or
+    overlay for internet). MP HOOK patches: creatures/bolts target the
+    NEAREST hunter; remote deaths respawn via the driver; world forced_seed.
+    Gate: tools/mp_test.sh (two headless processes, loopback) → MP TEST OK.
+    Docs: tech/33; usage manual: docs/USAGE.md.
+37. **Open source + moddable (2026-09-02, Ricardo: "make it full open source
+    — extensible and extremely moddable").** Anti-piracy-by-cryptography is
+    rejected outright: client binaries are inherently crackable, DRM costs
+    performance (violates the 60 FPS directive), and our value is
+    server-resident BY DESIGN (authoritative combat, economy-core sole writer,
+    web-only marketplace, server-only policy weights, account-bound
+    entitlements) — a pirated client is a sandbox, not a business. Decision:
+    client, sim, tools, ml, genforge and docs are OPEN SOURCE; license split
+    CONFIRMED: code MIT, art/content PROPRIETARY (all rights reserved,
+    LICENSE-ASSETS — modders distribute code/data, assets come from official
+    builds), secrets never in-repo. Modding = the existing content-pack system formalized: mods are
+    schema-validated data packs (NO scripts — §7 already), loaded via the
+    weekly-drop PCK path; solo = anything goes, P2P co-op = content-hash match,
+    ranked/economy = official packs only (mod IDs quarantined by namespace).
+    Cheating (not piracy) is the residual risk: server authority + AOI +
+    replay anomaly detection are the answer; no kernel anything. Full spec +
+    checklist: business/32.

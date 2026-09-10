@@ -27,7 +27,9 @@ const CRIT_MULT := 1.5          # (proposal)
 # sess = the Session autoload (passed in: statics can't assume autoload scope).
 # equipment: optional override (hypothetical loadout) for equip-diff previews;
 # empty = the session's real equipment.
-static func compute(sess: Node, equipment: Dictionary = {}) -> Dictionary:
+# ARENA: typed Object (not Node) so Session-compatible RefCounted build objects
+# (arena/builds.gd ProtoBuild) can drive the same pipeline — build vs build.
+static func compute(sess: Object, equipment: Dictionary = {}) -> Dictionary:
 	var eq: Dictionary = equipment if not equipment.is_empty() else sess.equipment
 	var pts := {}
 	for a in sess.ATTRIBUTES:
@@ -109,7 +111,9 @@ static func compute(sess: Node, equipment: Dictionary = {}) -> Dictionary:
 		# class-tree skill cooldowns divide by this (cooldown_reduction %)
 		"cdr_mult": 1.0 / (1.0 + float(node_mods.get("cooldown_reduction", 0.0)) / 100.0),
 		"armor": armor,
-		"phys_reduction": armor / (armor + 150.0),
+		# clamped: blood_price can take armor negative, but armor <= -150 is a
+		# division singularity that would turn hits into HEALING
+		"phys_reduction": clampf(armor / (armor + 150.0), -0.5, 0.9),
 		"resist_pct": minf(res_pct, 0.75),
 		"status_resist_pct": minf(0.02 * pts.willpower \
 				+ float(node_mods.get("status_resist_pct", 0.0)) / 100.0, 0.75),

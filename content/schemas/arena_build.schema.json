@@ -1,0 +1,118 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "arena_build.schema.json",
+  "title": "Arena build catalog",
+  "description": "Combatant roster for the self-play arena (docs/design/23): player builds (bounty hunters / Champion-Ghost stand-ins) and creature/boss builds, incl. cosmetic loadouts (presentation only).",
+  "type": "object",
+  "required": ["id", "builds"],
+  "properties": {
+    "id": {"type": "string", "pattern": "^[a-z0-9_]+\\.arena\\.[a-z0-9_]+$"},
+    "note": {"type": "string"},
+    "builds": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/definitions/build"}
+    },
+    "rotation": {
+      "type": "array",
+      "items": {
+        "type": "array",
+        "minItems": 2,
+        "maxItems": 2,
+        "items": {"type": "string"}
+      }
+    }
+  },
+  "definitions": {
+    "element": {
+      "type": "string",
+      "enum": ["fire", "frost", "storm", "venom", "umbral", "blood"]
+    },
+    "build": {
+      "type": "object",
+      "required": ["id", "kind", "name"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z0-9_]+\\.arena\\.[a-z0-9_]+$"},
+        "role": {"type": "string", "enum": ["bounty_hunter", "champion", "ghost"]},
+        "kind": {"type": "string", "enum": ["player", "creature", "boss"]},
+        "name": {"type": "string", "minLength": 1},
+        "policy": {"type": "string", "enum": ["native", "scripted"]},
+        "hp_scale": {"type": "number", "exclusiveMinimum": 0},
+        "dmg_scale": {"type": "number", "exclusiveMinimum": 0},
+        "cosmetics": {
+          "type": "object",
+          "properties": {
+            "aura": {"$ref": "#/definitions/element"},
+            "necklace": {"$ref": "#/definitions/element"},
+            "weapon": {"$ref": "#/definitions/element"}
+          },
+          "additionalProperties": false
+        },
+        "class_id": {"type": "string"},
+        "level": {"type": "integer", "minimum": 1, "maximum": 100},
+        "attributes": {
+          "type": "object",
+          "properties": {
+            "might": {"type": "integer", "minimum": 0},
+            "agility": {"type": "integer", "minimum": 0},
+            "intellect": {"type": "integer", "minimum": 0},
+            "vitality": {"type": "integer", "minimum": 0},
+            "willpower": {"type": "integer", "minimum": 0}
+          },
+          "additionalProperties": false
+        },
+        "equipment": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["slot", "base", "rarity"],
+            "properties": {
+              "slot": {"type": "string", "enum": ["weapon", "chest", "helm", "boots", "amulet", "ring"]},
+              "base": {"type": "string"},
+              "rarity": {"type": "string", "enum": ["common", "uncommon", "rare", "epic", "legendary"]},
+              "quality": {"type": "number", "minimum": 0, "maximum": 1}
+            },
+            "additionalProperties": false
+          }
+        },
+        "runes": {
+          "type": "object",
+          "properties": {
+            "cleave": {"type": "string"},
+            "rend": {"type": "string"},
+            "dodge": {"type": "string"}
+          },
+          "additionalProperties": false
+        },
+        "learned": {"type": "array", "items": {"type": "string"}},
+        "loadout": {"type": "array", "maxItems": 4, "items": {"type": "string"}},
+        "pet": {
+          "type": "object",
+          "properties": {
+            "name": {"type": "string"},
+            "roll_pct": {"type": "integer", "minimum": 70, "maximum": 110},
+            "species": {"type": "string"}
+          },
+          "additionalProperties": false
+        },
+        "bundle": {"type": "string"},
+        "species": {"type": "string"},
+        "archetype": {"type": "string"},
+        "affix": {"type": "string", "enum": ["", "Brutal", "Swift", "Fiery", "Bulwark"]},
+        "chassis": {"type": "string", "enum": ["boss", "hag", "pyre", "colossus"]},
+        "legendary": {"type": "string"}
+      },
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {"properties": {"kind": {"const": "player"}}},
+          "then": {"required": ["class_id", "level", "attributes", "equipment"]}
+        },
+        {
+          "if": {"properties": {"kind": {"const": "boss"}}},
+          "then": {"required": ["chassis"]}
+        }
+      ]
+    }
+  }
+}

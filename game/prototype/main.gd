@@ -148,11 +148,18 @@ func _ready() -> void:
 
 	world = WorldScene.new()
 	world.add_to_group("world")
+	# MP HOOK (docs/tech/33): in P2P co-op the lobby picked the hunt seed — every
+	# peer generates the identical world locally; only entities cross the wire.
+	if MpNet.pending_seed != 0:
+		world.forced_seed = MpNet.pending_seed
 	add_child(world)
 
 	player = PlayerScene.new()
 	player.global_position = world.spawn_point()
 	add_child(player)
+	# MP HOOK: co-op host — spawn the remote hunters and start replicating.
+	if MpNet.in_game and MpNet.is_host:
+		add_child(preload("res://mp/host_driver.gd").new())
 
 	# Hunts are fresh; the character is not — carry state from the Session autoload.
 	# Gear/attribute effects apply through player.apply_stats() (stats.gd).
@@ -575,6 +582,12 @@ func _physics_process(delta: float) -> void:
 					player.take_damage(f.dps * 0.25, Vector2.ZERO, "status")
 				if float(k.slow) > 0.0:
 					player.apply_slow(float(k.slow))
+			# hostile fields burn pets too — a pet can't tank lava for free
+			if not f.get("friendly", false):
+				for pet in get_tree().get_nodes_in_group("pet"):
+					if pet.hp > 0.0 and pet.global_position.distance_to(f.pos) < f.radius:
+						if f.dps > 0.0:
+							pet.take_damage(f.dps * 0.25, Vector2.ZERO)
 	if dirty:
 		for f in _fields:
 			if now > f.until and is_instance_valid(f.get("glow")):
@@ -590,6 +603,12 @@ func _physics_process(delta: float) -> void:
 	if _despawn_t <= 0.0:
 		_despawn_t = STREAM_DESPAWN_CADENCE
 		_despawn_far_creatures()
+	# camera lookahead: lead ~12% of the player->cursor vector (clamped) so
+	# ranged/kiting fights don't happen at the screen edge
+	if camera != null and not player.dead:
+		var look := (player.get_global_mouse_position()
+				- player.global_position) * 0.12
+		camera.position = camera.position.lerp(look.limit_length(40.0), delta * 6.0)
 
 # Kept as the classic entry point (Matriarch's Magma Breath calls this).
 func spawn_fire_field(at: Vector2, radius: float, duration: float, dps: float) -> void:
@@ -697,10 +716,16 @@ func _draw_fields() -> void:
 
 # ---- combat feedback -------------------------------------------------------
 
+var _hitstop_token := 0   # last-writer-wins: overlapping hitstops (a cleave
+# hitting 5 targets + a finisher) must not let the FIRST timer end the stop early
+
 func hitstop(scale := 0.15, dur := 0.045) -> void:
+	_hitstop_token += 1
+	var tok := _hitstop_token
 	Engine.time_scale = scale
 	await get_tree().create_timer(dur, true, false, true).timeout
-	Engine.time_scale = 1.0
+	if tok == _hitstop_token:
+		Engine.time_scale = 1.0
 
 func shake(amount: float) -> void:
 	_shake = maxf(_shake, amount)
@@ -1117,6 +1142,10 @@ func _grant_level_ups() -> void:
 	damage_number(player.global_position + Vector2(0, -24), 0, Color("ffe9d0"),
 			ProtoLang.t("msg_level_points") % [gained, levels])
 	player.apply_stats()   # higher level unlocks higher affix tiers on future rolls
+	# a ding is a sustain beat too: leveling heals to full (the hunt has no
+	# potions — without a sustain floor, long hunts are pure attrition)
+	player.hp = player.max_hp
+	refresh_hud()
 
 func _drop(at: Vector2, kind: String, amount: int) -> void:
 	var pk := PickupScene.new()
@@ -1182,7 +1211,14 @@ func add_gold(amount: int) -> void:
 	_sync_session()
 	refresh_hud()
 
-func on_player_death() -> void:
+func on_player_death(who = null) -> void:
+	# MP HOOK (docs/tech/33): a REMOTE hunter went down — the co-op driver
+	# respawns them near the host; the gold penalty is the local hunter's only.
+	if who != null and who != player:
+		var drv := get_tree().get_first_node_in_group("mp_host")
+		if drv != null:
+			drv.on_remote_death(who)
+		return
 	# Death rules taste (design/12 owns them): lose 25% of carried Gold.
 	var lost := int(gold * 0.25)
 	gold -= lost
@@ -1413,8 +1449,22 @@ func _update_boss_bar() -> void:
 		_hud.boss_bar2.color = rows[1].bar_color
 		_hud.boss_bar2.size.x = 300.0 * clampf(rows[1].hp / rows[1].max_hp, 0, 1)
 
+var _low_hp := false   # low-HP feedback state (refresh_hud)
+
 func refresh_hud() -> void:
-	_hud.hp_bar.size.x = 180.0 * clampf(player.hp / player.max_hp, 0, 1)
+	var hp_frac := clampf(player.hp / player.max_hp, 0, 1)
+	_hud.hp_bar.size.x = 180.0 * hp_frac
+	# low-HP read: the bar goes red and breathes; crossing the line pulses the post
+	if hp_frac <= 0.3 and player.hp > 0.0:
+		var pulse := 0.5 + 0.5 * sin(Time.get_ticks_msec() / 160.0)
+		_hud.hp_bar.color = Color("d84f4f").lerp(Color(1.0, 0.45, 0.4), pulse * 0.6)
+		if not _low_hp:
+			_low_hp = true
+			post.pulse(0.6)
+			play_ui("hit", -14.0)
+	else:
+		_hud.hp_bar.color = Color("58c470")
+		_low_hp = false
 	_hud.stats.text = ProtoLang.t("hud_stats") % [
 			Session.level, gold, kills, stones, snares,
 			Session.inventory.size(), ProtoItems.INVENTORY_CAP,

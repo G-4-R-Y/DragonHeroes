@@ -32,6 +32,9 @@
 | [20-release-retrospective-v1-v2](design/20-release-retrospective-v1-v2.md) | v1 → v2: first playable snapshot vs today, same engine, the authored-systems delta |
 | [21-multiplayer-roadmap](design/21-multiplayer-roadmap.md) | MP milestones: co-op infinite world (M-A) → PvP (M-B) → the combat/skill overhaul (M-C) |
 | [22-3d-alternative-view](design/22-3d-alternative-view.md) | The 3D view experiment: same world/art/data in perspective 3D; reuse scorecard; 2D stays canon |
+| [23-arena-and-self-play](design/23-arena-and-self-play.md) | The arena: observable self-play, per-species + global policies, bounty-hunter builds, cosmetics pack |
+| [24-order-of-magnitude](design/24-order-of-magnitude.md) | The OM levers: AI profiles, run structure, systemic bosses, pets as a build axis, C++ port, RC, audio |
+| [USAGE.md](USAGE.md) | **The usage manual: play, co-op, arena, training, content workflows, gates** |
 | **tech/** | |
 | [20-architecture-overview](tech/20-architecture-overview.md) | System map, one-sim-three-consumers, data flows, decision table |
 | [21-simulation-core](tech/21-simulation-core.md) | C++ sim workspace, entity store, tick pipeline, fields, determinism |
@@ -45,6 +48,8 @@
 | [29-infinite-world-streaming](tech/29-infinite-world-streaming.md) | Streaming the infinite world as a moving window: AOI budgets, worker threads, STREAMTEST gate |
 | [30-android-and-lan-builds](tech/30-android-and-lan-builds.md) | Exporting the prototype to Android: presets, keystores, adb; honest mobile/LAN caveats |
 | [31-image-to-3d-local](tech/31-image-to-3d-local.md) | Image-to-3D on open weights: draft tier (RTX 4050) vs max-quality rented tier; mesh_gen stage + runbook |
+| [32-scaling-rl-training](tech/32-scaling-rl-training.md) | Thousands of parallel episodes: parallel Godot workers (landed), dh-env, fleets |
+| [33-p2p-coop](tech/33-p2p-coop.md) | P2P co-op (friends & LAN): lobby, host authority, snapshot replication |
 | **business/** | |
 | [30-legal-payments-compliance](business/30-legal-payments-compliance.md) | Brazilian gambling/minors law, PSPs, tax, AML, LGPD — **read before launch decisions** |
 | [31-roadmap](business/31-roadmap.md) | M0→M6 milestones, exit gates, parallel tracks, risk register |

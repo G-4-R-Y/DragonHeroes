@@ -44,6 +44,13 @@ var _scale := 1.0
 var pack_anchor := Vector2.ZERO
 var dead := false
 var threat := false              # fought the player — the pet hunts these
+# ARENA HOOKS (game/arena self-play, docs/design/23): target_override makes this
+# creature hunt a specific node (an ArenaProxy) instead of the global "player"
+# group — that's what enables creature-vs-creature. bot_drive skips the built-in
+# chase/idle decisions (windup/recover still resolve) so an external policy can
+# drive via _move()/bot_attack() — the RL-policy seam.
+var target_override: Node2D = null
+var bot_drive := false
 
 var _state := "idle"            # idle | chase | windup | recover
 var _timer := 0.0
@@ -332,14 +339,19 @@ func _physics_process(delta: float) -> void:
 		_enrage_t -= delta
 		if _enrage_t <= 0.0:
 			sprite.self_modulate = _base_tint
-	var player := get_tree().get_first_node_in_group("player")
+	var player: Node2D = target_override if is_instance_valid(target_override) \
+			else _nearest_player()
 	if player == null or player.dead:
 		_state = "idle"
 	match _state:
 		"idle":
-			_idle(delta, player)
+			if not bot_drive:
+				_idle(delta, player)
 		"chase":
-			_chase(delta, player)
+			if bot_drive:
+				_state = "idle"   # policy-driven: no built-in chase decisions
+			else:
+				_chase(delta, player)
 		"windup":
 			_timer -= delta
 			if _timer <= 0.0:
@@ -469,6 +481,28 @@ func enrage(duration: float) -> void:
 	if _state == "idle":
 		_state = "chase"
 
+# MP HOOK (docs/tech/33): co-op has up to 4 hunters — creatures hunt the
+# NEAREST living one instead of the first node in the group.
+func _nearest_player() -> Node2D:
+	var best: Node2D = null
+	var best_d := INF
+	for p in get_tree().get_nodes_in_group("player"):
+		if p.dead:
+			continue
+		var d: float = p.global_position.distance_squared_to(global_position)
+		if d < best_d:
+			best_d = d
+			best = p
+	return best
+
+# ARENA HOOK: policy-driven attack — the same windup/strike path the built-in
+# AI uses, so telegraphs, recover windows and cooldowns all still apply.
+func bot_attack(dir: Vector2) -> bool:
+	if dead or _cd > 0.0 or _state == "windup":
+		return false
+	_begin_windup(dir)
+	return true
+
 func _begin_windup(dir: Vector2) -> void:
 	_state = "windup"
 	_timer = windup_time
@@ -543,8 +577,11 @@ func _strike(player: Node2D) -> void:
 	var cos_half := cos(deg_to_rad(attack_arc_deg * 0.5))
 	if player != null and not player.dead:
 		var to_player := player.global_position - global_position
+		# point-blank always connects: at zero separation the arc dot test
+		# normalizes a zero vector and point-blank strikes would whiff
 		if to_player.length() <= attack_reach + player.body_radius \
-				and to_player.normalized().dot(_attack_dir) >= cos_half:
+				and (to_player.length() <= 0.5 * player.body_radius \
+				or to_player.normalized().dot(_attack_dir) >= cos_half):
 			player.take_damage(damage, _attack_dir)
 			if fiery:   # Fiery affix: +50% as a fire packet (resist-mitigated)
 				player.take_damage(damage * 0.5, _attack_dir, "fire")
@@ -554,7 +591,8 @@ func _strike(player: Node2D) -> void:
 			continue
 		var to_pet: Vector2 = pet.global_position - global_position
 		if to_pet.length() <= attack_reach + pet.body_radius \
-				and to_pet.normalized().dot(_attack_dir) >= cos_half:
+				and (to_pet.length() <= 0.5 * pet.body_radius \
+				or to_pet.normalized().dot(_attack_dir) >= cos_half):
 			pet.take_damage(damage, _attack_dir)
 
 func _move(step: Vector2) -> void:
@@ -573,11 +611,12 @@ func _separate(delta: float) -> void:
 		if d.length() < min_d and d.length() > 0.01:
 			_move(d.normalized() * (min_d - d.length()) * 4.0 * delta)
 
-# Ignite (runes + class skills): refreshes the burn each application.
+# Ignite (runes + class skills): refreshes the burn each application, but a
+# weaker proc never erases a stronger burn's dps (same rule as Bleed stacks).
 func ignite(dps: float, duration: float) -> void:
 	if dead:
 		return
-	_burn_dps = dps
+	_burn_dps = maxf(_burn_dps, dps)
 	_burn_t = duration
 	threat = true
 
@@ -667,9 +706,11 @@ func shove(dir: Vector2, dist: float) -> void:
 	if not dead:
 		_move(dir.normalized() * dist)
 
-func take_damage(dmg: float, from_dir: Vector2, spark_color := Color("cfd6ff"), crit := false) -> void:
+func take_damage(dmg: float, from_dir: Vector2, spark_color: Variant = Color("cfd6ff"), crit := false) -> void:
 	if dead:
 		return
+	if spark_color is String:   # ARENA: a player-style (dmg, dir, dmg_type) hit
+		spark_color = Color("cfd6ff")   # landed on an unwrapped creature
 	if _expose_t > 0.0:   # Exposed: +20% from ALL sources (skill-tree synergy)
 		dmg *= EXPOSE_MULT
 	hp -= dmg

@@ -97,6 +97,7 @@ func _strike(player: Node2D) -> void:
 			p.trail_a = Color(0.6, 0.5, 0.35, 0.8)
 			p.trail_b = Color(0.3, 0.22, 0.12, 0.0)
 			p.radius = 7.0
+			p.shooter = self   # ARENA: lets the bolt hunt target_override
 			p.global_position = global_position
 			p.velocity = _attack_dir * 10.0 * TILE
 			p.damage = 22.0 * dmg_scale

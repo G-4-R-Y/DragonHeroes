@@ -1,0 +1,24 @@
+DRAGON HEROES — ART & CONTENT LICENSE (PROPRIETARY)
+
+All artwork, sprites, textures, animations, audio, lore, names, characters,
+creature designs, item designs, and content data in this repository —
+including but not limited to the contents of art/, content/,
+game/prototype/art/, game/prototype/data/, and genforge/lore/ — are
+
+    Copyright (c) 2026 IntelliGames. ALL RIGHTS RESERVED.
+
+They are NOT covered by the MIT license that applies to the code (LICENSE).
+
+You MAY:
+  - run the game and create personal backups;
+  - create MODS (content packs) that REFERENCE these assets at runtime on an
+    unmodified installation, per the modding contract (docs/business/32 §3);
+  - share unmodified gameplay screenshots and video (streaming/reviews).
+
+You MAY NOT, without written permission from IntelliGames:
+  - redistribute these assets, modified or not, standalone or bundled;
+  - use them in another game, product, or service, commercial or not;
+  - sell or monetize anything derived from them.
+
+Community servers and mods are welcome: distribute your own code and data —
+players fetch the proprietary assets from an official build.

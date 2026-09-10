@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://dheroes_client_hunt"]
+
+[ext_resource type="Script" path="res://mp/client_hunt.gd" id="1"]
+
+[node name="ClientHunt" type="Node2D"]
+script = ExtResource("1")

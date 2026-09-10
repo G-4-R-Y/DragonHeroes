@@ -143,6 +143,7 @@ func _strike(player: Node2D) -> void:
 			_timer = 0.9   # the volley's recovery IS the punish window
 			for i in 3:
 				var p := HexProjectile.new()
+				p.shooter = self   # ARENA: lets the bolt hunt target_override
 				p.set_violet()
 				p.global_position = global_position
 				p.velocity = _attack_dir.rotated(deg_to_rad(-14.0 + 14.0 * i)) \

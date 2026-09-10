@@ -146,6 +146,16 @@ func _build() -> void:
 	btn.pressed.connect(_enter)
 	vb.add_child(btn)
 
+	# CO-OP (P2P): the friends-and-LAN path (docs/tech/33) — Nakama matchmaking
+	# replaces discovery later; the hunt itself stays host-authoritative either way.
+	var coop := Button.new()
+	coop.text = "CO-OP (P2P)"
+	coop.custom_minimum_size = Vector2(190, 0)
+	coop.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	coop.pressed.connect(func() -> void:
+		get_tree().change_scene_to_file("res://mp/lobby.tscn"))
+	vb.add_child(coop)
+
 	# saved hunters (user://saves) — entering a listed name continues that character
 	var saves: Array = Session.list_saves()
 	if not saves.is_empty():
@@ -178,6 +188,26 @@ func _build() -> void:
 	lang_btn.position = Vector2(8, 330)
 	lang_btn.pressed.connect(_toggle_lang)
 	add_child(lang_btn)
+
+	# Display settings (canon §12.38) — bottom-right: window/fullscreen + pixel fit
+	var disp: Dictionary = ProtoDisplay.current()
+	var mode_btn := Button.new()
+	mode_btn.text = "MODE: %s" % str(disp.get("mode", "windowed")).to_upper()
+	mode_btn.focus_mode = Control.FOCUS_NONE
+	mode_btn.add_theme_font_size_override("font_size", ProtoTheme.SIZE_BODY)
+	mode_btn.position = Vector2(516, 330)
+	mode_btn.pressed.connect(func() -> void:
+		mode_btn.text = "MODE: %s" % ProtoDisplay.cycle_mode().to_upper())
+	add_child(mode_btn)
+	var fit_btn := Button.new()
+	fit_btn.text = "FIT: %s" % str(disp.get("scale", "integer")).to_upper()
+	fit_btn.focus_mode = Control.FOCUS_NONE
+	fit_btn.add_theme_font_size_override("font_size", ProtoTheme.SIZE_BODY)
+	fit_btn.position = Vector2(516, 306)
+	fit_btn.pressed.connect(func() -> void:
+		fit_btn.text = "FIT: %s" % ProtoDisplay.cycle_scale().to_upper())
+	add_child(fit_btn)
+	ProtoDisplay.apply_saved()
 
 	# glue the halo to wherever the centered VBox actually lands the title
 	# (content height shifts with the saves list / language). Guards cover the

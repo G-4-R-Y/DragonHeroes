@@ -19,6 +19,7 @@ config/features=PackedStringArray("4.6")
 [autoload]
 
 Session="*res://prototype/ui/session.gd"
+MpNet="*res://mp/mp_net.gd"
 
 [display]
 

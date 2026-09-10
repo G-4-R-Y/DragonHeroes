@@ -1,0 +1,10 @@
+[train:bog_golem] fresh net
+[train:bog_golem] g0 cand0 fitness=-0.002
+[train:bog_golem] g0 cand1 fitness=-0.005
+[train:bog_golem] g0 best=-0.002 mean=-0.003
+[train:bog_golem] registered v1 (candidate — run the gate)
+[gate] bog_golem v1: FAIL — fleet stays on previous pin
+   suite_scripted: {'win_rate': 0.0, 'fitness': -0.02, 'pass': False}
+   suite_scripted_sanity: {'mean_loser_hp': 0.523, 'pass': True}
+   suite_native: {'win_rate': 0.0, 'fitness': 0.0, 'pass': False}
+   suite_native_sanity: {'mean_loser_hp': 1.0, 'pass': False}

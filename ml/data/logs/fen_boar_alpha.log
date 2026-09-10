@@ -1,0 +1,10 @@
+[train:fen_boar_alpha] fresh net
+[train:fen_boar_alpha] g0 cand0 fitness=-0.017
+[train:fen_boar_alpha] g0 cand1 fitness=-0.007
+[train:fen_boar_alpha] g0 best=-0.007 mean=-0.012
+[train:fen_boar_alpha] registered v1 (candidate — run the gate)
+[gate] fen_boar_alpha v1: FAIL — fleet stays on previous pin
+   suite_scripted: {'win_rate': 0.0, 'fitness': -0.007, 'pass': False}
+   suite_scripted_sanity: {'mean_loser_hp': 0.14, 'pass': True}
+   suite_native: {'win_rate': 0.0, 'fitness': 0.0, 'pass': False}
+   suite_native_sanity: {'mean_loser_hp': 1.0, 'pass': False}

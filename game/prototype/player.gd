@@ -16,6 +16,15 @@ const DODGE_CHARGES_MAX := 3
 var max_hp := 100.0
 var hp := 100.0
 var body_radius := 8.0
+# ARENA HOOKS (game/arena self-play, docs/design/23): bot_drive hands control to
+# an external policy (it sets _bot_step per frame and calls use_skill/_attack/
+# bot_dodge directly); bot_aim replaces the mouse for every aimed skill;
+# build_source is a Session-compatible build object (arena/builds.gd ProtoBuild)
+# so two differently-geared builds can fight in one scene without the autoload.
+var bot_drive := false
+var bot_aim := Vector2.ZERO
+var build_source: Object = null
+var _bot_step := Vector2.ZERO
 var move_speed := 5.0 * TILE
 var attack_damage := 25.0
 var attack_reach := 2.2 * TILE
@@ -46,6 +55,15 @@ var charge_name := ""            # "" = this class has no charge mechanic
 var charge_max := 5
 var charge_per_stack := 0.25
 var _buffs: Array = []           # {until, mults:{attack_speed/move/damage/armor/leech}}
+
+# Input buffering (the Hades/Phantom-Tower feel bar): a press that lands up to
+# 150 ms BEFORE its cooldown ends is held and fired on the first ready frame
+# instead of being dropped. Bots bypass this (they call the executors directly).
+const INPUT_BUFFER_S := 0.15
+var _buf_dodge := 0.0
+var _buf_skill2 := 0.0
+var _buf_bestial := 0.0
+var _buf_slots := [0.0, 0.0, 0.0, 0.0]
 
 # Mounts (Ricardo, proposals): M rides the active mount. Walking respects
 # terrain; FLYING crosses water/rock. Combat or damage dismounts.
@@ -109,7 +127,7 @@ func _ready() -> void:
 	# soft warm pool under the hero (lights.gd) — the cheapest "sits IN the
 	# world" read there is. Deferred: main is still assembling fx at class cast.
 	call_deferred("_attach_ground_glow")
-	match str(Session.class_id):   # class cast (full class art: design/10/17)
+	match str(_src().class_id):   # class cast (full class art: design/10/17)
 		"core.class.emberkin":
 			sprite.self_modulate = Color(1.15, 0.9, 0.8)
 		"core.class.frostbinder":
@@ -118,8 +136,17 @@ func _ready() -> void:
 
 # Reads the real StatBlock (attributes + gear + enchants) and the rune sockets.
 # Called at hunt start and again on every equip/allocate/socket change.
+# ARENA HOOK: the stats source — the Session autoload in the hunt, a
+# Session-compatible ProtoBuild in arena matches (build vs build).
+func _src() -> Object:
+	return build_source if build_source != null else Session
+
+# ARENA HOOK: aimed skills read the policy's aim point under bot_drive.
+func _aim_point() -> Vector2:
+	return bot_aim if bot_drive else get_global_mouse_position()
+
 func apply_stats() -> void:
-	var s := ProtoStats.compute(Session)
+	var s := ProtoStats.compute(_src())
 	max_hp = s.max_hp
 	hp = max_hp if not _stats_applied else minf(hp, max_hp)
 	_stats_applied = true
@@ -154,13 +181,13 @@ func apply_stats() -> void:
 	_skill_mult = s.skill_damage_mult
 	cdr_mult = float(s.get("cdr_mult", 1.0))
 	# class charge mechanic (Attunement/Combo) — data from skill_trees.json
-	var ch: Dictionary = Session.class_charge()
+	var ch: Dictionary = _src().class_charge()
 	charge_name = str(ch.get("name", ""))
 	charge_max = int(ch.get("max", 5))
 	charge_per_stack = float(ch.get("per_stack", 0.25))
-	_rune_cleave = Session.rune_effect("cleave")
-	_rune_rend = Session.rune_effect("rend")
-	_rune_dodge = Session.rune_effect("dodge")
+	_rune_cleave = _src().rune_effect("cleave")
+	_rune_rend = _src().rune_effect("rend")
+	_rune_dodge = _src().rune_effect("dodge")
 
 func _physics_process(delta: float) -> void:
 	if dead:
@@ -199,11 +226,19 @@ func _physics_process(delta: float) -> void:
 		_echo_t -= delta
 		if _echo_t <= 0.0:
 			_fire_echo()
+	# input buffers decay (presses held for their ready frame)
+	_buf_dodge = maxf(_buf_dodge - delta, 0.0)
+	_buf_skill2 = maxf(_buf_skill2 - delta, 0.0)
+	_buf_bestial = maxf(_buf_bestial - delta, 0.0)
+	for i in 4:
+		_buf_slots[i] = maxf(_buf_slots[i] - delta, 0.0)
 
 	var step := Vector2.ZERO
 	if _dodging > 0.0:
 		_dodging -= delta
 		step = _dodge_dir * (4.0 * TILE / 0.12) * delta
+	elif bot_drive:   # ARENA HOOK: the policy already set _bot_step; skip Input
+		step = _bot_step
 	else:
 		var input := Input.get_vector("move_left", "move_right", "move_up", "move_down")
 		var spd := move_speed * (0.65 if _slow_t > 0.0 else 1.0) * _buff_mult("move")
@@ -214,7 +249,17 @@ func _physics_process(delta: float) -> void:
 				or Input.is_action_just_pressed("dodge")
 				or Input.is_action_just_pressed("bestial")):
 			_dismount()   # no combat from the saddle — dismount first (proposal)
-		if not mounted and Input.is_action_just_pressed("dodge") and dodge_charges > 0:
+		# buffered actions: a press within INPUT_BUFFER_S of readiness still fires
+		if not mounted and Input.is_action_just_pressed("dodge"):
+			if dodge_charges > 0:
+				_buf_dodge = INPUT_BUFFER_S
+			else:   # pressed dry — the pips flash and a dull click says "empty"
+				var main := get_tree().get_first_node_in_group("main")
+				if main:
+					main.play_sfx("swing", global_position, -22.0)
+					main.fx.ring(global_position, Color(0.9, 0.3, 0.3, 0.5), 14.0, 0.2)
+		if not mounted and _buf_dodge > 0.0 and dodge_charges > 0:
+			_buf_dodge = 0.0
 			if dodge_charges == DODGE_CHARGES_MAX:
 				_dodge_recharge = dodge_recharge_s   # first spend starts the refill clock
 			dodge_charges -= 1
@@ -235,7 +280,10 @@ func _physics_process(delta: float) -> void:
 				_wind_burst(main)
 		if not mounted and Input.is_action_pressed("attack") and _attack_cd <= 0.0:
 			_attack()
-		if not mounted and Input.is_action_just_pressed("skill2") and _whirl_cd <= 0.0:
+		if not mounted and Input.is_action_just_pressed("skill2"):
+			_buf_skill2 = INPUT_BUFFER_S
+		if not mounted and _buf_skill2 > 0.0 and _whirl_cd <= 0.0:
+			_buf_skill2 = 0.0
 			match _kit:
 				"mage":
 					_frost_nova()
@@ -243,14 +291,22 @@ func _physics_process(delta: float) -> void:
 					_fan_of_knives()
 				_:
 					_whirlwind()
-		if not mounted and Input.is_action_just_pressed("bestial") and _rend_cd <= 0.0:
+		if not mounted and Input.is_action_just_pressed("bestial"):
+			_buf_bestial = INPUT_BUFFER_S
+		if not mounted and _buf_bestial > 0.0 and _rend_cd <= 0.0:
 			var main := get_tree().get_first_node_in_group("main")
 			if main and main.stones >= 1:   # owning a stone unlocks the bestial slot
+				_buf_bestial = 0.0
 				_shadow_rend(main)
 		if not mounted:   # skill bar: 1-4 cast the assigned class-tree actives
 			for i in 4:
 				if Input.is_action_just_pressed("slot%d" % (i + 1)):
-					_cast_slot(i)
+					_buf_slots[i] = INPUT_BUFFER_S
+				if _buf_slots[i] > 0.0:
+					var sid := str(Session.skill_loadout[i]) if i < Session.skill_loadout.size() else ""
+					if sid != "" and Session.node_learned(sid) and skill_cd_left(sid) <= 0.0:
+						_buf_slots[i] = 0.0
+						_cast_slot(i)
 	step += _knockback * delta * 8.0
 	_knockback = _knockback.lerp(Vector2.ZERO, delta * 10.0)
 	_try_move(step)
@@ -398,6 +454,8 @@ func _arc_hit(dir: Vector2, reach: float, arc_deg: float, dmg: float,
 	for c in get_tree().get_nodes_in_group("creatures"):
 		if c.dead:
 			continue
+		if ("owner_fighter" in c) and c.owner_fighter == self:   # ARENA: own proxy
+			continue
 		var to_c: Vector2 = c.global_position - global_position
 		if to_c.length() <= reach + c.body_radius \
 				and to_c.normalized().dot(dir) >= cos_half:
@@ -431,7 +489,7 @@ func _attack() -> void:
 		return
 	_attack_cd = attack_cd_s / _buff_mult("attack_speed")
 	_swing = 1.0
-	_swing_dir = (get_global_mouse_position() - global_position).normalized()
+	_swing_dir = (_aim_point() - global_position).normalized()
 	if _swing_dir.length() < 0.1:
 		_swing_dir = Vector2.RIGHT
 	sprite.flip_h = _swing_dir.x < 0.0
@@ -475,7 +533,7 @@ func _attach_ground_glow() -> void:
 func _shadow_rend(main: Node) -> void:
 	_rend_cd = rend_cd_s
 	_rend_swing = 1.0
-	_rend_dir = (get_global_mouse_position() - global_position).normalized()
+	_rend_dir = (_aim_point() - global_position).normalized()
 	if _rend_dir.length() < 0.1:
 		_rend_dir = Vector2.RIGHT
 	sprite.flip_h = _rend_dir.x < 0.0
@@ -519,6 +577,8 @@ func _whirlwind() -> void:
 	for c in get_tree().get_nodes_in_group("creatures"):
 		if c.dead:
 			continue
+		if ("owner_fighter" in c) and c.owner_fighter == self:   # ARENA: own proxy
+			continue
 		var to_c: Vector2 = c.global_position - global_position
 		if to_c.length() <= 2.6 * TILE + c.body_radius:
 			c.take_damage(dmg, to_c.normalized(), Color(0.85, 0.95, 1.0))
@@ -551,7 +611,7 @@ func _whirlwind() -> void:
 # Arcane Bolt (Gloam Mage LMB, proposal): ranged umbral projectile, 0.9x stat.
 func _cast_bolt() -> void:
 	_attack_cd = attack_cd_s / _buff_mult("attack_speed")
-	_swing_dir = (get_global_mouse_position() - global_position).normalized()
+	_swing_dir = (_aim_point() - global_position).normalized()
 	if _swing_dir.length() < 0.1:
 		_swing_dir = Vector2.RIGHT
 	sprite.flip_h = _swing_dir.x < 0.0
@@ -590,6 +650,8 @@ func _frost_nova() -> void:
 	for c in get_tree().get_nodes_in_group("creatures"):
 		if c.dead:
 			continue
+		if ("owner_fighter" in c) and c.owner_fighter == self:   # ARENA: own proxy
+			continue
 		var to_c: Vector2 = c.global_position - global_position
 		if to_c.length() <= 2.8 * TILE + c.body_radius:
 			c.take_damage(dmg, to_c.normalized(), Color(0.65, 0.9, 1.0))
@@ -616,7 +678,7 @@ func _frost_nova() -> void:
 func _fan_of_knives() -> void:
 	_whirl_cd = whirl_cd_s
 	_whirl_t = 0.6
-	var aim := (get_global_mouse_position() - global_position).normalized()
+	var aim := (_aim_point() - global_position).normalized()
 	if aim.length() < 0.1:
 		aim = Vector2.RIGHT
 	sprite.flip_h = aim.x < 0.0
@@ -674,7 +736,7 @@ func use_skill(def: Dictionary) -> bool:
 		return false
 	var p: Dictionary = def.get("params", {})
 	var kind := str(def.get("kind", ""))
-	var aim := (get_global_mouse_position() - global_position).normalized()
+	var aim := (_aim_point() - global_position).normalized()
 	if aim.length() < 0.1:
 		aim = Vector2.RIGHT
 	var main := get_tree().get_first_node_in_group("main")
@@ -726,7 +788,9 @@ func use_skill(def: Dictionary) -> bool:
 	# charge builders (stab/arcane-tagged actives) build on the cast
 	if int(def.get("charge_gain", 0)) > 0 and charge_name != "":
 		charge_stacks = mini(charge_stacks + int(def.get("charge_gain", 0)), charge_max)
-	skill_cds[id] = float(p.get("cd", 6.0)) * cdr_mult
+	# chain whiff refund: leaping into empty air costs half the cooldown
+	var cd_scale := 0.5 if kind == "chain" and not hit_any else 1.0
+	skill_cds[id] = float(p.get("cd", 6.0)) * cdr_mult * cd_scale
 	if crit and hit_any and main \
 			and kind in ["melee_arc", "cone", "nova", "chain", "dash_strike"]:
 		main.damage_number(global_position + Vector2(0, -34), 0, Color("ffd166"), "CRIT!")
@@ -787,6 +851,8 @@ func _detonate_pop(at: Vector2, total: float, radius: float, main: Node) -> void
 	for n in get_tree().get_nodes_in_group("creatures"):
 		if n.dead:
 			continue
+		if ("owner_fighter" in n) and n.owner_fighter == self:   # ARENA: own proxy
+			continue
 		if n.global_position.distance_to(at) <= radius + n.body_radius:
 			n.take_damage(total, (n.global_position - at).normalized(), Color("ff9a3c"))
 
@@ -797,6 +863,8 @@ func _targets_in_arc(dir: Vector2, reach: float, arc_deg: float) -> Array:
 		if c.dead:
 			continue
 		var to_c: Vector2 = c.global_position - global_position
+		if ("owner_fighter" in c) and c.owner_fighter == self:   # ARENA: own proxy
+			continue
 		if to_c.length() <= reach + c.body_radius \
 				and to_c.normalized().dot(dir) >= cos_half:
 			out.append(c)
@@ -851,6 +919,8 @@ func _exec_nova(def: Dictionary, p: Dictionary, dmg: float, col: Color,
 	var hit := false
 	for c in get_tree().get_nodes_in_group("creatures"):
 		if c.dead:
+			continue
+		if ("owner_fighter" in c) and c.owner_fighter == self:   # ARENA: own proxy
 			continue
 		var to_c: Vector2 = c.global_position - global_position
 		if to_c.length() <= radius + c.body_radius:
@@ -911,6 +981,8 @@ func _nearest_creature(at: Vector2, max_d: float, exclude: Array) -> Node2D:
 	for c in get_tree().get_nodes_in_group("creatures"):
 		if c.dead or exclude.has(c):
 			continue
+		if ("owner_fighter" in c) and c.owner_fighter == self:   # ARENA: own proxy
+			continue
 		var d: float = c.global_position.distance_to(at)
 		if d <= best_d:
 			best_d = d
@@ -942,9 +1014,10 @@ func _exec_chain(def: Dictionary, p: Dictionary, aim: Vector2, dmg: float,
 		from = nxt.global_position + Vector2(0, -8)
 		falloff *= 0.85
 		hit = true
-	if main and hit:
-		main.play_sfx("bolt", global_position, -8.0)
-		main.refresh_hud()
+	if main:
+		main.play_sfx("bolt", global_position, -8.0)   # cast feedback even on a whiff
+		if hit:
+			main.refresh_hud()
 	return hit
 
 # Dash strike: displacement along the aim (walkability-gated like the dodge),
@@ -961,6 +1034,8 @@ func _exec_dash(def: Dictionary, p: Dictionary, aim: Vector2, dmg: float,
 	var hit := false
 	for c in get_tree().get_nodes_in_group("creatures"):
 		if c.dead:
+			continue
+		if ("owner_fighter" in c) and c.owner_fighter == self:   # ARENA: own proxy
 			continue
 		var t := 0.0
 		if seg.length_squared() > 0.0:
@@ -1004,7 +1079,7 @@ func _exec_field(p: Dictionary, main: Node) -> void:
 	if main == null:
 		return
 	var range_px := float(p.get("range", 5.0)) * TILE
-	var at := get_global_mouse_position()
+	var at := _aim_point()
 	var to := at - global_position
 	if to.length() > range_px:
 		at = global_position + to.normalized() * range_px
@@ -1126,6 +1201,8 @@ func _wind_burst(main: Node) -> void:
 	for c in get_tree().get_nodes_in_group("creatures"):
 		if c.dead:
 			continue
+		if ("owner_fighter" in c) and c.owner_fighter == self:   # ARENA: own proxy
+			continue
 		var to_c: Vector2 = c.global_position - global_position
 		if to_c.length() <= 1.5 * TILE + c.body_radius:
 			var dir := to_c.normalized() if to_c.length() > 0.1 else Vector2.RIGHT
@@ -1135,11 +1212,26 @@ func _wind_burst(main: Node) -> void:
 func knockback(vec: Vector2) -> void:
 	_knockback = vec
 
+# ARENA HOOK: policy-driven dodge — the same charge + dash path the input dodge
+# takes (brief i-frames AND displacement, identical for humans and bots).
+func bot_dodge(dir: Vector2) -> bool:
+	if dead or mounted or _dodging > 0.0 or dodge_charges <= 0:
+		return false
+	if dodge_charges == DODGE_CHARGES_MAX:
+		_dodge_recharge = dodge_recharge_s   # first spend starts the refill clock
+	dodge_charges -= 1
+	_dodge_dir = dir.normalized() if dir.length() > 0.1 else Vector2.RIGHT
+	_dodging = 0.12
+	var main := get_tree().get_first_node_in_group("main")
+	_dodge_fx(_dodge_dir, main)
+	return true
+
 # dmg_type: "physical" (armor mitigates) | "fire"/"umbral"/... (resist mitigates)
 # | "status" (field/DoT ticks — status resist mitigates, proposal).
 func take_damage(dmg: float, _from_dir: Vector2, dmg_type := "physical") -> void:
 	if dead or _dodging > 0.0:
-		return  # dodging displaces you out of harm — no i-frames, position is the defense
+		return  # the dodge dash has brief i-frames (~0.12 s) AND displaces you —
+				# the genre-standard dash; bots get exactly the same window
 	if mounted:
 		_dismount(true)   # knocked out of the saddle
 	match dmg_type:
@@ -1162,7 +1254,7 @@ func take_damage(dmg: float, _from_dir: Vector2, dmg_type := "physical") -> void
 		visible = false
 		_reset_pose()   # never leave the sprite mid-tween across a respawn
 		if main:
-			main.on_player_death()
+			main.on_player_death(self)   # MP: remote hunters die on the host too
 
 func respawn(at: Vector2) -> void:
 	if mounted:
@@ -1173,6 +1265,22 @@ func respawn(at: Vector2) -> void:
 	visible = true
 	dodge_charges = DODGE_CHARGES_MAX
 	_knockback = Vector2.ZERO
+	# transient combat state dies at the grave: no respawning chilled, mid-dodge,
+	# mid-buff, on cooldown, or with a pending echo strike firing at spawn
+	_dodging = 0.0
+	_slow_t = 0.0
+	_buffs.clear()
+	skill_cds.clear()
+	charge_stacks = 0
+	_echo_t = 0.0
+	_attack_cd = 0.0
+	_rend_cd = 0.0
+	_whirl_cd = 0.0
+	_buf_dodge = 0.0
+	_buf_skill2 = 0.0
+	_buf_bestial = 0.0
+	for i in 4:
+		_buf_slots[i] = 0.0
 	_reset_pose()
 	sprite.play("idle")
 

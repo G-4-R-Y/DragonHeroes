@@ -37,6 +37,7 @@ TYPE_MAP = {
     "loot-tables": ("loot_table.schema.json", "loot"),
     "pet-families": ("pet_family.schema.json", "pet_family"),
     "spirits": ("spirit_essence.schema.json", "spirit"),
+    "arena": ("arena_build.schema.json", "arena"),
 }
 
 errors: list[str] = []

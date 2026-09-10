@@ -117,6 +117,7 @@ func _strike(player: Node2D) -> void:
 				main.shake(3.0)
 		"bolt":
 			var p := EmberProjectile.new()
+			p.shooter = self   # ARENA: lets the bolt hunt target_override
 			p.global_position = global_position
 			p.velocity = _attack_dir * 18.0 * TILE
 			p.damage = 16.0 * dmg_scale

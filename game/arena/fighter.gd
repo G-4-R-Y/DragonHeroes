@@ -1,0 +1,491 @@
+# ARENA — one combatant (docs/design/23): a body (creature, boss, or geared
+# player build), its ArenaProxy (the uniform target surface), its policy, its
+# pet, and its cosmetic loadout (ProtoCosmetics — auras/necklaces/weapon glows
+# are VISUAL ONLY here; canon: cosmetics never touch combat math).
+class_name ArenaFighter
+extends Node2D
+
+const TILE := 16.0
+const CreatureScene := preload("res://prototype/creature.gd")
+const BossScene := preload("res://prototype/boss.gd")
+const HagScene := preload("res://prototype/hag.gd")
+const PyreScene := preload("res://prototype/pyre_sovereign.gd")
+const ColossusScene := preload("res://prototype/terravore_colossus.gd")
+const PlayerScene := preload("res://prototype/player.gd")
+const PetScene := preload("res://prototype/pet.gd")
+const ProjectileScene := preload("res://prototype/projectile.gd")
+const MainScript := preload("res://prototype/main.gd")
+
+var build_id := ""
+var build_name := ""
+var policy_key := ""            # embedding-row key: species id / build id
+var body: Node2D = null         # primary body (duo: first member)
+var body2: Node2D = null        # duo second member (null otherwise)
+var proxy: ArenaProxy = null
+var proxy2: ArenaProxy = null   # duo second member's proxy
+var build: ProtoBuild = null    # player builds only
+var policy: ArenaPolicy = null
+var pet: ProtoPet = null
+var enemy: ArenaFighter = null  # wired by the arena at match start
+
+# Creature skill kits (data from builds.json "skills"): per-species actives so
+# same-chassis species fight DIFFERENTLY — and per-species nets have something
+# to specialize in. Native AI fires them off cooldown (boss-kit style); bot
+# policies reach them through cmd_skill(i) just like player builds.
+var _kits: Array = []           # [{id, cd, kind?, element?, range?, _cd}]
+var _kit_fire_t := 0.0
+var _pending: Array = []        # [{t, cb: Callable}] scheduled kit resolutions
+
+var damage_taken := 0.0
+# Last emitted action (recorder): move vector + committed act code
+# (0 none, 1 attack, 2 special, 3..6 skill slots, 7 dodge).
+var last_action := {"move": Vector2.ZERO, "act": 0}
+var _last_pos := Vector2.ZERO
+var _vel := Vector2.ZERO
+var _move_dir := Vector2.ZERO
+
+func is_dead() -> bool:
+	if is_instance_valid(body) and not body.dead:
+		return false
+	return body2 == null or not is_instance_valid(body2) or body2.dead
+
+func owns_body(b: Node2D) -> bool:
+	return b == body or (body2 != null and b == body2)
+
+# Duo-aware HP: average fraction across members (obs + results).
+func hp_frac() -> float:
+	var fracs: Array = []
+	for b in [body, body2]:
+		if b != null and is_instance_valid(b):
+			fracs.append(clampf(b.hp / maxf(b.max_hp, 1.0), 0.0, 1.0))
+	if fracs.is_empty():
+		return 0.0
+	var s := 0.0
+	for f in fracs:
+		s += f
+	return s / fracs.size()
+
+# Enemies aim at the NEAREST member's proxy (duo targeting).
+func nearest_proxy_to(pos: Vector2) -> ArenaProxy:
+	if proxy2 != null and is_instance_valid(proxy2) and not proxy2.dead \
+			and proxy.global_position.distance_to(pos) > proxy2.global_position.distance_to(pos):
+		return proxy2
+	return proxy
+
+# Tear down every owned node (episode reset). The proxy is a child of the body
+# and dies with it; the cosmetics rig likewise.
+func free_body() -> void:
+	if is_instance_valid(pet):
+		pet.queue_free()
+	if is_instance_valid(body):
+		body.queue_free()
+	if is_instance_valid(body2):
+		body2.queue_free()
+	queue_free()
+
+func is_player() -> bool:
+	return body is ProtoPlayer
+
+func note_damage_taken(dmg: float) -> void:
+	damage_taken += dmg
+
+func is_ranged() -> bool:
+	if body is ProtoPlayer:
+		return str(body._kit) == "mage"
+	return body is ProtoWisp
+
+func preferred_range() -> Vector2:
+	if is_ranged():
+		return Vector2(4.0 * TILE, 7.0 * TILE)
+	if body is ProtoPlayer:
+		return Vector2(0.5 * body.attack_reach, body.attack_reach)
+	return Vector2(0.5 * body.attack_reach, body.attack_reach)
+
+func is_winding_up() -> bool:
+	return not is_dead() and ("_state" in body) and body._state == "windup"
+
+# ---- construction --------------------------------------------------------------------
+
+func setup(def: Dictionary, arena: Node, at: Vector2, policy_spec: String,
+		seed: int) -> void:
+	build_id = str(def.get("id", "?"))
+	build_name = str(def.get("name", build_id))
+	var rng := RandomNumberGenerator.new()
+	rng.seed = seed
+	match str(def.get("kind", "creature")):
+		"player":
+			build = ProtoBuild.make_player_build(def, rng)
+			body = PlayerScene.new()
+			body.build_source = build
+			policy_key = build_id
+		"boss":
+			body = _make_boss(str(def.get("chassis", "boss")), def)
+			policy_key = str(def.get("chassis", "boss"))
+		"duo":   # a Legendary duo as ONE fighter: two partnered bodies, shared fate
+			var members: Array = def.get("members", ["pyre", "colossus"])
+			body = _make_boss(str(members[0]), def)
+			body2 = _make_boss(str(members[1]) if members.size() > 1 else "colossus", def)
+			if body is ProtoDuoBoss and body2 is ProtoDuoBoss:
+				body.partner = body2
+				body2.partner = body
+			policy_key = build_id
+		_:   # "creature" — a bestiary species entry on its archetype chassis
+			body = CreatureScene.new()
+			var entry := _find_entry(str(def.get("species", "")), def)
+			if not entry.is_empty():
+				body.setup_from_entry(entry, str(def.get("affix", "")))
+				policy_key = str(entry.get("id", build_id))
+			else:
+				body.setup_archetype(str(def.get("archetype", "stalker")),
+						str(def.get("affix", "")))
+				policy_key = build_id
+	var hp_scale := float(def.get("hp_scale", 1.0))
+	var dmg_scale := float(def.get("dmg_scale", 1.0))
+	# Player bots have no "native" mind — the scripted baseline drives them.
+	var spec := policy_spec
+	if body is ProtoPlayer and spec == "native":
+		spec = "scripted"
+	if spec != "native":
+		body.bot_drive = true
+	body.global_position = at
+	arena.add_child(body)
+	if body is ProtoPlayer:
+		body.apply_stats()   # recompute with level-scaled arena gear in place
+	else:
+		body.max_hp *= hp_scale
+		body.hp = body.max_hp
+		body.damage *= dmg_scale
+	# Creature bodies leave the "creatures" group: the proxy is the fighter's
+	# ONLY representative there (no double-hits). Done post-_ready.
+	if body.is_in_group("creatures"):
+		body.remove_from_group("creatures")
+	proxy = ArenaProxy.new()
+	proxy.setup(body, self)
+	body.add_child(proxy)
+	if body2 != null:   # duo second member: its own body, proxy, and group exit
+		if spec != "native":
+			body2.bot_drive = true
+		body2.global_position = at + Vector2(36, 24)
+		arena.add_child(body2)
+		body2.max_hp *= hp_scale
+		body2.hp = body2.max_hp
+		body2.damage *= dmg_scale
+		if body2.is_in_group("creatures"):
+			body2.remove_from_group("creatures")
+		proxy2 = ArenaProxy.new()
+		proxy2.setup(body2, self)
+		body2.add_child(proxy2)
+	# creature skill kits: this species' actives (data), each with its cooldown
+	for k in def.get("skills", []):
+		_kits.append({"id": str(k.get("id", "")), "cd": float(k.get("cd", 6.0)),
+				"kind": str(k.get("kind", "fire")), "element": str(k.get("element", "")),
+				"range": float(k.get("range", 7.0 * TILE)), "_cd": 0.0})
+	# Cosmetics: pure presentation (aura / Grand-Chase necklace / weapon glow).
+	var cos: Dictionary = def.get("cosmetics", {})
+	if not cos.is_empty():
+		ProtoCosmetics.attach(body, cos)
+	# Pet companion (bounty hunters bring their bonded roll).
+	var pet_def: Dictionary = def.get("pet", {})
+	if not pet_def.is_empty():
+		pet = PetScene.new()
+		pet.setup({"uid": 1, "name": pet_def.get("name", "Gloam Stalker"),
+				"roll_pct": int(pet_def.get("roll_pct", 100)),
+				"species": pet_def.get("species", "")})
+		pet.owner_override = body
+		pet.global_position = at + Vector2(24, 0)
+		arena.add_child(pet)
+	# Policy
+	if spec == "native":
+		policy = ArenaPolicy.new()   # inert: the body's own AI runs
+	elif spec == "scripted" or spec == "":
+		policy = ArenaScriptedPolicy.new()
+	else:
+		policy = ArenaNeuralPolicy.from_file(spec)
+
+func _make_boss(chassis: String, def: Dictionary) -> Node2D:
+	var b: Node2D
+	match chassis:
+		"hag":
+			b = HagScene.new()
+		"pyre":
+			b = PyreScene.new()
+		"colossus":
+			b = ColossusScene.new()
+		_:
+			b = BossScene.new()
+	var leg := _find_entry(str(def.get("legendary", "")), def, "legendary")
+	if not leg.is_empty():
+		b.setup_legendary(leg)
+		b.display_name = str(leg.get("name", build_name))
+		b.bar_color = Color(str(leg.get("tint", "#c95bff")))
+	return b
+
+func _find_entry(species: String, def: Dictionary, kind := "normal") -> Dictionary:
+	if species != "":
+		for e in MainScript.bestiary(kind):
+			if str(e.get("id", "")) == species:
+				return e
+	var bundle := str(def.get("bundle", ""))
+	if bundle != "":
+		for e in MainScript.bestiary(kind):
+			if str(e.get("bundle", "")) == bundle:
+				return e
+	return {}
+
+# ---- per-frame wiring (arena calls before bodies process) ------------------------------
+
+func pre_tick(delta: float, enemy: ArenaFighter) -> void:
+	if is_dead():
+		return
+	_vel = (body.global_position - _last_pos) / maxf(delta, 0.0001)
+	_last_pos = body.global_position
+	# kit cooldowns + scheduled resolutions
+	for k in _kits:
+		k._cd = maxf(float(k._cd) - delta, 0.0)
+	if not _pending.is_empty():
+		var keep: Array = []
+		for p in _pending:
+			p.t = float(p.t) - delta
+			if float(p.t) <= 0.0:
+				(p.cb as Callable).call()
+			else:
+				keep.append(p)
+		_pending = keep
+	# target wiring: creatures hunt the ENEMY's NEAREST proxy (duo-aware);
+	# players are aimed by their policy via bot_aim.
+	if not (body is ProtoPlayer):
+		var foe_proxy: ArenaProxy = enemy.nearest_proxy_to(body.global_position)
+		body.target_override = foe_proxy
+		if body2 != null and is_instance_valid(body2):
+			body2.target_override = foe_proxy
+	if policy != null:
+		policy.tick(delta)
+	# apply the policy's movement command through the body's own path
+	if body is ProtoPlayer:
+		if body.bot_drive:
+			var spd: float = body.move_speed * (0.65 if body._slow_t > 0.0 else 1.0)
+			body._bot_step = _move_dir.limit_length(1.0) * spd * delta
+	elif body.bot_drive:
+		if _move_dir.length() > 0.05:
+			body._move(_move_dir.normalized() * body._speed() * delta)
+	# native AI fires its species kit off cooldown, boss-kit style — this is what
+	# makes same-chassis species fight differently (bot policies use cmd_skill)
+	if not _kits.is_empty() and policy != null and policy.policy_id() == "native" \
+			and enemy != null and not enemy.is_dead():
+		_kit_fire_t -= delta
+		if _kit_fire_t <= 0.0:
+			for i in _kits.size():
+				var k: Dictionary = _kits[i]
+				if float(k._cd) > 0.0:
+					continue
+				var d: float = enemy.nearest_proxy_to(body.global_position) \
+						.global_position.distance_to(body.global_position)
+				if d <= float(k.range) and _kit_exec(i):
+					_kit_fire_t = 0.4
+					break
+
+func post_tick() -> void:
+	if is_instance_valid(body) and body is ProtoPlayer:
+		body._bot_step = Vector2.ZERO   # commands are per-frame intents
+
+# ---- policy command API ---------------------------------------------------------------
+
+func cmd_move(dir: Vector2) -> void:
+	_move_dir = dir
+	last_action.move = dir
+
+func cmd_aim(pos: Vector2) -> void:
+	if body is ProtoPlayer:
+		body.bot_aim = pos
+
+func cmd_attack() -> bool:
+	if is_dead():
+		return false
+	if body is ProtoPlayer:
+		if body._attack_cd > 0.0:
+			return false
+		body._attack()
+		ProtoCosmetics.pulse(body.get_node_or_null("Cosmetics"))
+		last_action.act = 1
+		return true
+	var ok: bool = body.bot_attack(proxy_of_enemy_dir())
+	if ok:
+		last_action.act = 1
+	return ok
+
+func cmd_special() -> bool:
+	if is_dead():
+		return false
+	if body is ProtoPlayer:
+		if body._whirl_cd > 0.0:
+			return false
+		match str(body._kit):
+			"mage": body._frost_nova()
+			"rogue": body._fan_of_knives()
+			_: body._whirlwind()
+		ProtoCosmetics.pulse(body.get_node_or_null("Cosmetics"))
+		last_action.act = 2
+		return true
+	var ok: bool = body.bot_attack(proxy_of_enemy_dir())
+	if ok:
+		last_action.act = 2
+	return ok
+
+func cmd_skill(i: int) -> bool:
+	if is_dead():
+		return false
+	if body is ProtoPlayer:
+		if build == null or i < 0 or i >= build.skill_loadout.size():
+			return false
+		var id := str(build.skill_loadout[i])
+		if id == "" or body.skill_cd_left(id) > 0.0:
+			return false
+		var def := build.skill_def(id)
+		if def.is_empty():
+			return false
+		var ok: bool = body.use_skill(def)
+		if ok:
+			last_action.act = 3 + i
+		return ok
+	# creatures: fire species-kit slot i (bot policies learn WHEN to use them)
+	var ok := _kit_exec(i)
+	if ok:
+		last_action.act = 3 + i
+	return ok
+
+# ---- creature skill kits -----------------------------------------------------------
+
+func _kit_exec(i: int) -> bool:
+	if i < 0 or i >= _kits.size() or is_dead() or enemy == null or enemy.is_dead():
+		return false
+	var k: Dictionary = _kits[i]
+	if float(k._cd) > 0.0:
+		return false
+	var arena := get_parent()
+	var foe_proxy: ArenaProxy = enemy.nearest_proxy_to(body.global_position)
+	var foe_pos: Vector2 = foe_proxy.global_position
+	var from: Vector2 = body.global_position
+	var element := str(k.element) if str(k.element) != "" else str(k.kind)
+	match str(k.id):
+		"bolt_volley":
+			for j in 3:
+				var p := ProjectileScene.new()
+				p.shooter = body
+				match element:
+					"frost": p.set_frost()
+					"umbral", "venom", "blood": p.set_violet()
+					"storm": p.set_arcane()
+				p.global_position = from
+				p.velocity = (foe_pos - from).normalized().rotated(
+						deg_to_rad(-12.0 + 12.0 * j)) * 13.0 * TILE
+				p.damage = body.damage * 0.8 * body.dmg_scale
+				arena.add_child(p)
+		"radial_slam":
+			arena.telegraphs.ring(from, 2.2 * TILE, 0.45)
+			_pending.append({"t": 0.45, "cb": func() -> void:
+				if is_dead() or enemy == null or enemy.is_dead():
+					return
+				var pr: ArenaProxy = enemy.nearest_proxy_to(body.global_position)
+				if pr.global_position.distance_to(body.global_position) \
+						<= 2.2 * TILE + pr.body_radius:
+					pr.take_damage(body.damage * 1.5 * body.dmg_scale,
+							(pr.global_position - body.global_position).normalized())
+				arena.fx.shockwave(body.global_position, Color("ffb347"), 2.2 * TILE)
+				arena.fx.shader_burst("impact", body.global_position,
+						{"size": 64.0, "color": Color(0.9, 0.7, 0.45)})})
+		"pounce":
+			var dir := (foe_pos - from).normalized()
+			for _i in 6:
+				body._move(dir * 3.0 * TILE / 6.0)
+			if foe_pos.distance_to(body.global_position) <= body.attack_reach \
+					+ foe_proxy.body_radius:
+				foe_proxy.take_damage(body.damage * body.dmg_scale, dir)
+		"field_cast":
+			arena.spawn_field(foe_pos, 2.5 * TILE, 6.0,
+					body.damage * 0.3 * body.dmg_scale, str(k.kind), false, self)
+		"enrage":
+			if body.has_method("enrage"):
+				body.enrage(4.0)
+		_:
+			return false
+	k._cd = float(k.cd)
+	return true
+
+func cmd_dodge(dir: Vector2) -> bool:
+	if is_dead() or not (body is ProtoPlayer):
+		return false
+	var ok: bool = body.bot_dodge(dir)
+	if ok:
+		last_action.act = 7
+	return ok
+
+func proxy_of_enemy_dir() -> Vector2:
+	if enemy != null and not enemy.is_dead():
+		return (enemy.body.global_position - body.global_position).normalized()
+	return Vector2.RIGHT
+
+# ---- observation (schema "arena.obs.v1" — see policy.gd header) ------------------------
+
+func obs_vector(enemy: ArenaFighter) -> PackedFloat32Array:
+	var o := PackedFloat32Array()
+	o.resize(ArenaPolicy.OBS_DIM)
+	if is_dead():
+		return o
+	var foe_ok := enemy != null and not enemy.is_dead()
+	var foe_pos: Vector2 = enemy.body.global_position if foe_ok else body.global_position
+	o[0] = hp_frac()
+	o[1] = clampf(body.global_position.x / 512.0, -1.0, 1.0)
+	o[2] = clampf(body.global_position.y / 512.0, -1.0, 1.0)
+	o[3] = clampf(_vel.x / 100.0, -2.0, 2.0)
+	o[4] = clampf(_vel.y / 100.0, -2.0, 2.0)
+	if body is ProtoPlayer:
+		o[5] = clampf(body._attack_cd / maxf(body.attack_cd_s, 0.01), 0.0, 1.0)
+		o[6] = clampf(body._whirl_cd / maxf(body.whirl_cd_s, 0.01), 0.0, 1.0)
+		if build != null:
+			for i in 4:
+				var id := str(build.skill_loadout[i])
+				if id != "":
+					var def := build.skill_def(id)
+					var cd := float((def.get("params", {}) as Dictionary).get("cd", 6.0))
+					o[7 + i] = clampf(body.skill_cd_left(id) / maxf(cd, 0.01), 0.0, 1.0)
+		o[11] = float(body.charge_stacks) / maxf(float(body.charge_max), 1.0)
+		o[12] = float(body.dodge_charges) / float(ProtoPlayer.DODGE_CHARGES_MAX)
+		o[13] = 1.0 if body._slow_t > 0.0 else 0.0
+	else:
+		o[5] = clampf(body._cd / maxf(body.attack_cd, 0.01), 0.0, 1.0)
+		o[13] = 1.0 if body._slow_t > 0.0 else 0.0
+		o[14] = 1.0 if body._burn_t > 0.0 or body._bleed_t > 0.0 else 0.0
+	if foe_ok:
+		var rel: Vector2 = foe_pos - body.global_position
+		var dist := rel.length()
+		o[15] = enemy.hp_frac()
+		o[16] = clampf(rel.x / 512.0, -1.0, 1.0)
+		o[17] = clampf(rel.y / 512.0, -1.0, 1.0)
+		o[18] = clampf(dist / 512.0, 0.0, 1.0)
+		if dist > 0.01:
+			var ang := rel.angle()
+			o[19] = sin(ang)
+			o[20] = cos(ang)
+		o[21] = clampf(enemy.body.body_radius / 16.0, 0.0, 2.0)
+		o[22] = 1.0 if enemy.is_winding_up() else 0.0
+	# two nearest hostile projectiles
+	var hostile_friendly := not is_player()
+	var found: Array = []
+	for n in get_tree().get_nodes_in_group("arena_projectiles"):
+		found.append(n)
+	found.sort_custom(func(a: Node2D, b: Node2D) -> bool:
+		return a.global_position.distance_squared_to(body.global_position) \
+				< b.global_position.distance_squared_to(body.global_position))
+	var slot := 0
+	for p in found:
+		if slot >= 2:
+			break
+		if bool(p.friendly) != hostile_friendly:
+			continue
+		var rel: Vector2 = p.global_position - body.global_position
+		o[23 + slot * 4] = clampf(rel.x / 512.0, -1.0, 1.0)
+		o[24 + slot * 4] = clampf(rel.y / 512.0, -1.0, 1.0)
+		o[25 + slot * 4] = clampf(p.velocity.x / 256.0, -2.0, 2.0)
+		o[26 + slot * 4] = clampf(p.velocity.y / 256.0, -2.0, 2.0)
+		slot += 1
+	return o

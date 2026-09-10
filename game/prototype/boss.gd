@@ -131,6 +131,7 @@ func _strike(player: Node2D) -> void:
 	match skill:
 		"bolt":
 			var p := EmberProjectile.new()
+			p.shooter = self   # ARENA: lets the bolt hunt target_override
 			p.global_position = global_position
 			p.velocity = _attack_dir * 18.0 * TILE
 			p.damage = 12.0 * dmg_scale
@@ -150,7 +151,8 @@ func _strike(player: Node2D) -> void:
 				var t := clampf((player.global_position - global_position).dot(seg) / seg.length_squared(), 0.0, 1.0)
 				if (global_position + seg * t).distance_to(player.global_position) < 20.0 + player.body_radius:
 					player.take_damage(20.0 * dmg_scale, path.normalized())
-			global_position += path
+			for _i in 6:   # stepped like the lunger pounce: walls still gate the dive
+				_move(path / 6.0)
 			# talons-first landing: stretched along the dive, springs back
 			var horiz := absf(path.x) >= absf(path.y)
 			_pose_punch(Vector2(1.35, 0.72) if horiz else Vector2(0.72, 1.35),

@@ -1,0 +1,33 @@
+DRAGON HEROES — LICENSE MAP (canon §12.37, docs/business/32)
+
+This repository uses a split license:
+
+  CODE  (game/, sim/, tools/, ml/, genforge/, backend/, web/, infra/, and all
+        source files): MIT License (below).
+
+  ART & CONTENT  (art/, content/, all sprites/textures/audio/lore/names):
+        PROPRIETARY — all rights reserved by IntelliGames (see
+        LICENSE-ASSETS). The MIT grant below does NOT apply to them.
+
+--------------------------------------------------------------------------
+MIT License (code)
+
+Copyright (c) 2026 IntelliGames
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

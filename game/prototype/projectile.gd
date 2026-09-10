@@ -109,6 +109,8 @@ func _physics_process(delta: float) -> void:
 		for c in get_tree().get_nodes_in_group("creatures"):
 			if c.dead:
 				continue
+			if ("owner_fighter" in c) and c.owner_fighter == shooter:   # ARENA: own proxy
+				continue
 			var t_f := 0.0
 			if seg_f.length_squared() > 0.0:
 				t_f = clampf((c.global_position - from).dot(seg_f) \
@@ -123,7 +125,22 @@ func _physics_process(delta: float) -> void:
 				_impact()
 				return
 		return
-	var player := get_tree().get_first_node_in_group("player")
+	# ARENA HOOK: in arena matches a hostile bolt flies at its shooter's
+	# target_override (an ArenaProxy) instead of the global "player" group.
+	var player: Node2D = null
+	if is_instance_valid(shooter) and ("target_override" in shooter) \
+			and is_instance_valid(shooter.target_override):
+		player = shooter.target_override
+	else:
+		# MP HOOK: co-op — the bolt hunts the NEAREST living hunter.
+		var best_d := INF
+		for p in get_tree().get_nodes_in_group("player"):
+			if p.dead:
+				continue
+			var d: float = p.global_position.distance_squared_to(global_position)
+			if d < best_d:
+				best_d = d
+				player = p
 	if player and not player.dead:
 		# Segment-vs-circle check (poor man's CCD for one frame of travel).
 		var seg := global_position - from
@@ -136,6 +153,21 @@ func _physics_process(delta: float) -> void:
 			if dmg_type == "frost":
 				player.apply_slow(1.2)   # Chill: -35% move (effects registry)
 			_impact()
+			return
+	# bonded pets are valid bolt targets too (melee arcs already hit them)
+	var seg_p := global_position - from
+	for pet in get_tree().get_nodes_in_group("pet"):
+		if pet.hp <= 0.0:
+			continue
+		var t_p := 0.0
+		if seg_p.length_squared() > 0.0:
+			t_p = clampf((pet.global_position - from).dot(seg_p) \
+					/ seg_p.length_squared(), 0.0, 1.0)
+		if (from + seg_p * t_p).distance_to(pet.global_position) \
+				<= radius + pet.body_radius:
+			pet.take_damage(damage, velocity.normalized())
+			_impact()
+			return
 
 func _impact() -> void:
 	var main := get_tree().get_first_node_in_group("main")

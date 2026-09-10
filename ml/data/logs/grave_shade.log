@@ -1,0 +1,10 @@
+[train:grave_shade] fresh net
+[train:grave_shade] g0 cand0 fitness=-0.020
+[train:grave_shade] g0 cand1 fitness=-0.030
+[train:grave_shade] g0 best=-0.020 mean=-0.025
+[train:grave_shade] registered v1 (candidate — run the gate)
+[gate] grave_shade v1: FAIL — fleet stays on previous pin
+   suite_scripted: {'win_rate': 0.0, 'fitness': -0.07, 'pass': False}
+   suite_scripted_sanity: {'mean_loser_hp': 0.0, 'pass': True}
+   suite_native: {'win_rate': 0.0, 'fitness': 0.0, 'pass': False}
+   suite_native_sanity: {'mean_loser_hp': 1.0, 'pass': False}

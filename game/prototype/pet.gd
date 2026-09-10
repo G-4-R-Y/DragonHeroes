@@ -25,6 +25,10 @@ var body_radius := 8.0
 var attack_reach := 1.7 * TILE
 var attack_cd := 1.1
 
+# ARENA HOOK (game/arena): in arena matches the pet follows a specific fighter
+# body instead of the global "player" group (two builds may fight at once).
+var owner_override: Node2D = null
+
 var _cd := 0.0
 var _windup := 0.0
 var _rest := 0.0
@@ -73,7 +77,8 @@ func _physics_process(delta: float) -> void:
 	_flash = maxf(_flash - delta * 5.0, 0.0)
 	var tint := REST_TINT if _rest > 0.0 else TINT
 	sprite.modulate = tint.lerp(Color(2.5, 2.5, 2.5), _flash)
-	var player := get_tree().get_first_node_in_group("player")
+	var player: Node2D = owner_override if is_instance_valid(owner_override) \
+			else get_tree().get_first_node_in_group("player")
 	if player == null:
 		return
 	if _rest > 0.0:
@@ -130,6 +135,8 @@ func _acquire(player: Node2D) -> void:
 	var best_d := 9.0 * TILE
 	for c in get_tree().get_nodes_in_group("creatures"):
 		if c.dead or not c.threat:
+			continue
+		if ("owner_fighter" in c) and c.owner_fighter == player:   # ARENA: own proxy
 			continue
 		if c.global_position.distance_to(player.global_position) > LEASH_DIST:
 			continue

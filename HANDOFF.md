@@ -1,7 +1,128 @@
-# Handoff — running state (updated 2026-07-17, v0.2.0 in flight)
+# Handoff — running state (updated 2026-09-02 pm2, spawn-collapse INCIDENT fixed)
+
+## INCIDENT (2026-09-02 pm2): world silently not booting → all packs spawned
+## ON the player ("everything glitched", Ricardo). Root cause: the export
+## packaging's _find_dh_server() was inserted as a func INSIDE world_gen._ready
+## — GDScript ended _ready at the func keyword, so the entire boot block was
+## unreachable. Zero script errors → main.tscn boot gates passed blind. Fixed
+## (function moved out of _ready); NEW STANDING GATE
+## game/prototype/tests/spawn_probe.tscn asserts packs spawn on rings
+## (SPAWNTEST OK — nearest > 100 px) so a silent world-boot failure can never
+## pass again. LESSON (permanent): a hunt gate that only greps for errors is
+## blind to dead code paths; gates must assert OUTCOMES.
+## All gates re-verified after the fix: STREAMTEST OK, SPAWNTEST OK, CLICKTEST
+## 16, FXSTRESS OK, ARENA SELFTEST OK, MP TEST OK, pytest 63, validate 0.
+
+## P2P CO-OP (canon §12.36, docs/tech/33 — Ricardo: LAN + lobby P2P, keep it
+## simple, just me and friends) + PARALLEL TRAINING (tech/32) + USAGE MANUAL
+
+## P2P CO-OP (canon §12.36, docs/tech/33 — Ricardo: LAN + lobby P2P, keep it
+## simple, just me and friends) + PARALLEL TRAINING (tech/32) + USAGE MANUAL
+
+- game/mp/ LANDED: MpNet autoload (ENet lobby + RPC transport), lobby scene
+  (menu → CO-OP (P2P)), host_driver (remote hunters as bot_drive ProtoPlayers
+  w/ auto-rolled ProtoBuilds; 20 Hz snapshots incl. per-id spawn manifests),
+  client_hunt (same world from lobby seed via world forced_seed + smoothed
+  puppets + 30 Hz inputs + HUD), MpPuppet. Party loot/XP shared via host
+  Session (v1, documented).
+- MP HOOK patches (additive): creature/projectile NEAREST-player targeting;
+  player death passes self → main routes remote deaths to the driver (3 s
+  respawn, no party gold loss); world_gen forced_seed; main.gd reads
+  MpNet.pending_seed + attaches host driver; project.godot MpNet autoload;
+  menu CO-OP button. Solo behavior unchanged (16/16 CLICKTEST).
+- Gate: tools/mp_test.sh — 2 headless procs on loopback: registration, lobby
+  sync, seed payload, identical world, remote spawn + INPUT-DRIVEN movement,
+  snapshots → MP TEST OK. (Gotcha hit: @rpc call_local still needs rpc() to
+  reach peers; result-file/stdout races taught the test to assert DISPLACEMENT
+  and to grace-quit.)
+- TRAINING AT SCALE (tech/32): league.py --jobs N (ThreadPoolExecutor over
+  headless godot workers; measured 3.8x on 4 workers, ~3.8k episodes/hour at
+  16 workers). evaluate_candidates() parallelizes ALL (perturbation x
+  opponent) pairs; mirror mode for the global net. ml pytest 11/11.
+- DOCS: docs/USAGE.md (THE all-usage manual: play/co-op/arena/training/
+  content/gates/troubleshooting); tech/32 (scaling); tech/33 (co-op).
+- OPEN SOURCE decision (canon §12.37, business/32): no client crypto/DRM —
+  value is server-resident by design; code MIT / art CC BY-NC (pending
+  Ricardo's confirm); mods = schema-validated data packs (no scripts), solo
+  anything-goes / co-op hash-match / ranked+economy official-only.
+- PACKAGING: game/export_presets.cfg (Windows+Linux, embedded PCK, tests
+  excluded) + tools/package_game.sh → builds/dragon-heroes-<plat>.zip (game
+  binary + dh-server + LEIA-ME). world_gen now locates dh-server NEXT TO the
+  executable in exported builds. PENDING: templates download (~1 GB, needs
+  Ricardo's OK) + friends' platform list (Windows needs mingw dh-server.exe).
+- NEXT (Ricardo's picks pending): play co-op with real eyes (client feel,
+  puppet interp, world parity on two machines); L1 data-driven AI profiles
+  (OM doc §2); L4 pet skills; dh-sim port (authority + dh-env throughput).
+
+
+
+## POLISH PACK + GUIDE (2026-09-02 pm, docs/design/24 §1 landed; §2 = the OM
+## levers awaiting Ricardo's call; §3 = next polish backlog)
+
+- GUIDE: game/arena/README.md — spectator keys, every headless flag, roster/
+  build/cosmetics authoring, train/gate/watch-a-net workflows, JSONL format,
+  CI gates, troubleshooting.
+- LANDED (full-repo gameplay review → curated fixes, all gates green):
+  input buffering (dodge/E/Q/slots, 150 ms) + empty-charge feedback; dodge
+  i-frames honesty (comments == behavior); point-blank strikes no longer whiff;
+  Ignite max-dps; hostile bolts + fields hit pets; phys_reduction clamped
+  (blood_price heal singularity); hitstop last-writer-wins; respawn clears
+  transient state; chain whiff = half-CD + always-sfx; Talon Dive wall-gated;
+  low-HP breathing red bar + post pulse; camera lookahead to cursor; level-up
+  heals to full (sustain floor).
+- THE OM LEVERS (docs/design/24 §2, Ricardo's pick): L1 data-driven AI profiles
+  for the 1000-species bestiary (fun × species value; the arena bot_drive seam
+  is the executor socket); L2 run structure (in-run boon picks, night-fall
+  escalation); L3 bosses as system-play (generalize field-combos into the
+  boss-design primitive); L4 pets as second build axis (rolled skills never
+  cast today — UI advertises them); L5 dh-sim C++ port (authority + 100x RL);
+  L6 Radiance Cascades (queued Phase 3); L7 reactive audio layer.
+- Gates after the pack: CLICKTEST 16/16, FXSTRESS OK 4.75 ms, ARENA SELFTEST
+  OK, hunt boot clean, validate 0, pytest ml 10 + genforge 52.
+
+
 
 Read `CLAUDE.md` + `docs/00-canon.md` first (decisions log §12 is current through
-item 34). This file is the delta: exactly where work stopped and what's next.
+item 35). This file is the delta: exactly where work stopped and what's next.
+
+## THE ARENA (canon §12.35, docs/design/23 — Ricardo: observable self-play,
+## per-species + global nets, player builds, cosmetics)
+
+- game/arena/ LANDED: creature/creature, build/creature, build/build matches on
+  the prototype combat code. Windowed spectator (roster rotation, N/R/1-3/Q),
+  headless CLI for training (--a/--b/--policy-*/--episodes/--seed/--fast/
+  --record-dir/--out), gate: `... arena.tscn -- --selftest` → ARENA SELFTEST OK.
+- TWO ARENA HOOK patch sets in prototype files (additive, marked in-code):
+  target_override on creature/projectile(+shooter at 5 spawn sites)/pet;
+  bot_drive + bot_aim + bot_dodge + build_source on player; ProtoStats.compute
+  now takes Object. Hunt behavior unchanged (click_test + fx_stress + hunt
+  boot gates green).
+- ArenaProxy is the uniform target surface (only "creatures" member per
+  fighter). policy.gd = obs schema arena.obs.v1 (31 floats) + fairness layer
+  (150-250 ms obs delay, aim noise, 6 commits/s burst cap). scripted_policy.gd
+  baseline; neural_policy.gd loads ml/-exported weights (species nets + global
+  net, one runtime; embedding rows per content id, mean-init for new content).
+- recorder.gd = R0 obs+action JSONL (30 Hz) → ml/data/episodes (gitignored).
+- ml/ LIVE: policy_net.py (numpy twin), league.py (ES trainer + registry),
+  eval/gate.py (scripted suite + ladder + sanity; FAIL = stay on pin). Smoke
+  verified: fen_boar train g0 registered v1; gate correctly FAILED it (0% vs
+  native) — the boring failure mode works. ml pytest 10/10.
+- BOUNTY HUNTERS: content/core/arena/builds.json (+ arena_build.schema.json,
+  validator wired — `arena` type) = 5 geared player builds (class/attrs/rolled
+  gear/runes/loadouts/pets) + 7 creature/boss builds + spectate rotation.
+  Snapshot: game/arena/data/builds.json (hand-sync like prototype/data).
+- COSMETICS PACK (Ricardo: shadow auras, elemental effects, Grand Chase
+  necklaces): genforge/vfx_lab/{auras,necklace_orbit} labs + shaders
+  aura_body/necklace_bead/weapon_aura.gdshader + game/arena/cosmetics.gd
+  (ProtoCosmetics; 3-bead orbiting necklaces, media auras, weapon pulse).
+  Gate: arena/tests/cosmetics_test.tscn → COSMETICS OK. z-band −1..2 (under
+  darkness, graded as light). Worn by arena builds via "cosmetics" spec keys.
+- NEXT: spectate-mode eyes (Ricardo — the windowed watch loop + cosmetics
+  read); neural-vs-native boss kits not policy-addressable yet (boss RL stays
+  R3); bounty hunters as hunt-world NPC spawns; fields don't hit summons;
+  PufferLib/dh-env port carries registry/gate/schema/datasets unchanged.
+
+
 
 ## v0.2.0 — INFINITE WORLD (canon §12.32, Ricardo: "work on this for the next
 ## patch"; design law: docs/tech/29-infinite-world-streaming.md)

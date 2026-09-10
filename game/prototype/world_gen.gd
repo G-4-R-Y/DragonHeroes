@@ -62,6 +62,10 @@ var _spawn_cache := Vector2.ZERO
 var _spawn_valid := false
 var _streaming := false           # true once the async pipeline is armed at boot
 var _hunt_seed := 0               # rolled ONCE; every window dump reuses it
+# MP HOOK (docs/tech/33): in P2P co-op the host chooses the hunt seed in the
+# lobby and every peer builds the SAME world from it (dh-procgen is
+# deterministic) — the world itself never crosses the wire, only entities do.
+var forced_seed := 0
 var _bin_path := ""
 
 # Per-chunk scene artifacts (created on apply, freed on unload — no runtime pool
@@ -108,12 +112,12 @@ var _pending_shrooms := []         # [ [key,pos] ] deferred until darkness exist
 
 func _ready() -> void:
 	y_sort_enabled = true
-	_bin_path = ProjectSettings.globalize_path("res://../sim/build/libs/dh-server/dh-server")
+	_bin_path = _find_dh_server()
 	_setup_layers()
 	if can_stream():
 		# A NEW map every hunt (Ricardo): roll the seed ONCE and reuse it for every
 		# window dump so revisited coordinates stay byte-identical.
-		_hunt_seed = randi()
+		_hunt_seed = forced_seed if forced_seed != 0 else randi()
 		print("world seed: ", _hunt_seed)
 		_streaming = true
 		_boot_sync()
@@ -121,6 +125,17 @@ func _ready() -> void:
 			_boot_fallback()
 	else:
 		_boot_fallback()
+
+# Locate the worldgen binary. Exported builds (friends' installs) carry it NEXT
+# TO the game executable; the dev repo carries it in sim/build. Co-op world
+# parity depends on every peer having it (docs/tech/33 §architecture).
+func _find_dh_server() -> String:
+	if OS.has_feature("standalone"):
+		var exe := "dh-server.exe" if OS.has_feature("windows") else "dh-server"
+		var beside: String = OS.get_executable_path().get_base_dir().path_join(exe)
+		if FileAccess.file_exists(beside):
+			return beside
+	return ProjectSettings.globalize_path("res://../sim/build/libs/dh-server/dh-server")
 
 func can_stream() -> bool:
 	return FileAccess.file_exists(

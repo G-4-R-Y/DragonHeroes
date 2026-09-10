@@ -78,6 +78,7 @@ func _strike(player: Node2D) -> void:
 		return
 	var dir := (player.global_position - global_position).normalized()
 	var p := Bolt.new()
+	p.shooter = self   # ARENA: lets the bolt hunt target_override
 	match element:
 		"ember":
 			pass          # projectile default IS the ember bolt (fire)

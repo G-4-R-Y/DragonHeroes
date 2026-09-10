@@ -1,0 +1,12 @@
+DRAGON HEROES (dev build)
+=========================
+Run the dragon-heroes binary. No Godot installation needed.
+
+SOLO:  main menu -> name your hunter -> pick a class -> ENTER THE HUNT.
+CO-OP (P2P): menu -> CO-OP (P2P). One friend HOSTs and shares the LAN IP
+shown; up to 3 friends JOIN with it (UDP port 7377). Over the internet:
+port-forward UDP 7377 on the host or use a Tailscale-style overlay.
+
+Keep dh-server(.exe) NEXT TO the game binary — it generates the world.
+Controls: WASD move, LMB/Space attack, Shift/RMB dodge, E Q skills, 1-4 bar,
+F capture, Z mount, C character, K keybinds.
