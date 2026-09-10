@@ -1,3 +1,23 @@
+# Handoff — running state (updated 2026-09-10; HEAD = v0.3.0 + mesh/harness commit)
+
+DURABLE MEMORY IS NOW docs/harness/ (README = start here, 10-systems-map,
+20-roadmap). This file is only the volatile delta. Canon §12 current through 38.
+
+## 2026-09-10 session (main context)
+- COMMITTED the eight days of uncommitted parallel-session work as v0.3.0
+  (arena, P2P co-op, open source, polish pack, spawn_probe gate, packaging,
+  cosmetics, USAGE manual) after re-running EVERY gate on the merged tree.
+- Cloud GPU tier PARKED for budget (canon §12.38 — history logged; code kept
+  commented-out + guarded, NOT deleted; re-enable when budget returns).
+  mesh_gen registry is local-only; DH_MESH_OFFLOAD=1 is the max-quality path
+  on the 4050 for now.
+- TripoSR draft tier: venv ready (torch cu124 OK); torchmcubes blocked by the
+  CUDA 12.8 `lerp` header clash — fix recipe in docs/harness/20-roadmap.md NOW.
+- WATCH: spawn_probe flaked ONCE right after `--import` (packs at 0 px),
+  passed twice on rerun. If it recurs, suspect the boot dump timing.
+- No Unreal Engine anything exists (Ricardo asked for "unreal engine tests" —
+  the engine is Godot, settled §12.27; the test commands are docs/USAGE.md).
+
 # Handoff — running state (updated 2026-09-02 pm2, spawn-collapse INCIDENT fixed)
 
 ## INCIDENT (2026-09-02 pm2): world silently not booting → all packs spawned

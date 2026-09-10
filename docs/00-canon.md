@@ -770,3 +770,29 @@ Still open:
     Cheating (not piracy) is the residual risk: server authority + AOI +
     replay anomaly detection are the answer; no kernel anything. Full spec +
     checklist: business/32.
+38. **Cloud GPUs PAUSED for budget — local hardware for now (2026-09-10,
+   Ricardo: "Don't run anything into cloud gpu on google. We don't have
+   settings anymore. Arenas will be run on local gpus!" + "comment out
+   previous max quality settings, don't simply delete code" + "log the
+   whole history... remember to use full quality when budget is
+   sufficient").** THE HISTORY, so no future harness misreads it:
+   (a) 2026-09-02 — image-to-3D chosen as open-weight, max quality, under
+   our control (§12.34); (b) same day — the RTX 4050's 6 GB forced a
+   two-tier split, and the MAX-QUALITY tier was designed for Google Cloud
+   Run GPU (nvidia-l4 24 GB, scale-to-zero, ~cents per asset): container
+   `genforge/service/mesh_cloudrun/`, `CloudRunMeshProvider`, credentials
+   map in tech/31 — the PREFERRED design, never deployed; (c) 2026-09-10 —
+   the GCP account/budget went away, so the tier is PARKED, not rejected:
+   code kept commented-out in place (mesh_gen.py, its tests, the service
+   dir with a deploy guard; tech/31 §7). STANDING RULE: while budget is
+   absent, arena self-play training (tech/32 — ES league over headless
+   Godot workers), image-to-3D (tech/31 — offload path on the 4050, bigger
+   local card later through the same adapters) and any other ML run on
+   LOCAL GPUs. THE DAY BUDGET IS SUFFICIENT: re-enable the Cloud Run tier
+   (uncomment, deploy.sh, set DH_MESH_CLOUDRUN_URL) — full quality is the
+   intended path; local offload is the stopgap. Also this date: the
+   **harness memory** was centralized at docs/harness/ (Ricardo: "so any
+   harness can continue your work") — README = start-here, 10-systems-map =
+   current-state spec per system with file pointers and gates,
+   20-roadmap = one consolidated roadmap pointing at each law doc. HANDOFF.md
+   stays the volatile delta; docs/harness/ is the durable layer.

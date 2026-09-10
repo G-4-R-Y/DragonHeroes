@@ -47,7 +47,7 @@
 | [28-generation-service](tech/28-generation-service.md) | GenForge: lore-grounded creature/item/skill candidate generation, curation gates |
 | [29-infinite-world-streaming](tech/29-infinite-world-streaming.md) | Streaming the infinite world as a moving window: AOI budgets, worker threads, STREAMTEST gate |
 | [30-android-and-lan-builds](tech/30-android-and-lan-builds.md) | Exporting the prototype to Android: presets, keystores, adb; honest mobile/LAN caveats |
-| [31-image-to-3d-local](tech/31-image-to-3d-local.md) | Image-to-3D on open weights: draft tier (RTX 4050) vs max-quality rented tier; mesh_gen stage + runbook |
+| [31-image-to-3d-local](tech/31-image-to-3d-local.md) | Image-to-3D on open weights, LOCAL GPUs: draft tier (RTX 4050) + offload max-quality; Cloud Run tier parked for budget; mesh_gen stage + runbook |
 | [32-scaling-rl-training](tech/32-scaling-rl-training.md) | Thousands of parallel episodes: parallel Godot workers (landed), dh-env, fleets |
 | [33-p2p-coop](tech/33-p2p-coop.md) | P2P co-op (friends & LAN): lobby, host authority, snapshot replication |
 | **business/** | |
@@ -85,3 +85,11 @@ most work (see also canon §12):
    to Legendary kits until a balance pass (tech/21).
 8. **Pet skill-roll shape:** 3–7 skills, ~70:30 signature-to-shared weighting, and
    whether higher-rarity captures roll more skills (design/13 §7.1).
+
+## Harness memory (`docs/harness/` — start here when resuming work)
+
+| doc | what |
+|---|---|
+| [README](harness/README.md) | Start-here for any harness: read order, invariants, gate suite, gotchas, Ricardo's doctrine, environment facts |
+| [10-systems-map](harness/10-systems-map.md) | Every system: status · law doc · key files · gate · known issues |
+| [20-roadmap](harness/20-roadmap.md) | The one consolidated roadmap: NOW / PICK / SCHEDULED / BUDGET / polish |

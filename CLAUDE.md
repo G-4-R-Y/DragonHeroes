@@ -46,3 +46,11 @@ work into background agents/workflows so the main context stays lean.
 ## Layout
 
 Monorepo layout and coupling rules: canon §10. Document set index: `docs/README.md`.
+
+## Resuming work (any harness)
+
+Start at **`docs/harness/README.md`** — the durable harness memory (invariants,
+gates, doctrine, environment), then `docs/harness/10-systems-map.md` (every
+system's status/files/gate) and `docs/harness/20-roadmap.md` (the one roadmap).
+`HANDOFF.md` is the volatile delta from the last session. Update all three in
+the same change as the work they describe.

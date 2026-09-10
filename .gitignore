@@ -20,6 +20,8 @@ backend/economy-core/economy-core
 ml/**/runs/
 ml/**/checkpoints/
 *.onnx
+ml/data/episodes/
+ml/serving/weights/
 
 # GenForge candidates — generated bundles are quarantined output, never
 # committed (candidate contract, docs/tech/28 §6). Keep the directory.
@@ -34,3 +36,5 @@ genforge/candidates/*
 # Secrets — never commit credentials
 .env
 *.secret.*
+.env.local
+rebirth/

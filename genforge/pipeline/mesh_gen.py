@@ -131,9 +131,18 @@ class StubMeshProvider:
 # this stage only orchestrates and records provenance.
 # --------------------------------------------------------------------------
 
+def offload_enabled() -> bool:
+    """DH_MESH_OFFLOAD=1: weights staged in system RAM and streamed through
+    the GPU per layer (accelerate-style CPU offload / the upstream low-VRAM
+    forks). Lowers each adapter's VRAM floor at the cost of minutes-per-asset
+    inference — the patient fallback when the Cloud Run tier is not wanted."""
+    return os.environ.get("DH_MESH_OFFLOAD", "") == "1"
+
+
 class ExternalMeshProvider:
     name = "external"
     min_free_vram_mb = 0
+    offload_free_vram_mb: Optional[int] = None   # None = offload can't save it
     env_dir = ""                   # env var naming the upstream checkout
     runner = "dh_runner.py"        # adapter script inside that checkout
 
@@ -145,13 +154,21 @@ class ExternalMeshProvider:
                 f"(install runbook: docs/tech/31-image-to-3d-local.md)")
         return Path(root)
 
+    def _vram_floor(self) -> int:
+        if offload_enabled() and self.offload_free_vram_mb is not None:
+            return self.offload_free_vram_mb
+        return self.min_free_vram_mb
+
     def _preflight(self) -> None:
         free = free_vram_mb()
-        if free is not None and free < self.min_free_vram_mb:
+        floor = self._vram_floor()
+        if free is not None and free < floor:
+            hint = ("even offloaded (activations set this floor, not weights)"
+                    if offload_enabled() else
+                    "try DH_MESH_OFFLOAD=1 (slow) or the Cloud Run tier")
             raise RuntimeError(
-                f"{self.name}: needs ~{self.min_free_vram_mb} MB free VRAM, "
-                f"found {free} MB — use the draft tier locally or run this "
-                f"adapter on the rented-GPU tier (docs/tech/31 §4)")
+                f"{self.name}: needs ~{floor} MB free VRAM, found {free} MB — "
+                f"{hint}; rented-GPU/Cloud Run runbook: docs/tech/31 §6")
 
     def generate_mesh(self, request: MeshRequest, out_dir: Path) -> MeshResult:
         root = self._root()
@@ -163,11 +180,14 @@ class ExternalMeshProvider:
         cmd = [str(py), str(root / self.runner), "--image",
                str(request.image_path), "--out", str(mesh),
                "--seed", str(request.seed)]
+        if offload_enabled():
+            cmd.append("--offload")
         proc = subprocess.run(cmd, capture_output=True, text=True)
         if proc.returncode != 0 or not mesh.exists():
             raise RuntimeError(
                 f"{self.name} failed ({proc.returncode}):\n{proc.stderr[-2000:]}")
-        return MeshResult(mesh, self.name, {"cmd": " ".join(cmd)})
+        return MeshResult(mesh, self.name,
+                          {"cmd": " ".join(cmd), "offload": offload_enabled()})
 
 
 class TripoSRProvider(ExternalMeshProvider):
@@ -185,24 +205,95 @@ class Hunyuan3DMiniProvider(ExternalMeshProvider):
 
 
 class TrellisProvider(ExternalMeshProvider):
-    """Batch/max-quality tier — refuses to start under 16 GB free."""
+    """Max-quality — 16 GB class; low-VRAM forks bottom out ~8 GB
+    (sparse-voxel attention activations), so offload can NOT reach 6 GB."""
     name = "trellis"
     min_free_vram_mb = 16000
+    offload_free_vram_mb = 7500
     env_dir = "DH_TRELLIS_DIR"
 
 
 class Hunyuan3DFullProvider(ExternalMeshProvider):
-    """Batch/max-quality tier — full shape+texture Hunyuan3D."""
+    """Max-quality — full shape+texture. The 'GPU-poor' offload forks run the
+    whole pipeline on ~5-6 GB at minutes-per-asset speeds."""
     name = "hunyuan3d"
     min_free_vram_mb = 16000
+    offload_free_vram_mb = 5000
     env_dir = "DH_HUNYUAN3D_DIR"
     runner = "dh_runner_full.py"
 
 
+# --- PARKED 2026-09-10 — Cloud Run GPU tier (Ricardo: "don't run anything
+# into cloud gpu on google... arenas will be run on local gpus" + "comment out
+# previous max quality settings, don't simply delete code"). Kept verbatim,
+# disabled: not registered, never imported. Service container + deploy script
+# live in genforge/service/mesh_cloudrun/ (deploy.sh exits early). Re-enable
+# by uncommenting this block + the registry lines below. docs/tech/31 §7.
+#
+# class CloudRunMeshProvider:
+#     """Max-quality tier on Google Cloud Run GPU: POSTs the concept image to
+#     our private mesh service (nvidia-l4, 24 GB, scale-to-zero) and writes
+#     the returned GLB. Auth = the caller's gcloud identity token
+#     (roles/run.invoker on the service); nothing secret in the repo."""
+#     name = "cloudrun"
+#     min_free_vram_mb = 0           # remote GPU — local VRAM is irrelevant
+#     env_url = "DH_MESH_CLOUDRUN_URL"
+#
+#     def _url(self) -> str:
+#         url = os.environ.get(self.env_url, "")
+#         if not url:
+#             raise RuntimeError(
+#                 f"{self.name}: set {self.env_url} to the deployed service URL "
+#                 f"(deploy + credentials runbook: docs/tech/31 §7)")
+#         return url.rstrip("/")
+#
+#     def _id_token(self) -> str:
+#         try:
+#             out = subprocess.run(["gcloud", "auth", "print-identity-token"],
+#                                  capture_output=True, text=True, timeout=30,
+#                                  check=True).stdout.strip()
+#             if out:
+#                 return out
+#         except (OSError, subprocess.SubprocessError) as exc:
+#             raise RuntimeError(
+#                 f"{self.name}: could not mint an identity token — run "
+#                 f"`gcloud auth login` first (docs/tech/31 §7)") from exc
+#         raise RuntimeError(f"{self.name}: empty identity token from gcloud")
+#
+#     def generate_mesh(self, request: MeshRequest, out_dir: Path) -> MeshResult:
+#         import urllib.request
+#         url = f"{self._url()}/generate?seed={request.seed}"
+#         req = urllib.request.Request(
+#             url, data=request.image_path.read_bytes(), method="POST",
+#             headers={"Authorization": f"Bearer {self._id_token()}",
+#                      "Content-Type": "application/octet-stream"})
+#         with urllib.request.urlopen(req, timeout=900) as resp:
+#             glb = resp.read()
+#             model = resp.headers.get("X-DH-Model", "unknown")
+#         if len(glb) < 1000:
+#             raise RuntimeError(f"{self.name}: suspiciously small mesh "
+#                                f"({len(glb)} bytes) — check service logs")
+#         mesh = out_dir / "mesh.glb"
+#         mesh.write_bytes(glb)
+#         return MeshResult(mesh, self.name, {"service_model": model, "url": url})
+# --- end PARKED block -------------------------------------------------------
+
+# Registry is LOCAL-ONLY (canon §12.38). Max quality = the offload path
+# (DH_MESH_OFFLOAD=1) or a bigger local card through the same adapters.
 _PROVIDERS = {p.name: p for p in
               (StubMeshProvider, TripoSRProvider, Hunyuan3DMiniProvider,
                TrellisProvider, Hunyuan3DFullProvider)}
+#              ^ PARKED: add CloudRunMeshProvider here to re-enable the tier
+# auto = best installed local checkout. The stub is only ever explicit (CI).
 _AUTO_ORDER = ["hunyuan3d", "trellis", "hunyuan3d-mini", "triposr"]
+#             ^ PARKED: prepend "cloudrun" to prefer the remote tier when set
+
+
+def _configured(prov) -> bool:
+    # PARKED: `if isinstance(prov, CloudRunMeshProvider): return bool(
+    #             os.environ.get(prov.env_url, ""))`
+    return bool(os.environ.get(prov.env_dir, "")) and Path(
+            os.environ[prov.env_dir]).is_dir()
 
 
 def get_mesh_provider(name: str = "auto") -> MeshProvider:
@@ -211,11 +302,9 @@ def get_mesh_provider(name: str = "auto") -> MeshProvider:
             raise KeyError(f"unknown mesh provider '{name}' "
                            f"(have: {', '.join(sorted(_PROVIDERS))})")
         return _PROVIDERS[name]()
-    # auto = best installed real adapter; stub is only ever explicit (CI)
     for cand in _AUTO_ORDER:
         prov = _PROVIDERS[cand]()
-        if os.environ.get(prov.env_dir, "") and Path(
-                os.environ[prov.env_dir]).is_dir():
+        if _configured(prov):
             return prov
     raise RuntimeError("no mesh provider installed — install runbook: "
                        "docs/tech/31-image-to-3d-local.md")
