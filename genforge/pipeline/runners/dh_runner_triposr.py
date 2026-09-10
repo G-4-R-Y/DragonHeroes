@@ -37,6 +37,9 @@ def main() -> int:
     root = Path(__file__).resolve().parent                  # the TripoSR checkout
     has_alpha = Image.open(args.image).mode in ("RGBA", "LA")
     with tempfile.TemporaryDirectory() as td:
+        # run.py only mkdirs the per-image subfolder on its remove-bg path;
+        # with --no-remove-bg the GLB export would hit a missing directory
+        Path(td, "0").mkdir()
         cmd = [sys.executable, str(root / "run.py"), str(args.image),
                "--output-dir", td, "--model-save-format", "glb",
                "--mc-resolution", str(args.mc_resolution)]
