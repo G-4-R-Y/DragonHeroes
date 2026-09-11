@@ -87,6 +87,8 @@ func _ready() -> void:
 	_repo = ProjectSettings.globalize_path("res://..").simplify_path()
 	theme = ProtoTheme.get_theme()
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	if not _selftest and DisplayServer.get_name() != "headless":
+		_fit_window()
 	_reset_run()
 	_build_ui()
 	_populate_roster()
@@ -110,6 +112,25 @@ func _process(delta: float) -> void:
 	_refresh_ui()
 
 # ---- UI ---------------------------------------------------------------------------------
+
+# The console is a desktop TOOL, not the 640x360 game: take the biggest 16:9
+# logical canvas that fits the screen it opens on (the full-rect containers
+# reflow). At 640x360 the roster column's minimum heights overflowed and the
+# TRAIN/STOP/GATE/WATCH buttons rendered outside the window.
+func _fit_window() -> void:
+	var w := get_window()
+	var usable := DisplayServer.screen_get_usable_rect(w.current_screen)
+	for cand in [Vector2i(1600, 900), Vector2i(1440, 810), Vector2i(1280, 720),
+			Vector2i(1152, 648), Vector2i(1024, 576), Vector2i(960, 540)]:
+		if cand.x <= usable.size.x - 24 and cand.y <= usable.size.y - 96:
+			# the roster column needs ~400 logical px of height; when a 2x integer
+			# step still clears that (1600x900 -> 800x450), take it — the pixel
+			# typography reads at menu size instead of 1:1 dots on a 1080p screen
+			var k := 2 if cand.y / 2 >= 420 else 1
+			w.content_scale_size = cand / k
+			w.size = cand
+			w.position = usable.position + (usable.size - cand) / 2
+			return
 
 func _build_ui() -> void:
 	var bg := ColorRect.new()

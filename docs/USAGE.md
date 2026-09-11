@@ -158,7 +158,7 @@ Rules: gameplay content is data (`content/`), validated in CI; IDs are
 
 | Gate | Command | Pass line |
 |---|---|---|
-| Menu boot | `godot --headless --path game --quit-after 150` | no errors |
+| Menu boot | `godot --headless --path game res://prototype/tests/menu_probe.tscn` | MENU OK (asserts the main scene BUILT: MODE/FIT/ENTER/CO-OP/LANGUAGE buttons present) |
 | Hunt boot ×3 | `godot --headless --path game res://prototype/main.tscn --quit-after 150` | no errors |
 | World spawn | `godot --headless --path game res://prototype/tests/spawn_probe.tscn` | SPAWNTEST OK |
 | World stream | `godot --headless --path game res://prototype/tests/stream_test.tscn` | STREAMTEST OK |

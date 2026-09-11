@@ -18,13 +18,26 @@ static func apply(mode: String, scale: String) -> void:
 	w.mode = Window.MODE_FULLSCREEN if mode == "fullscreen" else Window.MODE_WINDOWED
 	w.content_scale_stretch = Window.CONTENT_SCALE_STRETCH_INTEGER \
 			if scale == "integer" else Window.CONTENT_SCALE_STRETCH_FRACTIONAL
+	if DisplayServer.get_name() != "headless":
+		fit_windowed(w)
+
+# Windowed fit (canon §12.38): the largest INTEGER scale of the 640x360 base
+# that fits the usable screen rect (minus chrome), centered. The default
+# 1280x720 override overflowed smaller screens — UI ended up outside the glass.
+static func fit_windowed(w: Window) -> void:
+	if w.mode != Window.MODE_WINDOWED:
+		return
+	var usable := DisplayServer.screen_get_usable_rect(w.current_screen)
+	var s := maxi(1, mini((usable.size.x - 16) / 640, (usable.size.y - 96) / 360))
+	w.size = Vector2i(640, 360) * s
+	w.position = usable.position + (usable.size - w.size) / 2
 
 static func current() -> Dictionary:
 	return _load()
 
 static func cycle_mode() -> String:
 	var d := _load()
-	var next := MODES[(MODES.find(str(d.get("mode", "windowed"))) + 1) % MODES.size()]
+	var next := str(MODES[(MODES.find(str(d.get("mode", "windowed"))) + 1) % MODES.size()])
 	d["mode"] = next
 	_save(d)
 	apply_saved()
@@ -32,7 +45,7 @@ static func cycle_mode() -> String:
 
 static func cycle_scale() -> String:
 	var d := _load()
-	var next := SCALES[(SCALES.find(str(d.get("scale", "integer"))) + 1) % SCALES.size()]
+	var next := str(SCALES[(SCALES.find(str(d.get("scale", "integer"))) + 1) % SCALES.size()])
 	d["scale"] = next
 	_save(d)
 	apply_saved()

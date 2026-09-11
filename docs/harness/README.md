@@ -53,8 +53,11 @@ through item 38). Nothing here duplicates a law doc — it points at it.
 ## The gate suite (run ALL before any commit — one line each, from `game/`)
 
 `docs/USAGE.md` §Dev gates is authoritative. In one breath:
-`--import` once after new class_name/.gdshader → hunt boot ×2 (`main.tscn
---quit-after 150`, no error lines) → `tests/spawn_probe.tscn` (SPAWNTEST OK)
+`--import` once after new class_name/.gdshader → `tests/menu_probe.tscn`
+(MENU OK — the main scene BUILT; 2026-09-11: display.gd's parse error had
+been aborting the menu's `_build` for 9 days behind "no errors" boot checks)
+→ hunt boot ×2 (`main.tscn --quit-after 150`, no error lines) →
+`tests/spawn_probe.tscn` (SPAWNTEST OK)
 → `tests/stream_test.tscn` (STREAMTEST OK, worst apply ≤2 ms) →
 `tests/click_test.tscn` (CLICKTEST DONE — ALL PASS; guards PT-BR SAIR/Talho)
 → `tests/fx_stress.tscn --quit-after 260` (FXSTRESS OK) → `arena/arena.tscn
