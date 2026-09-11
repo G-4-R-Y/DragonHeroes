@@ -43,6 +43,17 @@ EN/PT-BR toggle in the menu and the Haven.
 Attacks and skills **buffer** for 150 ms — presses just before a cooldown ends
 still fire. Leveling heals to full. Death costs 25% of carried gold.
 
+### Settings (title screen, bottom corners)
+
+Bottom-left: **Language** (EN / PT-BR). Bottom-right, stacked: **MUSIC: ON/OFF**,
+**SFX: ON/OFF**, **FIT** (integer pixels / fractional fill), **MODE** (windowed /
+fullscreen). Everything persists in `user://settings.json` and applies at every
+boot, including direct scene boots. Audio runs on two buses, `Music` and `SFX`
+(created in code — there is no music track yet; the slice's sound is
+synthesized effects, so MUSIC controls the bus future music will play on).
+Volumes are also persisted (`audio.music_vol` / `audio.sfx_vol`, 0..1) for
+anyone who wants quieter rather than silent.
+
 ### The hunt
 
 Infinite seeded world (new map every hunt): 14 packs, three boss hunts —

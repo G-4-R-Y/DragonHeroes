@@ -36,7 +36,7 @@ func _process(_delta: float) -> void:
 	# the menu LOOKS fine minus its last controls, so assert they are all there
 	var texts := " ".join(buttons.map(func(b: Variant) -> String: return str((b as Button).text).to_upper()))
 	var missing: PackedStringArray = []
-	for want in ["MODE", "FIT", "ENTER", "CO-OP", "LANGUAGE"]:
+	for want in ["MODE", "FIT", "MUSIC", "SFX", "ENTER", "CO-OP", "LANGUAGE"]:
 		if texts.find(want) < 0:
 			missing.append(want)
 	if not missing.is_empty():
@@ -46,8 +46,28 @@ func _process(_delta: float) -> void:
 	if edits.size() < 2:
 		_verdict(false, "menu has %d text fields (want name + password)" % edits.size())
 		return
-	_verdict(true, "%d buttons incl. MODE/FIT/ENTER/CO-OP/LANGUAGE, %d fields, script compiled" % [
-			buttons.size(), edits.size()])
+	# audio settings reach the mixer: flip SFX off, the bus must be muted; then
+	# restore the saved state (the probe runs against the real user:// file)
+	var was_on := ProtoAudio.is_on("sfx")
+	ProtoAudio.set_on("sfx", false)
+	var sfx_bus := AudioServer.get_bus_index("SFX")
+	var muted := sfx_bus >= 0 and AudioServer.is_bus_mute(sfx_bus)
+	ProtoAudio.set_on("sfx", was_on)
+	var restored := sfx_bus >= 0 and AudioServer.is_bus_mute(sfx_bus) == (not was_on)
+	if not muted or not restored or AudioServer.get_bus_index("Music") < 0:
+		_verdict(false, "audio settings did not reach the buses (SFX idx %d, muted %s, restored %s)" % [
+				sfx_bus, muted, restored])
+		return
+	# three writers share user://settings.json: a language save must not wipe audio
+	ProtoAudio.set_on("sfx", false)
+	ProtoLang.set_lang(ProtoLang.lang)
+	var survived := not ProtoAudio.is_on("sfx")
+	ProtoAudio.set_on("sfx", was_on)
+	if not survived:
+		_verdict(false, "the language save wiped the audio settings — settings.json writers must merge")
+		return
+	_verdict(true, "%d buttons incl. MODE/FIT/MUSIC/SFX/ENTER/CO-OP/LANGUAGE, %d fields, SFX bus mutes + restores, settings survive a language save (%s), script compiled" % [
+			buttons.size(), edits.size(), OS.get_user_data_dir()])
 
 func _verdict(ok: bool, detail: String) -> void:
 	print(("MENU OK — " if ok else "MENU FAIL — ") + detail)

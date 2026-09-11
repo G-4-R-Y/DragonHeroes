@@ -209,12 +209,30 @@ func _build() -> void:
 	add_child(fit_btn)
 	ProtoDisplay.apply_saved()
 
+	# Audio (Ricardo: "mute songs and effects") — stacked above the display
+	# buttons: per-bus ON/OFF, same settings file, applied at every boot
+	_audio_button("sfx", "SFX", Vector2(516, 282))
+	_audio_button("music", "MUSIC", Vector2(516, 258))
+	ProtoAudio.apply_saved()
+
 	# glue the halo to wherever the centered VBox actually lands the title
 	# (content height shifts with the saves list / language). Guards cover the
 	# rebuild-on-language-toggle freeing these nodes mid-await.
 	await get_tree().process_frame
 	if is_instance_valid(halo) and is_instance_valid(title):
 		halo.position = title.get_global_rect().get_center()
+
+# One MUSIC/SFX switch: shows the saved state, flips + persists on press.
+func _audio_button(kind: String, label: String, at: Vector2) -> Button:
+	var b := Button.new()
+	b.text = "%s: %s" % [label, "ON" if ProtoAudio.is_on(kind) else "OFF"]
+	b.focus_mode = Control.FOCUS_NONE
+	b.add_theme_font_size_override("font_size", ProtoTheme.SIZE_BODY)
+	b.position = at
+	b.pressed.connect(func() -> void:
+		b.text = "%s: %s" % [label, "ON" if ProtoAudio.toggle(kind) else "OFF"])
+	add_child(b)
+	return b
 
 func _toggle_lang() -> void:
 	ProtoLang.set_lang("pt" if ProtoLang.lang == "en" else "en")

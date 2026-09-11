@@ -748,13 +748,18 @@ func damage_number(at: Vector2, amount: float, color: Color, text := "", crit :=
 # ---- procedural SFX (sfx.gd static cache; 8 positional players, round-robin) ---
 
 func _build_audio() -> void:
+	# Music/SFX buses + the saved mute/volume FIRST, so every player below binds
+	# to a bus that exists (ui/audio.gd — the title screen's MUSIC/SFX switches)
+	ProtoAudio.apply_saved()
 	ProtoSfx.warm()   # synthesize every stream once, up front — no mid-fight hitch
 	for i in 8:
 		var p := AudioStreamPlayer2D.new()
 		p.max_distance = 480.0
+		p.bus = "SFX"
 		add_child(p)
 		_sfx_players.append(p)
 	_ui_player = AudioStreamPlayer.new()
+	_ui_player.bus = "SFX"
 	add_child(_ui_player)
 
 func play_sfx(sfx_name: String, at: Vector2, vol_db := -8.0) -> void:

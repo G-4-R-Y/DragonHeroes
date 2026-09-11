@@ -511,9 +511,19 @@ static func term(prefix: String, word: String) -> String:
 static func set_lang(l: String) -> void:
 	_ensure()
 	lang = "pt" if l == "pt" else "en"
+	# MERGE into the shared settings file — display (ProtoDisplay) and audio
+	# (ProtoAudio) keys live here too; this used to rewrite it as {"lang"} alone
+	# and silently wiped them on every language toggle
+	var root := {}
+	var raw := FileAccess.get_file_as_string(SETTINGS_PATH)
+	if not raw.is_empty():
+		var parsed: Variant = JSON.parse_string(raw)
+		if parsed is Dictionary:
+			root = parsed
+	root["lang"] = lang
 	var f := FileAccess.open(SETTINGS_PATH, FileAccess.WRITE)
 	if f != null:
-		f.store_string(JSON.stringify({"lang": lang}, "\t"))
+		f.store_string(JSON.stringify(root, "\t"))
 
 # Lazy load on first access; a missing/corrupt settings file just keeps "en".
 static func _ensure() -> void:

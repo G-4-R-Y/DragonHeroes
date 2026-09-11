@@ -821,3 +821,75 @@ Still open:
    Claude background agents/workflows are OFF by default — two workflows
    exhausted the session quota mid-flight; work runs inline unless Ricardo
    asks otherwise (CLAUDE.md, docs/harness/README.md).
+
+40. **dh-env tier 2 landed: C++ arena + GPU PPO, local (2026-09-11, Ricardo:
+   "why aren't we using modern libs like pytorch... we want sota gaming ai,
+   ppo and other rl techniques... use my GPU... with a cap based on my GPU
+   capacity in VRAM").** The §12.39 tier-1 loop stays (cheap ES breadth over
+   Godot workers); tier 2 adds DEPTH: (a) **dh-sim arena** — a deterministic
+   C++20 twin of game/arena (same 60 Hz tick, same arena.obs.v1 31 floats,
+   same kits/fields/projectiles/fairness delays, native + scripted + frozen-MLP
+   opponents), no Godot, no I/O (canon boundaries); (b) **dh-env C API**
+   (create/reset/step/winner/destroy) consumed from Python via **ctypes**
+   (nanobind deferred — zero vendored deps); (c) **specs.json is GENERATED**
+   from the real Godot bodies (game/arena/tools/dump_specs.tscn) — balance
+   changes reach training by re-dumping, never by hand tables; (d) throughput
+   gate ≥100k steps/s/core PASSED: 216k (native) / 256k (scripted) over the
+   full ctypes path; (e) **PyTorch venv** at ml/.venv (torch 2.6+cu124 on the
+   RTX 4050; venv created without sudo — python3-venv STILL missing on the box,
+   get-pip workaround in tools docs); **VRAM hard cap 50%** via
+   ml/training/gpu_guard.py (set_per_process_memory_fraction + rollout-batch
+   clamp — no OOMs by construction); (f) **PPO** (ml/training/ppo.py): GAE,
+   clipped objective, factorized move/act/dodge policy, self-play = the
+   learner's own frozen snapshot as the C++ MLP opponent (the past-self league
+   inside the env), SAME reward shaping as ES fitness, exports schema
+   "arena.policy.v1" so the Godot arena gates PPO nets verbatim (a 250k-step
+   smoke net lost 0-4 there — the gate stays the honest arbiter; real runs are
+   ≥5M steps). ES → PPO warm-start via from_policy_net. Also this date: arena
+   creature KITS (species actives in builds.json skills[]: bolt_volley,
+   radial_slam, pounce, field_cast, enrage — native fires them boss-style, bot
+   policies via cmd_skill, cooldowns in obs[7..10]) and the DUO build kind
+   (core.arena.the_duologue: two partnered bodies, one fighter, nearest-proxy
+   targeting, alive_body()/living_proxies() guards for the freed-member crash
+   class; the selftest's 4th matchup is the duo so the gate sees member-death
+   mid-fight every run). Display fit (§12.38's missing entry, same date):
+   ProtoDisplay.fit_windowed — largest integer 640×360 scale inside the usable
+   screen rect, centered; the training console is a desktop TOOL with its own
+   logical-canvas ladder (1600×900 → 960×540 by what fits) — its buttons no
+   longer render outside the window.
+
+41. **League shape + combo combat rules (2026-09-11, Ricardo: "pitch nets
+   against themselves... exploit their strategies... no creature is allowed to
+   be absolutely poor on skills... mobs rely on skill combos... electric AOE
+   through a pool of water").** (a) PPO opponent pools are MIXED thirds —
+   native / scripted / past-self snapshots — never self-play alone (the 5M
+   run's 1.00 win rate vs its own snapshots was an inflated metric; vs real
+   opponents the same net showed 0.05 — the honest gradient). (b) EXPLOITER
+   mode: `ppo.py --exploit <policy_v1.json>` trains a dedicated counter-net
+   against a FIXED main agent, registered with kind "exploiter" (AlphaStar
+   league shape: mains, past-selves, exploiters; main-exploiters next). (c)
+   COMBO incentives in the reward: R_KIT per cast (beats LMB spam), R_CHAIN
+   for firing a DIFFERENT kit within a 90-tick window — mobs must learn
+   sequencing, not spam. (d) EMERGENT FIELD INTERACTIONS (combat canon —
+   both sims, parity-gated): lava fusion (fire+earth, existing) is joined by
+   CONDUCT: a storm bolt inside a mire field detonates it — 2x bolt damage
+   over 1.5x radius on the field owner's enemy, field consumed. In 1v1 this
+   is an anti-synergy (your storm punishes THEIR mire); in 2v2 (roadmap) it
+   is the ally combo Ricardo described. Fire×frost (steam?) and other pairs:
+   open question, same pattern. (e) Windows cross-build unblocked WITHOUT
+   sudo: portable llvm-mingw toolchain at ~/.local/share/dh-toolchains +
+   sim/cmake/mingw-w64-x86_64.cmake → sim/build-windows/dh-server.exe (the
+   sim has no sockets yet, so zero portability shims were needed).
+
+42. **Audio settings: Music + SFX buses with persisted switches (2026-09-11,
+   Ricardo: "include a settings option as to control audio (mute songs and
+   effects for god's sake)").** The slice has no audio assets — every sound
+   is synthesized (sfx.gd) and there is no music yet — so the fix is the
+   seam, not a track: `ProtoAudio` (prototype/ui/audio.gd) creates the
+   "Music" and "SFX" buses in code at first use, persists ON/OFF + linear
+   volume per bus in user://settings.json ("audio", beside display and
+   language) and applies them at every boot, menu or direct scene; all SFX
+   players bind to the SFX bus; the title screen carries MUSIC/SFX switches
+   above FIT/MODE. Rule: any future music plays on the Music bus, any effect
+   on SFX — never on Master — so the switches keep working without
+   retrofits. The MENU OK gate proves the mute reaches the mixer.
