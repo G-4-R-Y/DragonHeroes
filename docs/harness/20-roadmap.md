@@ -6,6 +6,16 @@ Ricardo's call) · SCHEDULED (decided, sequenced) · BUDGET (blocked on money).
 
 ## NOW — finish what is open
 
+- **Arena training console + speed lever** (design/25, canon §12.39) — LANDED
+  2026-09-11: `game/arena/console.tscn` (roster with jobs/speed + parallelism
+  hint, Train/Stop, progress tail → fitness chart + match-score strip + ETA,
+  Gate, Watch), the progress JSONL seam, `arena --speed max|N` (CPU-bound
+  training: one worker ≈ 24× the old wall-locked fast mode, bit-identical
+  results; 16 workers ≈ 870× real time). Gates: CONSOLE SELFTEST OK, ARENA
+  SELFTEST OK, pytest ml 18. OPEN: the learning signal — candidates take 0 wins
+  vs native fen_boar every match, fitness moves only on hp margin; next is an
+  opponent curriculum (scripted → past self → native) and/or shaping (tech/25
+  §4.2), now ~3 s per generation to iterate.
 - **Image-to-3D spike, draft tier** (tech/31 §4-5): TripoSR is INSTALLED at
   `~/tools/TripoSR` (torchmcubes patched for CUDA 12.8 — recipe in tech/31 §4;
   runner adapter versioned at `genforge/pipeline/runners/dh_runner_triposr.py`).

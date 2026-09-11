@@ -58,7 +58,8 @@ through item 38). Nothing here duplicates a law doc — it points at it.
 → `tests/stream_test.tscn` (STREAMTEST OK, worst apply ≤2 ms) →
 `tests/click_test.tscn` (CLICKTEST DONE — ALL PASS; guards PT-BR SAIR/Talho)
 → `tests/fx_stress.tscn --quit-after 260` (FXSTRESS OK) → `arena/arena.tscn
--- --selftest` (ARENA SELFTEST OK) → `arena/tests/cosmetics_test.tscn`
+-- --selftest` (ARENA SELFTEST OK) → `arena/console.tscn -- --selftest`
+(CONSOLE SELFTEST OK) → `arena/tests/cosmetics_test.tscn`
 (COSMETICS OK) → `bash tools/mp_test.sh` (MP TEST OK) → `python3 -m pytest
 ml/tests genforge/tests -q` → `python3 tools/validate_content.py` (0 problems).
 Watch item: spawn_probe flaked ONCE right after `--import` (2026-09-10),
@@ -85,9 +86,10 @@ passed on rerun — rerun before declaring it broken.
 
 - Consult Ricardo on DIRECTIONAL decisions; execute freely inside them.
 - Reusable, decoupled, extensible code; registries/seams over coupling.
-- Token economy: bulk work → plan-following agents on disjoint file
-  partitions (write the plan to a doc first); the main context integrates and
-  runs gates. When Ricardo says "synchronously", do it yourself.
+- Token economy: work INLINE. Background agents/workflows are OFF by default —
+  two workflows exhausted the session quota on 2026-09-11 and their work was
+  lost mid-flight (canon §12.39). Spawn them only when Ricardo asks in the
+  moment; keep the main context lean with /compact instead.
 - Orders of magnitude over increments; capture-verified; docs updated IN THE
   SAME CHANGE (canon note when deviating).
 - Never delete a decided-then-paused design — comment it out and log the

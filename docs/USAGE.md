@@ -66,11 +66,30 @@ Details + v1 simplifications: [tech/33](tech/33-p2p-coop.md).
 ```bash
 godot --path game res://arena/arena.tscn           # spectator (N/R/1-3/Q)
 godot --headless --path game res://arena/arena.tscn -- --selftest   # CI gate
+godot --path game res://arena/console.tscn         # training console (below)
 ```
 
 Creatures, bosses and geared bounty-hunter builds fight 1v1; scripted baselines
 or trained neural policies drive them. Full manual (all flags, roster,
 cosmetics, training): **[game/arena/README.md](../game/arena/README.md)**.
+
+### Training console
+
+A windowed front-end for the ES trainer ([design/25](design/25-arena-training-console.md)).
+It drives `python3 -m ml.training.league` for you and tails the trainer's
+progress file `ml/data/progress/<key>.jsonl` (one JSON event per line).
+
+| Control | What it does |
+|---|---|
+| **Roster** | pick the trainee (species key + build), tick opponents, set generations / pop / episodes / **jobs** (default = your core count) / **speed** (default `max`); a hint line states the parallelism ceiling (pop × opponents matches per generation), idle workers, and the pop that fills your cores |
+| **Train / Stop** | spawns `league train …` as a child process; Stop kills it; the UI never blocks |
+| **Progress** | current generation / candidate / match, matches done of total, ETA from observed match durations, a fitness chart (best + mean per generation, per-candidate dots), a per-match **score strip** coloured by opponent (`native@fen_boar_alpha 0.00` in its legend = no learning signal yet), the last gate result |
+| **Gate** | runs `league gate` for the trainee → PASS / FAIL + the numbers |
+| **Watch** | opens a windowed arena for ONE episode with the trainee's latest net (candidate version, else deployed) against a chosen opponent |
+
+ES has no loss curve: **fitness** (candidate match score vs opponents, 0..1,
+higher is better) is the metric, plus the gate's win-rates. Progress arrives
+per match, so the chart moves long before a generation completes.
 
 ## Training policies (ML)
 
@@ -80,6 +99,22 @@ python3 -m ml.training.league train --key fen_boar --build core.arena.fen_boar_a
     --generations 20 --pop 16 --episodes 4 --jobs "$(nproc)"   # parallel workers
 python3 -m ml.training.league gate --key fen_boar --build core.arena.fen_boar_alpha
 ```
+
+**What to expect.** Every match runs at `--speed max` (default since
+2026-09-11: CPU-bound, one core per worker, results bit-identical to the old
+wall-locked 4× mode), so a 4-episode match set takes ~1–3 s instead of 45 s.
+With the defaults (3 generations × 6 candidates × 2 opponents × 4 episodes,
+`--jobs 1`) the CLI prints `[train:KEY] fresh net`, then within ~30 s per
+generation the `[train:KEY] g0 candN fitness=..` lines and `g0 best=.. mean=..`,
+ending `registered vN (candidate — run the gate)`. **Scaling rules:** a
+generation is pop × opponents independent matches (12 by default) — that is the
+most workers ever busy, so `--jobs` past it idles; raise `--pop` to use more
+cores (a better ES gradient too) and set `--jobs` ≈ cores. Measured on the
+20-core dev box: 1 worker ≈ 110× real time, 16 workers ≈ 870× aggregate
+(≈ 70k episodes/hour; flat past 16). The GPU is not used anywhere in this loop
+(numpy MLP + Godot physics/GDScript workers — tech/32); GPUs arrive with the
+C++ `dh-env` tier. For live per-match progress use the console (above) — it
+reads the same `ml/data/progress/<key>.jsonl` the trainer appends to.
 
 Thousands of parallel episodes, the dh-env endgame, fleet runs:
 **[tech/32](tech/32-scaling-rl-training.md)**.
@@ -130,6 +165,7 @@ Rules: gameplay content is data (`content/`), validated in CI; IDs are
 | Click test | `godot --headless --path game res://prototype/tests/click_test.tscn` | CLICKTEST OK ×16 |
 | FX budget | `godot --headless --path game res://prototype/tests/fx_stress.tscn --quit-after 260` | FXSTRESS OK |
 | Arena | `godot --headless --path game res://arena/arena.tscn -- --selftest` | ARENA SELFTEST OK |
+| Console | `godot --headless --path game res://arena/console.tscn -- --selftest` | CONSOLE SELFTEST OK |
 | Cosmetics | `godot --headless --path game res://arena/tests/cosmetics_test.tscn --quit-after 140` | COSMETICS OK |
 | Co-op | `bash tools/mp_test.sh` | MP TEST OK |
 | Content | `python3 tools/validate_content.py` | 0 problems |

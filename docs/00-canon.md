@@ -796,3 +796,28 @@ Still open:
    current-state spec per system with file pointers and gates,
    20-roadmap = one consolidated roadmap pointing at each law doc. HANDOFF.md
    stays the volatile delta; docs/harness/ is the durable layer.
+
+39. **Training speed: CPU-bound `--speed max`, and no GPU in this loop
+   (2026-09-11, Ricardo: "is the arena training script using my gpu? as i
+   increase the number of jobs, it doesn't seem to accelerate much. it should
+   be able to become faster with more compute!").** Diagnosis: (a) nothing in
+   the ES loop touches the GPU — the trainer is numpy on a tiny MLP, every
+   worker is Godot physics + GDScript; (b) fast mode was WALL-LOCKED at 4×
+   (240 Hz ticks × time_scale 4), so a 4-episode match took ≥ 45 s however idle
+   the machine was; (c) a generation is pop × opponents independent matches
+   (12 by default) — the most workers that can ever be busy, so `--jobs 32`
+   ran 12 processes. Decision: `arena.gd --speed` — `max` (training's default:
+   the engine flag `--fixed-fps 60` advances exactly one 1/60 s tick per
+   frame, CPU-bound and deterministic — results bit-identical to 4× and 16×; a
+   2-episode set 0.91 s vs 22.1 s) or a wall-locked `N` for watching. Measured
+   on the 20-core dev box: 1 worker ≈ 110× real time, 16 workers ≈ 870×
+   aggregate (≈ 70k episodes/hour vs 3.8k before), flat past 16. Rules:
+   `--jobs` ≤ pop × opponents (raise `--pop` to use more cores — a better ES
+   gradient too); training workers never build the camera/HUD (only
+   `--selftest` does, to gate that code path); GPUs enter with dh-env (tech/32
+   tier 2), not this tier; gameplay bookkeeping runs per physics tick, never
+   per frame (the projectile group tagging moved). The training console
+   (design/25) exposes jobs + speed and states the ceiling. Also this date:
+   Claude background agents/workflows are OFF by default — two workflows
+   exhausted the session quota mid-flight; work runs inline unless Ricardo
+   asks otherwise (CLAUDE.md, docs/harness/README.md).

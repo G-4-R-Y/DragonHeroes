@@ -34,6 +34,7 @@
 | [22-3d-alternative-view](design/22-3d-alternative-view.md) | The 3D view experiment: same world/art/data in perspective 3D; reuse scorecard; 2D stays canon |
 | [23-arena-and-self-play](design/23-arena-and-self-play.md) | The arena: observable self-play, per-species + global policies, bounty-hunter builds, cosmetics pack |
 | [24-order-of-magnitude](design/24-order-of-magnitude.md) | The OM levers: AI profiles, run structure, systemic bosses, pets as a build axis, C++ port, RC, audio |
+| [25-arena-training-console](design/25-arena-training-console.md) | The arena training console: pick trainee/opponents, drive the ES trainer, live fitness over the progress JSONL seam, gate, watch one episode |
 | [USAGE.md](USAGE.md) | **The usage manual: play, co-op, arena, training, content workflows, gates** |
 | **tech/** | |
 | [20-architecture-overview](tech/20-architecture-overview.md) | System map, one-sim-three-consumers, data flows, decision table |

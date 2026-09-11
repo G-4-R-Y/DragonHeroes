@@ -80,14 +80,29 @@ genforge (52). Issue: TripoSR local install blocked on `torchmcubes` vs CUDA
 12.8 — see roadmap "NOW".
 
 ## Arena & ML (self-play creature AI)
-**LANDED (v0.3.0).** design/23, tech/25, tech/32, canon §12.35. `game/arena/`
-(arena.tscn spectator/headless, ArenaProxy, policy.gd obs `arena.obs.v1`,
-scripted/neural policies, recorder JSONL, builds/cosmetics), `ml/training/
-{policy_net,league}.py` (numpy twin + ES league, `--jobs N`), `ml/eval/
-gate.py`, `ml/serving/` (registry + weights), content `core/arena/builds.json`.
-Gates: ARENA SELFTEST, COSMETICS, pytest ml (11). Rule: LOCAL GPUs only
-(§12.38). Issue: scripted baseline beats native AI — L1 data-driven AI
-profiles is the unlock.
+**LANDED (v0.3.0); training console + `--speed` lever LANDED 2026-09-11
+(design/25, canon §12.39).** design/23,
+design/25, tech/25, tech/32, canon §12.35. `game/arena/` (arena.tscn
+spectator/headless, ArenaProxy, policy.gd obs `arena.obs.v1`, scripted/neural
+policies, recorder JSONL, builds/cosmetics; `console.gd`/`console.tscn` —
+roster, Train/Stop child process, progress tail + fitness chart, Gate, Watch
+one episode), `ml/training/{policy_net,league}.py` (numpy twin + ES league,
+`--jobs N`, progress writer), `ml/eval/gate.py`, `ml/serving/` (registry +
+weights), content `core/arena/builds.json`. THE SEAM: league.py appends one
+JSON event per line to `ml/data/progress/<key>.jsonl` (`--progress-file`
+overrides; events start / match / candidate / generation / registered / gate /
+error — design/25 §2); the console tails it every 0.5 s and tolerates partial
+trailing lines and unknown events. SPEED: `arena --speed max` (+ engine flag
+`--fixed-fps 60`, league.py's default) runs one 1/60 s tick per frame CPU-bound
+— same seeded 2-episode set 0.91 s vs 22.1 s under the old wall-locked 4×,
+bit-identical results; 16 workers ≈ 870× real time aggregate on the 20-core box
+(flat past 16); parallelism ceiling = pop × opponents; NO GPU anywhere in this
+tier. Training workers never build camera/HUD (only `--selftest` does, to gate
+that path). Gates: ARENA SELFTEST, CONSOLE SELFTEST (`console.tscn --
+--selftest`, headless), COSMETICS, pytest ml (18). Rule: LOCAL GPUs only
+(§12.38). Issues: scripted baseline beats native AI — L1 data-driven AI profiles
+is the unlock; fen_boar candidates take 0 wins vs native every match (fitness
+moves on hp margin only) — opponent curriculum/shaping next (design/25 §5).
 
 ## Multiplayer
 **P2P co-op v1 LANDED (v0.3.0); server-authoritative path = roadmap.**

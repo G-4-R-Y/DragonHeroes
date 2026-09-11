@@ -294,6 +294,39 @@
           }
         }
       }
+    },
+    {
+      "key": "fen_boar",
+      "kind": "species",
+      "version": 4,
+      "parent": null,
+      "created": "2026-09-11T01:29:39",
+      "npz": "/home/ricz/Ricz/Projetos/IntelliGames/Dragon Heroes/ml/serving/weights/fen_boar_v4.npz",
+      "game_json": "/home/ricz/Ricz/Projetos/IntelliGames/Dragon Heroes/ml/serving/weights/fen_boar_v4.json",
+      "deployed": false,
+      "eval": {}
+    },
+    {
+      "key": "fen_boar",
+      "kind": "species",
+      "version": 5,
+      "parent": null,
+      "created": "2026-09-11T01:34:17",
+      "npz": "/home/ricz/Ricz/Projetos/IntelliGames/Dragon Heroes/ml/serving/weights/fen_boar_v5.npz",
+      "game_json": "/home/ricz/Ricz/Projetos/IntelliGames/Dragon Heroes/ml/serving/weights/fen_boar_v5.json",
+      "deployed": false,
+      "eval": {}
+    },
+    {
+      "key": "fen_boar",
+      "kind": "species",
+      "version": 6,
+      "parent": null,
+      "created": "2026-09-11T01:46:22",
+      "npz": "/home/ricz/Ricz/Projetos/IntelliGames/Dragon Heroes/ml/serving/weights/fen_boar_v6.npz",
+      "game_json": "/home/ricz/Ricz/Projetos/IntelliGames/Dragon Heroes/ml/serving/weights/fen_boar_v6.json",
+      "deployed": false,
+      "eval": {}
     }
   ]
 }

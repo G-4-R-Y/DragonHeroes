@@ -38,3 +38,5 @@ genforge/candidates/*
 *.secret.*
 .env.local
 rebirth/
+ml/data/progress/
+ml/data/logs/

@@ -40,8 +40,10 @@ requires deviating from it, update the canon (with a note) in the same change.
 Longer sessions cost more even when cached. Auto-compact fires at 50% context
 (user settings `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=50`). On top of that: run
 `/compact` at natural checkpoints mid-task, and start fresh with `/clear` when
-switching to an unrelated task instead of dragging dead context along. Push bulk
-work into background agents/workflows so the main context stays lean.
+switching to an unrelated task instead of dragging dead context along. Do NOT spawn
+background agents/workflows unless Ricardo asks for them in the moment: two
+workflows exhausted the session quota on 2026-09-11 and their work was lost
+mid-flight (canon §12.39). Work inline; keep context lean with `/compact`.
 
 ## Layout
 

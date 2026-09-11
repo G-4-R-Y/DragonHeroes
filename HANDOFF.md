@@ -1,7 +1,38 @@
-# Handoff — running state (updated 2026-09-10; HEAD = v0.3.0 + mesh/harness commit)
+# Handoff — running state (updated 2026-09-11; HEAD = v0.3.0 + mesh/harness + arena console/speed)
 
 DURABLE MEMORY IS NOW docs/harness/ (README = start here, 10-systems-map,
-20-roadmap). This file is only the volatile delta. Canon §12 current through 38.
+20-roadmap). This file is only the volatile delta. Canon §12 current through 39.
+
+## 2026-09-11 session (main context; everything INLINE — no agents)
+- Two background workflows (a freed-instance sweep, the console build) HIT THE
+  SESSION QUOTA and died mid-flight. Ricardo: "Don't instantiate background
+  agents, execute everything yourself." → CLAUDE.md hygiene line + harness
+  README changed; standing rule, canon §12.39.
+- ARENA TRAINING CONSOLE LANDED (design/25): game/arena/console.{gd,tscn} —
+  roster (trainee / opponents / gens / pop / eps / jobs / speed + a parallelism
+  hint), Train/Stop (detached pid), progress tail of ml/data/progress/<key>
+  .jsonl, fitness chart, match-score strip by opponent, Gate, Watch. Gate:
+  CONSOLE SELFTEST OK. league.py: Progress writer (start / match / candidate /
+  generation / registered / gate / error), --progress-file, train_global
+  extracted, WEIGHTS_DIR mkdir fix; ml/tests/test_progress.py → 18 ml tests.
+- SPEED LEVER (canon §12.39, design/25 §5): arena `--speed max|N`
+  (_apply_speed); league.py `--speed` default max (passes the engine flag
+  --fixed-fps 60). Same seeded 2-episode set: 22.1 s (4×) / 5.65 s (16×) /
+  0.91 s (max), BIT-IDENTICAL results. 1→16 workers: 109× → 873× real time
+  aggregate; flat at 20. Projectile group tagging moved _process →
+  _physics_process (tick-exact at any speed). Camera/HUD: training workers
+  never build them (only --selftest does, on purpose).
+- OBSERVED, NOT FIXED: fen_boar candidates take 0 wins vs native in every match
+  (Ricardo's v4/v5 runs and the verification run) — fitness moves on hp margin
+  only. Next: opponent curriculum / shaping, now ~3 s per generation.
+- WATCH: `--import` logs a pre-existing parse error in prototype/ui/display.gd
+  (`var next :=` on an untyped Array element, lines 27/35); runtime is fine
+  (CLICKTEST ALL PASS). Type the two vars when next in that file.
+- Freed-instance sweep: 17 UNVERIFIED candidate sites (fighter.gd 48/73/240/
+  257/258/424, arena.gd 167/212/480/536/544, neural_policy.gd 78,
+  host_driver.gd 100/156/206, client_hunt.gd 105, mp_test.gd 85) — verifiers
+  died on quota; hand-check if the freed-body crash class recurs.
+- Git has NO remote: `git remote add origin <url> && git push -u origin master`.
 
 ## 2026-09-10 session (main context)
 - COMMITTED the eight days of uncommitted parallel-session work as v0.3.0

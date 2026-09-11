@@ -99,10 +99,7 @@ func _ready() -> void:
 		_hud = ArenaHud.new()
 		add_child(_hud)
 	if _fast:
-		# Faster-than-realtime: 240 Hz ticks x time_scale 4 = 4x wall speed at
-		# the same 1/60 s per-tick resolution (ticks alone only add resolution).
-		Engine.physics_ticks_per_second = 240
-		Engine.time_scale = 4.0
+		_apply_speed(str(_cfg.get("speed", "4")))
 	if _selftest:
 		_rotation = SELFTEST_MATCHES.map(func(m: Array) -> Array: return m)
 	elif _cfg.has("a"):
@@ -122,6 +119,32 @@ func _ready() -> void:
 	_start_match()
 
 # ---- CLI -----------------------------------------------------------------------------
+
+# --speed: how fast a --fast match runs relative to real time (training's lever).
+#   N (default 4, the original fast mode): WALL-LOCKED at N x. 60*N Hz ticks x
+#     time_scale N keeps the 1/60 s per-tick sim resolution (more ticks alone would
+#     only add resolution, not speed); max_physics_steps_per_frame follows N so
+#     the engine never drops sim time when a frame falls behind. Never faster
+#     than N x however idle the CPU is — this is why --jobs alone plateaued.
+#   max: CPU-BOUND and deterministic. 60 Hz ticks, time_scale 1, no frame sleep;
+#     needs the ENGINE flag `--fixed-fps 60` (before `--`; league.py passes it),
+#     which advances every frame by exactly 1/60 s of sim regardless of wall
+#     time — one tick per frame, so a match runs as fast as one core can step it
+#     and the frame/tick relationship is identical on every machine and load.
+#     Without the flag there is no in-script way to unlock the clock: warn and
+#     run the wall-locked 4x.
+func _apply_speed(spec: String) -> void:
+	if spec == "max":
+		if OS.get_cmdline_args().has("--fixed-fps"):
+			OS.low_processor_usage_mode_sleep_usec = 0   # headless sleeps 6.9 ms/frame otherwise
+			Engine.max_fps = 0
+			return
+		push_warning("arena: --speed max needs the engine flag `--fixed-fps 60` before `--` (see README §2) — running the wall-locked 4x")
+		spec = "4"
+	var n := clampf(float(spec), 1.0, 64.0)
+	Engine.physics_ticks_per_second = int(roundf(60.0 * n))
+	Engine.max_physics_steps_per_frame = maxi(8, int(roundf(60.0 * n)))
+	Engine.time_scale = n
 
 func _parse_cli() -> void:
 	const FLAGS := ["--selftest", "--fast", "--spectate"]
@@ -308,6 +331,13 @@ func _advance_or_quit(code: int) -> void:
 # ---- per-frame --------------------------------------------------------------------------
 
 func _physics_process(delta: float) -> void:
+	# tag fresh projectiles for the observation vector's nearest-hostile slots —
+	# per TICK, not per frame: at --speed max (one tick per frame) or a wall-locked
+	# N x (many ticks per frame) a per-frame tag would land a variable number of
+	# ticks late, so the obs would depend on the speed setting
+	for c in get_children():
+		if c is ProtoProjectile and not c.is_in_group("arena_projectiles"):
+			c.add_to_group("arena_projectiles")
 	if _state == "intro":
 		_timer += delta
 		if _timer >= INTRO_S:
@@ -350,10 +380,6 @@ func _physics_process(delta: float) -> void:
 				else (_fighters[0] if a > b else _fighters[1]))
 
 func _process(delta: float) -> void:
-	# tag fresh projectiles for the observation vector's nearest-hostile slots
-	for c in get_children():
-		if c is ProtoProjectile and not c.is_in_group("arena_projectiles"):
-			c.add_to_group("arena_projectiles")
 	if not _spectate or _fighters.size() < 2:
 		return
 	var fa: ArenaFighter = _fighters[0]

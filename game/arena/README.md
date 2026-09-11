@@ -43,6 +43,15 @@ godot --headless --path game res://arena/arena.tscn -- \
     --out /tmp/result.json
 ```
 
+Training's fastest form — CPU-bound and deterministic (results bit-identical to
+the wall-locked modes; measured 2026-09-11: a 2-episode set in 0.9 s vs 22 s):
+
+```bash
+godot --headless --fixed-fps 60 --path game res://arena/arena.tscn -- \
+    --a core.arena.fen_boar_alpha --b core.arena.fen_boar_alpha \
+    --policy-a scripted --policy-b native --episodes 4 --fast --speed max --out /tmp/r.json
+```
+
 | Flag | Default | Meaning |
 |---|---|---|
 | `--a`, `--b` | — | build IDs from the roster (§3) |
@@ -51,7 +60,8 @@ godot --headless --path game res://arena/arena.tscn -- \
 | `--seed` | 2026 | match RNG (gear rolls, policies, spawn jitter) |
 | `--level` | 20 | `Session.level` for creature power scaling + item ilvl |
 | `--time-limit` | 90 | seconds per episode; timeout → higher HP% wins |
-| `--fast` | off | 240 Hz ticks × time_scale 4 (same 1/60 s resolution, 4× wall speed) |
+| `--fast` | off | faster than real time (the headless training mode); the rate is `--speed` |
+| `--speed` | 4 | with `--fast`: `N` = WALL-LOCKED N× (60·N Hz ticks × time_scale N, same 1/60 s tick — never faster than N× however idle the CPU); `max` = CPU-bound, one tick per frame — needs the ENGINE flag `--fixed-fps 60` before `--` (league.py passes it; without it the arena warns and runs 4×) |
 | `--record-dir` | off | write obs+action JSONL per episode here |
 | `--out` | off | write the match-set summary JSON here |
 | `--selftest` | — | run the built-in CI gate instead (§6) |
@@ -102,7 +112,17 @@ native mind — they fall back to `scripted`.
 ## 4. Train policies (per-species nets + the global net)
 
 Requires: `python3` with numpy, `godot` on PATH. Everything runs real matches
-through the headless arena — expect ~10–20 s per match set.
+through the headless arena at `--speed max` (default since 2026-09-11): a
+4-episode match set takes ~1–3 s boot included, where the old wall-locked mode
+took 45 s. Nothing here uses the GPU — workers are Godot physics + GDScript and
+the trainer is numpy on a tiny MLP — so throughput = cores × per-core speed.
+
+**Training console** (the GUI for everything below — roster, jobs/speed, live
+progress, fitness chart, per-match score strip, gate, watch; docs/design/25):
+
+```bash
+godot --path game res://arena/console.tscn
+```
 
 ```bash
 # create + register a fresh net for a species/build key
@@ -111,6 +131,10 @@ python3 -m ml.training.league init --key fen_boar
 # train it (ES: perturb candidates, fight them, keep what wins)
 python3 -m ml.training.league train --key fen_boar \
     --build core.arena.fen_boar_alpha --generations 3 --pop 6 --episodes 4
+# scale: --jobs N runs N matches at once, but a generation is only pop × opponents
+# matches (12 here) — raise --pop to use more cores; --speed max|N (default max)
+python3 -m ml.training.league train --key fen_boar --build core.arena.fen_boar_alpha \
+    --generations 10 --pop 10 --episodes 4 --jobs 20
 
 # the eval gate: scripted suite + native suite + past-policy ladder.
 # PASS → deployed. FAIL → fleet stays on the previous pin (by design).
@@ -169,8 +193,9 @@ what training optimized.
 
 ```bash
 godot --headless --path game res://arena/arena.tscn -- --selftest        # ARENA SELFTEST OK
+godot --headless --path game res://arena/console.tscn -- --selftest      # CONSOLE SELFTEST OK
 godot --headless --path game res://arena/tests/cosmetics_test.tscn --quit-after 140  # COSMETICS OK
-python3 -m pytest ml/tests/ -q                                          # 10 passed
+python3 -m pytest ml/tests/ -q                                          # 18 passed
 python3 tools/validate_content.py                                       # content OK
 ```
 
@@ -180,6 +205,7 @@ python3 tools/validate_content.py                                       # conten
 |---|---|
 | `arena: unknown build(s)` | typo in the build ID — `league roster` lists valid ones; or the snapshot is stale (`cp content/core/arena/builds.json game/arena/data/`) |
 | `NeuralPolicy: obs_dim mismatch` | weights JSON from an old schema — re-export from `ml/training/policy_net.py` |
-| Matches take forever | you forgot `--fast` (headless runs real-time without it) |
+| Matches take forever | you forgot `--fast` (headless runs real-time without it); or `--speed max` without the engine flag `--fixed-fps 60` — the arena warns and runs the wall-locked 4× |
+| `--jobs` does not speed training up | a generation is pop × opponents matches — that is the most workers ever busy (the console's hint line states it); raise `--pop`, and make sure `--speed max` is in effect (league.py default) |
 | `godot: command not found` | install Godot 4.6+ or add it to PATH |
 | New global class not found after editing arena scripts | run `godot --headless --path game --import` once |
