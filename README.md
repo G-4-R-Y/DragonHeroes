@@ -1,5 +1,13 @@
 # Dragon Heroes
 
+As a kid I started programming to create anything. What fueled me at first were fantastic worlds like the lord of rings, narnia and all those cartoon and videogame universes. I started off programming to create anything, at the time specifically something to play with my friends, and RPG or TCG we would create together (we were a bunch of creatives).
+
+After years programming, I realized I ended up never actually building that game we would like to play together. With coding agents, the enormous amount of time demanded to create a game like this, with all the learning curves on different tools and whole research areas, is drastically reduced. 
+
+I can finally create some of the things that kid once dreamed of - for pure joy, as he portrayed it to be.
+
+
+
 Fast-paced dark-fantasy pixel-art multiplayer ARPG by IntelliGames: an infinite
 procedurally generated world of creature hunts (a real adventure with friends),
 weekly content drops, skill-based PvP and tournaments, and a real-money
@@ -11,18 +19,18 @@ set. Standing engineering guidelines: [CLAUDE.md](CLAUDE.md).
 
 ## Layout
 
-| Dir | What it is |
-|---|---|
-| `docs/` | Design/tech/business document set + canon |
-| `sim/` | C++20 CMake workspace: deterministic simulation core, procgen, netcode, headless server — one sim, three consumers (client prediction, authoritative server, RL env) |
-| `game/` | Godot 4.6+ client — presentation only, zero gameplay rules |
-| `content/` | All gameplay content as validated data (items, skills, creatures, biomes...) |
-| `backend/` | Nakama + Go economy core (real-money ledgers) + liveops |
-| `web/` | Marketplace + account portal (the only real-money surface) |
-| `ml/` | RL training/eval/serving for boss AI and Champion Ghosts |
-| `art/` | Source art: Aseprite files, archetype rigs, palettes |
-| `tools/` | Content validator, pipeline tooling |
-| `infra/` | Docker, Kubernetes/Agones, Terraform |
+| Dir          | What it is                                                                                                                                                            |
+| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `docs/`    | Design/tech/business document set + canon                                                                                                                             |
+| `sim/`     | C++20 CMake workspace: deterministic simulation core, procgen, netcode, headless server — one sim, three consumers (client prediction, authoritative server, RL env) |
+| `game/`    | Godot 4.6+ client — presentation only, zero gameplay rules                                                                                                           |
+| `content/` | All gameplay content as validated data (items, skills, creatures, biomes...)                                                                                          |
+| `backend/` | Nakama + Go economy core (real-money ledgers) + liveops                                                                                                               |
+| `web/`     | Marketplace + account portal (the only real-money surface)                                                                                                            |
+| `ml/`      | RL training/eval/serving for boss AI and Champion Ghosts                                                                                                              |
+| `art/`     | Source art: Aseprite files, archetype rigs, palettes                                                                                                                  |
+| `tools/`   | Content validator, pipeline tooling                                                                                                                                   |
+| `infra/`   | Docker, Kubernetes/Agones, Terraform                                                                                                                                  |
 
 ## Quickstart (today's M0 state)
 

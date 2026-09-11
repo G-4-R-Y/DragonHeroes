@@ -10,7 +10,9 @@
 #       --a core.arena.dusk_revenant --b core.arena.fen_boar_alpha \
 #       --policy-a scripted --policy-b native --episodes 4 --seed 7 --fast \
 #       --record-dir /abs/ml/data/episodes --out /abs/result.json
-#   --selftest runs the built-in gate (must end "ARENA SELFTEST OK", exit 0).
+#   --selftest runs the built-in gate (must end "ARENA SELFTEST OK", exit 0);
+#   it runs the spectator stack headless. --spectate forces that stack on
+#   for ad-hoc fast/headless runs.
 # Spectate (windowed, no args): cycles the roster rotation; [N]ext, [R]ematch,
 # [1/2/3] speed, [Q]uit.
 extends Node2D
@@ -47,6 +49,7 @@ var _hud: ArenaHud
 var _fighters: Array = []
 var _cfg := {}
 var _spectate := true
+var _hud_frames := 0          # selftest asserts the spectator path ran
 var _fast := false
 var _selftest := false
 var _selftest_stage := 0
@@ -73,7 +76,9 @@ func _ready() -> void:
 	_parse_cli()
 	_fast = bool(_cfg.get("fast", false)) or _selftest
 	ProtoFx.intensity = 0.3 if _fast else 1.0
-	_spectate = not _fast and not _cfg.has("a")
+	# the selftest runs the spectator stack too: the camera/HUD _process path
+	# is where freed-body dereferences bite (2026-09-11) — gate it, don't skip it
+	_spectate = _selftest or _cfg.has("spectate") or (not _fast and not _cfg.has("a"))
 	ProtoTheme.apply_doctrine()
 	_world = ArenaWorld.new()
 	add_child(_world)
@@ -119,7 +124,7 @@ func _ready() -> void:
 # ---- CLI -----------------------------------------------------------------------------
 
 func _parse_cli() -> void:
-	const FLAGS := ["--selftest", "--fast"]
+	const FLAGS := ["--selftest", "--fast", "--spectate"]
 	var args := OS.get_cmdline_user_args()
 	var i := 0
 	while i < args.size():
@@ -271,6 +276,9 @@ func _selftest_verdict() -> void:
 	if _selftest_player_damage <= 0.0:
 		ok = false
 		push_error("ARENA SELFTEST: player build dealt no damage (proxy wiring?)")
+	if _hud_frames == 0:
+		ok = false
+		push_error("ARENA SELFTEST: spectator camera/HUD path never ran")
 	for f in _fighters:
 		if is_instance_valid(f):
 			f.free_body()
@@ -286,12 +294,12 @@ func _selftest_verdict() -> void:
 		ok = false
 		push_error("ARENA SELFTEST: %d orphan proxies" % orphans)
 	if ok:
-		print("ARENA SELFTEST OK — %d matchups, damage flowed, no orphan proxies" \
-				% _rotation.size())
+		print("ARENA SELFTEST OK — %d matchups, damage flowed, no orphan proxies, HUD %d frames" \
+				% [_rotation.size(), _hud_frames])
 	get_tree().quit(0 if ok else 1)
 
 func _advance_or_quit(code: int) -> void:
-	if _spectate:
+	if _spectate and not _selftest:
 		_rotation_idx += 1
 		_start_match()
 	else:
@@ -308,7 +316,7 @@ func _physics_process(delta: float) -> void:
 		return
 	if _state == "end":
 		_timer += delta
-		if _timer >= (0.05 if _fast else END_S):
+		if _timer >= (0.05 if _fast and not _selftest else END_S):
 			_episode += 1
 			if _episode >= _episodes:
 				_finish_match()
@@ -348,19 +356,27 @@ func _process(delta: float) -> void:
 			c.add_to_group("arena_projectiles")
 	if not _spectate or _fighters.size() < 2:
 		return
-	var a: Node2D = _fighters[0].body
-	var b: Node2D = _fighters[1].body
-	if is_instance_valid(a) and is_instance_valid(b):
+	var fa: ArenaFighter = _fighters[0]
+	var fb: ArenaFighter = _fighters[1]
+	if not (is_instance_valid(fa) and is_instance_valid(fb)):
+		return
+	# A dead body frees ITSELF after its death tween (creature._die) — squarely
+	# inside the END pause, while the fighter still references it. Binding a
+	# freed instance to a typed var is the error, so validate BEFORE binding.
+	_hud_frames += 1
+	var a: Node2D = fa.body if is_instance_valid(fa.body) else null
+	var b: Node2D = fb.body if is_instance_valid(fb.body) else null
+	if a != null and b != null:
 		var mid := (a.global_position + b.global_position) * 0.5
 		_cam.global_position = _cam.global_position.lerp(mid, delta * 4.0)
 		var dist := a.global_position.distance_to(b.global_position)
 		var z := clampf(230.0 / maxf(dist, 120.0), 0.75, 1.5)
 		_cam.zoom = _cam.zoom.lerp(Vector2(z, z), delta * 2.0)
 	_hud.set_bars([
-		{"name": _fighters[0].build_name, "policy": _fighters[0].policy.policy_id(),
-			"frac": _fighters[0].hp_frac(), "tint": Color("7fd8ff"), "side": 0},
-		{"name": _fighters[1].build_name, "policy": _fighters[1].policy.policy_id(),
-			"frac": _fighters[1].hp_frac(), "tint": Color("ff9a3c"), "side": 1}])
+		{"name": fa.build_name, "policy": fa.policy.policy_id(),
+			"frac": fa.hp_frac(), "tint": Color("7fd8ff"), "side": 0},
+		{"name": fb.build_name, "policy": fb.policy.policy_id(),
+			"frac": fb.hp_frac(), "tint": Color("ff9a3c"), "side": 1}])
 	_hud.set_center("ARENA  ep %d/%d   %d : %d (%d draws)   %s" % [
 			_episode + 1, _episodes, _wins[0], _wins[1], _wins[2],
 			"" if _state == "fight" else _state.to_upper()])
@@ -389,6 +405,10 @@ func _tick_summon_wiring(delta: float) -> void:
 	# Summons (hag wisplings et al.) are loose ProtoCreatures; point them at the
 	# proxy of the fighter that did NOT summon them.
 	if _fighters.size() < 2:
+		return
+	# same-frame death: a body can be freed while summons still need wiring —
+	# never pass a freed body into a typed Node parameter
+	if not (is_instance_valid(_fighters[0].body) and is_instance_valid(_fighters[1].body)):
 		return
 	for n in get_tree().get_nodes_in_group("creatures"):
 		if n is ArenaProxy or not (n is ProtoCreature):
