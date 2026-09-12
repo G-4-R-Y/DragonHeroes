@@ -8,18 +8,28 @@ artifact cards with bounded lore previews. Main-menu copy is localized; the
 existing trial remains English. Production HUD/class sigils/bestiary/ordinary
 gear cards remain scheduled in the roadmap. Law: design/26, canon §12.45.
 
-Current integration step: commit this UI pass on `codex/modern-pixel-content-engine`,
-then fast-forward the clean original `master` workspace. Both include all fetched
-GitHub changes through 08f92d6; no upstream commits are missing. Preserve the
-Codex review branch and older unrelated stash. Rebuild both Codex packages from
-clean landed source so manifests identify the actual main-branch commit.
+Integration complete: the original workspace is now on `master`, fast-forwarded
+through **70e8b4f** with every reviewed Codex commit. Latest fetch of origin still
+reports 08f92d6; no upstream commits are missing, no conflicts, and rebirth plus
+upstream's tracked Windows artifacts are unchanged. The Codex review branch and
+the older unrelated stash remain. No remote push was requested or performed.
+
+Fresh archives are in the original workspace's `builds/codex/`:
+`dragon-heroes-codex-linux.zip` and `dragon-heroes-codex-windows.zip`. Both record
+clean main-branch source **70e8b4f**. The landing-record commit is documentation
+only; these packages contain the current game/tools/native source. File hashes,
+ZIP CRCs and both Windows six-size executable icons pass. Exported Linux normal
+Hunt (86 creatures), practice (chain + ward, eight atlas frames), and the full
+lair/reward/world-return/saved-unlock/rush/second-item/round-two journey all pass.
+Codex saves, package names and executable icons remain. Play with PLAY NEW
+CONTENT → EXPLORE SHRINE ENTRANCES → G; defeating Orun unlocks his boss rush.
 
 Verification for this pass: 113 Python tests, CTest 4/4, content validator and
 all 16 Godot outcome gates passed; the console's deliberate malformed-JSON
 fixture is qualified as before. Stream worst apply 1.48ms; FX stress 4.85ms,
 no pool growth. Five actual GL UI captures + metrics: docs/art/ui-identity/.
-All report 60 FPS at 1280×720; these are short desktop samples. Combat capture was also inspected (`docs/art/ui-identity/practice.png`);
-rebuilt package results will be recorded after the mainline export. Windows still
+All report 60 FPS at 1280×720; these are short desktop samples. Combat capture was also inspected (`docs/art/ui-identity/practice.png`):
+60 FPS, 1.942ms process CPU, 85 draws; prior sample 60 FPS, 1.52ms, 85 draws. Windows still
 requires native gameplay testing.
 
 ---

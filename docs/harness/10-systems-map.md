@@ -60,6 +60,8 @@ previews on data-driven rarity cards. Menu/Haven/options keep their existing
 flows. Actual GL frames + metrics: `docs/art/ui-identity/`; capture tool accepts
 `UI_LANG` and `UI_OPTIONS`. Law: design/26, canon §12.45. Production HUD,
 class sigils, bestiary and full gear-card migration remain scheduled.
+Approved Codex source is now on `master` (70e8b4f); fresh verified Linux/Windows
+Codex archives live in the original workspace under `builds/codex/`.
 
 ## Combat, classes, skills (prototype rules — presentation-side for now)
 **PLAYABLE; overhaul SCHEDULED.** design/10-11 (kits), design/21 M-C (the

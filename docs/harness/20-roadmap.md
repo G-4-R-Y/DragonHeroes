@@ -4,7 +4,7 @@ Ricardo decides DIRECTION (which lever, when); harnesses execute inside it.
 Every item points at its law doc. Statuses: NOW (in flight) · PICK (awaiting
 Ricardo's call) · SCHEDULED (decided, sequenced) · BUDGET (blocked on money).
 
-## NOW — Land the approved Codex work and give the UI a stronger identity (Ricardo, 2026-09-12)
+## DONE — Land the approved Codex work and give the UI a stronger identity (Ricardo, 2026-09-12)
 
 Demand: the UI needs more personality; commit the reviewed graphics/content work
 onto the main branch. Main is named `master` in this repository. Law: canon
@@ -27,7 +27,18 @@ and authored artifact cards with two-line names and bounded lore excerpts.
 EN/PT menu copy fits; normal login, quick start, co-op, arena and options remain.
 Gates: 113 Python tests, CTest 4/4, validator and all 16 Godot outcomes; stream
 1.48ms, FX stress 4.85ms. Actual GL UI captures report 60 FPS at 1280×720.
-Mainline landing and clean-source binary regeneration are the remaining steps.
+Landed all six Codex commits on `master` by fast-forward to **70e8b4f**, after
+another fetch confirmed `origin/master` 08f92d6 and clean worktrees. No conflicts,
+no upstream commits missing, no changes to rebirth or tracked Windows artifacts.
+Fresh Linux and Windows packages in `builds/codex/` both record clean `master`
+source **70e8b4f**. CRCs/file hashes and both Windows six-size executable icons
+pass. Exported Linux normal Hunt (86 creatures), practice (eight atlas frames,
+chain + ward) and complete lair → saved reward → same-world return → rush →
+second artifact → round two pass. Windows gameplay remains untested natively.
+Final practice GL capture: 60 FPS, 1.942ms process CPU, 85 draws (prior: 60 FPS,
+1.52ms, 85 draws); short desktop samples, not a sustained/mobile guarantee.
+The later landing-record commit changes documentation only. Commits are local;
+no remote push was requested or performed. The Codex branch remains available.
 
 ## SCHEDULED — Extend the UI identity into the production HUD and bestiary
 
