@@ -18,11 +18,13 @@ instant HUD updates, party parity, unchanged gear/cooldowns and dead hunters.
 Gate command is in docs/USAGE and the harness suite. The exported Codex smoke
 now also crosses a real kill threshold and asserts the HP/dodge/flask refill.
 
-After this commit run `python3 tools/package_codex.py all` for clean-source
-Linux/Windows artifacts in `builds/codex/`, including the full exported
-lair/rush journey, icons, hashes and ZIP checks. Their BUILD-INFO is the source
-record. Windows gameplay still requires native testing. Commits stay on local
-`master`; no remote push was requested.
+Fresh Linux/Windows Codex archives are rebuilt in `builds/codex/`. Both record
+clean `master` source **e570acc**. Actual exported Linux gameplay passes the
+new level-up refill gate (94-creature Hunt), practice and full saved lair/rush
+journey. Icons, file hashes and ZIP checks pass, including both six-size Windows
+executable icons. The final package-record commit changes only documentation;
+these binaries contain the current gameplay code. Windows gameplay still
+requires native testing. Commits stay local on `master`; no push was requested.
 
 ---
 

@@ -28,9 +28,12 @@ refills living hunters' HP/dodges/flasks and discards obsolete refill timers.
 The Hunt applies it before VFX; the co-op host also refreshes living allies.
 All 17 Godot outcomes pass, including the new real-death regression and co-op;
 113 Python tests, CTest 4/4, validator and whitespace gates pass. Streaming
-worst apply 1.39ms; FX stress 5.53ms with no pool growth. Rebuild Codex exports
-after committing for clean manifests; the package gate now requires the actual
-exported Hunt level-up refill in addition to practice and the lair/rush journey.
+worst apply 1.39ms; FX stress 5.53ms with no pool growth. Fresh Linux and Windows
+Codex packages record clean `master` source **e570acc**. The actual Linux export
+passes the new kill → level-up → HP/dodge/flask refill gate (94-creature Hunt),
+practice and the full saved lair/rush journey. ZIP/hash and both Windows six-size
+icon checks pass; Windows gameplay remains untested natively. The final package
+record changes documentation only.
 
 ## DONE — Land the approved Codex work and give the UI a stronger identity (Ricardo, 2026-09-12)
 
