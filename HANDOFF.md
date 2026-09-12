@@ -1,7 +1,7 @@
 # Handoff — modern pixel-art review branch (2026-09-12)
 
 Worktree: `/tmp/dragon-heroes-codex-content-engine`; branch:
-`codex/modern-pixel-content-engine`; base: `b3d41e9`. The original workspace's
+`codex/modern-pixel-content-engine`; rebased base: `8568d26` (originally `b3d41e9`). The original workspace's
 uncommitted code, training runs, logs and builds remain untouched.
 
 Delivered: `genforge/living/` (draft, grounded explicit provider generation,
@@ -31,6 +31,32 @@ crowded Hunt and mid-mobile profiling; signed pack promotion/rollback.
 The keyframe is a concept, not a screenshot. Firefox Snap could not use the
 isolated `/tmp` profile for a review-page screenshot; no browser visual gate
 is claimed. Raw generated art and the quantized atlas were inspected directly.
+
+Codex desktop packaging follow-up: original transparent dragon/Lumen icon at
+`genforge/art_sources/app_icon/`; PNG + six-size ICO at `game/branding/`.
+`tools/package_codex.py all` rebuilds Linux/Windows clients and their adjacent
+world helpers into `builds/codex/`, includes the offline content review, hashes
+files, verifies embedded PE icon bytes and ZIP CRCs. Separate Codex title/saves.
+Optional Linux app-menu installer ships inside its package; it was tested only
+against an isolated XDG directory. Windows native gameplay remains untested.
+
+The actual release-PCK smoke gate found a pre-existing packaging defect:
+`world_gen.gd::can_stream()` ignored the resolved adjacent helper and checked
+only the dev tree. Fixed alongside exported-build detection. The new explicit
+`-- --codex-smoke` probe confirms the release menu, both icon resources, save
+isolation and a populated streaming Hunt (95 creatures on the first passing
+run). It is dormant on normal boots. Godot 4.6 release templates disable
+external `--script`, so that earlier probe attempt timed out and was replaced
+by this included outcome probe. Run `python3 tools/smoke_codex.py
+builds/codex/linux`; evidence: `genforge/candidates/packaging/`.
+
+Rebase retained upstream arena tests and Codex effects tests. Python: 93 pass;
+CTest + content validation pass. Headless full outcome suite after rebase
+passes with the documented console malformed-JSON fixture qualification;
+stream measured 1.51ms on final suite (inside the 2ms target). That final suite
+hit the documented spawn flake once (streaming=true, nearest 0px); isolated
+rerun passes with 91 creatures / nearest 135px. Both logs are retained; final
+checks and source reference are in roadmap / package BUILD-INFO.json.
 
 ---
 

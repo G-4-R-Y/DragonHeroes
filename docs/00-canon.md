@@ -998,4 +998,12 @@ Still open:
    docs/design/26. Runbook and implementation boundary: docs/tech/34.
    Branch `codex/modern-pixel-content-engine` starts at committed b3d41e9 in
    `/tmp/dragon-heroes-codex-content-engine`; the original dirty workspace
-   is untouched, including its additional simulation/training work.
+   is untouched, including its additional simulation/training work. This
+   branch was subsequently rebased onto committed mainline `8568d26`.
+
+   Packaging addendum (Ricardo, 2026-09-12): regenerate Linux and Windows
+   review binaries/archives with a `codex` affix and an original dragon/Lumen
+   application icon; isolate saves and package outputs. Rebase this branch
+   onto the other agent's latest committed mainline before final builds.
+   Packaging automates rebuilds, manifests and actual PE icon checks (tech/34).
+   The accompanying offline candidate remains distinct from the playable Hunt.

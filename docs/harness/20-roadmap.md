@@ -8,9 +8,9 @@ Ricardo's call) · SCHEDULED (decided, sequenced) · BUDGET (blocked on money).
 
 New priority: modern 2D pixel-art production and an extensible weekly content
 engine. Branch `codex/modern-pixel-content-engine`, isolated worktree
-`/tmp/dragon-heroes-codex-content-engine`, based on committed `b3d41e9`.
+`/tmp/dragon-heroes-codex-content-engine`, originally based on `b3d41e9`, now rebased onto committed `8568d26`.
 The original workspace's uncommitted gameplay/training changes remain untouched.
-Law: `docs/design/26-living-pixel-world.md` (to be authored), canon §§1, 4, 7.
+Law: `docs/design/26-living-pixel-world.md`, canon §§1, 4, 7 and §12.45.
 
 1. **DONE — Review moats and existing art/combat/content systems.** Translate
    the requested modern, luminous dark-fantasy direction into measurable art
@@ -59,7 +59,65 @@ Firefox Snap could not access the isolated profile, so the HTML screenshot
 gate remains unverified. Review JavaScript syntax passed; the artwork and
 compiled atlas were inspected directly. No whole-game visual gain is claimed.
 
-### SCHEDULED — production follow-ups to this review branch
+### DONE — Codex binaries and executable icon (Ricardo, 2026-09-12)
+
+New demand: regenerate the review branch's distributable binaries with a
+`codex` affix and create an icon for the executables. Law: tech/34 (packaging
+section), design/26 art direction; existing export contract in docs/USAGE.md.
+Plan: generate an original dragon/Lumen icon, derive native icon sizes,
+configure project and Windows resources plus a Linux desktop launcher;
+rebuild Linux and Windows in isolated `builds/codex/` paths, with explicitly
+named `dragon-heroes-codex` executables/archives. Validate packaged contents
+and exported Linux startup, preserve original workspace and normal builds.
+The prior pipeline review remains delivered; its pending live integrations
+are not implicitly included in this packaging request.
+
+Steering (Ricardo, 2026-09-12): the other agent has been asked to commit;
+rebase this Codex work onto the latest committed mainline before continuing,
+so the regenerated binaries include that work and conflicts are resolved here.
+Checkpoint: dragon/Lumen icon source, PNG/ICO conversion, project/export icon
+settings and Windows C++ icon resources are in progress. Packaging-script
+replacement has not landed yet. Preserve these local edits during the rebase,
+then complete the Codex-named packages and validation from the updated base.
+
+Rebase checkpoint: `8568d26` is included; canon and C++ tests retain both
+upstream arena work and the Codex effect probe. Icon/packaging edits restored
+from stash `73d6dfa65a06b313d4fd931522521fbd86d64738`. Dedicated
+`tools/package_codex.py` now rebuilds clients/helpers and checks manifests.
+Python suite: 93 passed after rebase. Linux first export passed contents gate;
+Windows icon verification caught a resource mismatch, under diagnosis. Check
+mainline once more before final packaging; other workspace still has uncommitted
+changes, which are not safe to import until their agent commits them.
+
+Packaging defect discovered by the real exported-game outcome gate:
+**DONE — exported streaming helper lookup** (law tech/29 + tech/34). The
+package contains the helper, but `can_stream()` still checks only the dev
+`sim/build` path; exported Hunts silently fall back to seed-404 island.
+Use the resolved adjacent executable in the capability check and identify
+exports by absence of the editor feature. Gate: actual release PCK boots menu
+then a populated Hunt with `_streaming == true`, using its packaged helper.
+Release templates disable external `--script`; an explicit `-- --codex-smoke`
+probe is included and otherwise dormant. No interactive menu change required.
+
+Final packaging evidence: original dragon/Lumen source + PNG/six-size ICO;
+Linux and Windows clients/helpers rebuilt, actual embedded Windows icons
+verified byte-for-byte (all six sizes, game and helper), default-template
+negative check rejects the Godot icon; package manifests and ZIP CRCs pass.
+Actual Linux release smoke: menu built, PNG/ICO present, separate Codex saves,
+streaming world from the adjacent C++ helper, 95 creatures. Optional Linux
+launcher verified in isolated XDG data with escaped special-character paths.
+Python 93 passed; CTest + content validation pass. Final full headless suite:
+all outcomes pass with qualifications — spawn failed once (streaming=true,
+nearest 0px), then isolated rerun passes (91 creatures, nearest 135px); console
+keeps its expected malformed-JSON fixture error. Full-run raw failure remains
+in results.json and spawn-first-rebase.log; recheck-results.json proves rerun.
+Stream measured 1.51ms (2ms target / 4ms hard limit). Windows gameplay/shell
+appearance and desktop visual capture are not claimed. Latest checked mainline:
+`8568d26`; source HEAD/dirty state are included in each archive's BUILD-INFO.json.
+Rebuild after the packaging commit for clean provenance; archives remain in
+`builds/codex/` and are ignored rather than adding binaries to source history.
+
+### SCHEDULED — production follow-ups
 
 - Complete Orun's movement, directional/action, contact, hit/death animation
   and manual cleanup; verify native-scale Hunt captures (design/26, tech/34).

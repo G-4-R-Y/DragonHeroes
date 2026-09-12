@@ -11,12 +11,18 @@ config_version=5
 
 [application]
 
-config/name="Dragon Heroes"
+config/name="Dragon Heroes — Codex"
+config/icon="res://branding/dragon-heroes.png"
+config/windows_native_icon="res://branding/dragon-heroes.ico"
+config/use_custom_user_dir=true
+config/custom_user_dir_name="Dragon Heroes Codex"
 config/description="Fast-paced dark-fantasy pixel-art ARPG. This client is a thin presentation layer over the dh-sim GDExtension."
 run/main_scene="res://prototype/ui/main_menu.tscn"
 config/features=PackedStringArray("4.6")
 
 [autoload]
+
+CodexPackageProbe="*res://tools/package_smoke.gd"
 
 Session="*res://prototype/ui/session.gd"
 MpNet="*res://mp/mp_net.gd"

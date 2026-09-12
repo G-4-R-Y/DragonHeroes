@@ -1,0 +1,19 @@
+{
+  "provider": "built-in image_gen",
+  "model": "not exposed by tool",
+  "prompt": "prompt.txt",
+  "source": "source.png",
+  "source_sha256": "dd01b42889b24068487a45f107aee2425f45eab718f2f45d47757711b20758b1",
+  "outputs": [
+    "game/branding/dragon-heroes.png",
+    "game/branding/dragon-heroes.ico"
+  ],
+  "ico_sizes": [
+    16,
+    32,
+    48,
+    64,
+    128,
+    256
+  ]
+}

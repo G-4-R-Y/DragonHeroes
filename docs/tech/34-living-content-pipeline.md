@@ -171,3 +171,79 @@ The probe tests the implemented boundary, not an imaginary complete ARPG.
    stage/canary/rollback, then accept lore into the world bible.
 
 These are tracked in the single roadmap, not silently treated as complete.
+
+
+## Codex review packages and application icon
+
+On `codex/modern-pixel-content-engine`, build both desktop packages with:
+
+```bash
+python3 tools/package_codex.py all   # or linux / windows
+python3 tools/verify_package.py builds/codex/linux
+python3 tools/verify_package.py builds/codex/windows
+python3 tools/smoke_codex.py builds/codex/linux
+```
+
+Requires the existing Python authoring dependencies, CMake/C++ compiler,
+Godot **4.6 stable** and its installed export templates. Windows helpers use
+`sim/cmake/mingw-w64-x86_64.cmake`; set `DH_MINGW_ROOT` for a different local
+portable llvm-mingw installation. The command never downloads a toolchain or
+calls an image provider. It rebuilds helpers from source, runs CTest and content
+validation, imports assets, exports into a fresh stage and checks every file
+hash before making CRC-checked archives:
+
+- `builds/codex/dragon-heroes-codex-linux.zip`
+- `builds/codex/dragon-heroes-codex-windows.zip`
+
+The extracted directories sit beside those ZIPs. The primary executables are
+`dragon-heroes-codex.x86_64` and `dragon-heroes-codex.exe`; `dh-server(.exe)`
+retains the name the world-generation loader expects. `BUILD-INFO.json`
+records source HEAD, branch, dirty state and SHA-256 per packaged file. Build
+from a clean committed checkout for an exact review reference. Generated
+packages and cross-build outputs are ignored by Git. Export logs live under
+`genforge/candidates/packaging/`; a failed icon check preserves its client
+there for inspection and does not publish a ZIP.
+
+The project title and application-data directory are **Dragon Heroes Codex**
+(the window title includes an em dash), keeping review saves/settings separate.
+Each package includes `content-review/index.html` and its complete offline
+candidate bundle. This is an accompanying art/design review: new Orun art,
+artifact tiers and skills are **not yet installed in the playable Hunt**.
+The browser review is outside the PCK and carries its integration blockers.
+
+The original transparent dragon/Lumen emblem is curated at
+`genforge/art_sources/app_icon/source.png`; the exact generation prompt and
+source hash are beside it. It was generated with built-in `image_gen`; the
+model identity is not exposed. `python3 tools/build_app_icon.py` deterministically
+converts that source into `game/branding/dragon-heroes.png` (512px) and a
+multi-resolution ICO (16, 32, 48, 64, 128, 256px). No API call is part of rebuilding.
+
+Windows exports enable resource modification and set `application/icon`;
+`config/windows_native_icon` sets the runtime window/taskbar icon. The C++
+helper embeds the same ICO through an RC resource. The package gate parses
+the actual PE resource tree (including Godot's named `MAINICON` group) and
+requires every embedded size to match the source bytes. The six-size contract
+follows [Godot 4.6's Windows icon guide](https://docs.godotengine.org/en/4.6/tutorials/export/changing_application_icon_for_windows.html).
+Linux uses the project icon for its window. For an application-menu entry,
+optionally run `python3 install-launcher.py` from the extracted Linux package;
+it copies the icon and writes a launcher into the user's XDG data directory.
+Keep the extracted directory in place afterward. Launcher quoting follows the
+[Desktop Entry specification](https://specifications.freedesktop.org/desktop-entry/latest/exec-variables.html).
+The packager does not install
+anything into the user's desktop menu.
+
+The Linux packager runs the actual exported release executable with the
+explicit `-- --codex-smoke` flag. A dormant `game/tools/package_smoke.gd`
+autoload checks embedded icons, save isolation, the built menu and a populated
+streaming Hunt, writing an outcome report in isolated temporary user data.
+This caught and fixed `world_gen.gd` checking the development helper path in
+`can_stream()` despite packaging an adjacent executable. It now checks its
+resolved helper path and detects exports through the absence of `editor`.
+Probe results persist in `genforge/candidates/packaging/linux-smoke.{json,log}`.
+[Godot 4.6 release templates disable external script/path overrides](https://docs.godotengine.org/en/4.6/tutorials/editor/command_line_tutorial.html),
+so the gate does not rely on silently ignored `--script` arguments.
+
+Windows is cross-built and its archive, executable format and embedded icon
+are verified here; native Windows gameplay and Explorer/taskbar appearance
+require a Windows machine. Headless Linux startup checks are separate from
+visual captures and do not prove 60 FPS or desktop-shell appearance.

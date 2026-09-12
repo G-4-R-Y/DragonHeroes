@@ -1,5 +1,7 @@
 # C++ / CMake
 sim/build/
+sim/build-windows/
+builds/codex/
 *.o
 *.a
 

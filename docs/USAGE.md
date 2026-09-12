@@ -137,6 +137,13 @@ Thousands of parallel episodes, the dh-env endgame, fleet runs:
 
 ## Distributing to friends (no Godot needed on their end)
 
+**On the Codex review branch**, use `python3 tools/package_codex.py all`
+(or `linux` / `windows`). Outputs are `builds/codex/dragon-heroes-codex-<platform>.zip`,
+with a new dragon icon, rebuilt world-generation helper and offline content
+review. This branch's project/export defaults are marked Codex and isolate
+review saves. [Full runbook](tech/34-living-content-pipeline.md#codex-review-packages-and-application-icon).
+The existing mainline packaging command is:
+
 ```bash
 tools/package_game.sh linux      # or: windows | all
 # DH_FETCH_TEMPLATES=1 tools/package_game.sh all   # first time: fetch ~1 GB templates

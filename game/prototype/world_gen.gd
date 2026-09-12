@@ -130,7 +130,7 @@ func _ready() -> void:
 # TO the game executable; the dev repo carries it in sim/build. Co-op world
 # parity depends on every peer having it (docs/tech/33 §architecture).
 func _find_dh_server() -> String:
-	if OS.has_feature("standalone"):
+	if not OS.has_feature("editor"):
 		var exe := "dh-server.exe" if OS.has_feature("windows") else "dh-server"
 		var beside: String = OS.get_executable_path().get_base_dir().path_join(exe)
 		if FileAccess.file_exists(beside):
@@ -138,8 +138,8 @@ func _find_dh_server() -> String:
 	return ProjectSettings.globalize_path("res://../sim/build/libs/dh-server/dh-server")
 
 func can_stream() -> bool:
-	return FileAccess.file_exists(
-			ProjectSettings.globalize_path("res://../sim/build/libs/dh-server/dh-server"))
+	var resolved := _bin_path if not _bin_path.is_empty() else _find_dh_server()
+	return not resolved.is_empty() and FileAccess.file_exists(resolved)
 
 # --- boot ------------------------------------------------------------------
 
