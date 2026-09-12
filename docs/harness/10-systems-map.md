@@ -53,6 +53,13 @@ default-theme restamp), `ui/main_menu.gd` (name-chip class cards, CO-OP
 button), `ui/haven.gd`, `ui/character_panel.gd`, `ui/lang.gd` (EN/PT-BR),
 `ui/display.gd`, `damage_numbers.gd`. Gate: CLICKTEST (16 checks). Issue:
 skill-bar labels clip at fixed widths ("Lumenpie").
+**2026-09-12 identity pass:** `ui/theme.gd`, `ui/world_frame.gd`,
+`ui/slider_rune.svg`, `living/lair_menu.gd` + `artifact_card.gd` share bronze,
+ivory and Lumen styling, cached shrine framing, visible focus and bounded lore
+previews on data-driven rarity cards. Menu/Haven/options keep their existing
+flows. Actual GL frames + metrics: `docs/art/ui-identity/`; capture tool accepts
+`UI_LANG` and `UI_OPTIONS`. Law: design/26, canon §12.45. Production HUD,
+class sigils, bestiary and full gear-card migration remain scheduled.
 
 ## Combat, classes, skills (prototype rules — presentation-side for now)
 **PLAYABLE; overhaul SCHEDULED.** design/10-11 (kits), design/21 M-C (the

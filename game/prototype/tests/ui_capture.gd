@@ -9,6 +9,8 @@
 extends Node
 
 func _ready() -> void:
+	if OS.get_environment("UI_LANG") in ["en", "pt"]:
+		ProtoLang.set_lang(OS.get_environment("UI_LANG"))
 	var scene_path := OS.get_environment("UI_SCENE")
 	if scene_path == "":
 		scene_path = "res://prototype/ui/main_menu.tscn"
@@ -24,7 +26,10 @@ func _ready() -> void:
 	# or claims the slot; nothing here calls save)
 	if tag.begins_with("haven") or tag.begins_with("panel") or tag.begins_with("hunt"):
 		Session.login("Hunter")
-	add_child(ps.instantiate())
+	var screen := ps.instantiate()
+	add_child(screen)
+	if OS.get_environment("UI_OPTIONS") == "1" and screen.has_method("_open_options"):
+		screen._open_options()
 	var wait := 40
 	if OS.get_environment("UI_WAIT") != "":
 		wait = int(OS.get_environment("UI_WAIT"))
@@ -57,6 +62,16 @@ func _run(tag: String, wait: int) -> void:
 	var path := dir + "/ui_" + tag + ".png"
 	img.save_png(path)
 	print("UI_CAPTURE SAVED ", path, " ", img.get_size())
+	# Short desktop sample, not a sustained frame-budget assertion. Useful for
+	# comparing art passes at identical viewport/renderer/settings.
+	var metrics := {"fps": Engine.get_frames_per_second(),
+		"process_ms": Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0,
+		"draw_calls": Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME),
+		"viewport": [img.get_width(), img.get_height()], "scene": OS.get_environment("UI_SCENE")}
+	var report := FileAccess.open(path.trim_suffix(".png") + ".json", FileAccess.WRITE)
+	if report != null:
+		report.store_string(JSON.stringify(metrics, "  ") + "\n")
+	print("UI_CAPTURE METRICS ", JSON.stringify(metrics))
 	await get_tree().process_frame
 	get_tree().quit(0)
 

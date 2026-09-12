@@ -1,0 +1,10 @@
+{
+  "draw_calls": 68.0,
+  "fps": 60.0,
+  "process_ms": 1.278,
+  "scene": "res://prototype/ui/main_menu.tscn",
+  "viewport": [
+    1280,
+    720
+  ]
+}

@@ -240,3 +240,28 @@ intermissions, bounded HP pressure and partial recovery. Practice is freely
 available for comparing builds. Reward cycles are intentionally generous preview
 tuning; production rarity/economy balancing is a separate gate. No paid entry,
 keys, random purchases or permanent power inflation are introduced.
+
+## UI identity: the hunter's field kit (2026-09-12)
+
+Ricardo requested more personality in the UI and approved landing the reviewed
+Codex work on `master`. The first presentation pass uses obsidian reading
+surfaces, clipped bronze edges, ivory text and restrained Lumen accents. The
+approved shrine plate is shared by the title screen, Haven and lair collection;
+a single cached CanvasItem draws the engraving. Existing class colors keep
+their meaning. The Pixel Operator 8/16px doctrine (§12.31) remains authoritative
+for this prototype; design/17's native-resolution typography is a future target.
+
+`ProtoTheme` owns reusable colors, buttons, cut-metal panels, keyboard focus
+and the rune-shaped volume grip. `world_frame.gd` adds decoration behind inputs;
+it has no processing loop and redraws on resize. Collection cards read authored
+artifact names, rarity, signature and lore; labels supplement color, and bounded
+hover excerpts point toward the full stories in the encounter's Lore view.
+These are saved local collection counts, not a migration of ordinary equipment.
+New chapters reuse the same presentation components and authoring fields.
+
+This is the first UI identity pass, not the final interface. Next: unique class
+and Bestial Skill sigils; a connected hunter's bestiary; production gear cards
+with clearly separated skill effects and story; coherent HUD ornaments, focus
+navigation and touch/controller layouts. Preserve attack visibility, the six
+active/three passive target, and the 60 FPS budget as those systems migrate.
+Actual frames and reproduction instructions: [UI captures](../art/ui-identity/README.md).

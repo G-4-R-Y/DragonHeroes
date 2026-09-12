@@ -2,21 +2,15 @@ extends Control
 
 func _ready() -> void:
 	theme = ProtoTheme.get_theme()
-	var bg := TextureRect.new()
-	bg.texture = load("res://living/shrine.png")
-	bg.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	bg.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
-	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	bg.modulate = Color(0.25, 0.32, 0.37)
-	add_child(bg)
+	add_child(preload("res://prototype/ui/world_frame.gd").new())
 	var box := VBoxContainer.new()
-	box.position = Vector2(46, 20)
+	box.position = Vector2(46, 18)
 	box.size = Vector2(548, 320)
-	box.add_theme_constant_override("separation", 7)
+	box.add_theme_constant_override("separation", 5)
 	add_child(box)
 	label(box, "LAIRS & LEGENDS", 16, Color("d8b875"))
 	label(box, "Find a doorway. Defeat its guardian. Remember the hunt.", 8)
-	button(box, "EXPLORE SHRINE ENTRANCES", LairJourney.explore)
+	ProtoTheme.accent_button(button(box, "EXPLORE SHRINE ENTRANCES", LairJourney.explore), ProtoTheme.LUMEN)
 	button(box, "PRACTICE THE BELL SHRINE — ALL ARTIFACTS", LairJourney.practice)
 	label(box, "BOSS RUSH  ·  Defeat guardians in their lairs to unlock them", 8, Color("7ed4ba"))
 	var saved := LairJourney.collection()
@@ -24,7 +18,9 @@ func _ready() -> void:
 		label(box, str(saved.error), 8, Color("ec867e"))
 	else:
 		var scroller := ScrollContainer.new()
-		scroller.custom_minimum_size.y = 72
+		scroller.custom_minimum_size.y = 60
+		scroller.follow_focus = true
+		scroller.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 		box.add_child(scroller)
 		var list := VBoxContainer.new()
 		list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -41,10 +37,37 @@ func _ready() -> void:
 			entry.disabled = clears == 0
 			label(list, "Lair victories %d  ·  Rush victories %d" % [clears, rushes], 8)
 		label(box, "EARNED COLLECTION  ·  equip these artifacts in lairs and rush", 8, Color("d8b875"))
-		var names := ["Legendary", "Relic", "Mythic", "Divine"]
-		var counts: Array[String] = []
-		for i in range(4): counts.append("%s ×%d" % [names[i], int(saved.items[i])])
-		label(box, "     ".join(counts), 8)
+		var cards := HBoxContainer.new()
+		cards.add_theme_constant_override("separation", 6)
+		box.add_child(cards)
+		var rarities := ["legendary", "relic", "mythic", "divine"]
+		var colors := [Color("e2b96f"), Color("79d4b7"), Color("c5a1ea"), Color("eee1ab")]
+		var chapter := LairJourney.data()
+		for i in range(rarities.size()):
+			for artifact in chapter.release.artifacts:
+				if artifact.rarity != rarities[i]: continue
+				var card := preload("res://living/artifact_card.gd").new()
+				card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+				card.add_theme_stylebox_override("panel", ProtoTheme.chip_box(colors[i], 0.1))
+				card.tooltip_text = str(artifact.name) + "\n" + str(artifact.signature).left(220)
+				for lore in chapter.release.lore:
+					if lore.id == artifact.lore:
+						card.tooltip_text += "\n\n" + str(lore.story).left(220) + ("…" if str(lore.story).length() > 220 else "")
+				cards.add_child(card)
+				var content := VBoxContainer.new()
+				content.add_theme_constant_override("separation", 3)
+				content.mouse_filter = Control.MOUSE_FILTER_IGNORE
+				card.add_child(content)
+				label(content, str(rarities[i]).to_upper(), 8, colors[i])
+				label(content, "%d earned" % int(saved.items[i]), 8)
+				var name_label := Label.new()
+				name_label.text = str(artifact.name)
+				name_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+				name_label.max_lines_visible = 2
+				name_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+				name_label.add_theme_color_override("font_color", ProtoTheme.DIM)
+				name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+				content.add_child(name_label)
 		label(box, "Each victory earns an artifact. New facets unlock as your collection grows.", 8)
 	label(box, "Codex collection · local profile · separate from your regular equipment", 8, Color("acb8b4"))
 	button(box, "BACK TO MAIN MENU", func() -> void: get_tree().change_scene_to_file("res://prototype/ui/main_menu.tscn"))
@@ -55,6 +78,7 @@ func label(parent: Node, text: String, size: int, color := Color("d9d4c7")) -> v
 	item.add_theme_font_size_override("font_size", size)
 	if size == 16: item.add_theme_font_override("font", ProtoTheme.font_big())
 	item.add_theme_color_override("font_color", color)
+	item.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	parent.add_child(item)
 
 func button(parent: Node, text: String, action: Callable) -> Button:

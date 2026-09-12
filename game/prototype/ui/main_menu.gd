@@ -4,7 +4,7 @@
 # presentation layer proper once dh-godot exists.
 extends Control
 
-const EMBER := Color("ff9a3c")
+const EMBER := ProtoTheme.GOLD
 const PALE := Color("d9d4c7")
 const DIM := Color(0.55, 0.54, 0.5)
 
@@ -58,10 +58,8 @@ func _start_living() -> void:
 # place (keeping whatever name was typed).
 func _build() -> void:
 	theme = ProtoTheme.get_theme()
-	var bg := ColorRect.new()
-	bg.color = Color("0c1116")
-	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	add_child(bg)
+	var frame := preload("res://prototype/ui/world_frame.gd").new()
+	add_child(frame)
 
 	# soft ember halo behind the title (glow.gd fake-bloom); positioned onto the
 	# title after the container's first layout pass (end of _build)
@@ -127,7 +125,7 @@ func _build() -> void:
 		var card: Dictionary = CLASSES[cid]
 		var cb := Button.new()
 		cb.toggle_mode = true
-		cb.focus_mode = Control.FOCUS_NONE
+		cb.focus_mode = Control.FOCUS_ALL
 		cb.text = str(card["name"])
 		if big != null:
 			cb.add_theme_font_override("font", big)
@@ -160,6 +158,7 @@ func _build() -> void:
 	btn.custom_minimum_size = Vector2(190, 0)
 	btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	btn.pressed.connect(_enter)
+	ProtoTheme.accent_button(btn, ProtoTheme.GOLD)
 	play_row.add_child(btn)
 
 	# instant offline play (Ricardo: "no work to register... can just put any
@@ -184,7 +183,7 @@ func _build() -> void:
 	living.text = "PLAY NEW CONTENT: LAIRS & LEGENDS"
 	living.custom_minimum_size = Vector2(310, 22)
 	living.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	living.add_theme_color_override("font_color", Color("7ed4ba"))
+	ProtoTheme.accent_button(living, ProtoTheme.LUMEN)
 	living.pressed.connect(func() -> void: get_tree().change_scene_to_file("res://living/lair_menu.tscn"))
 	vb.add_child(living)
 
@@ -239,7 +238,7 @@ func _build() -> void:
 	# (user://settings.json via ProtoLang).
 	var lang_btn := Button.new()
 	lang_btn.text = ProtoLang.t("lang_toggle")
-	lang_btn.focus_mode = Control.FOCUS_NONE
+	lang_btn.focus_mode = Control.FOCUS_ALL
 	lang_btn.add_theme_font_size_override("font_size", ProtoTheme.SIZE_BODY)
 	lang_btn.position = Vector2(8, 330)
 	lang_btn.pressed.connect(_toggle_lang)
@@ -250,7 +249,7 @@ func _build() -> void:
 	# volume"). The quick-toggle corner buttons fold into this screen.
 	var opt_btn := Button.new()
 	opt_btn.text = ProtoLang.t("menu_options")
-	opt_btn.focus_mode = Control.FOCUS_NONE
+	opt_btn.focus_mode = Control.FOCUS_ALL
 	opt_btn.add_theme_font_size_override("font_size", ProtoTheme.SIZE_BODY)
 	opt_btn.position = Vector2(516, 330)
 	opt_btn.pressed.connect(_open_options)
@@ -419,7 +418,7 @@ func _update_class_ui() -> void:
 	for cid in _class_btns:
 		var on: bool = cid == _class_pick
 		_class_btns[cid].button_pressed = on
-		_class_btns[cid].modulate = Color(1, 1, 1, 1.0 if on else 0.62)
+		_class_btns[cid].modulate = Color(1, 1, 1, 1.0 if on else 0.86)
 	var card: Dictionary = CLASSES[_class_pick]
 	_class_kit.text = ProtoLang.pick(card, "kit")
 	_class_kit.add_theme_color_override("font_color", card["accent"])

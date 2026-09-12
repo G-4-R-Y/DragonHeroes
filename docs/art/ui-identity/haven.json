@@ -1,0 +1,10 @@
+{
+  "draw_calls": 37.0,
+  "fps": 60.0,
+  "process_ms": 1.419,
+  "scene": "res://prototype/ui/haven.tscn",
+  "viewport": [
+    1280,
+    720
+  ]
+}

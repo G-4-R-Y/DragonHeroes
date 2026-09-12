@@ -7,7 +7,7 @@
 # rule). Dies the day the real meta screens land.
 extends Control
 
-const EMBER := Color("ff9a3c")
+const EMBER := ProtoTheme.GOLD
 const GOLD := Color("ffd166")
 const PALE := Color("d9d4c7")
 const DIM := Color(0.6, 0.59, 0.55)
@@ -39,10 +39,7 @@ func _build() -> void:
 	# display text (screen + panel titles) rides the 16 px pixel font; body stays 8
 	var big := ProtoTheme.font_big()
 	Session.request_save()   # entering the Haven checkpoints the character
-	var bg := ColorRect.new()
-	bg.color = Color("0e1319")
-	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	add_child(bg)
+	add_child(preload("res://prototype/ui/world_frame.gd").new())
 
 	var margin := MarginContainer.new()
 	margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)

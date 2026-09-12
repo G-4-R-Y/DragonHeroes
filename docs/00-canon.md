@@ -1035,3 +1035,13 @@ Still open:
    the existing global power cap and no-paid-randomness rules remain. Local
    preview items never enter cashable tables; public authority, co-op lairs and
    production save/economy migration remain separate gates. Runbook: tech/35.
+
+   Mainline/UI addendum (Ricardo, 2026-09-12: "our UI is lacking ... personality"
+   and "Commit all your changes ... to the main branch"). The reviewed Codex
+   graphics, authoring, branding, playable trial and lair/rush work is approved
+   for the existing main branch, named `master`. Add a reusable bronze/ivory/
+   Lumen UI identity with shrine framing, readable artifact cards and visible
+   focus states; preserve the prototype pixel typography doctrine (§12.31).
+   The Codex package names and save isolation remain during testing. This is
+   source integration, not authorization to publish a public game server or
+   migrate ordinary/cashable inventory. Design scope and follow-ups: design/26.

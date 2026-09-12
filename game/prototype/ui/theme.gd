@@ -1,5 +1,5 @@
 # PROTOTYPE HARNESS — one code-built Theme for every menu surface (main menu,
-# Haven, character panel, confirm/keybind cards). Dark slate panels, ember
+# Haven, character panel, confirm/keybind cards). Obsidian panels, engraved bronze edges, Lumen
 # accents, hover/pressed states — set it on a root Control/PanelContainer and it
 # propagates. The shipping UI theme is an art-directed resource (docs/design/17).
 #
@@ -15,15 +15,17 @@
 class_name ProtoTheme
 extends RefCounted
 
-const PANEL_BG := Color(0.055, 0.078, 0.106, 0.97)
-const PANEL_BORDER := Color(0.16, 0.23, 0.30)
-const BTN_BG := Color(0.075, 0.105, 0.14)
-const BTN_BG_HOVER := Color(0.11, 0.155, 0.21)
-const BTN_BG_PRESSED := Color(0.05, 0.07, 0.095)
-const EMBER := Color("ff9a3c")
-const EMBER_DIM := Color(1.0, 0.6, 0.24, 0.6)
-const PALE := Color("d9d4c7")
-const DIM := Color(0.5, 0.49, 0.45)
+const PANEL_BG := Color("101a1cf7")
+const PANEL_BORDER := Color("66533b")
+const BTN_BG := Color("172325")
+const BTN_BG_HOVER := Color("273837")
+const BTN_BG_PRESSED := Color("101b1b")
+const GOLD := Color("d8b875")
+const LUMEN := Color("7ed4ba")
+const EMBER := GOLD
+const EMBER_DIM := Color("a48a55")
+const PALE := Color("e5dfcd")
+const DIM := Color("a49f8e")
 
 # Native pixel grids of the two shipped fonts (ui/fonts/README.md).
 const GRID_SMALL := 8                  # PixelOperator8.ttf
@@ -110,6 +112,9 @@ static func _box(bg: Color, border: Color, radius := 3, margin := 6.0,
 	sb.border_color = border
 	sb.set_border_width_all(border_w)
 	sb.set_corner_radius_all(radius)
+	# One segment makes a clipped, cut-metal corner on the integer pixel grid.
+	sb.corner_detail = 1
+	sb.anti_aliasing = false
 	sb.content_margin_left = margin
 	sb.content_margin_right = margin
 	sb.content_margin_top = margin * 0.6
@@ -124,6 +129,16 @@ static func chip_box(accent: Color, bg_alpha := 0.14, border_w := 1) -> StyleBox
 	sb.content_margin_top = 2.0
 	sb.content_margin_bottom = 2.0
 	return sb
+
+# Use semantic accents for navigation and content cards, without duplicating
+# a theme per chapter. Disabled states keep the shared theme's subdued styling.
+static func accent_button(button: Button, accent: Color) -> void:
+	button.add_theme_stylebox_override("normal", _box(BTN_BG.lerp(accent, 0.08), accent.darkened(0.38)))
+	button.add_theme_stylebox_override("hover", _box(BTN_BG_HOVER.lerp(accent, 0.12), accent))
+	button.add_theme_stylebox_override("pressed", _box(BTN_BG_PRESSED, accent))
+	button.add_theme_color_override("font_color", accent.lightened(0.15))
+	button.add_theme_color_override("font_hover_color", PALE)
+	button.add_theme_color_override("font_pressed_color", accent)
 
 static func get_theme() -> Theme:
 	if _theme != null:
@@ -149,8 +164,10 @@ static func get_theme() -> Theme:
 	t.set_stylebox("pressed", "Button", pressed)
 	t.set_stylebox("hover_pressed", "Button", _box(BTN_BG_HOVER, EMBER))
 	t.set_stylebox("disabled", "Button", _box(Color(0.06, 0.08, 0.1, 0.6),
-			Color(0.12, 0.16, 0.2)))
-	t.set_stylebox("focus", "Button", StyleBoxEmpty.new())
+			Color("403e34")))
+	var focus := _box(Color.TRANSPARENT, LUMEN, 2, 6.0)
+	focus.draw_center = false
+	t.set_stylebox("focus", "Button", focus)
 	t.set_color("font_color", "Button", PALE)
 	t.set_color("font_hover_color", "Button", Color(1.0, 0.98, 0.92))
 	t.set_color("font_pressed_color", "Button", EMBER)
@@ -159,17 +176,30 @@ static func get_theme() -> Theme:
 	t.set_stylebox("panel", "TabContainer", _box(PANEL_BG, PANEL_BORDER, 4, 6.0))
 	var sel := _box(BTN_BG_HOVER, EMBER_DIM, 3, 7.0)
 	sel.border_width_bottom = 0
-	var unsel := _box(Color(0, 0, 0, 0.25), Color(0.1, 0.14, 0.18), 3, 7.0)
+	var unsel := _box(Color(0, 0, 0, 0.25), PANEL_BORDER.darkened(0.4), 3, 7.0)
 	unsel.border_width_bottom = 0
 	t.set_stylebox("tab_selected", "TabContainer", sel)
 	t.set_stylebox("tab_unselected", "TabContainer", unsel)
 	t.set_color("font_selected_color", "TabContainer", EMBER)
 	t.set_color("font_unselected_color", "TabContainer", DIM)
 	t.set_font_size("font_size", "TabContainer", body)
-	t.set_stylebox("normal", "LineEdit", _box(Color(0.05, 0.07, 0.095), PANEL_BORDER, 3, 6.0))
-	t.set_stylebox("focus", "LineEdit", _box(Color(0.05, 0.07, 0.095), EMBER_DIM, 3, 6.0))
+	t.set_stylebox("normal", "LineEdit", _box(Color("0c1618"), PANEL_BORDER, 2, 6.0))
+	t.set_stylebox("focus", "LineEdit", _box(Color("0c1618"), LUMEN, 2, 6.0))
 	t.set_color("font_color", "LineEdit", PALE)
 	t.set_color("caret_color", "LineEdit", EMBER)
+	# Thin inlaid tracks and a rune-shaped grip replace the engine's generic
+	# rounded sliders. One shared vector asset, imported once as a tiny texture.
+	var track := _box(Color("0c1618"), PANEL_BORDER, 1, 2.0)
+	track.content_margin_top = 2
+	track.content_margin_bottom = 2
+	t.set_stylebox("slider", "HSlider", track)
+	t.set_stylebox("grabber_area", "HSlider", _box(LUMEN.darkened(0.5), PANEL_BORDER, 1, 2.0))
+	t.set_stylebox("grabber_area_highlight", "HSlider", _box(LUMEN.darkened(0.3), GOLD, 1, 2.0))
+	var grip := preload("res://prototype/ui/slider_rune.svg")
+	t.set_icon("grabber", "HSlider", grip)
+	t.set_icon("grabber_highlight", "HSlider", grip)
+	t.set_icon("grabber_disabled", "HSlider", grip)
+	t.set_color("font_color", "Label", PALE)
 	t.set_stylebox("panel", "TooltipPanel", _box(Color(0.04, 0.06, 0.08, 0.97), EMBER_DIM))
 	t.set_color("font_color", "TooltipLabel", PALE)
 	t.set_font_size("font_size", "TooltipLabel", body if _font_small != null else 9)

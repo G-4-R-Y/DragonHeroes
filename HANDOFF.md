@@ -1,4 +1,32 @@
-# Handoff — modern pixel-art review branch (2026-09-12)
+# Handoff — UI identity and approved mainline integration (2026-09-12)
+
+Ricardo approved committing all Codex work to the existing main branch `master`
+and requested a stronger UI identity. The first pass adds reusable bronze,
+ivory and Lumen styling, clipped metal panels, visible keyboard focus, a rune
+volume grip, shared shrine framing for menu/Haven/collection, and data-driven
+artifact cards with bounded lore previews. Main-menu copy is localized; the
+existing trial remains English. Production HUD/class sigils/bestiary/ordinary
+gear cards remain scheduled in the roadmap. Law: design/26, canon §12.45.
+
+Current integration step: commit this UI pass on `codex/modern-pixel-content-engine`,
+then fast-forward the clean original `master` workspace. Both include all fetched
+GitHub changes through 08f92d6; no upstream commits are missing. Preserve the
+Codex review branch and older unrelated stash. Rebuild both Codex packages from
+clean landed source so manifests identify the actual main-branch commit.
+
+Verification for this pass: 113 Python tests, CTest 4/4, content validator and
+all 16 Godot outcome gates passed; the console's deliberate malformed-JSON
+fixture is qualified as before. Stream worst apply 1.48ms; FX stress 4.85ms,
+no pool growth. Five actual GL UI captures + metrics: docs/art/ui-identity/.
+All report 60 FPS at 1280×720; these are short desktop samples. Combat capture was also inspected (`docs/art/ui-identity/practice.png`);
+rebuilt package results will be recorded after the mainline export. Windows still
+requires native gameplay testing.
+
+---
+
+## Previous delivery history (preserved; current instructions are above)
+
+### Modern pixel-art review branch (2026-09-12)
 
 Latest delivery: GitHub sync + world lairs / earned boss rush (2026-09-12).
 Branch `codex/modern-pixel-content-engine` contains `origin/master` **08f92d6**;

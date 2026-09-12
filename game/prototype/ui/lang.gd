@@ -43,14 +43,14 @@ const S := {
 	"dt_arcane": {"en": "arcane", "pt": "arcano"},
 
 	# ---- main menu ---------------------------------------------------------------
-	"menu_subtitle": {"en": "pre-alpha prototype", "pt": "protótipo pré-alfa"},
+	"menu_subtitle": {"en": "BENEATH THE GLOOM, A LEGEND WAKES", "pt": "SOB O GLOOM, UMA LENDA DESPERTA"},
 	"menu_hunter_name": {"en": "hunter name", "pt": "nome do caçador"},
 	"menu_password": {"en": "password", "pt": "senha"},
 	"menu_enter": {"en": "Enter the World", "pt": "Entrar no Mundo"},
 	"menu_saved": {"en": "saved hunters: %s — enter a name to continue",
 			"pt": "caçadores salvos: %s — digite um nome para continuar"},
-	"menu_foot": {"en": "offline prototype login — real auth arrives with Nakama (docs/tech/26)",
-			"pt": "login offline do protótipo — a autenticação real chega com o Nakama (docs/tech/26)"},
+	"menu_foot": {"en": "Name your hunter, or Quick Start to continue your journey.",
+			"pt": "Dê um nome ao caçador ou use JOGO RÁPIDO para continuar."},
 	"menu_options": {"en": "OPTIONS", "pt": "OPÇÕES"},
 	"menu_quick": {"en": "QUICK START — %s", "pt": "JOGO RÁPIDO — %s"},
 	"opt_music": {"en": "Music", "pt": "Música"},

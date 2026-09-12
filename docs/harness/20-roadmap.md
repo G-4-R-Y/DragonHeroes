@@ -4,6 +4,41 @@ Ricardo decides DIRECTION (which lever, when); harnesses execute inside it.
 Every item points at its law doc. Statuses: NOW (in flight) · PICK (awaiting
 Ricardo's call) · SCHEDULED (decided, sequenced) · BUDGET (blocked on money).
 
+## NOW — Land the approved Codex work and give the UI a stronger identity (Ricardo, 2026-09-12)
+
+Demand: the UI needs more personality; commit the reviewed graphics/content work
+onto the main branch. Main is named `master` in this repository. Law: canon
+§12.45, design/26, and the harness integration/visual gates. This explicitly
+supersedes the earlier review-branch-only landing constraint.
+
+Strategy at this interruption: preserve the clean Codex review branch, inspect
+the existing UI/theme and canon, define a bounded presentation pass around the
+world's bronze, Lumen and Gloom motifs, and keep gameplay and readability intact.
+Fetch all remotes again, integrate over the latest committed mainline without
+overwriting concurrent work, verify the UI in actual GL captures and run the
+required compatibility gates. Commit the finished work and fast-forward `master`
+when ancestry permits; retain the Codex branch and produce tested Codex packages
+from the landed source. UI work beyond the bounded pass remains explicitly
+tracked rather than being represented as finished.
+
+Delivered UI pass: shared bronze/ivory/Lumen theme, cut-metal corners,
+keyboard focus, rune volume sliders, shrine-backed menu/Haven/collection,
+and authored artifact cards with two-line names and bounded lore excerpts.
+EN/PT menu copy fits; normal login, quick start, co-op, arena and options remain.
+Gates: 113 Python tests, CTest 4/4, validator and all 16 Godot outcomes; stream
+1.48ms, FX stress 4.85ms. Actual GL UI captures report 60 FPS at 1280×720.
+Mainline landing and clean-source binary regeneration are the remaining steps.
+
+## SCHEDULED — Extend the UI identity into the production HUD and bestiary
+
+Demand: carry Ricardo's stronger UI personality direction beyond the first
+menu/collection pass. Law: design/26 UI identity and design/17 §8; prototype
+typography doctrine canon §12.31. Next slices: class/Bestial Skill sigils,
+connected bestiary, production gear cards with signature/lore hierarchy,
+readable HUD ornaments and touch/controller navigation. Gates: actual busy-Hunt
+frames, input/focus outcomes, production inventory compatibility and target-device
+frame budgets. Keep weekly content authored through existing stable-ID fields.
+
 ## DONE — Synchronize GitHub and verify compatibility (Ricardo, 2026-09-12)
 
 Demand: fetch all GitHub changes and ensure the isolated Codex branch is current
