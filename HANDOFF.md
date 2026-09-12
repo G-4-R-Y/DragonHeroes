@@ -1,4 +1,24 @@
-# Handoff — progression scaling audit (2026-09-12)
+# Handoff — GitHub publication authorized (2026-09-12)
+
+Ricardo explicitly requested committing and pushing all completed changes,
+resolving merge issues. Latest fetch reports origin/master at 08f92d6, with
+zero upstream commits missing and ten completed local commits ready to publish.
+Both worktrees were clean before recording this demand; there are no merge
+conflicts. Gameplay still matches the tested e570acc source exactly: 17 Godot
+outcomes, 113 Python tests, four native suites, and the actual exported Linux
+level-up/practice/lair/rush checks passed. Existing clean-source Codex packages
+remain in builds/codex; generated archives stay ignored per repository policy.
+
+Publication is in progress on `master` with a normal fast-forward push. After
+GitHub confirms it, update this entry and the roadmap, then publish that record
+and verify remote HEAD equality. No force push, other branches or stashes need
+changing. The prior statements that a push was not requested are historical.
+
+---
+
+## Prior delivery (preserved)
+
+### Progression scaling audit (2026-09-12)
 
 Ricardo asked whether hunters, monsters and items scale indefinitely. They do
 not: the playable hunter cap is 100; ordinary items roll with the hunter's level,

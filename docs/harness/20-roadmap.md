@@ -4,6 +4,17 @@ Ricardo decides DIRECTION (which lever, when); harnesses execute inside it.
 Every item points at its law doc. Statuses: NOW (in flight) · PICK (awaiting
 Ricardo's call) · SCHEDULED (decided, sequenced) · BUDGET (blocked on money).
 
+## NOW — Commit and push all completed work (Ricardo, 2026-09-12)
+
+Demand: commit everything and push the changes, resolving any merge issues.
+Law: harness integration gates; this explicitly authorizes publishing the
+completed work to the existing GitHub main branch, `origin/master`.
+Strategy: inspect both worktrees, record this demand, fetch every remote,
+merge any new upstream commits without rewriting remote history, verify the
+result, commit the publication record, and push `master`. Verify the remote
+commit matches local HEAD and leave a clean tree. Preserve ignored generated
+artifacts and the existing review branch; no force push or unrelated cleanup.
+
 ## DONE — Audit infinite hunter, monster and item scaling (Ricardo, 2026-09-12)
 
 Demand/question: do items and monster levels/stats scale indefinitely alongside
