@@ -6,7 +6,7 @@ After years programming, I realized I ended up never actually building that game
 
 I can finally create some of the things that kid once dreamed of - for pure joy, as he portrayed it to be.
 
-
+=================================================================================================
 
 Fast-paced dark-fantasy pixel-art multiplayer ARPG by IntelliGames: an infinite
 procedurally generated world of creature hunts (a real adventure with friends),
