@@ -4,6 +4,34 @@ Ricardo decides DIRECTION (which lever, when); harnesses execute inside it.
 Every item points at its law doc. Statuses: NOW (in flight) · PICK (awaiting
 Ricardo's call) · SCHEDULED (decided, sequenced) · BUDGET (blocked on money).
 
+## DONE — Refresh Hunt stats and replenish resources on level-up (Ricardo, 2026-09-12)
+
+Demand: when the hunter levels up during a Hunt, refresh stats and replenish
+HP and the relevant combat resources immediately. Law: canon §3, the existing
+prototype progression contract in design/24, and the harness outcome gates.
+Strategy: trace the current kill/progression and stat-application path, identify
+which resources actually exist, refresh derived values before refilling them,
+and prevent ordinary equipment/stat changes from granting free healing. Add
+an outcome regression for real Hunt level-up, update the docs in the same
+change, commit on the approved mainline, and refresh the Codex test binaries.
+
+Inspection: existing level-up only healed HP after VFX. The Hunt's other
+consumable resources are dodge and Ember Flask charges; there is no mana pool.
+Apply the stat/resource refresh before feedback and share it with host-owned
+remote hunters, retaining equipment, cooldowns, earned stacks and death state.
+The new real-death probe passes ordinary/duplicate/multi-level/dead-player and
+party cases. The exported smoke also exercises the refill through an actual
+creature death so the binary, not just the editor, proves this behavior.
+
+Delivered and gated: `ProtoPlayer.refresh_on_level_up()` recomputes stats,
+refills living hunters' HP/dodges/flasks and discards obsolete refill timers.
+The Hunt applies it before VFX; the co-op host also refreshes living allies.
+All 17 Godot outcomes pass, including the new real-death regression and co-op;
+113 Python tests, CTest 4/4, validator and whitespace gates pass. Streaming
+worst apply 1.39ms; FX stress 5.53ms with no pool growth. Rebuild Codex exports
+after committing for clean manifests; the package gate now requires the actual
+exported Hunt level-up refill in addition to practice and the lair/rush journey.
+
 ## DONE — Land the approved Codex work and give the UI a stronger identity (Ricardo, 2026-09-12)
 
 Demand: the UI needs more personality; commit the reviewed graphics/content work

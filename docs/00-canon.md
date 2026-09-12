@@ -1045,3 +1045,14 @@ Still open:
    The Codex package names and save isolation remain during testing. This is
    source integration, not authorization to publish a public game server or
    migrate ordinary/cashable inventory. Design scope and follow-ups: design/26.
+
+46. **Hunt level-up replenishes combat resources (2026-09-12, Ricardo:
+   "refresh stats when level-up in the hunt (replenish hp and stuff)").**
+   Refresh the derived stat block first, then refill HP, dodge charges and
+   Ember Flask charges on a genuine level increase. The current Hunt has no
+   mana pool. Shared party progression applies the same host-owned refresh
+   to remote hunters without rerolling their builds. Ordinary stat changes
+   grant no refill; skill cooldowns and earned class stacks retain their state;
+   dead hunters remain dead until their normal respawn. This extends the
+   existing Hunt sustain beat, not the separate living-trial resource model.
+   Implementation scope and outcome gate: design/24, Hunt level-up refresh.

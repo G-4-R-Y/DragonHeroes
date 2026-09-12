@@ -23,6 +23,25 @@ ARENA SELFTEST OK, hunt boot clean, validate 0):
   pulse, the camera leads toward the cursor, and leveling heals to full
   (the sustain floor the hunt lacked).
 
+### Hunt level-up refresh (Ricardo, 2026-09-12)
+
+A newly earned Hunt level refreshes derived stats, then fills current HP to the
+new maximum, restores all three dodge charges and both Ember Flask charges,
+and clears the obsolete dodge recharge / flask healing timers. The HP HUD updates
+before the existing level-up flourish. The current Hunt has no mana bar.
+Ordinary equipment/stat application never refills resources; earned class stacks,
+skill cooldowns, movement and active effects retain their state. A dead hunter
+can still earn progression from a delayed kill but does not heal or revive.
+
+The P2P host applies the same refresh to living remote hunters when the shared
+party level rises, retaining their actual equipment and build. This remains in
+the existing prototype authority layer pending the planned C++ Hunt migration.
+Gate: `game/prototype/tests/level_up_probe.tscn` (`LEVEL UP OK`) exercises actual
+creature deaths, immediate HUD/stat/resource refresh, no refill before/after a
+real level transition, multi-level point awards, party parity and dead players.
+The Codex export smoke repeats a real kill → level-up → HP/dodge/flask refill
+inside the release PCK.
+
 ## 2. The levers (biggest first)
 
 ### L1 — Data-driven AI profiles for the bestiary (fun × species value)

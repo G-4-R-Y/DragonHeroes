@@ -136,6 +136,11 @@ func _physics_process(delta: float) -> void:
 				MpNet.send_event({"k": "toast", "text": "%s is back up" % r.label.text})
 	# level-up toasts (shared party progression)
 	if Session.level != _level_seen:
+		if Session.level > _level_seen:
+			for r: Dictionary in _remotes.values():
+				if is_instance_valid(r.body):
+					r.build.level = Session.level
+					r.body.refresh_on_level_up()
 		_level_seen = Session.level
 		MpNet.send_event({"k": "toast", "text": "Party level %d!" % _level_seen})
 	# snapshots

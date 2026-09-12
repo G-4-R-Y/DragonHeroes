@@ -63,7 +63,7 @@ been aborting the menu's `_build` for 9 days behind "no errors" boot checks)
 → `tests/fx_stress.tscn --quit-after 260` (FXSTRESS OK) → `arena/arena.tscn
 -- --selftest` (ARENA SELFTEST OK) → `arena/console.tscn -- --selftest`
 (CONSOLE SELFTEST OK) → `arena/tests/cosmetics_test.tscn`
-(COSMETICS OK) → `bash tools/mp_test.sh` (MP TEST OK) → `python3 -m pytest
+(COSMETICS OK) → `tests/level_up_probe.tscn` (LEVEL UP OK) → `bash tools/mp_test.sh` (MP TEST OK) → `python3 -m pytest
 ml/tests genforge/tests -q` → `python3 tools/validate_content.py` (0 problems).
 Watch item: spawn_probe flaked ONCE right after `--import` (2026-09-10),
 passed on rerun — rerun before declaring it broken.

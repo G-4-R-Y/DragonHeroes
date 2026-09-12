@@ -44,7 +44,7 @@ var whirl_cd_s := 4.0            # Whirlwind (E): full-circle strike (proposal)
 
 # Ember Flask (design/11: "dodge, heal, or reverse" — healing is a verb):
 # 2 charges, each a 40%-max HoT over 2 s with a 0.8 s drink commitment (30%
-# slow); every 6 kills rekindles one charge; Haven/respawn refills all. Feeds
+# slow); every 6 kills rekindles one charge; Haven/respawn/level-up refill all. Feeds
 # the same aggression loop as leech — the answer to "ultra-mogged early".
 const FLASK_MAX := 2
 const FLASK_KILLS_PER_CHARGE := 6
@@ -199,6 +199,19 @@ func apply_stats() -> void:
 	_rune_cleave = _src().rune_effect("cleave")
 	_rune_rend = _src().rune_effect("rend")
 	_rune_dodge = _src().rune_effect("dodge")
+
+# A level-up is a sustain beat. Keep this separate from apply_stats(): opening
+# a gear panel or changing equipment must never refill combat resources.
+# The Hunt currently has HP, dodge charges and Ember Flask charges, not mana.
+func refresh_on_level_up() -> void:
+	apply_stats()
+	if dead:
+		return   # delayed kills may grant XP; resurrection still belongs to respawn
+	hp = max_hp
+	dodge_charges = DODGE_CHARGES_MAX
+	_dodge_recharge = 0.0
+	refill_flask()
+	# Skill cooldowns, earned Combo/Attunement, buffs and movement stay intact.
 
 func _physics_process(delta: float) -> void:
 	if dead:

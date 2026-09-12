@@ -210,6 +210,7 @@ Rules: gameplay content is data (`content/`), validated in CI; IDs are
 | Arena | `godot --headless --path game res://arena/arena.tscn -- --selftest` | ARENA SELFTEST OK |
 | Console | `godot --headless --path game res://arena/console.tscn -- --selftest` | CONSOLE SELFTEST OK |
 | Cosmetics | `godot --headless --path game res://arena/tests/cosmetics_test.tscn --quit-after 140` | COSMETICS OK |
+| Hunt level-up | `godot --headless --path game res://prototype/tests/level_up_probe.tscn` | LEVEL UP OK |
 | Co-op | `bash tools/mp_test.sh` | MP TEST OK |
 | Content | `python3 tools/validate_content.py` | 0 problems |
 | Python | `python3 -m pytest ml/tests/ genforge/tests/ -q` | all pass |

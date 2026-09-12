@@ -46,4 +46,21 @@ func _run() -> void:
 	if not bool(world.get("_streaming")):
 		_verdict(false, "packaged C++ helper did not generate streaming world")
 		return
-	_verdict(true, "exported menu, icons, isolated saves, streaming Hunt; creatures=%d" % creatures.size())
+	# Assert the sustain beat in the release PCK too, through a real death.
+	# This explicit smoke mode runs in the packager's isolated user directory.
+	var hunt: Node = tree.current_scene
+	hunt.process_mode = Node.PROCESS_MODE_DISABLED
+	player.respawn(player.global_position)
+	player.hp = player.max_hp * 0.25
+	player.dodge_charges = 0
+	player.flask_charges = 0
+	Session.level = 1
+	hunt.kills = hunt._kills_for_level(1) - 1
+	var prey := ProtoCreature.new()
+	hunt.add_child(prey)
+	prey.take_damage(prey.max_hp + 1.0, Vector2.ZERO)
+	if Session.level != 2 or not is_equal_approx(player.hp, player.max_hp) \
+			or player.dodge_charges != ProtoPlayer.DODGE_CHARGES_MAX or player.flask_charges != ProtoPlayer.FLASK_MAX:
+		_verdict(false, "exported Hunt level-up did not refill HP/dodges/flasks")
+		return
+	_verdict(true, "exported menu, icons, isolated saves, streaming Hunt, level-up HP/dodge/flask refill; creatures=%d" % creatures.size())

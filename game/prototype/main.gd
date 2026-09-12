@@ -1279,6 +1279,8 @@ func _grant_level_ups() -> void:
 	Session.level = new_level
 	Session.attribute_points += gained
 	Session.skill_points += levels   # 1 skill point per level (Reaver tree)
+	player.refresh_on_level_up()
+	refresh_hud()   # authoritative prototype state is applied before VFX feedback
 	play_ui("victory", -6.0)
 	shake(3.0)
 	fx.lightning(player.global_position)   # the sky marks the hunter
@@ -1298,11 +1300,6 @@ func _grant_level_ups() -> void:
 			ProtoLang.t("msg_level_up") % new_level)
 	damage_number(player.global_position + Vector2(0, -24), 0, Color("ffe9d0"),
 			ProtoLang.t("msg_level_points") % [gained, levels])
-	player.apply_stats()   # higher level unlocks higher affix tiers on future rolls
-	# a ding is a sustain beat too: leveling heals to full (the hunt has no
-	# potions — without a sustain floor, long hunts are pure attrition)
-	player.hp = player.max_hp
-	refresh_hud()
 
 func _drop(at: Vector2, kind: String, amount: int) -> void:
 	var pk := PickupScene.new()

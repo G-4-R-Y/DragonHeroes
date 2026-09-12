@@ -63,6 +63,14 @@ class sigils, bestiary and full gear-card migration remain scheduled.
 Approved Codex source is now on `master` (70e8b4f); fresh verified Linux/Windows
 Codex archives live in the original workspace under `builds/codex/`.
 
+## Hunt progression sustain
+**Level-up refresh (2026-09-12).** Law: canon §12.46, design/24.
+`player.gd::refresh_on_level_up`, `main.gd::_grant_level_ups`,
+`mp/host_driver.gd`: recompute stats, replenish HP/dodges/flasks, clear obsolete
+refill timers, refresh HUD before feedback; host applies party parity. Preserve
+builds, cooldowns, class stacks and death state. Normal apply_stats never heals.
+Gate: `tests/level_up_probe.tscn` (`LEVEL UP OK`, real creature deaths).
+
 ## Combat, classes, skills (prototype rules — presentation-side for now)
 **PLAYABLE; overhaul SCHEDULED.** design/10-11 (kits), design/21 M-C (the
 overhaul), design/24 §1 (polish pack landed: input buffering, dodge

@@ -1,4 +1,34 @@
-# Handoff — UI identity and approved mainline integration (2026-09-12)
+# Handoff — Hunt level-up resource refresh (2026-09-12)
+
+Ricardo requested immediate stat/resource refresh when leveling during a Hunt.
+`ProtoPlayer.refresh_on_level_up()` recomputes the stat block before filling
+HP to its new maximum, three dodge charges and both Ember Flasks; obsolete
+recharge/HoT timers clear. Hunt updates HP HUD before the existing flourish.
+The P2P host applies the same refresh to living remote hunters, preserving
+their builds. Skill cooldowns, class stacks, effects and death state remain.
+Ordinary equipment/stat changes grant no refill. The normal Hunt has no mana;
+the separate living-trial resource model is unaffected. Law: canon §12.46,
+design/24; roadmap is complete for the implementation and outcome gates.
+
+Validation: all **17 Godot checks**, including real-death level-up regression,
+co-op, ESC, flask and repopulation; **113 Python tests**, CTest **4/4** and the
+content validator pass. Stream 1.39ms; FX stress 5.53ms/no pool growth. The new
+regression covers no-level/duplicate/multi-level transitions, new max HP,
+instant HUD updates, party parity, unchanged gear/cooldowns and dead hunters.
+Gate command is in docs/USAGE and the harness suite. The exported Codex smoke
+now also crosses a real kill threshold and asserts the HP/dodge/flask refill.
+
+After this commit run `python3 tools/package_codex.py all` for clean-source
+Linux/Windows artifacts in `builds/codex/`, including the full exported
+lair/rush journey, icons, hashes and ZIP checks. Their BUILD-INFO is the source
+record. Windows gameplay still requires native testing. Commits stay on local
+`master`; no remote push was requested.
+
+---
+
+## Previous delivery history (preserved)
+
+### UI identity and approved mainline integration (2026-09-12)
 
 Ricardo approved committing all Codex work to the existing main branch `master`
 and requested a stronger UI identity. The first pass adds reusable bronze,
