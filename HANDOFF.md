@@ -3,6 +3,74 @@
 DURABLE MEMORY IS NOW docs/harness/ (README = start here, 10-systems-map,
 20-roadmap). This file is only the volatile delta. Canon §12 current through 39.
 
+## 2026-09-12 (night, second context) — REBIRTH ENGINE EXPERIMENTS EXECUTED
+- Ricardo: "Unreal engine, godot 3d and the rest… execute what is documented
+  in the rebirth folder; one folder per engine inside rebirth; assets/pipelines
+  outside." Done INLINE (no agents), never a Vulkan window. Status of record:
+  rebirth/docs/02-status.md; canon §12.44; systems map + roadmap updated.
+- rebirth/godot3d — RUNS + GATED: `REBIRTH_SELFTEST=1 godot --headless
+  --fixed-fps 60 --path rebirth/godot3d` → REBIRTH3D OK (5 skills, enrage,
+  i-frame avoids, combo 9, kill, toast, rematch, fx overflow 0, nodes 210);
+  captures rebirth_{breath,fight,enrage}.png. gl_compatibility (agent shell);
+  Forward+ flip = Ricardo (auto-enables vol fog/SDFGI/SSAO).
+- rebirth/native — C++20 + GL 3.3, own 30 Hz deterministic sim: -Werror
+  clean, REBIRTH-NATIVE OK + determinism hash + ctest 2/2; 9.5–10 ms/frame
+  on Intel Mesa; captures native_{breath,fight}.png.
+- rebirth/unreal — UE 5.4 C++ slice, 20 files, COMPLETE BUT UNCOMPILED (no UE
+  here; needs Epic account, ~45 GB): INSTALL.md has the runbook + where
+  compile errors would surface. rebirth/unity-hdrp — parked by decision (README).
+- rebirth/assets/tools — engine-neutral staging (placeholder GLB writer,
+  glb_to_dhm, gen_assets → GenForge mesh_gen); proven with placeholders in
+  all three engines; real mesh blocked on concept renders (same as §12.38).
+- COLLISION (needs Ricardo): the OTHER session committed a UE scaffold at
+  rebirth/ ROOT (69a5cd3: Rebirth.uproject, Config/, Source/ stub,
+  tools/gen_assets.py) + siblings ../rebirth-native (links dh-sim, arena
+  headless) and ../rebirth-unity. I followed the per-engine-folder
+  instruction; touched none of theirs (their Source/ was briefly deleted as
+  an empty stub and restored from their commit). Pick: delete the root trio
+  in favour of rebirth/unreal/, move siblings inside as native-dhsim/ +
+  unity/ — or the reverse. Their root Config sets GameEngine= to the
+  GameMode class (won't boot as-is).
+- Committed in the rebirth repo: my folders only (godot3d/, native/, unreal/,
+  unity-hdrp/, assets/tools, docs/02-status, README index, .gitignore). In the
+  parent: harness docs only; this file + canon are dirty with the other
+  session's work — commit them from that session.
+
+## 2026-09-11 (afternoon, main context) — verification pass on the other session's tree
+- FOUND + FIXED: prototype/ui/display.gd `var next := MODES[...]` (x2) was a
+  FATAL GDScript parse error since v0.3.0 — main_menu.gd logged "Failed to
+  compile depended scripts" at every boot and `_build` aborted at the display
+  controls (menu rendered WITHOUT the MODE/FIT buttons; everything else looked
+  fine, so nobody noticed). Typed the two vars. NEW GATE
+  prototype/tests/menu_probe.tscn → MENU OK asserts the menu BUILT (buttons
+  MODE/FIT/ENTER/CO-OP/LANGUAGE + 2 fields); proven to FAIL on the old file.
+  USAGE gates row + harness README chain updated.
+- Console fit VERIFIED by capture (tests/captures/ui_console_fit2.png,
+  1600x900 on the 1080p screen): no overflow, all buttons in view; added a 2x
+  integer step to _fit_window (800x450 logical when the canvas allows) so the
+  pixel type reads at menu size instead of 1:1 dots. Menu capture
+  (ui_menu_fit.png) = 1280x720 integer 2x, centered. Smaller screens (1366x768
+  ladder rungs) untested here — no Xvfb on the box.
+- Gated the other session's PPO net cinder_drake v4 (10M steps, mixed
+  opponents): FAIL — suite_scripted win_rate 0.0 (fitness -0.09), suite_native
+  0.5 (pass). Up from 0-4 vs native, scripted baseline still unbeaten.
+- Status checks: NO engine experiments exist on disk (Unreal/"Rebirth"/
+  siblings = queued twice in the late/night blocks, never started; Godot
+  settled §12.27). 3D pipeline: TripoSR installed + runner fixed, ZERO meshes
+  generated yet — blocked on valid concept renders (52 px sprites are not
+  conditioning); Ricardo's local image repo is the unblock (plug in as an
+  ImageBackend, GENFORGE_IMAGE_BACKEND=local).
+- AUDIO SETTINGS (Ricardo: "mute songs and effects", canon §12.42): NEW
+  prototype/ui/audio.gd (ProtoAudio) — Music + SFX buses created in code,
+  ON/OFF + volume persisted in user://settings.json "audio", applied at every
+  boot (main_menu._build + main._build_audio); all SFX players bind to "SFX";
+  title screen MUSIC/SFX buttons above FIT/MODE. No music exists yet — the
+  bus is the seam. menu_probe now also asserts the switch mutes the bus.
+- Committed ONLY display.gd, console.gd, the probe, captures, gate docs. The
+  rest of the late/night work (kits, duo, dh-env, ppo.py, Windows build) is
+  still uncommitted in this tree — commit it from that session (sim/build-windows
+  must be gitignored first).
+
 ## 2026-09-11 session (main context; everything INLINE — no agents)
 - Two background workflows (a freed-instance sweep, the console build) HIT THE
   SESSION QUOTA and died mid-flight. Ricardo: "Don't instantiate background
@@ -474,3 +542,63 @@ prototype3d/hunt3d.tscn: same world dump/art/bundles as perspective 3D
 mesh_gen.py landed (stub CI green). NEXT ACTION (Ricardo-gated): sudo install
 cuda-toolkit-12-4, then the TripoSR draft-tier runbook (tech/31 §4), then the
 two-creature spike (§5). DH_*_DIR env vars locate adapter checkouts.
+
+## 2026-09-11 (late) — kits+duo, console fit, dh-env tier 2 + GPU PPO (canon §12.40)
+- Arena: creature KITS live (7 species, skills[] in builds.json: bolt_volley /
+  radial_slam / pounce / field_cast / enrage; native fires boss-style, bots via
+  cmd_skill, cds in obs[7..10]); DUO kind + core.arena.the_duologue (pyre+
+  colossus, one fighter two bodies); roster 17 builds / 14 rotation pairs;
+  schema extended (skills, members, kind duo). Freed-member crash class fixed
+  via alive_body()/living_proxies()/nearest_proxy_to; SELFTEST_MATCHES now
+  includes the duo (gate sees member-death mid-fight). ARENA SELFTEST OK (4
+  matchups), content validate OK.
+- Console/game fit: console gets a screen-fitting tool canvas ladder; game
+  windowed mode = largest integer scale inside usable rect (ProtoDisplay.
+  fit_windowed). CONSOLE SELFTEST OK.
+- dh-env: dh-sim arena.cpp (C++ twin, deterministic), dh-env C API (ctypes),
+  dump_specs.tscn GENERATES ml/env/specs.json from real bodies (16 builds);
+  bench: 216k native / 256k scripted steps/s/core (gate 100k). sim-tests +3.
+- PyTorch: ml/.venv (torch 2.6+cu124, CUDA on the 4050; python3-venv missing —
+  sudo apt install python3.10-venv pending on Ricardo, get-pip workaround used).
+  gpu_guard caps VRAM at 50%. torch_policy = GPU twin + arena.policy.v1 export
+  (loads in Godot verbatim — proven). ppo.py: GAE + clip + self-play (frozen
+  snapshot opponent in-env), registry-integrated. 250k-step smoke lost 0-4 at
+  the Godot gate (expected); a 5M-step cinder_drake run trains in background
+  (ml/data/logs/cinder_drake_ppo.log — buffered; use python -u next time).
+- NEXT: gate the 5M-step net (league gate), then ES league-shape (past-self +
+  exploiters in league.py opponent lists), graphics OM (VFX lab pack + RC
+  lab), Rebirth UE scaffold + sibling engine repos, Windows dh-server.exe via
+  portable mingw (no sudo).
+
+## 2026-09-11 (night) — league shape, combos, conduct rule, Windows exe (canon §12.41)
+- ppo.py: MIXED opponent thirds (native/scripted/past-self) — self-play-only
+  was inflating win rates (1.00 fake vs 0.05 honest). --exploit <weights> =
+  dedicated exploiter vs a fixed main. Combo rewards: R_KIT/R_CHAIN (90-tick
+  window). 5M-step cinder_drake v2 gated: 0W/1L/3D vs native (up from 0/3/1),
+  0-4 vs scripted — learning, not passing. 10M-step league-shaped run
+  warm-started from v2 in background (ml/data/logs/cinder_drake_ppo2.log,
+  python -u unbuffered now).
+- CONDUCT combat rule (both sims + test): storm bolt × mire field = 2x burst,
+  field consumed (arena.cpp + arena.gd parity, sim-tests +1: 10 total green).
+- Windows: portable llvm-mingw (no sudo) → sim/build-windows/dh-server.exe.
+  NEXT: tools/package_game.sh windows zip; gate the 10M net; GRU arch variant
+  + ES-over-checkpoints outer selection (design: docs/tech/32); 2v2 group
+  dynamics (ally obs slots, horde-vs-player) — design pending; graphics OM
+  (VFX lab + RC) still queued; engine repos (rebirth + siblings).
+
+## 2026-09-11 (night 2) — strategies + engine POCs (canon §12.42-43)
+- Fair training: balance_specs (geometric-mean EHPxDPS normalization) is the
+  DhEnv default; gate stays unbalanced. gloam_wisp gained mire field (every
+  mob now chains; wisp can SELF-conduct). specs.json re-dumped.
+- GRU arch (--arch gru): recurrent PPO, truncated BPTT T=256, .pt export,
+  verified. ~40x slower/step than MLP (sequential update) — batch later.
+- evolve.py: ES outer loop over PPO configs {arch, lr, entropy, selfplay_every}
+  — subprocess PPO + Godot-gate fitness, top-half + mutation. Smoke green.
+- 2v2 SQUADS (§12.43): dh-sim buddy bodies, obs v2 (36), C API + ctypes +
+  PPO flags, 11 sim-tests green incl. squad termination + ally block.
+- Engine POCs: rebirth/ UE5 scaffold committed (uprotject+Source+gen_assets);
+  rebirth-unity/ + rebirth-native/ repos created+committed; native M0 PROVEN
+  (dh-sim episode headless). Parent .gitignore covers all three.
+- Windows: dh-server.exe via portable llvm-mingw (sim/cmake/mingw-w64-x86_64.cmake).
+- 10M-step balanced cinder run in background (cinder_drake_ppo3.log).
+- NEXT: gate the balanced run; package windows zip; horde mode; graphics OM.

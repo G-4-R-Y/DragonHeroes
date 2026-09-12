@@ -11,7 +11,9 @@ const SCALES := ["integer", "fit"]
 
 static func apply_saved() -> void:
 	var d := _load()
-	apply(str(d.get("mode", "windowed")), str(d.get("scale", "integer")))
+	# default = FIT (fills the screen edge-to-edge; Ricardo: fullscreen must
+	# scale); integer stays as the crisp-pixel option in the menu
+	apply(str(d.get("mode", "windowed")), str(d.get("scale", "fit")))
 
 static func apply(mode: String, scale: String) -> void:
 	var w := (Engine.get_main_loop() as SceneTree).root.get_window()
@@ -55,7 +57,14 @@ static func _load() -> Dictionary:
 	if FileAccess.file_exists(PATH):
 		var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(PATH))
 		if parsed is Dictionary:
-			return parsed.get("display", {})
+			var d: Dictionary = parsed.get("display", {})
+			# one-time migration (v2): saves written when the default was
+			# "integer" letterboxed fullscreen on non-multiple screens
+			if not d.has("_v") and str(d.get("scale", "")) == "integer":
+				d["scale"] = "fit"
+				d["_v"] = 2
+				_save(d)
+			return d
 	return {}
 
 static func _save(display: Dictionary) -> void:

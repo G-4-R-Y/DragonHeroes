@@ -24,6 +24,9 @@ const SELFTEST_MATCHES := [
 	["core.arena.dusk_revenant", "core.arena.fen_boar_alpha", "scripted", "native"],
 	["core.arena.fen_boar_alpha", "core.arena.gloamfen_stalker", "scripted", "scripted"],
 	["core.arena.pyre_justiciar", "core.arena.fenwitch_hag", "scripted", "native"],
+	# duo: a member falls MID-FIGHT (freed body while the fighter lives on) —
+	# the crash class of 2026-09-11; keeps alive_body()/living_proxies() honest
+	["core.arena.the_duologue", "core.arena.bloodwarrant", "native", "scripted"],
 ]
 
 # Elemental fields (main.gd parity, trimmed): fire/earth fuse into LAVA here
@@ -338,6 +341,28 @@ func _physics_process(delta: float) -> void:
 	for c in get_children():
 		if c is ProtoProjectile and not c.is_in_group("arena_projectiles"):
 			c.add_to_group("arena_projectiles")
+	# storm bolt x mire field = CONDUCT (canon §12.41): the bolt detonates the
+	# field — 2x bolt damage over 1.5x radius on the field owner's enemy
+	for c in get_children():
+		if not (c is ProtoProjectile) or c.dmg_type != "storm":
+			continue
+		for fd in _fields:
+			if fd.kind != "mire":
+				continue
+			if c.global_position.distance_to(fd.pos) > fd.radius:
+				continue
+			for f in _fighters:
+				if not is_instance_valid(f) or f == fd.owner or f.is_dead():
+					continue
+				for pr in f.living_proxies():
+					if pr.global_position.distance_to(fd.pos) <= fd.radius * 1.5 \
+							+ pr.body_radius:
+						pr.take_damage(c.damage * 2.0,
+								(pr.global_position - fd.pos).normalized())
+			fx.shockwave(fd.pos, Color("7fd8ff"), fd.radius * 1.5)
+			fd.until = 0.0   # consumed
+			c.queue_free()
+			break
 	if _state == "intro":
 		_timer += delta
 		if _timer >= INTRO_S:
@@ -390,8 +415,8 @@ func _process(delta: float) -> void:
 	# inside the END pause, while the fighter still references it. Binding a
 	# freed instance to a typed var is the error, so validate BEFORE binding.
 	_hud_frames += 1
-	var a: Node2D = fa.body if is_instance_valid(fa.body) else null
-	var b: Node2D = fb.body if is_instance_valid(fb.body) else null
+	var a: Node2D = fa.alive_body() if is_instance_valid(fa.alive_body()) else null
+	var b: Node2D = fb.alive_body() if is_instance_valid(fb.alive_body()) else null
 	if a != null and b != null:
 		var mid := (a.global_position + b.global_position) * 0.5
 		_cam.global_position = _cam.global_position.lerp(mid, delta * 4.0)
@@ -503,11 +528,12 @@ func _tick_fields(delta: float) -> void:
 		for f in _fighters:
 			if not is_instance_valid(f) or f.is_dead() or f == fd.owner:
 				continue
-			if f.proxy.global_position.distance_to(fd.pos) < fd.radius + f.proxy.body_radius:
-				if fd.dps > 0.0:
-					f.proxy.dot_damage(fd.dps * 0.25, FIELD_KINDS[fd.kind].edge)
-				if fd.slow > 0.0:
-					f.proxy.apply_slow(fd.slow)
+			for pr in f.living_proxies():   # duo: each member takes its own field hit
+				if pr.global_position.distance_to(fd.pos) < fd.radius + pr.body_radius:
+					if fd.dps > 0.0:
+						pr.dot_damage(fd.dps * 0.25, FIELD_KINDS[fd.kind].edge)
+					if fd.slow > 0.0:
+						pr.apply_slow(fd.slow)
 	if dirty:
 		for fd in _fields:
 			if now > fd.until and is_instance_valid(fd.get("glow")):
@@ -567,8 +593,10 @@ func on_player_death() -> void:
 
 func _route_death(body: Node2D) -> void:
 	for f in _fighters:
-		if is_instance_valid(f) and f.body == body:
-			_end_episode(f.enemy)
+		if is_instance_valid(f) and f.owns_body(body):
+			# duo bodies die one at a time — the FIGHTER falls when both do
+			if f.is_dead():
+				_end_episode(f.enemy)
 			return
 	# a summon died: a small pop, no match impact
 	fx.impact_pop(body.global_position, Color("9a6cff"))

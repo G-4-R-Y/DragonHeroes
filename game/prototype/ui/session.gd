@@ -87,6 +87,7 @@ func setup_input() -> void:
 		"attack": [KEY_SPACE], "dodge": [KEY_SHIFT],
 		"capture": [KEY_F], "bestial": [KEY_Q], "skill2": [KEY_E],
 		"mount": [KEY_Z],   # Z: reachable without leaving WASD (was M — Ricardo)
+		"flask": [KEY_R],   # Ember Flask (heal): kill-fed charges, haven-refilled
 		"toggle_character": [KEY_C, KEY_TAB], "toggle_keybinds": [KEY_K],
 		# skill bar: 1-4 cast the assigned class-tree actives (skill_loadout)
 		"slot1": [KEY_1], "slot2": [KEY_2], "slot3": [KEY_3], "slot4": [KEY_4],

@@ -36,7 +36,7 @@ func _process(_delta: float) -> void:
 	# the menu LOOKS fine minus its last controls, so assert they are all there
 	var texts := " ".join(buttons.map(func(b: Variant) -> String: return str((b as Button).text).to_upper()))
 	var missing: PackedStringArray = []
-	for want in ["MODE", "FIT", "MUSIC", "SFX", "ENTER", "CO-OP", "LANGUAGE"]:
+	for want in ["OPTIONS", "ENTER", "CO-OP", "LANGUAGE"]:
 		if texts.find(want) < 0:
 			missing.append(want)
 	if not missing.is_empty():
@@ -45,6 +45,24 @@ func _process(_delta: float) -> void:
 		return
 	if edits.size() < 2:
 		_verdict(false, "menu has %d text fields (want name + password)" % edits.size())
+		return
+	# the OPTIONS screen opens and carries the real controls: MUSIC/SFX toggles,
+	# two volume sliders, MODE + FIT cycles, BACK (Ricardo: "the option menu
+	# with audio configs and volume")
+	_menu._open_options()
+	var sliders := _menu.find_children("*", "HSlider", true, false)
+	var opt_widgets: Array = []
+	opt_widgets.append_array(_menu.find_children("*", "Button", true, false))
+	opt_widgets.append_array(_menu.find_children("*", "Label", true, false))
+	var opt_texts := " ".join(opt_widgets.map(
+			func(w: Variant) -> String: return str(w.text).to_upper()))
+	var opt_ok := sliders.size() >= 2
+	for want2 in ["MUSIC", "EFFECTS", "ON", "MODE", "FIT", "BACK"]:
+		if opt_texts.find(want2) < 0:
+			opt_ok = false
+	if _menu._options == null or not opt_ok:
+		_verdict(false, "OPTIONS screen incomplete (sliders %d, texts %s)" % [
+				sliders.size(), opt_texts.left(80)])
 		return
 	# audio settings reach the mixer: flip SFX off, the bus must be muted; then
 	# restore the saved state (the probe runs against the real user:// file)
@@ -66,7 +84,7 @@ func _process(_delta: float) -> void:
 	if not survived:
 		_verdict(false, "the language save wiped the audio settings — settings.json writers must merge")
 		return
-	_verdict(true, "%d buttons incl. MODE/FIT/MUSIC/SFX/ENTER/CO-OP/LANGUAGE, %d fields, SFX bus mutes + restores, settings survive a language save (%s), script compiled" % [
+	_verdict(true, "%d buttons + OPTIONS screen (2 volume sliders, MUSIC/SFX/MODE/FIT/BACK), %d fields, SFX bus mutes + restores, settings survive a language save (%s), script compiled" % [
 			buttons.size(), edits.size(), OS.get_user_data_dir()])
 
 func _verdict(ok: bool, detail: String) -> void:

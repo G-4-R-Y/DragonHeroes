@@ -1,332 +1,415 @@
 {
-  "schema": "arena.registry.v1",
-  "policies": [
-    {
-      "key": "fen_boar",
-      "kind": "species",
-      "version": 1,
-      "parent": null,
-      "created": "2026-09-02T20:18:02",
-      "npz": "/home/ricz/Ricz/Projetos/IntelliGames/Dragon Heroes/ml/serving/weights/fen_boar_v1.npz",
-      "game_json": "/home/ricz/Ricz/Projetos/IntelliGames/Dragon Heroes/ml/serving/weights/fen_boar_v1.json",
-      "deployed": false,
-      "eval": {
-        "build": "core.arena.fen_boar_alpha",
-        "episodes": 2,
-        "checks": {
-          "suite_scripted": {
-            "win_rate": 0.5,
-            "fitness": 0.507,
-            "pass": true
-          },
-          "suite_scripted_sanity": {
-            "mean_loser_hp": 0.103,
-            "pass": true
-          },
-          "suite_native": {
-            "win_rate": 0.0,
-            "fitness": 0.0,
-            "pass": false
-          },
-          "suite_native_sanity": {
-            "mean_loser_hp": 1.0,
-            "pass": false
-          }
-        }
-      }
-    },
-    {
-      "key": "fen_boar",
-      "kind": "species",
-      "version": 2,
-      "parent": null,
-      "created": "2026-09-04T02:44:16",
-      "npz": "/home/ricz/Ricz/Projetos/IntelliGames/Dragon Heroes/ml/serving/weights/fen_boar_v2.npz",
-      "game_json": "/home/ricz/Ricz/Projetos/IntelliGames/Dragon Heroes/ml/serving/weights/fen_boar_v2.json",
-      "deployed": false,
-      "eval": {}
-    },
-    {
-      "key": "fen_boar",
-      "kind": "species",
-      "version": 3,
-      "parent": null,
-      "created": "2026-09-04T02:44:30",
-      "npz": "/home/ricz/Ricz/Projetos/IntelliGames/Dragon Heroes/ml/serving/weights/fen_boar_v3.npz",
-      "game_json": "/home/ricz/Ricz/Projetos/IntelliGames/Dragon Heroes/ml/serving/weights/fen_boar_v3.json",
-      "deployed": false,
-      "eval": {}
-    },
-    {
-      "key": "fen_boar_alpha",
-      "kind": "species",
-      "version": 1,
-      "parent": null,
-      "created": "2026-09-09T03:12:22",
-      "npz": "/home/ricz/Ricz/Projetos/IntelliGames/Dragon Heroes/ml/serving/weights/fen_boar_alpha_v1.npz",
-      "game_json": "/home/ricz/Ricz/Projetos/IntelliGames/Dragon Heroes/ml/serving/weights/fen_boar_alpha_v1.json",
-      "deployed": false,
-      "eval": {
-        "build": "core.arena.fen_boar_alpha",
-        "episodes": 1,
-        "checks": {
-          "suite_scripted": {
-            "win_rate": 0.0,
-            "fitness": -0.007,
-            "pass": false
-          },
-          "suite_scripted_sanity": {
-            "mean_loser_hp": 0.14,
-            "pass": true
-          },
-          "suite_native": {
-            "win_rate": 0.0,
-            "fitness": 0.0,
-            "pass": false
-          },
-          "suite_native_sanity": {
-            "mean_loser_hp": 1.0,
-            "pass": false
-          }
-        }
-      }
-    },
-    {
-      "key": "gloamfen_stalker",
-      "kind": "species",
-      "version": 1,
-      "parent": null,
-      "created": "2026-09-09T03:12:58",
-      "npz": "/home/ricz/Ricz/Projetos/IntelliGames/Dragon Heroes/ml/serving/weights/gloamfen_stalker_v1.npz",
-      "game_json": "/home/ricz/Ricz/Projetos/IntelliGames/Dragon Heroes/ml/serving/weights/gloamfen_stalker_v1.json",
-      "deployed": false,
-      "eval": {
-        "build": "core.arena.gloamfen_stalker",
-        "episodes": 1,
-        "checks": {
-          "suite_scripted": {
-            "win_rate": 0.0,
-            "fitness": -0.064,
-            "pass": false
-          },
-          "suite_scripted_sanity": {
-            "mean_loser_hp": 0.0,
-            "pass": true
-          },
-          "suite_native": {
-            "win_rate": 0.0,
-            "fitness": 0.0,
-            "pass": false
-          },
-          "suite_native_sanity": {
-            "mean_loser_hp": 1.0,
-            "pass": false
-          }
-        }
-      }
-    },
-    {
-      "key": "cinder_drake",
-      "kind": "species",
-      "version": 1,
-      "parent": null,
-      "created": "2026-09-09T03:13:27",
-      "npz": "/home/ricz/Ricz/Projetos/IntelliGames/Dragon Heroes/ml/serving/weights/cinder_drake_v1.npz",
-      "game_json": "/home/ricz/Ricz/Projetos/IntelliGames/Dragon Heroes/ml/serving/weights/cinder_drake_v1.json",
-      "deployed": false,
-      "eval": {
-        "build": "core.arena.cinder_drake",
-        "episodes": 1,
-        "checks": {
-          "suite_scripted": {
-            "win_rate": 0.0,
-            "fitness": -0.029,
-            "pass": false
-          },
-          "suite_scripted_sanity": {
-            "mean_loser_hp": 0.0,
-            "pass": true
-          },
-          "suite_native": {
-            "win_rate": 0.0,
-            "fitness": 0.0,
-            "pass": false
-          },
-          "suite_native_sanity": {
-            "mean_loser_hp": 1.0,
-            "pass": false
-          }
-        }
-      }
-    },
-    {
-      "key": "bog_golem",
-      "kind": "species",
-      "version": 1,
-      "parent": null,
-      "created": "2026-09-09T03:13:55",
-      "npz": "/home/ricz/Ricz/Projetos/IntelliGames/Dragon Heroes/ml/serving/weights/bog_golem_v1.npz",
-      "game_json": "/home/ricz/Ricz/Projetos/IntelliGames/Dragon Heroes/ml/serving/weights/bog_golem_v1.json",
-      "deployed": false,
-      "eval": {
-        "build": "core.arena.bog_golem",
-        "episodes": 1,
-        "checks": {
-          "suite_scripted": {
-            "win_rate": 0.0,
-            "fitness": -0.02,
-            "pass": false
-          },
-          "suite_scripted_sanity": {
-            "mean_loser_hp": 0.523,
-            "pass": true
-          },
-          "suite_native": {
-            "win_rate": 0.0,
-            "fitness": 0.0,
-            "pass": false
-          },
-          "suite_native_sanity": {
-            "mean_loser_hp": 1.0,
-            "pass": false
-          }
-        }
-      }
-    },
-    {
-      "key": "mire_serpent",
-      "kind": "species",
-      "version": 1,
-      "parent": null,
-      "created": "2026-09-09T03:14:31",
-      "npz": "/home/ricz/Ricz/Projetos/IntelliGames/Dragon Heroes/ml/serving/weights/mire_serpent_v1.npz",
-      "game_json": "/home/ricz/Ricz/Projetos/IntelliGames/Dragon Heroes/ml/serving/weights/mire_serpent_v1.json",
-      "deployed": false,
-      "eval": {
-        "build": "core.arena.mire_serpent",
-        "episodes": 1,
-        "checks": {
-          "suite_scripted": {
-            "win_rate": 0.0,
-            "fitness": -0.053,
-            "pass": false
-          },
-          "suite_scripted_sanity": {
-            "mean_loser_hp": 0.0,
-            "pass": true
-          },
-          "suite_native": {
-            "win_rate": 0.0,
-            "fitness": 0.0,
-            "pass": false
-          },
-          "suite_native_sanity": {
-            "mean_loser_hp": 1.0,
-            "pass": false
-          }
-        }
-      }
-    },
-    {
-      "key": "grave_shade",
-      "kind": "species",
-      "version": 1,
-      "parent": null,
-      "created": "2026-09-09T03:14:59",
-      "npz": "/home/ricz/Ricz/Projetos/IntelliGames/Dragon Heroes/ml/serving/weights/grave_shade_v1.npz",
-      "game_json": "/home/ricz/Ricz/Projetos/IntelliGames/Dragon Heroes/ml/serving/weights/grave_shade_v1.json",
-      "deployed": false,
-      "eval": {
-        "build": "core.arena.grave_shade",
-        "episodes": 1,
-        "checks": {
-          "suite_scripted": {
-            "win_rate": 0.0,
-            "fitness": -0.07,
-            "pass": false
-          },
-          "suite_scripted_sanity": {
-            "mean_loser_hp": 0.0,
-            "pass": true
-          },
-          "suite_native": {
-            "win_rate": 0.0,
-            "fitness": 0.0,
-            "pass": false
-          },
-          "suite_native_sanity": {
-            "mean_loser_hp": 1.0,
-            "pass": false
-          }
-        }
-      }
-    },
-    {
-      "key": "gloam_wisp",
-      "kind": "species",
-      "version": 1,
-      "parent": null,
-      "created": "2026-09-09T03:15:29",
-      "npz": "/home/ricz/Ricz/Projetos/IntelliGames/Dragon Heroes/ml/serving/weights/gloam_wisp_v1.npz",
-      "game_json": "/home/ricz/Ricz/Projetos/IntelliGames/Dragon Heroes/ml/serving/weights/gloam_wisp_v1.json",
-      "deployed": false,
-      "eval": {
-        "build": "core.arena.gloam_wisp",
-        "episodes": 1,
-        "checks": {
-          "suite_scripted": {
-            "win_rate": 0.0,
-            "fitness": -0.057,
-            "pass": false
-          },
-          "suite_scripted_sanity": {
-            "mean_loser_hp": 0.0,
-            "pass": true
-          },
-          "suite_native": {
-            "win_rate": 0.0,
-            "fitness": 0.0,
-            "pass": false
-          },
-          "suite_native_sanity": {
-            "mean_loser_hp": 1.0,
-            "pass": false
-          }
-        }
-      }
-    },
-    {
-      "key": "fen_boar",
-      "kind": "species",
-      "version": 4,
-      "parent": null,
-      "created": "2026-09-11T01:29:39",
-      "npz": "/home/ricz/Ricz/Projetos/IntelliGames/Dragon Heroes/ml/serving/weights/fen_boar_v4.npz",
-      "game_json": "/home/ricz/Ricz/Projetos/IntelliGames/Dragon Heroes/ml/serving/weights/fen_boar_v4.json",
-      "deployed": false,
-      "eval": {}
-    },
-    {
-      "key": "fen_boar",
-      "kind": "species",
-      "version": 5,
-      "parent": null,
-      "created": "2026-09-11T01:34:17",
-      "npz": "/home/ricz/Ricz/Projetos/IntelliGames/Dragon Heroes/ml/serving/weights/fen_boar_v5.npz",
-      "game_json": "/home/ricz/Ricz/Projetos/IntelliGames/Dragon Heroes/ml/serving/weights/fen_boar_v5.json",
-      "deployed": false,
-      "eval": {}
-    },
-    {
-      "key": "fen_boar",
-      "kind": "species",
-      "version": 6,
-      "parent": null,
-      "created": "2026-09-11T01:46:22",
-      "npz": "/home/ricz/Ricz/Projetos/IntelliGames/Dragon Heroes/ml/serving/weights/fen_boar_v6.npz",
-      "game_json": "/home/ricz/Ricz/Projetos/IntelliGames/Dragon Heroes/ml/serving/weights/fen_boar_v6.json",
-      "deployed": false,
-      "eval": {}
+ "schema": "arena.registry.v1",
+ "policies": [
+  {
+   "key": "fen_boar",
+   "kind": "species",
+   "version": 1,
+   "parent": null,
+   "created": "2026-09-02T20:18:02",
+   "npz": "/home/ricz/Ricz/Projetos/IntelliGames/Dragon Heroes/ml/serving/weights/fen_boar_v1.npz",
+   "game_json": "/home/ricz/Ricz/Projetos/IntelliGames/Dragon Heroes/ml/serving/weights/fen_boar_v1.json",
+   "deployed": false,
+   "eval": {
+    "build": "core.arena.fen_boar_alpha",
+    "episodes": 2,
+    "checks": {
+     "suite_scripted": {
+      "win_rate": 0.5,
+      "fitness": 0.507,
+      "pass": true
+     },
+     "suite_scripted_sanity": {
+      "mean_loser_hp": 0.103,
+      "pass": true
+     },
+     "suite_native": {
+      "win_rate": 0.0,
+      "fitness": 0.0,
+      "pass": false
+     },
+     "suite_native_sanity": {
+      "mean_loser_hp": 1.0,
+      "pass": false
+     }
     }
-  ]
+   }
+  },
+  {
+   "key": "fen_boar",
+   "kind": "species",
+   "version": 2,
+   "parent": null,
+   "created": "2026-09-04T02:44:16",
+   "npz": "/home/ricz/Ricz/Projetos/IntelliGames/Dragon Heroes/ml/serving/weights/fen_boar_v2.npz",
+   "game_json": "/home/ricz/Ricz/Projetos/IntelliGames/Dragon Heroes/ml/serving/weights/fen_boar_v2.json",
+   "deployed": false,
+   "eval": {}
+  },
+  {
+   "key": "fen_boar",
+   "kind": "species",
+   "version": 3,
+   "parent": null,
+   "created": "2026-09-04T02:44:30",
+   "npz": "/home/ricz/Ricz/Projetos/IntelliGames/Dragon Heroes/ml/serving/weights/fen_boar_v3.npz",
+   "game_json": "/home/ricz/Ricz/Projetos/IntelliGames/Dragon Heroes/ml/serving/weights/fen_boar_v3.json",
+   "deployed": false,
+   "eval": {}
+  },
+  {
+   "key": "fen_boar_alpha",
+   "kind": "species",
+   "version": 1,
+   "parent": null,
+   "created": "2026-09-09T03:12:22",
+   "npz": "/home/ricz/Ricz/Projetos/IntelliGames/Dragon Heroes/ml/serving/weights/fen_boar_alpha_v1.npz",
+   "game_json": "/home/ricz/Ricz/Projetos/IntelliGames/Dragon Heroes/ml/serving/weights/fen_boar_alpha_v1.json",
+   "deployed": false,
+   "eval": {
+    "build": "core.arena.fen_boar_alpha",
+    "episodes": 1,
+    "checks": {
+     "suite_scripted": {
+      "win_rate": 0.0,
+      "fitness": -0.007,
+      "pass": false
+     },
+     "suite_scripted_sanity": {
+      "mean_loser_hp": 0.14,
+      "pass": true
+     },
+     "suite_native": {
+      "win_rate": 0.0,
+      "fitness": 0.0,
+      "pass": false
+     },
+     "suite_native_sanity": {
+      "mean_loser_hp": 1.0,
+      "pass": false
+     }
+    }
+   }
+  },
+  {
+   "key": "gloamfen_stalker",
+   "kind": "species",
+   "version": 1,
+   "parent": null,
+   "created": "2026-09-09T03:12:58",
+   "npz": "/home/ricz/Ricz/Projetos/IntelliGames/Dragon Heroes/ml/serving/weights/gloamfen_stalker_v1.npz",
+   "game_json": "/home/ricz/Ricz/Projetos/IntelliGames/Dragon Heroes/ml/serving/weights/gloamfen_stalker_v1.json",
+   "deployed": false,
+   "eval": {
+    "build": "core.arena.gloamfen_stalker",
+    "episodes": 1,
+    "checks": {
+     "suite_scripted": {
+      "win_rate": 0.0,
+      "fitness": -0.064,
+      "pass": false
+     },
+     "suite_scripted_sanity": {
+      "mean_loser_hp": 0.0,
+      "pass": true
+     },
+     "suite_native": {
+      "win_rate": 0.0,
+      "fitness": 0.0,
+      "pass": false
+     },
+     "suite_native_sanity": {
+      "mean_loser_hp": 1.0,
+      "pass": false
+     }
+    }
+   }
+  },
+  {
+   "key": "cinder_drake",
+   "kind": "species",
+   "version": 1,
+   "parent": null,
+   "created": "2026-09-09T03:13:27",
+   "npz": "/home/ricz/Ricz/Projetos/IntelliGames/Dragon Heroes/ml/serving/weights/cinder_drake_v1.npz",
+   "game_json": "/home/ricz/Ricz/Projetos/IntelliGames/Dragon Heroes/ml/serving/weights/cinder_drake_v1.json",
+   "deployed": false,
+   "eval": {
+    "build": "core.arena.cinder_drake",
+    "episodes": 1,
+    "checks": {
+     "suite_scripted": {
+      "win_rate": 0.0,
+      "fitness": -0.029,
+      "pass": false
+     },
+     "suite_scripted_sanity": {
+      "mean_loser_hp": 0.0,
+      "pass": true
+     },
+     "suite_native": {
+      "win_rate": 0.0,
+      "fitness": 0.0,
+      "pass": false
+     },
+     "suite_native_sanity": {
+      "mean_loser_hp": 1.0,
+      "pass": false
+     }
+    }
+   }
+  },
+  {
+   "key": "bog_golem",
+   "kind": "species",
+   "version": 1,
+   "parent": null,
+   "created": "2026-09-09T03:13:55",
+   "npz": "/home/ricz/Ricz/Projetos/IntelliGames/Dragon Heroes/ml/serving/weights/bog_golem_v1.npz",
+   "game_json": "/home/ricz/Ricz/Projetos/IntelliGames/Dragon Heroes/ml/serving/weights/bog_golem_v1.json",
+   "deployed": false,
+   "eval": {
+    "build": "core.arena.bog_golem",
+    "episodes": 1,
+    "checks": {
+     "suite_scripted": {
+      "win_rate": 0.0,
+      "fitness": -0.02,
+      "pass": false
+     },
+     "suite_scripted_sanity": {
+      "mean_loser_hp": 0.523,
+      "pass": true
+     },
+     "suite_native": {
+      "win_rate": 0.0,
+      "fitness": 0.0,
+      "pass": false
+     },
+     "suite_native_sanity": {
+      "mean_loser_hp": 1.0,
+      "pass": false
+     }
+    }
+   }
+  },
+  {
+   "key": "mire_serpent",
+   "kind": "species",
+   "version": 1,
+   "parent": null,
+   "created": "2026-09-09T03:14:31",
+   "npz": "/home/ricz/Ricz/Projetos/IntelliGames/Dragon Heroes/ml/serving/weights/mire_serpent_v1.npz",
+   "game_json": "/home/ricz/Ricz/Projetos/IntelliGames/Dragon Heroes/ml/serving/weights/mire_serpent_v1.json",
+   "deployed": false,
+   "eval": {
+    "build": "core.arena.mire_serpent",
+    "episodes": 1,
+    "checks": {
+     "suite_scripted": {
+      "win_rate": 0.0,
+      "fitness": -0.053,
+      "pass": false
+     },
+     "suite_scripted_sanity": {
+      "mean_loser_hp": 0.0,
+      "pass": true
+     },
+     "suite_native": {
+      "win_rate": 0.0,
+      "fitness": 0.0,
+      "pass": false
+     },
+     "suite_native_sanity": {
+      "mean_loser_hp": 1.0,
+      "pass": false
+     }
+    }
+   }
+  },
+  {
+   "key": "grave_shade",
+   "kind": "species",
+   "version": 1,
+   "parent": null,
+   "created": "2026-09-09T03:14:59",
+   "npz": "/home/ricz/Ricz/Projetos/IntelliGames/Dragon Heroes/ml/serving/weights/grave_shade_v1.npz",
+   "game_json": "/home/ricz/Ricz/Projetos/IntelliGames/Dragon Heroes/ml/serving/weights/grave_shade_v1.json",
+   "deployed": false,
+   "eval": {
+    "build": "core.arena.grave_shade",
+    "episodes": 1,
+    "checks": {
+     "suite_scripted": {
+      "win_rate": 0.0,
+      "fitness": -0.07,
+      "pass": false
+     },
+     "suite_scripted_sanity": {
+      "mean_loser_hp": 0.0,
+      "pass": true
+     },
+     "suite_native": {
+      "win_rate": 0.0,
+      "fitness": 0.0,
+      "pass": false
+     },
+     "suite_native_sanity": {
+      "mean_loser_hp": 1.0,
+      "pass": false
+     }
+    }
+   }
+  },
+  {
+   "key": "gloam_wisp",
+   "kind": "species",
+   "version": 1,
+   "parent": null,
+   "created": "2026-09-09T03:15:29",
+   "npz": "/home/ricz/Ricz/Projetos/IntelliGames/Dragon Heroes/ml/serving/weights/gloam_wisp_v1.npz",
+   "game_json": "/home/ricz/Ricz/Projetos/IntelliGames/Dragon Heroes/ml/serving/weights/gloam_wisp_v1.json",
+   "deployed": false,
+   "eval": {
+    "build": "core.arena.gloam_wisp",
+    "episodes": 1,
+    "checks": {
+     "suite_scripted": {
+      "win_rate": 0.0,
+      "fitness": -0.057,
+      "pass": false
+     },
+     "suite_scripted_sanity": {
+      "mean_loser_hp": 0.0,
+      "pass": true
+     },
+     "suite_native": {
+      "win_rate": 0.0,
+      "fitness": 0.0,
+      "pass": false
+     },
+     "suite_native_sanity": {
+      "mean_loser_hp": 1.0,
+      "pass": false
+     }
+    }
+   }
+  },
+  {
+   "key": "fen_boar",
+   "kind": "species",
+   "version": 4,
+   "parent": null,
+   "created": "2026-09-11T01:29:39",
+   "npz": "/home/ricz/Ricz/Projetos/IntelliGames/Dragon Heroes/ml/serving/weights/fen_boar_v4.npz",
+   "game_json": "/home/ricz/Ricz/Projetos/IntelliGames/Dragon Heroes/ml/serving/weights/fen_boar_v4.json",
+   "deployed": false,
+   "eval": {}
+  },
+  {
+   "key": "fen_boar",
+   "kind": "species",
+   "version": 5,
+   "parent": null,
+   "created": "2026-09-11T01:34:17",
+   "npz": "/home/ricz/Ricz/Projetos/IntelliGames/Dragon Heroes/ml/serving/weights/fen_boar_v5.npz",
+   "game_json": "/home/ricz/Ricz/Projetos/IntelliGames/Dragon Heroes/ml/serving/weights/fen_boar_v5.json",
+   "deployed": false,
+   "eval": {}
+  },
+  {
+   "key": "fen_boar",
+   "kind": "species",
+   "version": 6,
+   "parent": null,
+   "created": "2026-09-11T01:46:22",
+   "npz": "/home/ricz/Ricz/Projetos/IntelliGames/Dragon Heroes/ml/serving/weights/fen_boar_v6.npz",
+   "game_json": "/home/ricz/Ricz/Projetos/IntelliGames/Dragon Heroes/ml/serving/weights/fen_boar_v6.json",
+   "deployed": false,
+   "eval": {}
+  },
+  {
+   "key": "cinder_drake",
+   "kind": "species",
+   "version": 2,
+   "parent": null,
+   "created": "2026-09-11T04:44:48",
+   "npz": null,
+   "game_json": "/home/ricz/Ricz/Projetos/IntelliGames/Dragon Heroes/ml/serving/weights/cinder_drake_ppo_v2.json",
+   "deployed": false,
+   "eval": {
+    "build": "core.arena.cinder_drake",
+    "trainer": "ppo",
+    "steps": 5013504,
+    "selfplay": true
+   }
+  },
+  {
+   "key": "cinder_drake",
+   "kind": "species",
+   "version": 3,
+   "parent": null,
+   "created": "2026-09-11T04:49:08",
+   "npz": null,
+   "game_json": "/home/ricz/Ricz/Projetos/IntelliGames/Dragon Heroes/ml/serving/weights/cinder_drake_ppo_v3.json",
+   "deployed": false,
+   "eval": {
+    "build": "core.arena.cinder_drake",
+    "trainer": "ppo",
+    "steps": 122880,
+    "selfplay": true
+   }
+  },
+  {
+   "key": "cinder_drake",
+   "kind": "species",
+   "version": 4,
+   "parent": "ml/serving/weights/cinder_drake_ppo_v2.json",
+   "created": "2026-09-11T05:06:22",
+   "npz": null,
+   "game_json": "/home/ricz/Ricz/Projetos/IntelliGames/Dragon Heroes/ml/serving/weights/cinder_drake_ppo_v4.json",
+   "deployed": false,
+   "eval": {
+    "build": "core.arena.cinder_drake",
+    "episodes": 4,
+    "checks": {
+     "suite_scripted": {
+      "win_rate": 0.0,
+      "fitness": -0.09,
+      "pass": false
+     },
+     "suite_scripted_sanity": {
+      "mean_loser_hp": 0.0,
+      "pass": true
+     },
+     "suite_native": {
+      "win_rate": 0.5,
+      "fitness": 0.5,
+      "pass": true
+     },
+     "suite_native_sanity": {
+      "mean_loser_hp": 0.0,
+      "pass": true
+     }
+    }
+   }
+  },
+  {
+   "key": "cinder_drake",
+   "kind": "species",
+   "version": 5,
+   "parent": "ml/serving/weights/cinder_drake_ppo_v4.json",
+   "created": "2026-09-11T08:23:37",
+   "npz": null,
+   "game_json": "/home/ricz/Ricz/Projetos/IntelliGames/Dragon Heroes/ml/serving/weights/cinder_drake_ppo_v5.json",
+   "deployed": false,
+   "eval": {
+    "build": "core.arena.cinder_drake",
+    "trainer": "ppo",
+    "arch": "mlp",
+    "steps": 10014720,
+    "selfplay": true
+   }
+  }
+ ]
 }

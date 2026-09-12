@@ -51,6 +51,18 @@ const S := {
 			"pt": "caçadores salvos: %s — digite um nome para continuar"},
 	"menu_foot": {"en": "offline prototype login — real auth arrives with Nakama (docs/tech/26)",
 			"pt": "login offline do protótipo — a autenticação real chega com o Nakama (docs/tech/26)"},
+	"menu_options": {"en": "OPTIONS", "pt": "OPÇÕES"},
+	"opt_music": {"en": "Music", "pt": "Música"},
+	"opt_sfx": {"en": "Effects", "pt": "Efeitos"},
+	"opt_mode": {"en": "Mode", "pt": "Modo"},
+	"opt_fit": {"en": "Fit", "pt": "Escala"},
+	"opt_back": {"en": "BACK", "pt": "VOLTAR"},
+	"msg_flask_sip": {"en": "the Ember Flask burns bright",
+			"pt": "o Frasco de Brasas arde forte"},
+	"msg_flask_empty": {"en": "the flask is empty — 6 kills rekindle a charge",
+			"pt": "o frasco está vazio — 6 abates reacendem uma carga"},
+	"msg_flask_charge": {"en": "an ember charge rekindles",
+			"pt": "uma carga de brasa se reacende"},
 
 	# ---- Haven: chrome -------------------------------------------------------------
 	"hv_welcome_title": {"en": "Haven — welcome, %s", "pt": "Refúgio — bem-vindo, %s"},

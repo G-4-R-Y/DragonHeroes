@@ -18,8 +18,9 @@ add_subdirectory(libs/dh-sim)
 add_subdirectory(libs/dh-procgen)
 add_subdirectory(libs/dh-net)
 add_subdirectory(libs/dh-server)
-# dh-godot (godot-cpp GDExtension) and dh-env (C API + nanobind) join the build once
-# their third-party dependencies are vendored — see the READMEs in those directories.
+add_subdirectory(libs/dh-env)   # C API over dh-sim's arena (ctypes today, nanobind later)
+# dh-godot (godot-cpp GDExtension) joins the build once its third-party
+# dependency is vendored — see the README in that directory.
 
 enable_testing()
 add_subdirectory(tests)

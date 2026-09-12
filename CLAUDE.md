@@ -45,6 +45,11 @@ background agents/workflows unless Ricardo asks for them in the moment: two
 workflows exhausted the session quota on 2026-09-11 and their work was lost
 mid-flight (canon §12.39). Work inline; keep context lean with `/compact`.
 
+**The roadmap rule (2026-09-12):** `docs/harness/20-roadmap.md` is the single
+demand ledger. Add EVERY new demand to it the moment it arrives; work it item
+by item; at interruptions, append the new demands/details plus the current
+strategy/plan state BEFORE continuing. Nothing asked is ever forgotten.
+
 ## Layout
 
 Monorepo layout and coupling rules: canon §10. Document set index: `docs/README.md`.

@@ -261,6 +261,13 @@ func _unhandled_input(event: InputEvent) -> void:
 		_try_capture()
 	elif event.is_action_pressed("mount"):
 		player.toggle_mount()
+	elif event.is_action_pressed("flask"):
+		if player.drink_flask():
+			play_ui("victory", -14.0)
+			fx.aura(player, Color("7ce7a2"), {"dur": 0.6})
+			_hud.hint.text = ProtoLang.t("msg_flask_sip")
+		elif player.flask_charges <= 0:
+			_hud.hint.text = ProtoLang.t("msg_flask_empty")
 	elif event.is_action_pressed("toggle_keybinds"):
 		_kb_overlay.visible = not _kb_overlay.visible
 	elif event.is_action_pressed("ui_cancel"):
@@ -895,6 +902,7 @@ func _sync_session() -> void:
 
 func _return_to_haven() -> void:
 	Engine.time_scale = 1.0   # in case a hitstop was in flight
+	player.refill_flask()   # the haven rekindles the Ember Flask
 	_sync_session()
 	get_tree().change_scene_to_file(HAVEN_SCENE)
 
@@ -962,6 +970,7 @@ func on_creature_died(c: ProtoCreature) -> void:
 		_drop_item(ProtoItems.make_essence(), c.global_position + Vector2(-14, -4))
 	if c.elite:
 		_maybe_drop_rune(c.global_position + Vector2(0, -14))
+	_feed_flask()
 	_grant_level_ups()
 	_sync_session()
 	refresh_hud()
@@ -1117,6 +1126,14 @@ func _level_progress(k: int) -> float:
 			return float(k - prev) / float(need - prev)
 		lvl += 1
 	return 1.0
+
+
+# Every death handler routes through _grant_level_ups — the flask feeds here:
+# 6 kills rekindle one Ember charge (player.note_kill), with feedback.
+func _feed_flask() -> void:
+	if player != null and is_instance_valid(player) and player.note_kill():
+		_hud.hint.text = ProtoLang.t("msg_flask_charge")
+		fx.aura(player, Color("7ce7a2"), {"dur": 0.5})
 
 func _grant_level_ups() -> void:
 	var new_level := _level_for_kills(kills)
@@ -1408,11 +1425,21 @@ func _build_hud() -> void:
 	boss_bar2.position = Vector2(2, 2)
 	boss_bar2.size = Vector2(300, 5)
 	boss_bar_bg2.add_child(boss_bar2)
+	# Ember Flask charges (R) — ember pips beside the dodge pips
+	var flask_pips: Array = []
+	for i in ProtoPlayer.FLASK_MAX:
+		var fp := ColorRect.new()
+		fp.color = Color("ff9a3c")
+		fp.position = Vector2(12 + i * 14, 22)
+		fp.size = Vector2(10, 4)
+		canvas.add_child(fp)
+		flask_pips.append(fp)
 	_hud = {"hp_bar": hp_bar, "stats": stats, "hint": hint, "pips": pips,
 			"q_label": q_label, "q_bar": q_bar, "xp_bar": xp_bar,
 			"e_bar": e_bar, "pet_chips": pet_chips, "slots": slots, "charge": charge,
 			"boss_bar_bg": boss_bar_bg, "boss_bar": boss_bar, "boss_name": boss_name,
-			"boss_bar_bg2": boss_bar_bg2, "boss_bar2": boss_bar2}
+			"boss_bar_bg2": boss_bar_bg2, "boss_bar2": boss_bar2,
+			"flask_pips": flask_pips}
 
 # Nearest engaged boss owns the bar; if it is half of a living duo, both bosses
 # render as stacked thin bars under a combined label (task: keep it clean).
@@ -1505,6 +1532,19 @@ func _update_gauges(delta: float) -> void:
 		else:
 			pip.size.x = 10.0
 			pip.color = PIP_OFF
+	# Ember Flask pips: full = ember, next = kill-counter fill, spent = dim
+	for i in _hud.flask_pips.size():
+		var fp: ColorRect = _hud.flask_pips[i]
+		if i < player.flask_charges:
+			fp.size.x = 10.0
+			fp.color = Color("ff9a3c")
+		elif i == player.flask_charges:
+			fp.size.x = maxf(10.0 * player.flask_kills
+					/ ProtoPlayer.FLASK_KILLS_PER_CHARGE, 1.0)
+			fp.color = Color("ff9a3c").darkened(0.35)
+		else:
+			fp.size.x = 10.0
+			fp.color = Color("ff9a3c").darkened(0.7)
 	_update_skill_slots(pulse)
 	# Whirlwind (E): always owned — fill + soft glow when ready
 	var ep: float = player.whirl_progress()

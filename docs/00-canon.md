@@ -893,3 +893,78 @@ Still open:
    above FIT/MODE. Rule: any future music plays on the Music bus, any effect
    on SFX — never on Master — so the switches keep working without
    retrofits. The MENU OK gate proves the mute reaches the mixer.
+
+42. **Fair training + architecture diversity + the outer loop (2026-09-11,
+   Ricardo: "did you alter normal creatures so every single one has skills to
+   chain and combo... do we balance stats to train in the arena? otherwise is
+   unfair").** (a) ARENA TRAINING IS STAT-NORMALIZED: dh_env.balance_specs
+   scales both fighters to the geometric-mean EHPxDPS budget (sqrt on hp and
+   damage each), so kits and mechanics — not raw stats — decide training
+   fights; mirror matchups untouched; the Godot eval GATE stays unbalanced on
+   purpose (deployment reality). The pre-balance gap was real: fen_boar 340
+   hp/26 dmg vs cinder_drake 87/9.6 — a useless training matchup. (b) EVERY
+   creature now chains: gloam_wisp gained field_cast mire — and because
+   CONDUCT detonates ANY mire field, the wisp can SELF-COMBO (mire the foe,
+   storm-volley the mire, 2x burst). Roster kits: boar pounce+enrage, stalker
+   pounce+enrage, drake volley+fire field, golem slam+mire, serpent venom
+   volley+mire, shade umbral volley+pounce, wisp storm volley+mire. (c)
+   ARCHITECTURES: TorchGRUPolicyNet (obs+emb -> GRUCell 64 -> same heads) is
+   the second architecture; PPO threads hidden state with truncated BPTT
+   (horizon 256 — sequential update is ~40x slower wall-time than MLP; batch
+   it later). GRU has no Godot export (the runtime is stateless MLP) — it
+   gates via dh-env eval until the Godot neural policy grows recurrence.
+   (d) ES IS NOW THE OUTER SELECTOR TOO: ml/training/evolve.py evolves PPO
+   CONFIGS {arch, lr, entropy, selfplay_every} — subprocess PPO per
+   candidate, Godot gate as MLP fitness, dh-env win-rate as GRU proxy,
+   top-half survives + mutates. (e) Engine POCs finished as three sibling
+   repos (git-ignored by the parent): rebirth/ (UE5 scaffold + gen_assets.py
+   GenForge feed — committed), rebirth-unity/ (HDRP plan + vertical-slice
+   boar stub; C# quarantined there, canon ban intact), rebirth-native/ (M0
+   PROVEN: links dh-sim and runs a full arena episode headless — the
+   §10 engine-agnostic bet, demonstrated). Same vertical slice + scorecard
+   across all three; no UE/Unity on the dev box — spikes run when hardware
+   lands.
+
+43. **Group dynamics: 2v2 squad mode (2026-09-11, Ricardo: "perhaps working
+   in groups? horde mob training vs player?... a fire and ice wolf duo... an
+   electric enemy AOE through a pool of water created by an allied
+   complementary creature").** dh-sim squads landed: each fighter can field a
+   second, autonomous melee BODY (game/arena duo semantics — one fighter, two
+   bodies, shared fate, nearest-body targeting for every policy/kit/
+   projectile/field). obs schema arena.obs.v2 = v1 + ally block [31..35]
+   (buddy hp / rel pos / dist / windup); v1 (31) unchanged for 1v1 — the
+   Godot gate keeps consuming v1. C API dh_env_create_squad; ctypes DhEnv
+   squad=(a_buddy, b_buddy); PPO --squad-a-buddy/--squad-b-buddy (36-input
+   nets, .pt export until Godot grows obs v2; self-play snapshots are
+   v1-only so squads train vs native+scripted). CONDUCT now pays off as the
+   ALLY combo it was designed for: ally mire + your storm volley = 2x burst
+   on the shared enemy. Horde-vs-player and >2 bodies: same pattern, later;
+   squad PPO smoke verified end-to-end (boar pack vs serpent+golem).
+
+44. **Rebirth engine experiments EXECUTED, one slice × three engines
+   (2026-09-11/12, Ricardo: "Unreal engine, godot 3d and the rest of
+   suggested themes. Execute what is documented in the rebirth folder! For
+   each engine experiment, create a new folder inside rebirth, containing the
+   whole thing (3d assets and pipelines may be outside, as to be
+   reusable)").** Status of record: rebirth/docs/02-status.md. (a)
+   `rebirth/godot3d/` RUNS + GATED (`REBIRTH3D OK`, headless autopilot,
+   outcome assertions: 5 distinct dragon skills, enrage, i-frame avoid,
+   combo ≥ 3, kill → drop toast → rematch, fx pool overflow 0, no node
+   growth) + 3 captures; gl_compatibility from the agent shell — the Forward+
+   flip is Ricardo's. (b) `rebirth/native/` (C++20, own 30 Hz deterministic
+   sim + GL 3.3) BUILDS -Werror + GATED (`REBIRTH-NATIVE OK`, determinism
+   hash, ctest) + 2 captures; 9.5–10 ms/frame on the Intel fallback. (c)
+   `rebirth/unreal/` (UE 5.4 C++, the plan's PICK) is CODE COMPLETE and
+   UNCOMPILED — no engine on the box, Epic account needed; INSTALL runbook
+   written. (d) `rebirth/unity-hdrp/` parked by decision (C# directive, no
+   ceiling win). (e) ONE combat table drives all three (five skills, enrage →
+   retreat leap → meteors → pounce, hunter dodge i-frames 0.28 s + buffer
+   0.15 s + 3-hit combo, pet HOWL) — the seam dh-sim later fills (§10). (f)
+   Shared, engine-neutral asset staging `rebirth/assets/tools/` (GenForge →
+   GLB → runtime Godot / `.dhm` native / UE manifest with provenance); real
+   meshes wait on valid concept renders like §12.38's spike. (g) COLLISION
+   with the parallel session's layout (§12.42(e), second "42" — that entry
+   and §43 should renumber to 43/44 when its canon edits land): root-level UE
+   trio in rebirth/ + siblings rebirth-native/ (links dh-sim, the §10 proof)
+   and rebirth-unity/. Nothing removed; Ricardo picks the layout. 2D stays
+   canon; Rebirth remains a research spike (§12.27).

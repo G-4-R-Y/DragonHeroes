@@ -15,12 +15,12 @@ func policy_id() -> String:
 
 func _act(delta: float) -> void:
 	var obs := delayed_obs()
-	if obs.is_empty() or not is_instance_valid(fighter.body):
+	if obs.is_empty() or not is_instance_valid(fighter.alive_body()):
 		return
 	var my_pos := Vector2(obs[1], obs[2]) * 512.0
 	var foe_pos := my_pos + Vector2(obs[16], obs[17]) * 512.0
 	var dist := float(obs[18]) * 512.0
-	var to_foe: Vector2 = (foe_pos - fighter.body.global_position).normalized()
+	var to_foe: Vector2 = (foe_pos - fighter.alive_body().global_position).normalized()
 	var foe_windup: bool = obs[22] > 0.5
 	var my_hp := float(obs[0])
 	_strafe_t -= delta

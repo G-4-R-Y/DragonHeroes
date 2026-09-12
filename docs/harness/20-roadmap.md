@@ -93,3 +93,56 @@ through walls, Spirit Essence stack pickup, hitstop scene-time, HUD buff
 icons, pet HP chips, DoT number aggregation, sell confirmation, panel pause,
 boss bar persistence, telegraph shapes, respawn-near-fight, first-time toasts,
 mount dismount lockout, HUD stats → icon chips, skill-bar label clipping.
+
+## Demand ledger (2026-09-12 — the roadmap rule, AGENTS.md/CLAUDE.md)
+
+Every new ask lands here the moment it arrives; work oldest NOW first.
+
+### NOW (in flight)
+1. **Ember Flask heal** (design/11 "dodge, heal, or reverse"; Ricardo: "we
+   need a healing mechanism") — player.gd DONE (R key, 2 charges, 40% HoT/2s,
+   0.8s drink slow, 6 kills rekindle, refill fn). TODO: main.gd input +
+   note_kill in the 5 death handlers + haven/respawn refill + HUD pips +
+   lang keys + gate + package.
+2. **Hordes don't keep spawning + always the same mobs** (tech/29 §3;
+   Ricardo 2026-09-12). Diagnosis: origin packs spawn once, frontier chunks
+   roll once (`_visited_chunks`), nothing replaces despawned/killed packs;
+   packs are mono-species from a small ground roster. Plan: (a) timed
+   repopulation — every ~20 s, if living creatures near player < floor,
+   spawn 1-2 packs off-screen (ring 30-45 tiles), entity-capped; (b) pack
+   variety — members mix 2-3 species (affinity + strays), frontier too.
+3. **Skills-screen text clutter/capping** (design/polish; Ricardo) — the
+   character panel pins a FIXED 92px detail card; text clipped/capped.
+   Investigate autowrap/min-size; declutter panels (OPTIONS screen was step 1).
+3. **Skills-screen text clutter/capping** (design/polish; Ricardo) — the
+   character panel pins a FIXED 92px detail card; text clipped/capped.
+   Investigate autowrap/min-size; declutter panels (OPTIONS screen was step 1).
+3b. **ESC→YES return-to-hub broken** (CRITICAL, Ricardo 2026-09-12: clicking
+   yes plays the animation but nothing happens) — investigate _return_to_haven
+   / _confirm flow; possibly linked to the memory blow-up freezing transition.
+3c. **Infinite-map memory growth** (Ricardo: generation "exploding memory") —
+   profile what accumulates per chunk (streamer unload? minimap/SDF caches?
+   entity leaks); canon directive 2 budgets apply to RAM too.
+3d. **Arena console discoverability + launcher** (Ricardo: "where are the
+   commands... perhaps a launcher") — command is `godot --path game
+   res://arena/console.tscn`; add a launcher (tools/ + maybe menu entry).
+4. **Slow opening minutes** (game feel; Ricardo) — first fight/first level
+   pacing; make the first minutes rewarding (links to #1 heal + #2 density).
+5. **Performance regression check** (Ricardo: "game seems a bit more laggy") —
+   profile frame time vs the 60 FPS budget (canon directive 2); suspects:
+   recent FX/HUD additions, audio warm, display fit.
+
+### NEXT (queued, decided)
+6. **Bond works with ALL creatures** (design/13 §7.1; Ricardo: creatures are
+   core to builds) — capture/bond currently limited; extend to every species.
+7. **Every creature ≥3 skills with combos** (design/13; Ricardo: "not boring
+   attacks") — game-side kits (arena has 2/species + conduct); synergy pairs.
+8. **Difficulty/reward curve** (Ricardo: "1-hit KO late or ultra-mogged early")
+   — after #1/#2: revisit scaling so strategy decides, not stats.
+9. **Graphics OM** (design/24): elemental VFX lab pack + Radiance Cascades lab.
+10. **macOS package** — needs a Mac/CI runner (preset ready).
+
+### ON RICARDO
+- **UE 5.4 install** (~45 GB + Epic account) → `rebirth/unreal/INSTALL.md`.
+- **`sudo apt install python3.10-venv`** (workaround active).
+- **Play the slices for feel** — gates prove loops, not fun.

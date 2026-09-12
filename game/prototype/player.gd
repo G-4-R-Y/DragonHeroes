@@ -41,6 +41,17 @@ var status_resist_pct := 0.0
 var attack_speed_mult := 1.0     # Reaver tree (cleave_rampage)
 var leech_pct := 0.0             # blood_price keystone: heal % of melee damage dealt
 var whirl_cd_s := 4.0            # Whirlwind (E): full-circle strike (proposal)
+
+# Ember Flask (design/11: "dodge, heal, or reverse" — healing is a verb):
+# 2 charges, each a 40%-max HoT over 2 s with a 0.8 s drink commitment (30%
+# slow); every 6 kills rekindles one charge; Haven/respawn refills all. Feeds
+# the same aggression loop as leech — the answer to "ultra-mogged early".
+const FLASK_MAX := 2
+const FLASK_KILLS_PER_CHARGE := 6
+var flask_charges := FLASK_MAX
+var flask_kills := 0
+var _flask_hot := 0.0            # seconds of heal-over-time remaining
+var _flask_rate := 0.0           # hp/s while the flask burns
 var _whirl_cd := 0.0
 var _whirl_t := 0.0
 var _class_fx := ""              # Emberkin ignite / Frostbinder chill on hit
@@ -201,6 +212,7 @@ func _physics_process(delta: float) -> void:
 	_gale_t = maxf(_gale_t - delta * 4.0, 0.0)
 	_flash = maxf(_flash - delta * 5.0, 0.0)
 	_slow_t = maxf(_slow_t - delta, 0.0)
+	_process_flask(delta)
 	# class-tree skill cooldowns + timed buffs (both tiny dicts/arrays)
 	for k in skill_cds:
 		skill_cds[k] = maxf(float(skill_cds[k]) - delta, 0.0)
@@ -1228,6 +1240,37 @@ func bot_dodge(dir: Vector2) -> bool:
 
 # dmg_type: "physical" (armor mitigates) | "fire"/"umbral"/... (resist mitigates)
 # | "status" (field/DoT ticks — status resist mitigates, proposal).
+func drink_flask() -> bool:
+	if dead or flask_charges <= 0 or _flask_hot > 0.0 or hp >= max_hp:
+		return false
+	flask_charges -= 1
+	_flask_hot = 2.0
+	_flask_rate = max_hp * 0.4 / 2.0   # 40% of max over the burn
+	_slow_t = maxf(_slow_t, 0.8)       # the drink is a commitment
+	return true
+
+func note_kill() -> bool:   # true when a charge rekindles (main gives feedback)
+	flask_kills += 1
+	if flask_kills >= FLASK_KILLS_PER_CHARGE and flask_charges < FLASK_MAX:
+		flask_kills = 0
+		flask_charges += 1
+		return true
+	return false
+
+func refill_flask() -> void:
+	flask_charges = FLASK_MAX
+	flask_kills = 0
+	_flask_hot = 0.0
+	_flask_rate = 0.0
+
+func _process_flask(delta: float) -> void:
+	if _flask_hot <= 0.0:
+		return
+	_flask_hot = maxf(_flask_hot - delta, 0.0)
+	hp = minf(hp + _flask_rate * delta, max_hp)
+	if hp >= max_hp:
+		_flask_hot = 0.0
+
 func take_damage(dmg: float, _from_dir: Vector2, dmg_type := "physical") -> void:
 	if dead or _dodging > 0.0:
 		return  # the dodge dash has brief i-frames (~0.12 s) AND displaces you —

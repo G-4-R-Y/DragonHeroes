@@ -40,3 +40,8 @@ genforge/candidates/*
 rebirth/
 ml/data/progress/
 ml/data/logs/
+ml/.venv/
+
+# raw export dirs (100 MB GitHub limit) — the zips are the distributable
+builds/linux/
+builds/windows/

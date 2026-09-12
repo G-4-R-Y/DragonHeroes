@@ -11,7 +11,12 @@
 #      Templates, or run this script with DH_FETCH_TEMPLATES=1 to download
 #      them via godot's CLI into ~/.local/share/godot/export_templates/.
 #   2. sim built for the TARGET platform: Linux = `cmake --build sim/build`.
-#      Windows dh-server.exe needs a cross build (mingw-w64) or a Windows CI job.
+#      Windows dh-server.exe = the portable llvm-mingw cross build (no sudo):
+#        cmake -S sim -B sim/build-windows \
+#          -DCMAKE_TOOLCHAIN_FILE=$PWD/sim/cmake/mingw-w64-x86_64.cmake \
+#          -DCMAKE_BUILD_TYPE=Release && cmake --build sim/build-windows -j
+#        cp sim/build-windows/libs/dh-server/dh-server.exe sim/build-windows/
+#      (toolchain lives at ~/.local/share/dh-toolchains — fetched once, ~80 MB)
 #
 # Usage: tools/package_game.sh [windows|linux|all]   (default: all available)
 set -euo pipefail

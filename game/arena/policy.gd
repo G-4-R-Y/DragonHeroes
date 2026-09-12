@@ -92,8 +92,8 @@ func note_commit() -> void:
 	_commits.append(_clock)
 
 func noisy_aim(at: Vector2) -> Vector2:
-	var d := at - fighter.body.global_position
-	return fighter.body.global_position + d.rotated(rng.randfn(0.0, AIM_NOISE_RAD))
+	var d := at - fighter.alive_body().global_position
+	return fighter.alive_body().global_position + d.rotated(rng.randfn(0.0, AIM_NOISE_RAD))
 
 func _act(_delta: float) -> void:
 	pass   # native: the body's own AI runs

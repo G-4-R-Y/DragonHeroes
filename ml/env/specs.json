@@ -1,0 +1,327 @@
+{
+  "builds": {
+    "core.arena.ashwing_matriarch": {
+      "attack_cd": 1.6,
+      "attack_reach": 38.4,
+      "body_radius": 20.0,
+      "damage": 22.0,
+      "dodge_max": 0,
+      "is_player": false,
+      "is_ranged": false,
+      "kind": "boss",
+      "kits": [],
+      "max_hp": 900.0,
+      "move_speed": 88.0,
+      "special_cd": 6.0
+    },
+    "core.arena.bloodwarrant": {
+      "attack_cd": 0.4,
+      "attack_reach": 35.2,
+      "body_radius": 8.0,
+      "damage": 121.36,
+      "dodge_max": 3,
+      "is_player": true,
+      "is_ranged": false,
+      "kind": "player",
+      "kits": [],
+      "max_hp": 400.0,
+      "move_speed": 95.2,
+      "special_cd": 4.0
+    },
+    "core.arena.bog_golem": {
+      "attack_cd": 1.8,
+      "attack_reach": 28.8,
+      "body_radius": 15.985,
+      "damage": 25.942,
+      "dodge_max": 0,
+      "is_player": false,
+      "is_ranged": false,
+      "kind": "creature",
+      "kits": [
+        {
+          "cd": 7.0,
+          "id": "radial_slam",
+          "kind": "fire",
+          "range": 112.0
+        },
+        {
+          "cd": 9.0,
+          "id": "field_cast",
+          "kind": "mire",
+          "range": 7.0
+        }
+      ],
+      "max_hp": 656.64,
+      "move_speed": 40.32,
+      "special_cd": 6.0
+    },
+    "core.arena.cinder_drake": {
+      "attack_cd": 0.9,
+      "attack_reach": 28.8,
+      "body_radius": 9.84,
+      "damage": 9.632,
+      "dodge_max": 0,
+      "is_player": false,
+      "is_ranged": false,
+      "kind": "creature",
+      "kits": [
+        {
+          "cd": 4.0,
+          "id": "bolt_volley",
+          "kind": "fire",
+          "range": 10.0
+        },
+        {
+          "cd": 8.0,
+          "id": "field_cast",
+          "kind": "fire",
+          "range": 9.0
+        }
+      ],
+      "max_hp": 87.36,
+      "move_speed": 107.532,
+      "special_cd": 6.0
+    },
+    "core.arena.dusk_revenant": {
+      "attack_cd": 0.25,
+      "attack_reach": 28.8,
+      "body_radius": 8.0,
+      "damage": 67.84128,
+      "dodge_max": 3,
+      "is_player": true,
+      "is_ranged": false,
+      "kind": "player",
+      "kits": [],
+      "max_hp": 303.45,
+      "move_speed": 127.2,
+      "special_cd": 4.5
+    },
+    "core.arena.fen_boar_alpha": {
+      "attack_cd": 1.8,
+      "attack_reach": 28.8,
+      "body_radius": 13.915,
+      "damage": 26.061,
+      "dodge_max": 0,
+      "is_player": false,
+      "is_ranged": false,
+      "kind": "creature",
+      "kits": [
+        {
+          "cd": 5.0,
+          "id": "pounce",
+          "kind": "fire",
+          "range": 8.0
+        },
+        {
+          "cd": 14.0,
+          "id": "enrage",
+          "kind": "fire",
+          "range": 112.0
+        }
+      ],
+      "max_hp": 339.72,
+      "move_speed": 41.832,
+      "special_cd": 6.0
+    },
+    "core.arena.fenwitch_hag": {
+      "attack_cd": 1.8,
+      "attack_reach": 28.8,
+      "body_radius": 12.0,
+      "damage": 14.0,
+      "dodge_max": 0,
+      "is_player": false,
+      "is_ranged": false,
+      "kind": "boss",
+      "kits": [],
+      "max_hp": 520.0,
+      "move_speed": 67.2,
+      "special_cd": 6.0
+    },
+    "core.arena.gloam_wisp": {
+      "attack_cd": 1.2,
+      "attack_reach": 28.8,
+      "body_radius": 7.65,
+      "damage": 10.5,
+      "dodge_max": 0,
+      "is_player": false,
+      "is_ranged": false,
+      "kind": "creature",
+      "kits": [
+        {
+          "cd": 2.5,
+          "id": "bolt_volley",
+          "kind": "storm",
+          "range": 10.0
+        },
+        {
+          "cd": 8.0,
+          "id": "field_cast",
+          "kind": "mire",
+          "range": 9.0
+        }
+      ],
+      "max_hp": 85.2,
+      "move_speed": 75.6,
+      "special_cd": 6.0
+    },
+    "core.arena.gloamfen_stalker": {
+      "attack_cd": 0.9,
+      "attack_reach": 28.8,
+      "body_radius": 8.73,
+      "damage": 16.24,
+      "dodge_max": 0,
+      "is_player": false,
+      "is_ranged": false,
+      "kind": "creature",
+      "kits": [
+        {
+          "cd": 4.5,
+          "id": "pounce",
+          "kind": "fire",
+          "range": 9.0
+        },
+        {
+          "cd": 16.0,
+          "id": "enrage",
+          "kind": "fire",
+          "range": 112.0
+        }
+      ],
+      "max_hp": 117.6,
+      "move_speed": 108.864,
+      "special_cd": 6.0
+    },
+    "core.arena.grave_shade": {
+      "attack_cd": 1.2,
+      "attack_reach": 28.8,
+      "body_radius": 8.37,
+      "damage": 11.76,
+      "dodge_max": 0,
+      "is_player": false,
+      "is_ranged": false,
+      "kind": "creature",
+      "kits": [
+        {
+          "cd": 4.0,
+          "id": "bolt_volley",
+          "kind": "umbral",
+          "range": 9.0
+        },
+        {
+          "cd": 6.0,
+          "id": "pounce",
+          "kind": "fire",
+          "range": 7.0
+        }
+      ],
+      "max_hp": 100.8,
+      "move_speed": 75.6,
+      "special_cd": 6.0
+    },
+    "core.arena.mire_serpent": {
+      "attack_cd": 0.675,
+      "attack_reach": 28.8,
+      "body_radius": 9.68,
+      "damage": 11.312,
+      "dodge_max": 0,
+      "is_player": false,
+      "is_ranged": false,
+      "kind": "creature",
+      "kits": [
+        {
+          "cd": 3.5,
+          "id": "bolt_volley",
+          "kind": "venom",
+          "range": 9.0
+        },
+        {
+          "cd": 8.0,
+          "id": "field_cast",
+          "kind": "mire",
+          "range": 8.0
+        }
+      ],
+      "max_hp": 83.46,
+      "move_speed": 160.776,
+      "special_cd": 6.0
+    },
+    "core.arena.pale_concord": {
+      "attack_cd": 0.4,
+      "attack_reach": 35.2,
+      "body_radius": 8.0,
+      "damage": 103.67848,
+      "dodge_max": 3,
+      "is_player": true,
+      "is_ranged": false,
+      "kind": "player",
+      "kits": [],
+      "max_hp": 453.1,
+      "move_speed": 93.6,
+      "special_cd": 4.0
+    },
+    "core.arena.pyre_justiciar": {
+      "attack_cd": 0.4,
+      "attack_reach": 35.2,
+      "body_radius": 8.0,
+      "damage": 127.008,
+      "dodge_max": 3,
+      "is_player": true,
+      "is_ranged": false,
+      "kind": "player",
+      "kits": [],
+      "max_hp": 333.0,
+      "move_speed": 96.0,
+      "special_cd": 4.0
+    },
+    "core.arena.pyre_sovereign": {
+      "attack_cd": 1.7,
+      "attack_reach": 41.6,
+      "body_radius": 22.0,
+      "damage": 30.0,
+      "dodge_max": 0,
+      "is_player": false,
+      "is_ranged": false,
+      "kind": "boss",
+      "kits": [],
+      "max_hp": 1700.0,
+      "move_speed": 92.8,
+      "special_cd": 6.0
+    },
+    "core.arena.stormwarrant": {
+      "attack_cd": 0.55,
+      "attack_reach": 35.2,
+      "body_radius": 8.0,
+      "damage": 61.71,
+      "dodge_max": 3,
+      "is_player": true,
+      "is_ranged": true,
+      "kind": "player",
+      "kits": [],
+      "max_hp": 247.2,
+      "move_speed": 99.2,
+      "special_cd": 5.0
+    },
+    "core.arena.terravore_colossus": {
+      "attack_cd": 2.2,
+      "attack_reach": 44.8,
+      "body_radius": 26.0,
+      "damage": 34.0,
+      "dodge_max": 0,
+      "is_player": false,
+      "is_ranged": false,
+      "kind": "boss",
+      "kits": [],
+      "max_hp": 2300.0,
+      "move_speed": 44.8,
+      "special_cd": 6.0
+    }
+  },
+  "field_kind_ids": {
+    "earth": 1,
+    "fire": 0,
+    "lava": 3,
+    "mire": 2
+  },
+  "note": "GENERATED by game/arena/tools/dump_specs.gd — do not hand-edit",
+  "schema": "arena.specs.v1"
+}

@@ -189,30 +189,17 @@ func _build() -> void:
 	lang_btn.pressed.connect(_toggle_lang)
 	add_child(lang_btn)
 
-	# Display settings (canon §12.38) — bottom-right: window/fullscreen + pixel fit
-	var disp: Dictionary = ProtoDisplay.current()
-	var mode_btn := Button.new()
-	mode_btn.text = "MODE: %s" % str(disp.get("mode", "windowed")).to_upper()
-	mode_btn.focus_mode = Control.FOCUS_NONE
-	mode_btn.add_theme_font_size_override("font_size", ProtoTheme.SIZE_BODY)
-	mode_btn.position = Vector2(516, 330)
-	mode_btn.pressed.connect(func() -> void:
-		mode_btn.text = "MODE: %s" % ProtoDisplay.cycle_mode().to_upper())
-	add_child(mode_btn)
-	var fit_btn := Button.new()
-	fit_btn.text = "FIT: %s" % str(disp.get("scale", "integer")).to_upper()
-	fit_btn.focus_mode = Control.FOCUS_NONE
-	fit_btn.add_theme_font_size_override("font_size", ProtoTheme.SIZE_BODY)
-	fit_btn.position = Vector2(516, 306)
-	fit_btn.pressed.connect(func() -> void:
-		fit_btn.text = "FIT: %s" % ProtoDisplay.cycle_scale().to_upper())
-	add_child(fit_btn)
+	# OPTIONS (audio volumes, display mode/fit) — one button, one clean modal
+	# (Ricardo: "I still don't see the option menu... with audio configs and
+	# volume"). The quick-toggle corner buttons fold into this screen.
+	var opt_btn := Button.new()
+	opt_btn.text = ProtoLang.t("menu_options")
+	opt_btn.focus_mode = Control.FOCUS_NONE
+	opt_btn.add_theme_font_size_override("font_size", ProtoTheme.SIZE_BODY)
+	opt_btn.position = Vector2(516, 330)
+	opt_btn.pressed.connect(_open_options)
+	add_child(opt_btn)
 	ProtoDisplay.apply_saved()
-
-	# Audio (Ricardo: "mute songs and effects") — stacked above the display
-	# buttons: per-bus ON/OFF, same settings file, applied at every boot
-	_audio_button("sfx", "SFX", Vector2(516, 282))
-	_audio_button("music", "MUSIC", Vector2(516, 258))
 	ProtoAudio.apply_saved()
 
 	# glue the halo to wherever the centered VBox actually lands the title
@@ -222,17 +209,92 @@ func _build() -> void:
 	if is_instance_valid(halo) and is_instance_valid(title):
 		halo.position = title.get_global_rect().get_center()
 
-# One MUSIC/SFX switch: shows the saved state, flips + persists on press.
-func _audio_button(kind: String, label: String, at: Vector2) -> Button:
+# ---- options screen -----------------------------------------------------------
+
+var _options: Control = null
+
+func _open_options() -> void:
+	if _options != null:
+		return
+	var dim := ColorRect.new()   # dim the menu behind the modal
+	dim.color = Color(0, 0, 0, 0.55)
+	dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_options = dim
+	var panel := PanelContainer.new()
+	panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	panel.custom_minimum_size = Vector2(310, 0)
+	dim.add_child(panel)
+	var vb := VBoxContainer.new()
+	vb.add_theme_constant_override("separation", 8)
+	panel.add_child(vb)
+	var title := Label.new()
+	title.text = ProtoLang.t("menu_options")
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", ProtoTheme.SIZE_TITLE)
+	vb.add_child(title)
+	vb.add_child(_audio_row("music", ProtoLang.t("opt_music")))
+	vb.add_child(_audio_row("sfx", ProtoLang.t("opt_sfx")))
+	vb.add_child(HSeparator.new())
+	vb.add_child(_cycle_row("opt_mode",
+			func() -> String: return str(ProtoDisplay.current().get("mode", "windowed")).to_upper(),
+			func() -> String: return ProtoDisplay.cycle_mode().to_upper()))
+	vb.add_child(_cycle_row("opt_fit",
+			func() -> String: return str(ProtoDisplay.current().get("scale", "fit")).to_upper(),
+			func() -> String: return ProtoDisplay.cycle_scale().to_upper()))
+	vb.add_child(HSeparator.new())
+	var back := Button.new()
+	back.text = ProtoLang.t("opt_back")
+	back.focus_mode = Control.FOCUS_NONE
+	back.pressed.connect(func() -> void:
+		_options.queue_free()
+		_options = null)
+	vb.add_child(back)
+	add_child(dim)
+
+# MUSIC/SFX row: ON/OFF toggle + a volume slider (ProtoAudio persists both).
+func _audio_row(kind: String, label_text: String) -> Control:
+	var vb := VBoxContainer.new()
+	vb.add_theme_constant_override("separation", 2)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 6)
+	var lb := Label.new()
+	lb.text = label_text
+	lb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	lb.add_theme_font_size_override("font_size", ProtoTheme.SIZE_BODY)
+	row.add_child(lb)
+	var tog := Button.new()
+	tog.text = "ON" if ProtoAudio.is_on(kind) else "OFF"
+	tog.focus_mode = Control.FOCUS_NONE
+	tog.add_theme_font_size_override("font_size", ProtoTheme.SIZE_BODY)
+	tog.pressed.connect(func() -> void:
+		tog.text = "ON" if ProtoAudio.toggle(kind) else "OFF")
+	row.add_child(tog)
+	vb.add_child(row)
+	var slider := HSlider.new()
+	slider.min_value = 0.0
+	slider.max_value = 1.0
+	slider.step = 0.05
+	slider.value = float(ProtoAudio.current().get(kind + "_vol", 1.0))
+	slider.value_changed.connect(func(v: float) -> void: ProtoAudio.set_volume(kind, v))
+	vb.add_child(slider)
+	return vb
+
+# Display row: label + a cycle button whose text is live state.
+func _cycle_row(label_key: String, get_state: Callable, cycle: Callable) -> Control:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 6)
+	var lb := Label.new()
+	lb.text = ProtoLang.t(label_key)
+	lb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	lb.add_theme_font_size_override("font_size", ProtoTheme.SIZE_BODY)
+	row.add_child(lb)
 	var b := Button.new()
-	b.text = "%s: %s" % [label, "ON" if ProtoAudio.is_on(kind) else "OFF"]
+	b.text = str(get_state.call())
 	b.focus_mode = Control.FOCUS_NONE
 	b.add_theme_font_size_override("font_size", ProtoTheme.SIZE_BODY)
-	b.position = at
-	b.pressed.connect(func() -> void:
-		b.text = "%s: %s" % [label, "ON" if ProtoAudio.toggle(kind) else "OFF"])
-	add_child(b)
-	return b
+	b.pressed.connect(func() -> void: b.text = str(cycle.call()))
+	row.add_child(b)
+	return row
 
 func _toggle_lang() -> void:
 	ProtoLang.set_lang("pt" if ProtoLang.lang == "en" else "en")

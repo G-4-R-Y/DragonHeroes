@@ -34,7 +34,7 @@
       "properties": {
         "id": {"type": "string", "pattern": "^[a-z0-9_]+\\.arena\\.[a-z0-9_]+$"},
         "role": {"type": "string", "enum": ["bounty_hunter", "champion", "ghost"]},
-        "kind": {"type": "string", "enum": ["player", "creature", "boss"]},
+        "kind": {"type": "string", "enum": ["player", "creature", "boss", "duo"]},
         "name": {"type": "string", "minLength": 1},
         "policy": {"type": "string", "enum": ["native", "scripted"]},
         "hp_scale": {"type": "number", "exclusiveMinimum": 0},
@@ -100,7 +100,29 @@
         "archetype": {"type": "string"},
         "affix": {"type": "string", "enum": ["", "Brutal", "Swift", "Fiery", "Bulwark"]},
         "chassis": {"type": "string", "enum": ["boss", "hag", "pyre", "colossus"]},
-        "legendary": {"type": "string"}
+        "legendary": {"type": "string"},
+        "members": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {"type": "string", "enum": ["pyre", "colossus"]}
+        },
+        "skills": {
+          "type": "array",
+          "maxItems": 4,
+          "items": {
+            "type": "object",
+            "required": ["id", "cd"],
+            "properties": {
+              "id": {"type": "string", "enum": ["bolt_volley", "radial_slam", "pounce", "field_cast", "enrage"]},
+              "cd": {"type": "number", "exclusiveMinimum": 0},
+              "kind": {"type": "string", "enum": ["fire", "frost", "storm", "venom", "umbral", "blood", "earth", "mire", "lava"]},
+              "element": {"$ref": "#/definitions/element"},
+              "range": {"type": "number", "exclusiveMinimum": 0}
+            },
+            "additionalProperties": false
+          }
+        }
       },
       "additionalProperties": false,
       "allOf": [
@@ -111,6 +133,10 @@
         {
           "if": {"properties": {"kind": {"const": "boss"}}},
           "then": {"required": ["chassis"]}
+        },
+        {
+          "if": {"properties": {"kind": {"const": "duo"}}},
+          "then": {"required": ["members"]}
         }
       ]
     }

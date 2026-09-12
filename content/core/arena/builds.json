@@ -1,236 +1,684 @@
 {
-  "id": "core.arena.builds",
-  "note": "Arena combatant roster (docs/design/23). Player builds are full bounty-hunter loadouts: class, attributes, rolled gear (base+rarity+quality, rolled per-match by seed), rune sockets, class-tree loadout, pet, and a COSMETIC loadout (aura/necklace/weapon glow — presentation only, canon: no paid power, cosmetics never touch combat math). Creature builds reference the generated bestiary by bundle; boss builds ride prototype chassis. The same roster feeds: self-play training opponents, the scripted eval suite (ml/eval), and later world bounty-hunter NPCs. Synced snapshot: game/arena/data/builds.json.",
-  "builds": [
+ "id": "core.arena.builds",
+ "note": "Arena combatant roster (docs/design/23). Player builds are full bounty-hunter loadouts: class, attributes, rolled gear (base+rarity+quality, rolled per-match by seed), rune sockets, class-tree loadout, pet, and a COSMETIC loadout (aura/necklace/weapon glow — presentation only, canon: no paid power, cosmetics never touch combat math). Creature builds reference the generated bestiary by bundle; boss builds ride prototype chassis. The same roster feeds: self-play training opponents, the scripted eval suite (ml/eval), and later world bounty-hunter NPCs. Synced snapshot: game/arena/data/builds.json.",
+ "builds": [
+  {
+   "id": "core.arena.dusk_revenant",
+   "role": "bounty_hunter",
+   "kind": "player",
+   "name": "Dusk Revenant",
+   "class_id": "core.class.rogue",
+   "level": 30,
+   "policy": "scripted",
+   "attributes": {
+    "might": 14,
+    "agility": 45,
+    "intellect": 12,
+    "vitality": 18,
+    "willpower": 11
+   },
+   "equipment": [
     {
-      "id": "core.arena.dusk_revenant",
-      "role": "bounty_hunter",
-      "kind": "player",
-      "name": "Dusk Revenant",
-      "class_id": "core.class.rogue",
-      "level": 30,
-      "policy": "scripted",
-      "attributes": {"might": 14, "agility": 45, "intellect": 12, "vitality": 18, "willpower": 11},
-      "equipment": [
-        {"slot": "weapon", "base": "emberfang_blade", "rarity": "epic", "quality": 0.65},
-        {"slot": "chest", "base": "gloamhide_vest", "rarity": "epic", "quality": 0.6},
-        {"slot": "helm", "base": "fenwarden_helm", "rarity": "rare", "quality": 0.5},
-        {"slot": "boots", "base": "mirebound_boots", "rarity": "rare", "quality": 0.55},
-        {"slot": "amulet", "base": "duskwarden_amulet", "rarity": "epic", "quality": 0.7},
-        {"slot": "ring", "base": "palecrown_signet", "rarity": "rare", "quality": 0.5}
-      ],
-      "runes": {"cleave": "rune_of_echoes", "dodge": "rune_of_the_gale"},
-      "learned": ["vb_root", "vb_quickstab", "vb_lacerate", "vb_heartseeker", "vb_ghostcut", "vb_veilstep", "vb_knife_waltz"],
-      "loadout": ["vb_lacerate", "vb_heartseeker", "vb_ghostcut", "vb_knife_waltz"],
-      "pet": {"name": "Nightfang", "roll_pct": 108, "species": "gloamfen_stalker"},
-      "cosmetics": {"aura": "umbral", "necklace": "umbral", "weapon": "umbral"}
+     "slot": "weapon",
+     "base": "emberfang_blade",
+     "rarity": "epic",
+     "quality": 0.65
     },
     {
-      "id": "core.arena.pyre_justiciar",
-      "role": "bounty_hunter",
-      "kind": "player",
-      "name": "Pyre Justiciar",
-      "class_id": "core.class.emberkin",
-      "level": 28,
-      "policy": "scripted",
-      "attributes": {"might": 30, "agility": 16, "intellect": 18, "vitality": 22, "willpower": 12},
-      "equipment": [
-        {"slot": "weapon", "base": "emberfang_blade", "rarity": "epic", "quality": 0.7},
-        {"slot": "chest", "base": "gloamhide_vest", "rarity": "rare", "quality": 0.55},
-        {"slot": "helm", "base": "fenwarden_helm", "rarity": "rare", "quality": 0.5},
-        {"slot": "boots", "base": "mirebound_boots", "rarity": "epic", "quality": 0.6},
-        {"slot": "amulet", "base": "duskwarden_amulet", "rarity": "rare", "quality": 0.5},
-        {"slot": "ring", "base": "palecrown_signet", "rarity": "epic", "quality": 0.65}
-      ],
-      "runes": {"cleave": "rune_of_cinders"},
-      "learned": ["em_root", "em_emberlash", "em_twin_suns", "em_emberwake", "em_flamechain", "em_cinderburst"],
-      "loadout": ["em_emberlash", "em_twin_suns", "em_cinderburst", "em_flamechain"],
-      "pet": {"name": "Cindermaw", "roll_pct": 96, "species": "marsh_drake"},
-      "cosmetics": {"aura": "fire", "necklace": "fire", "weapon": "fire"}
+     "slot": "chest",
+     "base": "gloamhide_vest",
+     "rarity": "epic",
+     "quality": 0.6
     },
     {
-      "id": "core.arena.pale_concord",
-      "role": "bounty_hunter",
-      "kind": "player",
-      "name": "Pale Concord",
-      "class_id": "core.class.frostbinder",
-      "level": 28,
-      "policy": "scripted",
-      "attributes": {"might": 18, "agility": 14, "intellect": 22, "vitality": 32, "willpower": 16},
-      "equipment": [
-        {"slot": "weapon", "base": "emberfang_blade", "rarity": "rare", "quality": 0.6},
-        {"slot": "chest", "base": "gloamhide_vest", "rarity": "epic", "quality": 0.65},
-        {"slot": "helm", "base": "fenwarden_helm", "rarity": "epic", "quality": 0.6},
-        {"slot": "boots", "base": "mirebound_boots", "rarity": "rare", "quality": 0.5},
-        {"slot": "amulet", "base": "duskwarden_amulet", "rarity": "rare", "quality": 0.55},
-        {"slot": "ring", "base": "palecrown_signet", "rarity": "epic", "quality": 0.7}
-      ],
-      "runes": {"rend": "rune_of_echoes"},
-      "learned": ["fb_root", "fb_frostbite", "fb_icelance", "fb_shatter", "fb_deepfreeze", "fb_glassing_volley"],
-      "loadout": ["fb_icelance", "fb_shatter", "fb_deepfreeze", "fb_glassing_volley"],
-      "pet": {"name": "Rimepelt", "roll_pct": 102, "species": "gloamfen_stalker"},
-      "cosmetics": {"aura": "frost", "necklace": "frost", "weapon": "frost"}
+     "slot": "helm",
+     "base": "fenwarden_helm",
+     "rarity": "rare",
+     "quality": 0.5
     },
     {
-      "id": "core.arena.stormwarrant",
-      "role": "bounty_hunter",
-      "kind": "player",
-      "name": "Stormwarrant",
-      "class_id": "core.class.mage",
-      "level": 26,
-      "policy": "scripted",
-      "attributes": {"might": 10, "agility": 20, "intellect": 42, "vitality": 14, "willpower": 18},
-      "equipment": [
-        {"slot": "weapon", "base": "emberglass_staff", "rarity": "epic", "quality": 0.68},
-        {"slot": "chest", "base": "gloamhide_vest", "rarity": "rare", "quality": 0.5},
-        {"slot": "helm", "base": "fenwarden_helm", "rarity": "rare", "quality": 0.5},
-        {"slot": "boots", "base": "mirebound_boots", "rarity": "epic", "quality": 0.62},
-        {"slot": "amulet", "base": "duskwarden_amulet", "rarity": "epic", "quality": 0.72},
-        {"slot": "ring", "base": "palecrown_signet", "rarity": "rare", "quality": 0.5}
-      ],
-      "runes": {"cleave": "rune_of_echoes"},
-      "learned": ["gm_root", "gm_gloambolt", "gm_unravel", "gm_dusk_volley", "gm_umbral_coil", "gm_gloomburst"],
-      "loadout": ["gm_gloambolt", "gm_dusk_volley", "gm_umbral_coil", "gm_gloomburst"],
-      "cosmetics": {"aura": "storm", "necklace": "storm", "weapon": "storm"}
+     "slot": "boots",
+     "base": "mirebound_boots",
+     "rarity": "rare",
+     "quality": 0.55
     },
     {
-      "id": "core.arena.bloodwarrant",
-      "role": "bounty_hunter",
-      "kind": "player",
-      "name": "Bloodwarrant",
-      "class_id": "core.class.reaver",
-      "level": 30,
-      "policy": "scripted",
-      "attributes": {"might": 42, "agility": 14, "intellect": 10, "vitality": 26, "willpower": 12},
-      "equipment": [
-        {"slot": "weapon", "base": "emberfang_blade", "rarity": "epic", "quality": 0.72},
-        {"slot": "chest", "base": "gloamhide_vest", "rarity": "epic", "quality": 0.6},
-        {"slot": "helm", "base": "fenwarden_helm", "rarity": "rare", "quality": 0.55},
-        {"slot": "boots", "base": "mirebound_boots", "rarity": "rare", "quality": 0.5},
-        {"slot": "amulet", "base": "duskwarden_amulet", "rarity": "epic", "quality": 0.6},
-        {"slot": "ring", "base": "palecrown_signet", "rarity": "epic", "quality": 0.62}
-      ],
-      "runes": {"cleave": "rune_of_cinders", "dodge": "rune_of_the_gale"},
-      "learned": ["root_cleave", "rv_gash", "rv_hurled_cleaver", "rv_ravage", "rv_blood_howl", "rv_leech_fury", "rv_red_harvest"],
-      "loadout": ["rv_gash", "rv_ravage", "rv_blood_howl", "rv_red_harvest"],
-      "cosmetics": {"aura": "blood", "necklace": "blood", "weapon": "blood"}
+     "slot": "amulet",
+     "base": "duskwarden_amulet",
+     "rarity": "epic",
+     "quality": 0.7
     },
     {
-      "id": "core.arena.fen_boar_alpha",
-      "role": "champion",
-      "kind": "creature",
-      "name": "Fen Boar Alpha",
-      "bundle": "fen_boar",
-      "affix": "Brutal",
-      "policy": "native",
-      "cosmetics": {"aura": "venom"}
-    },
-    {
-      "id": "core.arena.gloamfen_stalker",
-      "role": "champion",
-      "kind": "creature",
-      "name": "Gloamfen Stalker",
-      "bundle": "gloamfen_stalker",
-      "affix": "Swift",
-      "policy": "native"
-    },
-    {
-      "id": "core.arena.cinder_drake",
-      "role": "champion",
-      "kind": "creature",
-      "name": "Cinder Drake",
-      "bundle": "marsh_drake",
-      "affix": "Fiery",
-      "policy": "native",
-      "cosmetics": {"aura": "fire"}
-    },
-    {
-      "id": "core.arena.bog_golem",
-      "role": "champion",
-      "kind": "creature",
-      "name": "Bog Golem",
-      "bundle": "golem",
-      "affix": "Bulwark",
-      "policy": "native",
-      "cosmetics": {"aura": "venom"}
-    },
-    {
-      "id": "core.arena.mire_serpent",
-      "role": "champion",
-      "kind": "creature",
-      "name": "Mire Serpent",
-      "bundle": "serpent",
-      "affix": "Swift",
-      "policy": "native"
-    },
-    {
-      "id": "core.arena.grave_shade",
-      "role": "champion",
-      "kind": "creature",
-      "name": "Grave Shade",
-      "bundle": "shade",
-      "affix": "",
-      "policy": "native",
-      "cosmetics": {"aura": "umbral"}
-    },
-    {
-      "id": "core.arena.gloam_wisp",
-      "role": "champion",
-      "kind": "creature",
-      "name": "Gloam Wisp",
-      "bundle": "gloamfen_wisp",
-      "affix": "",
-      "policy": "native",
-      "cosmetics": {"aura": "storm"}
-    },
-    {
-      "id": "core.arena.fenwitch_hag",
-      "role": "champion",
-      "kind": "boss",
-      "name": "Fenwitch Hag",
-      "chassis": "hag",
-      "policy": "native",
-      "cosmetics": {"aura": "umbral"}
-    },
-    {
-      "id": "core.arena.pyre_sovereign",
-      "role": "champion",
-      "kind": "boss",
-      "name": "Pyre Sovereign",
-      "chassis": "pyre",
-      "policy": "native",
-      "cosmetics": {"aura": "fire"}
-    },
-    {
-      "id": "core.arena.terravore_colossus",
-      "role": "champion",
-      "kind": "boss",
-      "name": "Terravore Colossus",
-      "chassis": "colossus",
-      "policy": "native"
-    },
-    {
-      "id": "core.arena.ashwing_matriarch",
-      "role": "champion",
-      "kind": "boss",
-      "name": "Ashwing Matriarch",
-      "chassis": "boss",
-      "policy": "native",
-      "cosmetics": {"aura": "fire"}
+     "slot": "ring",
+     "base": "palecrown_signet",
+     "rarity": "rare",
+     "quality": 0.5
     }
+   ],
+   "runes": {
+    "cleave": "rune_of_echoes",
+    "dodge": "rune_of_the_gale"
+   },
+   "learned": [
+    "vb_root",
+    "vb_quickstab",
+    "vb_lacerate",
+    "vb_heartseeker",
+    "vb_ghostcut",
+    "vb_veilstep",
+    "vb_knife_waltz"
+   ],
+   "loadout": [
+    "vb_lacerate",
+    "vb_heartseeker",
+    "vb_ghostcut",
+    "vb_knife_waltz"
+   ],
+   "pet": {
+    "name": "Nightfang",
+    "roll_pct": 108,
+    "species": "gloamfen_stalker"
+   },
+   "cosmetics": {
+    "aura": "umbral",
+    "necklace": "umbral",
+    "weapon": "umbral"
+   }
+  },
+  {
+   "id": "core.arena.pyre_justiciar",
+   "role": "bounty_hunter",
+   "kind": "player",
+   "name": "Pyre Justiciar",
+   "class_id": "core.class.emberkin",
+   "level": 28,
+   "policy": "scripted",
+   "attributes": {
+    "might": 30,
+    "agility": 16,
+    "intellect": 18,
+    "vitality": 22,
+    "willpower": 12
+   },
+   "equipment": [
+    {
+     "slot": "weapon",
+     "base": "emberfang_blade",
+     "rarity": "epic",
+     "quality": 0.7
+    },
+    {
+     "slot": "chest",
+     "base": "gloamhide_vest",
+     "rarity": "rare",
+     "quality": 0.55
+    },
+    {
+     "slot": "helm",
+     "base": "fenwarden_helm",
+     "rarity": "rare",
+     "quality": 0.5
+    },
+    {
+     "slot": "boots",
+     "base": "mirebound_boots",
+     "rarity": "epic",
+     "quality": 0.6
+    },
+    {
+     "slot": "amulet",
+     "base": "duskwarden_amulet",
+     "rarity": "rare",
+     "quality": 0.5
+    },
+    {
+     "slot": "ring",
+     "base": "palecrown_signet",
+     "rarity": "epic",
+     "quality": 0.65
+    }
+   ],
+   "runes": {
+    "cleave": "rune_of_cinders"
+   },
+   "learned": [
+    "em_root",
+    "em_emberlash",
+    "em_twin_suns",
+    "em_emberwake",
+    "em_flamechain",
+    "em_cinderburst"
+   ],
+   "loadout": [
+    "em_emberlash",
+    "em_twin_suns",
+    "em_cinderburst",
+    "em_flamechain"
+   ],
+   "pet": {
+    "name": "Cindermaw",
+    "roll_pct": 96,
+    "species": "marsh_drake"
+   },
+   "cosmetics": {
+    "aura": "fire",
+    "necklace": "fire",
+    "weapon": "fire"
+   }
+  },
+  {
+   "id": "core.arena.pale_concord",
+   "role": "bounty_hunter",
+   "kind": "player",
+   "name": "Pale Concord",
+   "class_id": "core.class.frostbinder",
+   "level": 28,
+   "policy": "scripted",
+   "attributes": {
+    "might": 18,
+    "agility": 14,
+    "intellect": 22,
+    "vitality": 32,
+    "willpower": 16
+   },
+   "equipment": [
+    {
+     "slot": "weapon",
+     "base": "emberfang_blade",
+     "rarity": "rare",
+     "quality": 0.6
+    },
+    {
+     "slot": "chest",
+     "base": "gloamhide_vest",
+     "rarity": "epic",
+     "quality": 0.65
+    },
+    {
+     "slot": "helm",
+     "base": "fenwarden_helm",
+     "rarity": "epic",
+     "quality": 0.6
+    },
+    {
+     "slot": "boots",
+     "base": "mirebound_boots",
+     "rarity": "rare",
+     "quality": 0.5
+    },
+    {
+     "slot": "amulet",
+     "base": "duskwarden_amulet",
+     "rarity": "rare",
+     "quality": 0.55
+    },
+    {
+     "slot": "ring",
+     "base": "palecrown_signet",
+     "rarity": "epic",
+     "quality": 0.7
+    }
+   ],
+   "runes": {
+    "rend": "rune_of_echoes"
+   },
+   "learned": [
+    "fb_root",
+    "fb_frostbite",
+    "fb_icelance",
+    "fb_shatter",
+    "fb_deepfreeze",
+    "fb_glassing_volley"
+   ],
+   "loadout": [
+    "fb_icelance",
+    "fb_shatter",
+    "fb_deepfreeze",
+    "fb_glassing_volley"
+   ],
+   "pet": {
+    "name": "Rimepelt",
+    "roll_pct": 102,
+    "species": "gloamfen_stalker"
+   },
+   "cosmetics": {
+    "aura": "frost",
+    "necklace": "frost",
+    "weapon": "frost"
+   }
+  },
+  {
+   "id": "core.arena.stormwarrant",
+   "role": "bounty_hunter",
+   "kind": "player",
+   "name": "Stormwarrant",
+   "class_id": "core.class.mage",
+   "level": 26,
+   "policy": "scripted",
+   "attributes": {
+    "might": 10,
+    "agility": 20,
+    "intellect": 42,
+    "vitality": 14,
+    "willpower": 18
+   },
+   "equipment": [
+    {
+     "slot": "weapon",
+     "base": "emberglass_staff",
+     "rarity": "epic",
+     "quality": 0.68
+    },
+    {
+     "slot": "chest",
+     "base": "gloamhide_vest",
+     "rarity": "rare",
+     "quality": 0.5
+    },
+    {
+     "slot": "helm",
+     "base": "fenwarden_helm",
+     "rarity": "rare",
+     "quality": 0.5
+    },
+    {
+     "slot": "boots",
+     "base": "mirebound_boots",
+     "rarity": "epic",
+     "quality": 0.62
+    },
+    {
+     "slot": "amulet",
+     "base": "duskwarden_amulet",
+     "rarity": "epic",
+     "quality": 0.72
+    },
+    {
+     "slot": "ring",
+     "base": "palecrown_signet",
+     "rarity": "rare",
+     "quality": 0.5
+    }
+   ],
+   "runes": {
+    "cleave": "rune_of_echoes"
+   },
+   "learned": [
+    "gm_root",
+    "gm_gloambolt",
+    "gm_unravel",
+    "gm_dusk_volley",
+    "gm_umbral_coil",
+    "gm_gloomburst"
+   ],
+   "loadout": [
+    "gm_gloambolt",
+    "gm_dusk_volley",
+    "gm_umbral_coil",
+    "gm_gloomburst"
+   ],
+   "cosmetics": {
+    "aura": "storm",
+    "necklace": "storm",
+    "weapon": "storm"
+   }
+  },
+  {
+   "id": "core.arena.bloodwarrant",
+   "role": "bounty_hunter",
+   "kind": "player",
+   "name": "Bloodwarrant",
+   "class_id": "core.class.reaver",
+   "level": 30,
+   "policy": "scripted",
+   "attributes": {
+    "might": 42,
+    "agility": 14,
+    "intellect": 10,
+    "vitality": 26,
+    "willpower": 12
+   },
+   "equipment": [
+    {
+     "slot": "weapon",
+     "base": "emberfang_blade",
+     "rarity": "epic",
+     "quality": 0.72
+    },
+    {
+     "slot": "chest",
+     "base": "gloamhide_vest",
+     "rarity": "epic",
+     "quality": 0.6
+    },
+    {
+     "slot": "helm",
+     "base": "fenwarden_helm",
+     "rarity": "rare",
+     "quality": 0.55
+    },
+    {
+     "slot": "boots",
+     "base": "mirebound_boots",
+     "rarity": "rare",
+     "quality": 0.5
+    },
+    {
+     "slot": "amulet",
+     "base": "duskwarden_amulet",
+     "rarity": "epic",
+     "quality": 0.6
+    },
+    {
+     "slot": "ring",
+     "base": "palecrown_signet",
+     "rarity": "epic",
+     "quality": 0.62
+    }
+   ],
+   "runes": {
+    "cleave": "rune_of_cinders",
+    "dodge": "rune_of_the_gale"
+   },
+   "learned": [
+    "root_cleave",
+    "rv_gash",
+    "rv_hurled_cleaver",
+    "rv_ravage",
+    "rv_blood_howl",
+    "rv_leech_fury",
+    "rv_red_harvest"
+   ],
+   "loadout": [
+    "rv_gash",
+    "rv_ravage",
+    "rv_blood_howl",
+    "rv_red_harvest"
+   ],
+   "cosmetics": {
+    "aura": "blood",
+    "necklace": "blood",
+    "weapon": "blood"
+   }
+  },
+  {
+   "id": "core.arena.fen_boar_alpha",
+   "role": "champion",
+   "kind": "creature",
+   "name": "Fen Boar Alpha",
+   "bundle": "fen_boar",
+   "affix": "Brutal",
+   "policy": "native",
+   "cosmetics": {
+    "aura": "venom"
+   },
+   "skills": [
+    {
+     "id": "pounce",
+     "cd": 5.0,
+     "range": 8.0
+    },
+    {
+     "id": "enrage",
+     "cd": 14.0
+    }
+   ]
+  },
+  {
+   "id": "core.arena.gloamfen_stalker",
+   "role": "champion",
+   "kind": "creature",
+   "name": "Gloamfen Stalker",
+   "bundle": "gloamfen_stalker",
+   "affix": "Swift",
+   "policy": "native",
+   "skills": [
+    {
+     "id": "pounce",
+     "cd": 4.5,
+     "range": 9.0
+    },
+    {
+     "id": "enrage",
+     "cd": 16.0
+    }
+   ]
+  },
+  {
+   "id": "core.arena.cinder_drake",
+   "role": "champion",
+   "kind": "creature",
+   "name": "Cinder Drake",
+   "bundle": "marsh_drake",
+   "affix": "Fiery",
+   "policy": "native",
+   "cosmetics": {
+    "aura": "fire"
+   },
+   "skills": [
+    {
+     "id": "bolt_volley",
+     "cd": 4.0,
+     "kind": "fire",
+     "range": 10.0
+    },
+    {
+     "id": "field_cast",
+     "cd": 8.0,
+     "kind": "fire",
+     "range": 9.0
+    }
+   ]
+  },
+  {
+   "id": "core.arena.bog_golem",
+   "role": "champion",
+   "kind": "creature",
+   "name": "Bog Golem",
+   "bundle": "golem",
+   "affix": "Bulwark",
+   "policy": "native",
+   "cosmetics": {
+    "aura": "venom"
+   },
+   "skills": [
+    {
+     "id": "radial_slam",
+     "cd": 7.0
+    },
+    {
+     "id": "field_cast",
+     "cd": 9.0,
+     "kind": "mire",
+     "range": 7.0
+    }
+   ]
+  },
+  {
+   "id": "core.arena.mire_serpent",
+   "role": "champion",
+   "kind": "creature",
+   "name": "Mire Serpent",
+   "bundle": "serpent",
+   "affix": "Swift",
+   "policy": "native",
+   "skills": [
+    {
+     "id": "bolt_volley",
+     "cd": 3.5,
+     "kind": "venom",
+     "range": 9.0
+    },
+    {
+     "id": "field_cast",
+     "cd": 8.0,
+     "kind": "mire",
+     "range": 8.0
+    }
+   ]
+  },
+  {
+   "id": "core.arena.grave_shade",
+   "role": "champion",
+   "kind": "creature",
+   "name": "Grave Shade",
+   "bundle": "shade",
+   "affix": "",
+   "policy": "native",
+   "cosmetics": {
+    "aura": "umbral"
+   },
+   "skills": [
+    {
+     "id": "bolt_volley",
+     "cd": 4.0,
+     "kind": "umbral",
+     "range": 9.0
+    },
+    {
+     "id": "pounce",
+     "cd": 6.0,
+     "range": 7.0
+    }
+   ]
+  },
+  {
+   "id": "core.arena.gloam_wisp",
+   "role": "champion",
+   "kind": "creature",
+   "name": "Gloam Wisp",
+   "bundle": "gloamfen_wisp",
+   "affix": "",
+   "policy": "native",
+   "cosmetics": {
+    "aura": "storm"
+   },
+   "skills": [
+    {
+     "id": "bolt_volley",
+     "cd": 2.5,
+     "kind": "storm",
+     "range": 10.0
+    },
+    {
+     "id": "field_cast",
+     "cd": 8.0,
+     "kind": "mire",
+     "range": 9.0
+    }
+   ]
+  },
+  {
+   "id": "core.arena.fenwitch_hag",
+   "role": "champion",
+   "kind": "boss",
+   "name": "Fenwitch Hag",
+   "chassis": "hag",
+   "policy": "native",
+   "cosmetics": {
+    "aura": "umbral"
+   }
+  },
+  {
+   "id": "core.arena.pyre_sovereign",
+   "role": "champion",
+   "kind": "boss",
+   "name": "Pyre Sovereign",
+   "chassis": "pyre",
+   "policy": "native",
+   "cosmetics": {
+    "aura": "fire"
+   }
+  },
+  {
+   "id": "core.arena.terravore_colossus",
+   "role": "champion",
+   "kind": "boss",
+   "name": "Terravore Colossus",
+   "chassis": "colossus",
+   "policy": "native"
+  },
+  {
+   "id": "core.arena.ashwing_matriarch",
+   "role": "champion",
+   "kind": "boss",
+   "name": "Ashwing Matriarch",
+   "chassis": "boss",
+   "policy": "native",
+   "cosmetics": {
+    "aura": "fire"
+   }
+  },
+  {
+   "id": "core.arena.the_duologue",
+   "role": "champion",
+   "kind": "duo",
+   "name": "The Duologue",
+   "members": [
+    "pyre",
+    "colossus"
+   ],
+   "policy": "native",
+   "hp_scale": 0.6,
+   "dmg_scale": 0.8
+  }
+ ],
+ "rotation": [
+  [
+   "core.arena.dusk_revenant",
+   "core.arena.fen_boar_alpha"
   ],
-  "rotation": [
-    ["core.arena.dusk_revenant", "core.arena.fen_boar_alpha"],
-    ["core.arena.pyre_justiciar", "core.arena.stormwarrant"],
-    ["core.arena.gloamfen_stalker", "core.arena.cinder_drake"],
-    ["core.arena.pale_concord", "core.arena.fenwitch_hag"],
-    ["core.arena.bloodwarrant", "core.arena.pyre_sovereign"],
-    ["core.arena.gloam_wisp", "core.arena.stormwarrant"],
-    ["core.arena.bog_golem", "core.arena.mire_serpent"],
-    ["core.arena.grave_shade", "core.arena.dusk_revenant"],
-    ["core.arena.terravore_colossus", "core.arena.bloodwarrant"],
-    ["core.arena.ashwing_matriarch", "core.arena.pyre_justiciar"],
-    ["core.arena.gloam_wisp", "core.arena.mire_serpent"],
-    ["core.arena.bog_golem", "core.arena.pale_concord"]
+  [
+   "core.arena.pyre_justiciar",
+   "core.arena.stormwarrant"
+  ],
+  [
+   "core.arena.gloamfen_stalker",
+   "core.arena.cinder_drake"
+  ],
+  [
+   "core.arena.pale_concord",
+   "core.arena.fenwitch_hag"
+  ],
+  [
+   "core.arena.bloodwarrant",
+   "core.arena.pyre_sovereign"
+  ],
+  [
+   "core.arena.gloam_wisp",
+   "core.arena.stormwarrant"
+  ],
+  [
+   "core.arena.bog_golem",
+   "core.arena.mire_serpent"
+  ],
+  [
+   "core.arena.grave_shade",
+   "core.arena.dusk_revenant"
+  ],
+  [
+   "core.arena.terravore_colossus",
+   "core.arena.bloodwarrant"
+  ],
+  [
+   "core.arena.ashwing_matriarch",
+   "core.arena.pyre_justiciar"
+  ],
+  [
+   "core.arena.gloam_wisp",
+   "core.arena.mire_serpent"
+  ],
+  [
+   "core.arena.bog_golem",
+   "core.arena.pale_concord"
+  ],
+  [
+   "core.arena.the_duologue",
+   "core.arena.bloodwarrant"
+  ],
+  [
+   "core.arena.the_duologue",
+   "core.arena.pyre_justiciar"
   ]
+ ]
 }
