@@ -14,6 +14,8 @@ func _run() -> void:
 	# the suite asserts English strings — a stray user://settings.json from a
 	# local PT-BR session must never break CI
 	ProtoLang.set_lang("en")
+	DirAccess.remove_absolute("user://saves/clicktest.json")
+	Session.login("clicktest")
 	Session.gold = 1000
 	var sword: Dictionary = ProtoItems.roll_item("emberfang_blade", "rare")
 	Session.add_item(sword)
@@ -252,7 +254,6 @@ func _run() -> void:
 	await get_tree().process_frame
 
 	# ---- persistence: save → mutate → login reloads (stables included) ----------
-	Session.login("clicktest")
 	Session.stables.append({"uid": ProtoItems.next_uid(), "name": "Stabled 88%",
 			"species": "core.creature.gloamfen_stalker", "roll_pct": 88,
 			"skills": ["core.skill.shadow_rend"]})

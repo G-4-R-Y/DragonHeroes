@@ -274,12 +274,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event.is_action_pressed("mount"):
 		player.toggle_mount()
 	elif event.is_action_pressed("flask"):
-		if player.drink_flask():
-			play_ui("victory", -14.0)
-			fx.aura(player, Color("7ce7a2"), {"dur": 0.6})
-			_hud.hint.text = ProtoLang.t("msg_flask_sip")
-		elif player.flask_charges <= 0:
-			_hud.hint.text = ProtoLang.t("msg_flask_empty")
+		_use_flask()
 	elif event.is_action_pressed("toggle_keybinds"):
 		_kb_overlay.visible = not _kb_overlay.visible
 	elif event.is_action_pressed("toggle_debug"):
@@ -288,6 +283,14 @@ func _unhandled_input(event: InputEvent) -> void:
 		_debug_label.visible = not _debug_label.visible
 	elif event.is_action_pressed("ui_cancel"):
 		_confirm.visible = not _confirm.visible
+
+func _use_flask() -> void:
+	if player.drink_flask():
+		play_ui("victory", -14.0)
+		fx.aura(player, Color("7ce7a2"), {"dur": 0.6})
+		_hud.hint.text = ProtoLang.t("msg_flask_sip")
+	elif player.flask_charges <= 0:
+		_hud.hint.text = ProtoLang.t("msg_flask_empty")
 
 # F3 debug readout (roadmap 3c): fps + static RAM + video/texture VRAM — lets
 # anyone SEE memory behavior live in a windowed run (headless can't measure it).
@@ -1071,6 +1074,7 @@ func _build_confirm() -> void:
 	no.custom_minimum_size = Vector2(64, 0)
 	no.pressed.connect(func() -> void: _confirm.visible = false)
 	hb.add_child(no)
+	vb.add_child(ProtoDisplay.visibility_row())
 
 # ---- economy: REAL loot ------------------------------------------------------
 
@@ -1409,8 +1413,14 @@ func _build_hud() -> void:
 	var canvas := CanvasLayer.new()
 	canvas.layer = 10   # spec §2.0: above post(5)/damage(6) so the HUD stays crisp
 	add_child(canvas)
+	var vital_plate := Panel.new()
+	vital_plate.position = Vector2(6, 6)
+	vital_plate.size = Vector2(200, 89)
+	vital_plate.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	vital_plate.add_theme_stylebox_override("panel", ProtoTheme._box(Color("101a1ced"), ProtoTheme.PANEL_BORDER, 6, 4))
+	canvas.add_child(vital_plate)
 	var hp_frame := ColorRect.new()   # framed vital bar (roadmap 4b)
-	hp_frame.color = Color(0.35, 0.42, 0.55, 0.9)
+	hp_frame.color = ProtoTheme.GOLD.darkened(0.3)
 	hp_frame.position = Vector2(11, 11)
 	hp_frame.size = Vector2(186, 16)
 	canvas.add_child(hp_frame)
@@ -1429,16 +1439,25 @@ func _build_hud() -> void:
 	hp_bar.position = Vector2(2, 2)
 	hp_bar.size = Vector2(180, 10)
 	hp_bg.add_child(hp_bar)
+	var hp_text := Label.new()
+	hp_text.position = Vector2(14, 11)
+	hp_text.size = Vector2(180, 14)
+	hp_text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	hp_text.add_theme_color_override("font_color", Color("fff1d8"))
+	hp_text.add_theme_color_override("font_shadow_color", Color.BLACK)
+	hp_text.add_theme_constant_override("shadow_offset_x", 1)
+	hp_text.add_theme_constant_override("shadow_offset_y", 1)
+	hp_text.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	canvas.add_child(hp_text)
 	# dodge charge pips — cyan DIAMONDS under the HP bar (roadmap 4b: no plain
 	# squares; full = bright, refilling = half-alpha, spent = dark)
 	var pips: Array = []
 	for i in 3:
 		var pip := ColorRect.new()
 		pip.color = PIP_ON
-		pip.position = Vector2(12 + i * 14, 29)
-		pip.size = Vector2(7, 7)
-		pip.rotation = PI * 0.25
-		pip.pivot_offset = Vector2(3.5, 3.5)
+		pip.position = Vector2(13 + i * 13, 29)
+		pip.size = Vector2(10, 4)
+		pip.tooltip_text = "SHIFT · " + str(i + 1) + "/3"
 		canvas.add_child(pip)
 		pips.append(pip)
 	# XP progress to the next level (kills-based, proposal) — thin gold sliver,
@@ -1517,7 +1536,7 @@ func _build_hud() -> void:
 	charge.add_theme_color_override("font_color", Color("cf9dff"))
 	canvas.add_child(charge)
 	var stats := Label.new()
-	stats.position = Vector2(12, 62)
+	stats.position = Vector2(12, 96)
 	stats.add_theme_font_size_override("font_size", 8)
 	stats.modulate = Color(1, 1, 1, 0.92)
 	canvas.add_child(stats)
@@ -1533,7 +1552,7 @@ func _build_hud() -> void:
 	# stacks two thin bars (one per boss, each in its own color) under one label.
 	var boss_bar_bg := ColorRect.new()
 	boss_bar_bg.color = Color(0, 0, 0, 0.55)
-	boss_bar_bg.position = Vector2(170, 12)
+	boss_bar_bg.position = Vector2(230, 18)
 	boss_bar_bg.size = Vector2(304, 12)
 	boss_bar_bg.visible = false
 	canvas.add_child(boss_bar_bg)
@@ -1550,7 +1569,7 @@ func _build_hud() -> void:
 	boss_bar_bg.add_child(boss_name)
 	var boss_bar_bg2 := ColorRect.new()
 	boss_bar_bg2.color = Color(0, 0, 0, 0.55)
-	boss_bar_bg2.position = Vector2(170, 23)
+	boss_bar_bg2.position = Vector2(230, 31)
 	boss_bar_bg2.size = Vector2(304, 9)
 	boss_bar_bg2.visible = false
 	canvas.add_child(boss_bar_bg2)
@@ -1560,17 +1579,30 @@ func _build_hud() -> void:
 	boss_bar2.size = Vector2(300, 5)
 	boss_bar_bg2.add_child(boss_bar2)
 	# Ember Flask charges (R) — ember DIAMONDS beside the dodge pips
+	var flask_button := Button.new()
+	flask_button.name = "EmberFlask"
+	flask_button.theme = ProtoTheme.get_theme()
+	flask_button.position = Vector2(12, 41)
+	flask_button.size = Vector2(30, 36)
+	flask_button.icon = preload("res://prototype/ui/ember_flask.svg")
+	flask_button.expand_icon = true
+	flask_button.tooltip_text = ProtoLang.t("hud_flask_tip")
+	flask_button.pressed.connect(_use_flask)
+	canvas.add_child(flask_button)
+	var flask_key := Label.new()
+	flask_key.position = Vector2(14, 77)
+	flask_key.text = "R"
+	flask_key.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	canvas.add_child(flask_key)
 	var flask_pips: Array = []
 	for i in ProtoPlayer.FLASK_MAX:
 		var fp := ColorRect.new()
 		fp.color = Color("ff9a3c")
-		fp.position = Vector2(56 + i * 14, 29)
-		fp.size = Vector2(7, 7)
-		fp.rotation = PI * 0.25
-		fp.pivot_offset = Vector2(3.5, 3.5)
+		fp.position = Vector2(24 + i * 9, 81)
+		fp.size = Vector2(7, 4)
 		canvas.add_child(fp)
 		flask_pips.append(fp)
-	_hud = {"hp_bar": hp_bar, "hp_ghost": hp_ghost, "stats": stats, "hint": hint, "pips": pips,
+	_hud = {"hp_bar": hp_bar, "hp_ghost": hp_ghost, "hp_text": hp_text, "flask_button": flask_button, "stats": stats, "hint": hint, "pips": pips,
 			"q_label": q_label, "q_bar": q_bar, "xp_bar": xp_bar,
 			"e_bar": e_bar, "pet_chips": pet_chips, "slots": slots, "charge": charge,
 			"boss_bar_bg": boss_bar_bg, "boss_bar": boss_bar, "boss_name": boss_name,
@@ -1627,6 +1659,7 @@ func refresh_hud() -> void:
 		_hp_ghost = hp_frac
 	_hud.hp_bar.size.x = 180.0 * hp_frac
 	_hud.hp_ghost.size.x = 180.0 * _hp_ghost
+	_hud.hp_text.text = "%d / %d HP" % [ceili(player.hp), ceili(player.max_hp)]
 	# low-HP read: the bar goes red and breathes; crossing the line pulses the post
 	if hp_frac <= 0.3 and player.hp > 0.0:
 		var pulse := 0.5 + 0.5 * sin(Time.get_ticks_msec() / 160.0)
@@ -1642,10 +1675,13 @@ func refresh_hud() -> void:
 			Session.level, gold, kills, stones, snares,
 			Session.inventory.size(), ProtoItems.INVENTORY_CAP,
 			Session.pets.size(), Session.MAX_PETS]
+	_hud.stats.tooltip_text = _hud.stats.text
+	_hud.stats.text = ProtoLang.t("hud_summary") % [Session.level, gold, Session.inventory.size(), ProtoItems.INVENTORY_CAP]
 
 # ---- gauges: fill animations + glow on charge-complete (canon §4 UI) ----------
 
 func _update_gauges(delta: float) -> void:
+	_hud.flask_button.modulate = Color.WHITE if player.flask_charges > 0 else Color("858784")
 	_pip_flash = maxf(_pip_flash - delta * 3.0, 0.0)
 	_q_flash = maxf(_q_flash - delta * 3.0, 0.0)
 	_hud.xp_bar.size.x = 184.0 * _level_progress(kills)
@@ -1747,7 +1783,7 @@ func _update_pet_chips() -> void:
 		for n in get_tree().get_nodes_in_group("pet"):
 			if n.uid == int(pet.get("uid", 0)):
 				resting = n.resting()
-		chip.text = "◆ %s%s" % [str(pet.get("name", "?")),
+		chip.text = "◆ %s%s" % [Session.companion_name(pet),
 				ProtoLang.t("hud_resting") if resting else ""]
 		chip.add_theme_color_override("font_color",
 				Color("ff8a7a") if resting else Color("7fe7ff"))

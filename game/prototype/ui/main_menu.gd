@@ -48,6 +48,13 @@ const CLASSES := {
 
 func _ready() -> void:
 	_build()
+	# On Linux, the raw ELF has no desktop icon association merely because a
+	# PNG is alongside it. Install the packaged launcher/custom icon on normal
+	# startup, off the render thread. Test exports keep their homes hermetic.
+	if OS.has_feature("linux") and not OS.has_feature("editor") and OS.get_cmdline_user_args().is_empty():
+		var installer := OS.get_executable_path().get_base_dir().path_join("install-launcher.py")
+		if FileAccess.file_exists(installer) and FileAccess.file_exists("/usr/bin/python3"):
+			OS.create_process("/usr/bin/python3", [installer, "--quiet"])
 	if "--living-selftest" in OS.get_cmdline_user_args() or "--living-capture" in OS.get_cmdline_user_args():
 		_start_living.call_deferred()
 
@@ -293,6 +300,7 @@ func _open_options() -> void:
 	vb.add_child(title)
 	vb.add_child(_audio_row("music", ProtoLang.t("opt_music")))
 	vb.add_child(_audio_row("sfx", ProtoLang.t("opt_sfx")))
+	vb.add_child(ProtoDisplay.visibility_row())
 	vb.add_child(HSeparator.new())
 	vb.add_child(_cycle_row("opt_mode",
 			func() -> String: return str(ProtoDisplay.current().get("mode", "windowed")).to_upper(),

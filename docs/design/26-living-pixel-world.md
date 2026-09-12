@@ -265,3 +265,38 @@ with clearly separated skill effects and story; coherent HUD ornaments, focus
 navigation and touch/controller layouts. Preserve attack visibility, the six
 active/three passive target, and the 60 FPS budget as those systems migrate.
 Actual frames and reproduction instructions: [UI captures](../art/ui-identity/README.md).
+
+
+## Recovery UI/action foundation (2026-09-12, roadmap R01/R03–R07/R10)
+
+Playable first slice: the Haven saves and returns to the title without cloning
+character state into the next login. Shared companion cards show the actual
+species/mount sprite, nickname, base identity, potential or speed, skills and
+one primary action. Nicknames remain separate from species names, persist in
+saves, and follow the live companion. Six character tabs wrap into two rows
+instead of using the engine's overflow arrows. Mount controls are three short
+lines beneath the card. The Flask is an explicit bottle button with its R key
+and separate charge pips; HP has a numeric value and dodges have horizontal pips.
+
+World visibility is a saved 0–1 setting available in title Options and Hunt Esc.
+Default 0.6 lifts ambient illumination before grading, including low-effects mode;
+it does not enlarge attack lights or change combat visibility rules on a server.
+The bright/dark captures prove the adjustment; terrain contrast and all biome
+art still need the separate world pass.
+
+The local part baker now authors eight walk frames plus finite attack/cast/heavy/
+spin/dodge clips and regenerates their matching normal maps. Real traveled
+distance drives locomotion; actions finish before idle resumes. Slash direction
+uses the correct shader coordinate convention; melee presentation reads reach
+and arc width. Recycled effect materials reset their uniforms between uses.
+This is an animation correctness pass. The existing 26px hero silhouette is still
+below the requested modern-art bar, and richer melee mechanics remain pending.
+
+Gates: `renewal_probe` exercises real action completion, fallback non-looping,
+nickname UI/save, character isolation, visibility persistence and the actual
+Haven return button. `genforge/tests/test_renewal.py` checks distinct action
+motion and matching normal-map alpha. Actual GL frames are under
+`game/prototype/tests/captures/renewal/`; screenshot readback timings are not
+steady gameplay performance measurements. Original Haven courtyard source,
+exact prompt and provenance: `genforge/art_sources/haven-renewal/` (candidate,
+not yet used in the runtime). The complete Haven/NPC/crafting rework stays R11.

@@ -9,6 +9,13 @@
 > combat/skill overhaul it depends on. That document orders *when* PvP arrives; **this
 > document stays authoritative for PvP formats and rules**. Nothing here is scheduled yet.
 
+## Current continuity direction (2026-09-12)
+
+Characters, gear and skills never reset with seasons. Skill uncertainty/MMR and
+standings are separate from accumulated matches; bots are visibly tagged and
+start in exhibition play with no human prize eligibility. Guild territory and
+100v100 benchmarking are scheduled, not proven. See [design/27](27-continuity-and-community.md).
+
 ## Purpose
 
 This document specifies competitive Dragon Heroes: the three PvP modes (1v1 duel, 3v3 arena, and the Gloomfall battle royale), the Trophies ranked system and Glory reward currency, how gear is handled in ranked play, the weekly and seasonal tournament structure with its marketplace-funded prize pools, the legal constraints that shape prize design in Brazil, and the Champion Ghosts feature that turns each week's winner into a challengeable AI opponent. The core stance, inherited from the canon's anti-pay-to-win rules, is that competition must be won with skill and build strategy — never bought — even though the game contains a real-money item marketplace ([economy](../design/15-economy-and-marketplace.md)).
@@ -43,7 +50,7 @@ Team fights with a stall-breaker. The arena is larger (~80×80 m, proposal) with
 
 Forty hunters (proposal) drop into a freshly generated wilderness slice — same noise stack, biomes, and POIs as the Hunt, seeded per match, so no one has map knowledge beyond biome literacy. **The Gloom**, a wall of consuming darkness, contracts in phases (5 phases, ~2.5 min each, proposal) toward a seeded final zone; standing in the Gloom deals escalating percent-max-HP damage.
 
-Gloomfall runs on **normalized loadouts** (proposal): players drop with their class and class-skill loadout only, and **all gear is found in-match** from a curated BR loot table — nothing carries in, nothing carries out. The marketplace-tradable asset classes stay explicitly **outside** the mode: gear, pets, and Bestial Skill stones — marketplace-bought or self-looted — do not enter a Gloomfall match (proposal). This makes Gloomfall **gear-normalized** — marketplace power is kept out by construction, though accounts still differ in class progression and skill unlocks — and gives it its own looting-under-pressure rhythm. Roaming creature packs and a mid-match Legendary boss at a marked POI (proposal) provide PvPvE third-party pressure and high-tier in-match gear for whoever dares. Low-rating lobbies are filled with RL bots per the canon (§9); bots are trained with human-fairness constraints and never disclosed as bots in-lobby, but are labeled in the post-match report (proposal — honesty after the fact, immersion during).
+Gloomfall runs on **normalized loadouts** (proposal): players drop with their class and class-skill loadout only, and **all gear is found in-match** from a curated BR loot table — nothing carries in, nothing carries out. The marketplace-tradable asset classes stay explicitly **outside** the mode: gear, pets, and Bestial Skill stones — marketplace-bought or self-looted — do not enter a Gloomfall match (proposal). This makes Gloomfall **gear-normalized** — marketplace power is kept out by construction, though accounts still differ in class progression and skill unlocks — and gives it its own looting-under-pressure rhythm. Roaming creature packs and a mid-match Legendary boss at a marked POI (proposal) provide PvPvE third-party pressure and high-tier in-match gear for whoever dares. Low-rating lobbies are filled with RL bots per the canon (§9); bots are trained with human-fairness constraints and visibly labelled [AI] before and during play (current proposal, canon §12.47; supersedes the old post-match-only disclosure proposal).
 
 Gloomfall matches burst-schedule onto Edgegap capacity rather than the persistent Agones fleet ([hosting](../tech/22-netcode-and-server-hosting.md)).
 
@@ -130,7 +137,7 @@ A season is **12 weeks** (canon, proposal): 11 weekly cycles, then a **Seasonal 
 
 Because weekly content drops land throughout the season ([content pipeline](../tech/23-content-pipeline.md)), a **balance lock** freezes combat-affecting content changes for the final two weeks (proposal): week 11 qualifiers and the week 12 grand bracket play on the same patch, and Champion Ghost fine-tunes for those weeks skip redeployment unless the eval gate flags a regression.
 
-Funding is canonical: **20% (proposal) of marketplace fee revenue** accrues to tournament prizes (canon §2). We propose the split below; the studio may top up pools as marketing spend ("sponsored" pools — legally cleaner, see next section), but the marketplace allocation is the guaranteed floor.
+Funding revision (2026-09-12, canon §12.47): evaluate 10% of distributable profit for prizes plus 10% for contributors, detailed in [business/33](../business/33-community-funding.md). No unfunded guaranteed floor. The following 20%-of-fees diagram is the historical proposal, retained for comparison only.
 
 ```mermaid
 flowchart LR

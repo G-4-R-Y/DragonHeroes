@@ -36,6 +36,7 @@ var _mats := {}                  # kind -> Array[ShaderMaterial] (one per slot):
 								 # a spawn only re-points sprite.material, never
 								 # swaps a shader mid-fight (frame-time spike)
 var _cur: Array[ShaderMaterial] = []
+var _defaults := {}             # reset recycled uniforms: no cross-cast leakage
 var _age: Array[float] = []
 var _life: Array[float] = []
 var _persist: Array[bool] = []   # long-lived quads (field flames): stolen LAST
@@ -51,6 +52,10 @@ func _ready() -> void:
 	img.fill(Color.WHITE)
 	var tex := ImageTexture.create_from_image(img)
 	for kind in SHADERS:
+		var defaults := {}
+		for u in (SHADERS[kind] as Shader).get_shader_uniform_list():
+			defaults[u.name] = RenderingServer.shader_get_parameter_default(SHADERS[kind].get_rid(), u.name)
+		_defaults[kind] = defaults
 		var arr: Array[ShaderMaterial] = []
 		for i in POOL:
 			var m := ShaderMaterial.new()
@@ -82,6 +87,8 @@ func burst(kind: String, at: Vector2, cfg: Dictionary = {}) -> int:
 	var i := _claim()
 	var s := _sprites[i]
 	var m: ShaderMaterial = _mats[kind][i]
+	for u in _defaults[kind]:
+		m.set_shader_parameter(u, _defaults[kind][u])
 	s.material = m
 	_cur[i] = m
 	s.global_position = at

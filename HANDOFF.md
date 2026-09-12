@@ -1,3 +1,68 @@
+# Handoff — quota recovery ACTIVE, all pending requests preserved (2026-09-12)
+
+User authorizes finishing all queued 2D work, then Rebirth, committing/pushing
+master and regenerating Codex binaries. Do not stop at documentation alone.
+Remote fetch confirmed master/origin at e036a7c; the prior push succeeded. The
+quota rejection happened only on the next documentation command. Work inline
+(no subagents, CLAUDE explicit). Active demand ledger: docs/harness/20-roadmap.md
+R01–R26. Full prompts, including the earlier outage requests, are preserved in
+docs/harness/requests/2026-09-12-recovery.md. New direction is canon §12.47: permanent
+characters/power ceiling, weekly behavior enchantments, endless cosmetic XP;
+rarity-luck is bounded and needs supply simulation. Community/mod/anti-cheat/
+guilds/rating/bots plan in design/27, tech/36, business/33. New bot labels and
+financial pool rules are explicit proposals, not implemented live services.
+
+Uncommitted 2D code: new hero action clips locally baked with matched normal
+maps; finite fallback actions, real-distance locomotion, skill arc orientation
+and VFX uniform reset. Companion cards/nicknames persist; Haven returns to title
+with save; Session.login resets character data so new saves cannot clone gear.
+Six tab buttons in two rows replace overflowing arrows; visibility slider in
+main options and Hunt Esc, lifts ambient before grading; Flask has bottle button
+and independent charges (old charges overlapped Q). Existing click/flask/level-up
+pass; new renewal_probe passes actual animation/identity/save/navigation checks;
+115 Python tests pass with local runtime access. All 19 Godot outcomes now pass (spawn rechecked after fixing a test that
+confused normal pursuit with initial placement); native CTest 4/4 and validator
+pass. Stream 0.93 ms, recovery 2.15 ms worst apply, FX 2.99 ms/no node growth in the
+full run. Steady GL samples running; commits/packages remain.
+
+Actual GL renewal_capture frames exist in game/prototype/tests/captures/renewal
+and were viewed. UI/portraits/settings fit; duplicate mount identity was removed;
+HUD and hero still need the stronger art pass. Capture timing sampled cold
+screens/readback stalls, so do NOT call those figures a steady 60 FPS proof.
+Use Engine.max_fps=60 and warmed sustained samples for the next capture run.
+New Haven scene image generated with built-in imagegen, viewed/copied to
+ genforge/art_sources/haven-renewal/source.png (1672x941). Exact prompt/provenance are saved beside it; runtime integration remains. Original output under ~/.codex/generated_images/
+01a09445-0ed7-79b1-89ea-8280f42f2b8d/exec-0bccb45c-ed3c-4f4f-b376-4e77217751db.png.
+
+Icon clarification: PNG exists, executable is generic in file manager. Installer
+now writes app-menu and in-package desktop launchers, sets GIO custom-icon on
+ELF + trusted shortcut, supports --package/--quiet. Normal Linux exported title
+startup launches installer asynchronously; test args skip it. Package README
+updated. Test installer round-trip/desktop syntax passes; real local GIO icon
+installation and final packages remain pending. Existing binaries still e570acc.
+
+NEXT: complete small visual/persistence polish and full gates, then repair long
+Hunt world/hibernation and real biomes, strong reusable Orun-style all-creature/
+player/terrain/VFX pipeline, enchantments/classes/XP cosmetics/Haven mechanics.
+World audit: C++ generator has only four terrain types and no biomes. Stream
+recovery now implemented: periodic/apply reconciliation, discard stale loads,
+nearest-first painting, unfinished movement fence, helper retry, 49-chunk cap,
+worker-only bounded 7x7 SDF mask, scratch deletion. stream_recovery passes far
+negative travel/unload reversal/failure recovery/identical revisit at 1.07 ms worst
+apply (ordinary stream 1.10 ms). Distant creatures drop only beyond480tiles; bosses exempt,
+all count120cap. `_visited_chunks` grows forever and returns never respawn saved
+packs. Implement bounded active entities + per-Hunt chunk deltas, identity/HP/
+death preservation, canonical C++ biome metadata, recovery/long-travel tests.
+
+Warmed actual GL receipt: 300 gameplay frames at reported 60 FPS; frame median
+16.668 ms / p95 16.911 ms, CPU process median 3.813 ms / p95 4.218 ms. PNG readback stalls
+are excluded. Full captures and reproduction: docs/art/ui-renewal/README.md.
+This is a short desktop sample, not a sustained/mobile guarantee. First playable
+recovery milestone is being committed/pushed and packaged; all remaining R-items
+stay scheduled/in progress.
+
+---
+
 # Handoff — GitHub publication authorized (2026-09-12)
 
 Ricardo explicitly requested committing and pushing all completed changes,

@@ -90,6 +90,9 @@ var _inflight_needed := {}         # keys the in-flight request will satisfy (de
 var _staged := {}                  # Vector2i -> {tiles, img} parsed, awaiting apply
 var _jobs := []                    # [ {key, mode:"load"|"unload"} ] apply queue
 var _pending_unload := {}          # dedup set for queued unloads
+var _reconcile_in := 0.0
+var _retry_after_ms := 0
+var _stream_failures := 0
 
 # Amortized apply state machine — ONE chunk in flight at a time.
 var _apply_active := false
@@ -277,7 +280,7 @@ func _pack_tiles(tiles: Array) -> PackedByteArray:
 
 # --- per-frame driver ------------------------------------------------------
 
-func _process(_dt: float) -> void:
+func _process(dt: float) -> void:
 	# Foliage sway needs the hero's position once per frame (walk-through push).
 	if _sway_mat != null:
 		var p := _get_player()
@@ -293,6 +296,10 @@ func _process(_dt: float) -> void:
 		if pc != _player_chunk:
 			_player_chunk = pc
 			_on_crossing()
+	_reconcile_in -= dt
+	if _reconcile_in <= 0.0 and _player_chunk != _CHUNK_NONE:
+		_reconcile_in = 0.5
+		_on_crossing()
 	_process_apply()
 
 # Player crossed a chunk boundary: request the missing apron, retire what fell
@@ -308,6 +315,10 @@ func _on_crossing() -> void:
 			if _chebyshev(k, pc) <= UNLOAD_RADIUS or _in_origin_keep(k, pc):
 				_jobs.remove_at(i)
 				_pending_unload.erase(k)
+		elif _chebyshev(j["key"], pc) > UNLOAD_RADIUS:
+			# A teleport/reversal must not wait behind obsolete distant painting.
+			_staged.erase(j["key"])
+			_jobs.remove_at(i)
 	# missing = the 5×5 apron not already present anywhere in the pipeline
 	var missing: Array = []
 	for dy in range(-LOAD_RADIUS, LOAD_RADIUS + 1):
@@ -315,7 +326,7 @@ func _on_crossing() -> void:
 			var k := pc + Vector2i(dx, dy)
 			if not _present(k):
 				missing.append(k)
-	if not missing.is_empty() and not _req_inflight:
+	if not missing.is_empty() and not _req_inflight and Time.get_ticks_msec() >= _retry_after_ms:
 		_kick_stream(missing)
 	# unload past UNLOAD_RADIUS (chebyshev) — but never the origin 5×5 while inside
 	for key in chunks.keys():
@@ -327,11 +338,14 @@ func _on_crossing() -> void:
 			continue
 		_jobs.append({"key": key, "mode": "unload"})
 		_pending_unload[key] = true
-	_kick_sdf()
 
 # A chunk is "present" if it is loaded, staged, queued/active for load, or covered
 # by the in-flight request — so it is never fetched twice.
 func _present(key: Vector2i) -> bool:
+	# An active unload finishes atomically; its replacement is requested as
+	# soon as that job finishes, even if the player has stopped moving.
+	if _apply_active and _apply_mode == "unload" and _apply_key == key:
+		return true
 	if chunks.has(key) or _staged.has(key):
 		return true
 	if _req_inflight and _inflight_needed.has(key):
@@ -351,15 +365,17 @@ func _in_origin_keep(key: Vector2i, pc: Vector2i) -> bool:
 # --- streaming worker (subprocess dump -> parsed chunks) -------------------
 
 func _kick_stream(missing: Array) -> void:
-	var bmin := Vector2i(1 << 20, 1 << 20)
-	var bmax := Vector2i(-(1 << 20), -(1 << 20))
+	var bmin: Vector2i = missing[0]
+	var bmax: Vector2i = missing[0]
 	_inflight_needed = {}
 	for k in missing:
 		bmin = Vector2i(mini(bmin.x, k.x), mini(bmin.y, k.y))
 		bmax = Vector2i(maxi(bmax.x, k.x), maxi(bmax.y, k.y))
 		_inflight_needed[k] = true
 	_req_inflight = true
-	var out := ProjectSettings.globalize_path("user://stream_%d_%d.json" % [_player_chunk.x, _player_chunk.y])
+	# One worker per world, one reusable scratch file; exploration never leaves
+	# an unbounded directory of JSON dumps behind.
+	var out := ProjectSettings.globalize_path("user://stream_%d.json" % get_instance_id())
 	var job := {"bbox": "%d,%d,%d,%d" % [bmin.x, bmin.y, bmax.x, bmax.y],
 			"out": out, "needed": _inflight_needed.keys()}
 	_thread = Thread.new()
@@ -396,6 +412,8 @@ func _stream_worker(job: Dictionary) -> void:
 						@warning_ignore("integer_division")
 						img.set_pixel(i % CHUNK, i / CHUNK, MAP_COLS[t])
 					results.append({"key": key, "tiles": packed, "img": img, "entrances": c.get("entrances", [])})
+	if FileAccess.file_exists(job["out"]):
+		DirAccess.remove_absolute(job["out"])
 	_mutex.lock()
 	for r in results:
 		_ready_chunks.append(r)
@@ -418,6 +436,8 @@ func _drain_stream() -> void:
 		_thread = null
 	for r in newly:
 		var key: Vector2i = r["key"]
+		if _player_chunk != _CHUNK_NONE and _chebyshev(key, _player_chunk) > UNLOAD_RADIUS:
+			continue
 		if chunks.has(key) or _staged.has(key):
 			continue
 		_staged[key] = r
@@ -425,6 +445,8 @@ func _drain_stream() -> void:
 	if done:
 		_req_inflight = false
 		_inflight_needed = {}
+		_stream_failures = mini(_stream_failures + 1, 5) if newly.is_empty() else 0
+		_retry_after_ms = Time.get_ticks_msec() + (250 * (1 << _stream_failures) if _stream_failures > 0 else 0)
 		# a crossing may have happened mid-dump — re-evaluate to keep filling in
 		if _player_chunk != _CHUNK_NONE:
 			_on_crossing()
@@ -443,14 +465,28 @@ func _process_apply() -> void:
 		else:
 			_step_unload()
 	_worst_apply_ms = maxf(_worst_apply_ms, (Time.get_ticks_usec() - t0) / 1000.0)
+	if not _apply_active:
+		_on_crossing()
+		_sdf_dirty = true
+		if _jobs.is_empty() and not _req_inflight:
+			_kick_sdf()
 
 func _begin_next_job() -> void:
-	# Prefer loads (retreat the walkability fence) over unloads.
+	# Paint the nearest missing ground first. Retire a stale chunk before
+	# exceeding the preallocated 7x7 tile capacity, including during teleports.
 	var idx := -1
+	var nearest := 2147483647
 	for i in _jobs.size():
 		if _jobs[i]["mode"] == "load":
-			idx = i
-			break
+			var distance := _chebyshev(_jobs[i]["key"], _player_chunk)
+			if distance < nearest:
+				idx = i
+				nearest = distance
+	if chunks.size() >= 49:
+		for i in _jobs.size():
+			if _jobs[i]["mode"] == "unload":
+				idx = i
+				break
 	if idx == -1:
 		if _jobs.is_empty():
 			return
@@ -461,8 +497,8 @@ func _begin_next_job() -> void:
 	if mode == "load":
 		if chunks.has(key) or not _staged.has(key):
 			return   # already loaded / lost its staging — skip silently
-		# publish tile DATA at apply-start so this chunk's own transitions/water
-		# read it; the fence (is_walkable) only opens once data is in `chunks`.
+		# Dressing may read data now; the walkability fence remains closed
+		# until every visual phase has finished.
 		var st: Dictionary = _staged[key]
 		chunks[key] = st["tiles"]
 		entrances[key] = st.get("entrances", [])
@@ -867,23 +903,31 @@ func _kick_sdf() -> void:
 		return
 	if chunks.is_empty():
 		return
+	_sdf_dirty = false
 	_sdf_inflight = true
 	_sdf_thread = Thread.new()
+	var bounds := _chunk_bounds()
+	if _streaming and _player_chunk != _CHUNK_NONE:
+		bounds = [_player_chunk - Vector2i(3, 3), _player_chunk + Vector2i(3, 3)]
 	# LOW priority: the chamfer is pure background math — it must yield to apply.
-	_sdf_thread.start(_sdf_worker.bind(_snapshot_rock()), Thread.PRIORITY_LOW)
+	# Packed arrays use copy-on-write. The worker owns an immutable dictionary
+	# snapshot; even mask construction stays off the main thread.
+	_sdf_thread.start(_sdf_worker.bind({"chunks": chunks.duplicate(), "bounds": bounds}), Thread.PRIORITY_LOW)
 
-# Main-thread snapshot: copy each loaded chunk's rock bits into a window-sized
+# Worker snapshot: copy each loaded chunk's rock bits into a window-sized
 # byte mask (per-chunk memcpy-style loop, no per-tile dict lookups).
-func _snapshot_rock() -> Dictionary:
-	var b := _chunk_bounds()
+func _snapshot_rock(source: Dictionary) -> Dictionary:
+	var b: Array = source["bounds"]
 	var kmin: Vector2i = b[0]
 	var kmax: Vector2i = b[1]
 	var tw := (kmax.x - kmin.x + 1) * CHUNK
 	var th := (kmax.y - kmin.y + 1) * CHUNK
 	var rock := PackedByteArray()
 	rock.resize(tw * th)   # zero = not rock (holes in a non-rect window stay open)
-	for key: Vector2i in chunks:
-		var tiles: PackedByteArray = chunks[key]
+	for key: Vector2i in source["chunks"]:
+		if key.x < kmin.x or key.y < kmin.y or key.x > kmax.x or key.y > kmax.y:
+			continue
+		var tiles: PackedByteArray = source["chunks"][key]
 		var ox := (key.x - kmin.x) * CHUNK
 		var oy := (key.y - kmin.y) * CHUNK
 		for ly in CHUNK:
@@ -896,7 +940,8 @@ func _snapshot_rock() -> Dictionary:
 
 # WORKER THREAD — pure PackedFloat32Array chamfer (3-4 mask ~ 1 / 1.4 tile units),
 # two passes, then bakes the R8 Image. No engine/scene access.
-func _sdf_worker(snap: Dictionary) -> void:
+func _sdf_worker(source: Dictionary) -> void:
+	var snap := _snapshot_rock(source)
 	var tw: int = snap["tw"]
 	var th: int = snap["th"]
 	var rock: PackedByteArray = snap["rock"]
@@ -1001,8 +1046,8 @@ func chunk_map_image(key: Vector2i) -> Image:
 
 # Chunk-key bounding box of the loaded window: [kmin, kmax], inclusive.
 func _chunk_bounds() -> Array:
-	var kmin := Vector2i(1 << 20, 1 << 20)
-	var kmax := Vector2i(-(1 << 20), -(1 << 20))
+	var kmin: Vector2i = chunks.keys()[0] if not chunks.is_empty() else Vector2i.ZERO
+	var kmax := kmin
 	for key in chunks:
 		kmin = Vector2i(mini(kmin.x, key.x), mini(kmin.y, key.y))
 		kmax = Vector2i(maxi(kmax.x, key.x), maxi(kmax.y, key.y))
@@ -1019,6 +1064,8 @@ func _tile_grid(tx: int, ty: int) -> int:
 	var key := Vector2i(floori(float(tx) / CHUNK), floori(float(ty) / CHUNK))
 	if not chunks.has(key):
 		return T_ROCK
+	if _apply_active and _apply_key == key:
+		return T_ROCK   # loading has not finished / unloading is already hidden
 	return chunks[key][(ty - key.y * CHUNK) * CHUNK + (tx - key.x * CHUNK)]
 
 # DRESSING grid: like _tile_grid but also sees staged-not-yet-applied chunks, so

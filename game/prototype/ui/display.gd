@@ -8,9 +8,11 @@ class_name ProtoDisplay
 const PATH := "user://settings.json"
 const MODES := ["windowed", "fullscreen"]
 const SCALES := ["integer", "fit"]
+static var visibility := 0.6  # 0 moody .. 1 luminous; no texture/LUT rebakes
 
 static func apply_saved() -> void:
 	var d := _load()
+	visibility = clampf(float(d.get("visibility", 0.6)), 0.0, 1.0)
 	# default = FIT (fills the screen edge-to-edge; Ricardo: fullscreen must
 	# scale); integer stays as the crisp-pixel option in the menu
 	apply(str(d.get("mode", "windowed")), str(d.get("scale", "fit")))
@@ -36,6 +38,28 @@ static func fit_windowed(w: Window) -> void:
 
 static func current() -> Dictionary:
 	return _load()
+
+static func set_visibility(value: float) -> void:
+	visibility = clampf(value, 0.0, 1.0)
+	var d := _load()
+	d["visibility"] = visibility
+	_save(d)
+
+static func visibility_row() -> Control:
+	var row := VBoxContainer.new()
+	var label := Label.new()
+	label.text = ProtoLang.t("opt_visibility")
+	row.add_child(label)
+	var slider := HSlider.new()
+	slider.min_value = 0.0
+	slider.max_value = 1.0
+	slider.step = 0.05
+	slider.value = visibility
+	slider.custom_minimum_size = Vector2(180, 20)
+	slider.tooltip_text = ProtoLang.t("opt_visibility_hint")
+	slider.value_changed.connect(set_visibility)
+	row.add_child(slider)
+	return row
 
 static func cycle_mode() -> String:
 	var d := _load()

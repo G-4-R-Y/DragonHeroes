@@ -4,7 +4,107 @@ Ricardo decides DIRECTION (which lever, when); harnesses execute inside it.
 Every item points at its law doc. Statuses: NOW (in flight) · PICK (awaiting
 Ricardo's call) · SCHEDULED (decided, sequenced) · BUDGET (blocked on money).
 
-## NOW — Commit and push all completed work (Ricardo, 2026-09-12)
+## NOW — Resume every request queued during the quota outage (Ricardo, 2026-09-12)
+
+The user restored quota and explicitly requested execution of ALL pending work.
+The publication itself succeeded at e036a7c; automatic approval review rejected
+only the subsequent documentation-record command because workspace credits were
+exhausted. That command never ran. All messages below arrived during the outage
+and are recovered here before implementation. Work remains inline per CLAUDE.md.
+Finish the 2D work before the Rebirth follow-up; commit/push completed slices
+on the authorized mainline, preserve unrelated work, and rebuild Codex packages.
+
+| ID | Status | Recovered demand | Law / gate |
+|---|---|---|---|
+| R01 | NOW | Audit and improve movement, attack and skill animations; make melee skills visually/mechanically distinct with satisfying arcs. | canon §12.45, design/17/18/24/26; real action captures and combat outcomes |
+| R02 | SCHEDULED after 2D | Review rebirth files, build an Unreal-quality boss fight and improve the "plebs" model; get the 3D asset pipeline running. | canon §12.44, rebirth/docs; local GL capture and real fight/asset gates; determine intended model from files |
+| R03 | DONE | Add Return to Main Menu alongside Quit in Haven. | UI/Session flow; renewal_probe real Haven button → saved gold → title |
+| R04 | DONE | Show companion sprites and editable nicknames in stables. | design/13; renewal_probe nickname edit/save/reload + stables/mounts GL captures |
+| R05 | SCHEDULED | Overhaul the UI fully; replace ugly character-menu arrows; simplify mount information into organized cards. | design/17/26, typography doctrine; EN/PT fitting, input and capture gates |
+| R06 | SCHEDULED | Make Orun's design/concept contract the default creature-generation standard; rework ALL existing creatures and automate it. | design/26, tech/34, content schemas; complete catalog coverage, animation/atlas/style/budget gates |
+| R07 | DONE | Improve visibility/brightness/contrast and add an options setting. | design/17/19; renewal_probe settings round-trip + actual bright/dark GL captures |
+| R08 | SCHEDULED | Unload distant hordes from active memory/cap, then restore them when revisited. | tech/29, C++ authority; identity/HP/death persistence and bounded active-memory outcomes |
+| R09 | SCHEDULED | Fix distant map-generation stalls and missing biome variety; overhaul biome textures and atmosphere to match the shrine aesthetic. | tech/24/29, design/17/26; long-distance streaming/biome gates and captures |
+| R10 | SCHEDULED | Redesign HP/dodge HUD and make the Ember Flask clearly visible. | design/11/17; cooldown/resource readability and gameplay captures |
+| R11 | SCHEDULED | Turn Haven into a place with NPCs; enrich forge/enchanting and related facilities; salvage items into crafting materials; craft improved/unique/fixed-rarity randomized gear. | design/14/15, no paid randomness; inventory/material conservation, persistence and UI outcomes |
+| R12 | SCHEDULED | Upgrade all particle families to the dark-VFX quality bar; add wings, auras and cosmetic items earned through boss drops, hunting, quests, crafting, forge and enchanting. | design/18, economy boundaries; bounded VFX, acquisition/equip/save outcomes |
+| R13 | SCHEDULED | More classes, build choices, meaningful skill synergies, aesthetic customization and distinct equipment visuals; reflect them in the asset pipeline. | design/10/11/26, stable data IDs; real skill/build effects and visual coverage |
+| R14 | SCHEDULED | Explain and provide a sustainable local asset pipeline; avoid permanent dependence on cloud credits. | tech/23/34, canon local-compute directive; offline generation and explicit optional-provider costs |
+| R15 | SCHEDULED | Fix the PNG/application-icon attachment or packaging problem reported for the binary. | tech/34 packaging; inspect package files, icon association and executable resources; clarify symptom if needed |
+| R16 | SCHEDULED | Hunter levels improve equipment-rarity odds; add something that scales indefinitely. | progression audit in design/24; design an endless PvE/mastery track with bounded numeric combat and validated rarity curves; preserve saves |
+| R17 | NOW / recurring | Push ALL changes, including those completed after quota resumed, resolving upstream conflicts; regenerate playable Codex binaries. | harness suite, exact source manifests, GitHub remote equality |
+| R18 | NOW / design then implementation | Weekly item enchantments are the strongest moat: on-hit chain lightning, ignite, lifesteal, meteors/showers, impact thunder, AI clones, granted actives and class-tree synergies. Rarity increases behavioral identity, not an endless power ladder; preserve old item value. | canon §12.47; design/27; bounded native trigger graph and real equipped effects |
+| R19 | NOW / replaces R16's endless-power interpretation | Endless XP awards exclusive cosmetic reward caches; no paid random access. Investigate an asymptotic rarity-luck bonus, including new-player fairness and supply inflation; characters/equipment never season-reset. | canon §12.47; design/27; XP rollover, acquisition and bounded rarity simulations |
+| R20 | SCHEDULED with R13 | PvP needs deliberate counterplay, defenses, readable commitments and elemental interactions inspired by Magicka/Wizard Wars; stop rewarding button speed alone. | design/27; native duel outcome and reaction-window gates |
+| R21 | SCHEDULED | Open-source/mod ecosystem; community voting nominates mods for official promotion; define curated compatibility/security/art/balance/license gates and contribution credit. | canon §12.47; design/27; validate one mod submission through promotion tooling |
+| R22 | DESIGN / research | Proposed contributor pool 10% of distributable profit, weighted by accepted contributions (dungeons/items etc), plus 10% for event prizes. Compare current marketplace fee model with subscriptions/direct Pix; preserve uncertain alternatives and superseded allocations explicitly. | business/33; researched accounting/legal/PSP boundary; no unreviewed money movement |
+| R23 | SCHEDULED | Separate modded/local and official character provenance while preserving beloved character identity; validate offline→official boundaries. Research full anti-cheat, including the blockchain question, impossible casts/kills, authoritative drops/stats, replay and abuse detection. | tech/36; adversarial protocol/provenance tests; reject forged client loot |
+| R24 | SCHEDULED | Guilds/allegiances, territorial map and wars, contested legendary loot, allied raids and raid-contribution competition; research/load-test a 100v100 ambition. | design/27, tech/36; staged native 20/50/100v100 budgets, no unsupported capacity claim |
+| R25 | SCHEDULED | Named neural bot opponents during thin queues, coherent weekly item builds/meta exploration and leaderboard participation; explicit bot identity; rating based on skill/uncertainty rather than match-count farming; assess bounties/soft MMR seasons without character resets. | design/27, tech/36; rating simulations, bot eligibility and matchmaking gates |
+| R26 | NOW / recurring | Preserve ALL pending messages, comments and prompts verbatim as well as roadmap summaries; continue execution. Explicitly improve the PLAYER sprite along with all environments/textures/particles. | requests/2026-09-12-recovery.md; R06/R09/R12; captures and durable handoff |
+
+Execution strategy: inspect current code/tools and preserve every demand; complete
+cohesive 2D slices with shared data/presentation seams, regression outcomes and
+actual GL frames. Start with the existing animation/action contracts and UI/state
+flows, repair long-Hunt streaming/visibility foundations, then expand the same
+art contract across creatures/biomes/equipment/VFX and progression/Haven systems.
+Use local deterministic generation and reusable caches wherever possible; do
+not pretend static concepts are finished action animation or uncompiled engine
+code is a tested game. Rebirth comes after the 2D acceptance gates. Every item
+stays open until its implementation and concrete gate are complete.
+
+Interruption detail (R15, Ricardo): the PNG is present beside the binary but
+the executable still shows the generic file-manager icon. Investigate Linux
+desktop integration and launcher trust/icon paths, not missing in-game art.
+Current implementation state: distinct locally baked hero action clips,
+correctly oriented/ranged slash presentation and recycled-VFX reset are in
+flight; Haven return/save and shared companion portrait/nickname UI are being
+integrated. Finish their outcome gates, then visibility/world/UI foundations.
+
+Interruption detail (R02/R14, Ricardo): "plebs" means the GPU-poor LOCAL 3D
+asset-generation pipeline, not a named creature model. Target the available
+6 GB RTX 4050 and CPU fallback; inspect existing local model/cache support,
+make reusable meshes/materials/rigs actually load in Rebirth, and keep optional
+cloud providers explicit. The 2D-first execution order remains unchanged.
+
+New direction checkpoint: full latest prompts are archived in
+`requests/2026-09-12-recovery.md`; earlier outage requests are also archived verbatim.
+R18/R19 settle the ambiguity about endless progression: XP/cosmetics and new
+build possibilities continue; permanent numerical item power does not inflate.
+The rarity-luck idea is a concern to simulate, not permission to flood markets.
+Keep the 2D-first order, integrate the weekly enchantment/progression seam with
+the pending item/VFX/Haven work, then Rebirth's local 3D path. Community/server
+features require concrete specs, tools and native tests; no fiction that local
+prototype saves, uncompiled UE code or blockchain provide production trust.
+Current slice: renewal outcome gate passes (actions, save isolation, nicknames,
+visibility, real Haven return); existing click/flask/level-up pass. First GL
+captures expose remaining texture repetition, small hero and HUD hierarchy;
+fix these in the art/world pass and take steady-state performance samples.
+
+Recovery checkpoint: 115 Python tests pass with the required local runtime
+access; the sandbox-only attempt could not complete. Godot renewal/navigation/
+companion/visibility gates pass. R03/R04/R07 are complete; the wider art, melee,
+UI and world demands stay open. R09 streaming repair now discards obsolete
+loads, prioritizes nearby ground, closes unfinished-terrain movement fences,
+retries helper failures without moving, reconciles unload reversals, bounds
+active chunks at 49 and shadow masks at 7×7, and removes scratch dumps. Real
+stream_recovery passes far/negative travel, unload reversal, failed-helper
+recovery and deterministic return; worst apply 1.07 ms (ordinary stream 1.10 ms).
+Actual GL frames expose the remaining small hero/repetitive floor. Full updated suite: all 19 Godot outcomes pass, with spawn placement rechecked
+after correcting its eight-second live-pursuit false failure. CTest 4/4 and
+validator pass. Full-run stream 0.93 ms / recovery 2.15 ms / FX 2.99 ms (zero pool growth);
+recovery exceeds the 2 ms target in that sample but stays below 4 ms hard ceiling.
+Upcoming: per-Hunt dormant encounter state, native biomes/art contract, weekly enchanted
+builds/cosmetic XP/Haven stations; keep Rebirth after all 2D gates.
+
+Warmed actual GL receipt: 300 gameplay frames at reported 60 FPS; frame median
+16.668 ms / p95 16.911 ms, CPU process median 3.813 ms / p95 4.218 ms. PNG readback stalls
+are excluded. Full captures and reproduction: docs/art/ui-renewal/README.md.
+This is a short desktop sample, not a sustained/mobile guarantee. First playable
+recovery milestone is being committed/pushed and packaged; all remaining R-items
+stay scheduled/in progress.
+
+## DONE — Commit and push all completed work (Ricardo, 2026-09-12)
 
 Demand: commit everything and push the changes, resolving any merge issues.
 Law: harness integration gates; this explicitly authorizes publishing the
@@ -14,6 +114,10 @@ merge any new upstream commits without rewriting remote history, verify the
 result, commit the publication record, and push `master`. Verify the remote
 commit matches local HEAD and leave a clean tree. Preserve ignored generated
 artifacts and the existing review branch; no force push or unrelated cleanup.
+
+Publication receipt recovered: GitHub accepted 08f92d6 → e036a7c on master.
+The quota rejection happened after that successful push, during the attempt to
+record completion. Live remote ancestry will be refreshed at this resumed pass.
 
 ## DONE — Audit infinite hunter, monster and item scaling (Ricardo, 2026-09-12)
 

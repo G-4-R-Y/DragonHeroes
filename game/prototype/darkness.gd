@@ -104,7 +104,9 @@ func _process(dt: float) -> void:
 	_quad.scale = (vs * 1.04) / TEX_SIZE
 	_mat.set_shader_parameter("origin", center - vs * 0.52)
 	_mat.set_shader_parameter("size", vs * 1.04)
-	_mat.set_shader_parameter("ambient", ambient)
+	# Lift shadow detail before grading, preserving bright spell cores and the
+	# existing light registry. This also works with the low-effects post bypass.
+	_mat.set_shader_parameter("ambient", ambient.lerp(Color(0.78, 0.80, 0.86), ProtoDisplay.visibility * 0.72))
 
 	# gather candidate holes: dynamic light pools + static environment sources
 	# — entries are [pos, radius, strength, color, casts_shadows]

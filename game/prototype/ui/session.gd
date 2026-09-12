@@ -112,6 +112,9 @@ func setup_input() -> void:
 # shipping game NEVER trusts a client-side save. One JSON per hunter name.
 
 func login(pname: String) -> void:
+	if _logged_in and _save_dirty:
+		save()
+	_reset_character()
 	player_name = pname
 	_logged_in = true
 	if FileAccess.file_exists(save_path()):
@@ -121,6 +124,60 @@ func login(pname: String) -> void:
 		# the character screen, not one lonely root skill (Ricardo 2026-07-12).
 		skill_points = 3
 		save()   # claim the slot right away
+
+func leave_character() -> void:
+	save()
+	_logged_in = false
+
+func _reset_character() -> void:
+	# A return to the title screen must not clone the old hunter into a new
+	# save. Keep the menu's class selection, reset all per-character state.
+	level = 1
+	gold = 0
+	stones = 0
+	snares = 0
+	kills = 0
+	has_blade = false
+	rune_granted = false
+	attribute_points = 5
+	for k in ATTRIBUTES:
+		attributes[k] = BASE_ATTRIBUTE
+	inventory = []
+	stash = []
+	pets = []
+	stables = []
+	mounts = []
+	active_mount = -1
+	for slot in equipment:
+		equipment[slot] = {}
+	for skill in skill_runes:
+		skill_runes[skill] = {}
+	skill_points = 3
+	learned_nodes = ["root_cleave"]
+	skill_loadout = ["", "", "", ""]
+	_save_dirty = false
+	_save_t = 0.0
+
+func companion_name(data: Dictionary) -> String:
+	var nickname := str(data.get("nickname", "")).strip_edges()
+	return nickname if not nickname.is_empty() else str(data.get("name", "?"))
+
+func rename_companion(uid: int, nickname: String) -> bool:
+	var cleaned := ""
+	for ch in nickname.strip_edges():
+		if ch.unicode_at(0) >= 32 and ch.unicode_at(0) != 127:
+			cleaned += ch
+	cleaned = cleaned.left(24)
+	for collection in [pets, stables, mounts]:
+		for pet in collection:
+			if int(pet.get("uid", -1)) == uid:
+				pet["nickname"] = cleaned
+				for body in get_tree().get_nodes_in_group("pet"):
+					if body.uid == uid:
+						body.pet_name = companion_name(pet)
+				request_save()
+				return true
+	return false
 
 func save_path() -> String:
 	var safe := player_name.to_lower().replace(" ", "_").validate_filename()

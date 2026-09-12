@@ -48,7 +48,9 @@ static func ensure_animations(sf: SpriteFrames, required: Array) -> void:
 			continue
 		sf.add_animation(anim_name)
 		sf.set_animation_speed(anim_name, sf.get_animation_speed(donor))
-		sf.set_animation_loop(anim_name, sf.get_animation_loop(donor))
+		# A missing action must finish; inheriting a looping walk could pin the
+		# actor in its attack forever. This fallback is never an art approval.
+		sf.set_animation_loop(anim_name, anim_name in ["idle", "walk", "fly"])
 		for i in sf.get_frame_count(donor):
 			sf.add_frame(anim_name, sf.get_frame_texture(donor, i))
 

@@ -51,7 +51,7 @@ GAME_ART_ROOT = REPO_ROOT / "game" / "prototype" / "art"
 
 # actor -> animations to bake (names are the game's animation contract)
 ACTOR_ANIMS: Dict[str, List[str]] = {
-    "hero": ["idle", "walk", "attack"],
+    "hero": ["idle", "walk", "attack", "cast", "heavy", "spin", "dodge"],
     "gloamfen_stalker": ["idle", "walk", "lunge"],
     "gloamfen_wisp": ["idle", "walk", "lunge"],
     "emberwing_matriarch": ["idle", "fly", "walk", "attack", "lunge"],
@@ -80,6 +80,10 @@ def bake_actor(actor: str, out_root: Path = GAME_ART_ROOT) -> dict:
     fw, fh = atlas["frame_size"]
     atlas["logical_size"] = [fw // 2, fh // 2]
     (out_dir / "atlas.json").write_text(json.dumps(atlas, indent=2) + "\n")
+    # Atlas layout changes invalidate every matching normal strip. Rebuild
+    # them in this transaction instead of leaving lighting on stale frames.
+    from genforge.pipeline.normal_gen import run_batch
+    run_batch(out_dir)
     return atlas
 
 

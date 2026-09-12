@@ -66,8 +66,9 @@
 2. **No paid power.** Direct purchases are cosmetics, seasonal cosmetic pass, and
    convenience that never touches combat math.
 3. **Marketplace fee** is the core revenue: **10% (proposal)** of each player-to-player
-   item sale, taken as an automatic PSP split. **20% (proposal)** of fee revenue accrues
-   to the seasonal tournament prize pool.
+   item sale, taken as an automatic PSP split. **Historical funding proposal:** 20% of fee revenue accrued to prizes.
+   The current evaluation direction (§12.47) is 10% of distributable profit
+   to contributors plus 10% to prizes; no live payout contract is implied.
 4. **Phased cash-out:** Phase A (launch) — closed-loop: sale proceeds are marketplace
    credit (held in PSP subaccounts), spendable on the marketplace. Phase B — Pix
    cash-out, enabled only after a formal legal opinion (parecer) and proven KYC/AML
@@ -369,7 +370,8 @@ Resolved with Ricardo:
 2. ~~Ranked gear policy~~ → **equipment takes effect in tournaments, leveraged by
    power: power-bracketed matchmaking + per-slot power budget** (§5).
 3. ~~Class count/names~~ → **6 launch classes confirmed as proposed.**
-4. ~~Fees~~ → **10% marketplace fee / 20% of fees to prize pool confirmed.**
+4. ~~Fees~~ → **Historical: 10% marketplace fee / 20% of fees to prize pool.**
+   Funding revision under evaluation: §12.47 and business/33.
 5. ~~Phase A→B player flow~~ → **balance accrues; cash-out after KYC + registered,
    ownership-verified Pix key** (§2.4); parecer still gates enabling Phase B.
 6. ~~Economy-core language~~ → **Go confirmed** (§8): payments code wants memory
@@ -1056,3 +1058,62 @@ Still open:
    dead hunters remain dead until their normal respawn. This extends the
    existing Hunt sustain beat, not the separate living-trial resource model.
    Implementation scope and outcome gate: design/24, Hunt level-up refresh.
+
+47. **Continuity, weekly enchanted builds and community participation
+   (2026-09-12, Ricardo; full prompts: harness/requests/2026-09-12-recovery.md).**
+   Permanent characters, learned skills and legitimate equipment persist across
+   seasons. No numerical gear treadmill or mandatory character reset. Weekly
+   item enchantments are the strongest buildcraft moat: on-hit lightning,
+   ignition/lifesteal, meteors, thunder, AI-driven clones, granted active skills,
+   and interactions with learned class skills. Increasing rarity buys distinctive
+   combinations and presentation within a shared power budget. Old beloved
+   equipment remains usable; no promise that market prices cannot fluctuate.
+   PvP must add readable commitments, defensive responses and elemental setup/
+   payoff; action speed alone is not its skill test.
+
+   Endless XP may earn exclusive cosmetic caches through play only. No sale of
+   caches, keys, random-access boosts or conversions from paid currencies;
+   cosmetic rewards stay outside cashable inventory. A continuously increasing
+   but bounded rarity-luck factor is an EXPERIMENT to simulate for supply and
+   new-player fairness, not an approved unlimited drop-rate multiplier. Hunter
+   power cap remains; R19 supersedes ambiguous earlier infinite-stat requests.
+
+   The open-source code/modding direction is reaffirmed; the existing MIT-code /
+   proprietary-art license split remains. Community votes nominate mod packs
+   for official review; votes alone cannot deploy server code, grant licenses,
+   mint items or bypass balance, provenance and security gates. Accepted weekly
+   contributions retain stable IDs, version history and contributor credit.
+   Proposed allocation: 10% of distributable profit to weighted community
+   contributors and 10% to event prizes. This supersedes the old prize-funding
+   proposal as a direction to evaluate, not a live payout contract. Marketplace
+   fees versus subscriptions/direct Pix remain alternatives under review; the
+   web-only marketplace, PSP custody and sole economy writer remain mandatory.
+   Formula/accounting/rights questions: business/33.
+
+   Solo/modded and official progress have separate provenance. Preserve character
+   identity and allow local forks; a modded or editable offline save cannot
+   certify official tradable items, stats or ranked eligibility. An official
+   profile resumes its last server-verified state. Import/sanitization policy
+   is specified in tech/36; no destructive overwrite of local characters.
+   Blockchain is a research question, not the anti-cheat architecture: an
+   immutable record cannot establish that an untrusted drop report was true.
+   Server simulation, authenticated commands, idempotent award ledgers, replay
+   audit, interest management and fraud investigation are the trust boundary.
+
+   Guild/allegiance warfare, territories, contested bosses and cooperative raids
+   become scheduled content/system directions. 100v100 is a benchmark target,
+   not an achieved capacity. AI opponents can fill low-population queues with
+   coherent, versioned builds and explore weekly metas. Proposed default:
+   clearly visible reserved [AI] tag; bots may appear in a labelled exhibition
+   ladder but cannot earn human cash prizes, consume the human prize pool or
+   create cashable farming loops. Ranked fallback eligibility needs simulation
+   before activation. Rating estimates skill and uncertainty, never accumulated
+   match count; seasons may refresh standings/MMR confidence without resetting
+   characters. Bounties complement objectives; they do not replace skill rating
+   or create a purchasable cash bounty. Design/27 and tech/36 define the gates.
+
+   Recovery execution remains 2D first, then Rebirth's GPU-poor LOCAL 3D
+   generation pipeline ("plebs" clarified by Ricardo). All requests, including
+   visual/player/biome/VFX upgrades, live in harness/20-roadmap.md. These are
+   decisions/specifications; implementation statuses and test receipts must
+   never be inferred from this canon entry.

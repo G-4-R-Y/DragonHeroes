@@ -8,7 +8,7 @@
 class_name ProtoCharacterPanel
 extends CanvasLayer
 
-const EMBER := Color("ff9a3c")
+const EMBER := ProtoTheme.GOLD
 const GOLD := Color("ffd166")
 const PALE := Color("d9d4c7")
 const DIM := Color(0.62, 0.6, 0.55)
@@ -76,6 +76,15 @@ func _ready() -> void:
 	x.pressed.connect(func() -> void: visible = false)
 	bar.add_child(x)
 	var tabs := TabContainer.new()
+	tabs.tabs_visible = false
+	# Six stable navigation buttons fit in two rows, including PT-BR. The
+	# engine's overflowing single tab strip produced the oversized arrows.
+	var navigation := GridContainer.new()
+	navigation.columns = 3
+	navigation.add_theme_constant_override("h_separation", 3)
+	navigation.add_theme_constant_override("v_separation", 3)
+	root.add_child(navigation)
+	var group := ButtonGroup.new()
 	tabs.focus_mode = Control.FOCUS_NONE
 	tabs.get_tab_bar().focus_mode = Control.FOCUS_NONE
 	tabs.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -97,6 +106,15 @@ func _ready() -> void:
 	for i in tabs.get_tab_count():
 		tabs.set_tab_title(i, ProtoLang.t(
 				"tab_" + str(tabs.get_tab_control(i).name).to_lower()))
+		var button := Button.new()
+		button.text = tabs.get_tab_title(i)
+		button.toggle_mode = true
+		button.button_group = group
+		button.button_pressed = i == 0
+		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		button.pressed.connect(func() -> void: tabs.current_tab = i)
+		navigation.add_child(button)
+		tabs.tab_changed.connect(func(index: int) -> void: button.set_pressed_no_signal(index == i))
 
 # Skills tab shell: points header + loadout row pinned on top, the tree in a
 # ScrollContainer, and a FIXED detail card pinned at the bottom (not a tooltip).
@@ -1134,8 +1152,7 @@ func _do_learn(node: String, cost := 1) -> void:
 func _refresh_pets() -> void:
 	var vb: VBoxContainer = _boxes["Pets"]
 	_clear(vb)
-	_line(vb, ProtoLang.t("cp_pets_header") % [Session.pets.size(), Session.MAX_PETS],
-			EMBER)
+	_line(vb, ProtoLang.t("cp_pets_header") % [Session.pets.size(), Session.MAX_PETS], EMBER)
 	if Session.pets.is_empty():
 		_line(vb, ProtoLang.t("cp_pets_none"), DIM)
 	for pet in Session.pets:
@@ -1143,59 +1160,14 @@ func _refresh_pets() -> void:
 		for n in get_tree().get_nodes_in_group("pet"):
 			if n.uid == int(pet.get("uid", 0)):
 				resting = n.resting()
-		var card := PanelContainer.new()
-		vb.add_child(card)
-		var cv := VBoxContainer.new()
-		cv.add_theme_constant_override("separation", 1)
-		card.add_child(cv)
-		var hb := HBoxContainer.new()
-		hb.add_theme_constant_override("separation", 6)
-		cv.add_child(hb)
-		var nl := Label.new()
-		nl.text = "%s   %s" % [str(pet.get("name", "?")),
-				ProtoLang.t("cp_resting") if resting else ProtoLang.t("cp_on_hunt")]
-		nl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		nl.add_theme_font_size_override("font_size", ProtoTheme.SIZE_BODY)
-		nl.add_theme_color_override("font_color",
-				Color("ff8a7a") if resting else CYAN)
-		hb.add_child(nl)
-		_btn(hb, ProtoLang.t("cp_to_stables"), _do_stable.bind(int(pet.get("uid", 0))))
-		var skills: Array[String] = []
-		for sk in pet.get("skills", []):
-			skills.append(_pretty_id(str(sk)))
-		var det := Label.new()
-		det.text = ProtoLang.t("cp_pet_roll") % [int(pet.get("roll_pct", 100)),
-				" · ".join(skills)]
-		det.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		det.add_theme_font_size_override("font_size", ProtoTheme.SIZE_BODY)
-		det.add_theme_color_override("font_color", PALE)
-		cv.add_child(det)
-	# The stables (Ricardo: pets are NEVER abandoned) — overflow captures land here.
+		vb.add_child(ProtoCompanionCard.create(pet,
+				ProtoLang.t("cp_resting") if resting else ProtoLang.t("cp_on_hunt"),
+				ProtoLang.t("cp_to_stables"), _do_stable.bind(int(pet.get("uid", 0)))))
 	if not Session.stables.is_empty():
 		_line(vb, ProtoLang.t("cp_stables_header") % Session.stables.size(), EMBER)
-		var room := Session.pets.size() < Session.MAX_PETS
 		for pet in Session.stables:
-			var card := PanelContainer.new()
-			vb.add_child(card)
-			var hb := HBoxContainer.new()
-			hb.add_theme_constant_override("separation", 6)
-			card.add_child(hb)
-			var skills: Array[String] = []
-			for sk in pet.get("skills", []):
-				skills.append(_pretty_id(str(sk)))
-			var nl := Label.new()
-			nl.text = ProtoLang.t("cp_stable_row") % [str(pet.get("name", "?")),
-					int(pet.get("roll_pct", 100)), " · ".join(skills)]
-			nl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-			nl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			nl.add_theme_font_size_override("font_size", ProtoTheme.SIZE_BODY)
-			nl.add_theme_color_override("font_color", PALE)
-			hb.add_child(nl)
-			var b := _btn(hb, ProtoLang.t("cp_make_active"),
-					_do_activate.bind(int(pet.get("uid", 0))), CYAN)
-			b.disabled = not room
-			if not room:
-				b.tooltip_text = ProtoLang.t("cp_pack_full_tip")
+			vb.add_child(ProtoCompanionCard.create(pet, "", ProtoLang.t("cp_make_active"),
+					_do_activate.bind(int(pet.get("uid", 0))), Session.pets.size() >= Session.MAX_PETS))
 	_line(vb, ProtoLang.t("cp_stables_note"), DIM)
 
 func _do_stable(uid: int) -> void:
@@ -1231,23 +1203,9 @@ func _refresh_mounts() -> void:
 		return
 	for m in Session.mounts:
 		var active := int(m.get("uid", -1)) == Session.active_mount
-		var flying := str(m.get("kind", "")) == "fly"
-		var hb := HBoxContainer.new()
-		hb.add_theme_constant_override("separation", 6)
-		vb.add_child(hb)
-		var nl := Label.new()
-		nl.text = ProtoLang.t("cp_mount_row") % [str(m.get("name", "?")),
-				ProtoLang.t("cp_flying") if flying else ProtoLang.t("cp_walking"),
-				float(m.get("speed_mult", 1.0)),
-				ProtoLang.t("cp_active_tag") if active else ""]
-		nl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		nl.add_theme_font_size_override("font_size", ProtoTheme.SIZE_BODY)
-		nl.add_theme_color_override("font_color",
-				ProtoItems.rarity_color(str(m.get("rarity", "common"))))
-		hb.add_child(nl)
-		if not active:
-			_btn(hb, ProtoLang.t("cp_select"), _do_select_mount.bind(int(m.get("uid", -1))), CYAN)
-	_line(vb, ProtoLang.t("cp_mounts_note"), DIM)
+		vb.add_child(ProtoCompanionCard.create(m, ProtoLang.t("cp_active_tag") if active else "",
+				ProtoLang.t("cp_select"), _do_select_mount.bind(int(m.get("uid", -1))), active))
+	_line(vb, ProtoLang.t("mount_controls"), ProtoTheme.LUMEN)
 
 func _do_select_mount(uid: int) -> void:
 	Session.active_mount = uid

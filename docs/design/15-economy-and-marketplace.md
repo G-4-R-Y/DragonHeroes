@@ -8,6 +8,14 @@
 > [tech/26](../tech/26-backend-and-services.md), threat model (dupes, fraud, kill switches) in
 > [tech/27](../tech/27-security-anticheat-and-economy-integrity.md).
 
+## Funding revision under evaluation (2026-09-12)
+
+Canon §12.47 / [business/33](../business/33-community-funding.md) record the new
+10%-of-profit contributor pool and 10%-of-profit prize pool proposal. References
+to 20% of marketplace fees below are historical, not simultaneous allocations.
+Subscriptions/direct Pix remain alternatives to research; no live settlement
+change or funded payout guarantee is implied.
+
 ## Purpose
 
 This document is the player-facing design of the Dragon Heroes economy: what creates and destroys

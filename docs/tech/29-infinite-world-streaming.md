@@ -126,3 +126,27 @@ fx_stress as a standing gate).
 - Chunk deltas (docs/tech/24 §5 world-drop versioning) — virgin-space rule.
 - Server-authoritative streaming for multiplayer (AOI = the same window).
 - POI/feature layers when dh-procgen grows them (docs/tech/24 §3).
+
+
+## Recovery repair (2026-09-12, roadmap R09)
+
+Implemented in the prototype presentation streamer: reconciliation every 0.5 s
+and after apply completion closes a hole caused by returning during an active
+unload. Obsolete queued/worker loads are discarded; remaining loads prioritize
+distance to the hunter. Active terrain stays within 49 chunks even when teleporting
+between distant windows. Walkability stays closed during load AND unload phases.
+Helper failures retry with bounded exponential backoff (0.5–8s) without needing
+another boundary crossing. One per-world scratch dump is deleted after parsing.
+
+The SDF now receives a copy-on-write chunk snapshot and builds its rock mask in
+the worker. Its streaming extent is bounded to 7×7 around the hunter, including
+when old and new chunks briefly coexist thousands of chunks apart. This avoids
+allocating an enormous rectangle between those two windows. Frontier encounter
+persistence and actual biome identities/art remain separate pending R08/R09 work.
+
+Gate: `tests/stream_recovery.tscn` actually interrupts requests, travels through
+far negative coordinates, reverses an active unload, fails the helper then
+restores it while stationary, and returns to the byte-identical original chunk.
+It asserts the unfinished-ground fence, 49-chunk peak, empty staging/unload state
+and deleted scratch dump. Initial receipt: 1.07 ms worst apply; ordinary eight-step
+stream test 1.10 ms. These desktop/headless samples are not a mobile guarantee.

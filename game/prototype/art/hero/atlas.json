@@ -20,18 +20,46 @@
       "row": 0
     },
     "walk": {
-      "frames": 4,
-      "fps": 8.0,
+      "frames": 8,
+      "fps": 16.0,
       "loop": true,
       "strip": "strips/walk.png",
       "row": 1
     },
     "attack": {
-      "frames": 3,
-      "fps": 12.0,
+      "frames": 4,
+      "fps": 20.0,
       "loop": false,
       "strip": "strips/attack.png",
       "row": 2
+    },
+    "cast": {
+      "frames": 4,
+      "fps": 20.0,
+      "loop": false,
+      "strip": "strips/cast.png",
+      "row": 3
+    },
+    "heavy": {
+      "frames": 5,
+      "fps": 20.0,
+      "loop": false,
+      "strip": "strips/heavy.png",
+      "row": 4
+    },
+    "spin": {
+      "frames": 5,
+      "fps": 20.0,
+      "loop": false,
+      "strip": "strips/spin.png",
+      "row": 5
+    },
+    "dodge": {
+      "frames": 4,
+      "fps": 20.0,
+      "loop": false,
+      "strip": "strips/dodge.png",
+      "row": 6
     }
   },
   "logical_size": [

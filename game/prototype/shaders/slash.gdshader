@@ -52,7 +52,7 @@ void fragment() {
 
     float r = length(uv) + 1e-6;
     float a = atan(uv.y, uv.x);
-    float dir_ang = atan(dir.y, dir.x);
+    float dir_ang = atan(-dir.y, dir.x); // callers use Godot's screen-down Y
     float arel = atan(sin(a - dir_ang), cos(a - dir_ang)); // wrapped [-pi,pi]
     float t = arel / half_span;                            // along-arc [-1,1]
 

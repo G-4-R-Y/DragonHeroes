@@ -38,6 +38,7 @@
 | [USAGE.md](USAGE.md) | **The usage manual: play, co-op, arena, training, content workflows, gates** |
 | [26-living-pixel-world](design/26-living-pixel-world.md) | Modern pixel art direction, storied artifact rarity, skill-system audit and proposal, weekly chapter design |
 | [34-living-content-pipeline](tech/34-living-content-pipeline.md) | Reproducible candidate generation/ingest, review UI, schemas, C++ effect probe and runbook |
+| [27-continuity-and-community](design/27-continuity-and-community.md) | Permanent heroes, weekly behavioral enchantments, cosmetic XP, mod promotion, PvP/guild/AI roadmap |
 | **tech/** | |
 | [20-architecture-overview](tech/20-architecture-overview.md) | System map, one-sim-three-consumers, data flows, decision table |
 | [21-simulation-core](tech/21-simulation-core.md) | C++ sim workspace, entity store, tick pipeline, fields, determinism |
@@ -53,9 +54,12 @@
 | [31-image-to-3d-local](tech/31-image-to-3d-local.md) | Image-to-3D on open weights, LOCAL GPUs: draft tier (RTX 4050) + offload max-quality; Cloud Run tier parked for budget; mesh_gen stage + runbook |
 | [32-scaling-rl-training](tech/32-scaling-rl-training.md) | Thousands of parallel episodes: parallel Godot workers (landed), dh-env, fleets |
 | [33-p2p-coop](tech/33-p2p-coop.md) | P2P co-op (friends & LAN): lobby, host authority, snapshot replication |
+| [36-official-content-and-trust](tech/36-official-content-and-trust.md) | Official/modded provenance, promotion/anti-cheat gates, bot rating and 100v100 capacity proof |
 | **business/** | |
 | [30-legal-payments-compliance](business/30-legal-payments-compliance.md) | Brazilian gambling/minors law, PSPs, tax, AML, LGPD — **read before launch decisions** |
 | [31-roadmap](business/31-roadmap.md) | M0→M6 milestones, exit gates, parallel tracks, risk register |
+
+| [33-community-funding](business/33-community-funding.md) | Contributor/prize profit-pool proposal; subscriptions and Pix alternatives, rights/accounting gates |
 
 ## Research digests
 

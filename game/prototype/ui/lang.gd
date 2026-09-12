@@ -17,6 +17,20 @@ static var _loaded := false
 # key -> {en, pt}. EN values are the exact strings the prototype shipped with
 # (the click test asserts several of them verbatim).
 const S := {
+	"hud_summary": {"en": "Lv %d · %d gold · Bag %d/%d", "pt": "Nv %d · %d ouro · Bolsa %d/%d"},
+	"mount_speed": {"en": "speed", "pt": "velocidade"},
+	"mount_controls": {"en": "Z · Ride / dismount\nFlying · Cross obstacles\nCombat · Dismounts automatically", "pt": "Z · Montar / desmontar\nVoo · Atravessa obstáculos\nCombate · Desmonta automaticamente"},
+	"companion_potential": {"en": "potential", "pt": "potencial"},
+	"companion_skills": {"en": "skills", "pt": "habilidades"},
+	"hud_flask": {"en": "EMBER FLASK", "pt": "FRASCO ÍGNEO"},
+	"hud_flask_tip": {"en": "R · Heal 40% over 2 seconds. Six kills restore a charge.", "pt": "R · Cura 40% em 2 segundos. Seis abates restauram uma carga."},
+
+	"opt_visibility": {"en": "World visibility · moody / luminous", "pt": "Visibilidade · sombrio / luminoso"},
+	"opt_visibility_hint": {"en": "Lift dark terrain and creatures while preserving spell highlights.", "pt": "Clareia terreno e criaturas sem apagar o brilho das magias."},
+	"hv_main_menu": {"en": "MAIN MENU", "pt": "MENU PRINCIPAL"},
+	"hv_stable_status": {"en": "Resting in Haven", "pt": "Descansando no Refúgio"},
+	"companion_nickname": {"en": "Nickname", "pt": "Apelido"},
+	"companion_rename": {"en": "Save", "pt": "Salvar"},
 	# ---- shared ----------------------------------------------------------------
 	"lang_toggle": {"en": "Language: EN", "pt": "Idioma: PT-BR"},
 	"gold_line": {"en": "Gold: %d", "pt": "Ouro: %d"},
@@ -399,7 +413,7 @@ const S := {
 			"pt": "nenhum vinculado — enfraqueça um Gloamfen Stalker abaixo de 35% de HP e aperte F com um Laço de Alma (os stalkers os derrubam)"},
 	"cp_resting": {"en": "· resting", "pt": "· descansando"},
 	"cp_on_hunt": {"en": "· on the hunt", "pt": "· na caçada"},
-	"cp_to_stables": {"en": "→ stables", "pt": "→ estábulo"},
+	"cp_to_stables": {"en": "Stable", "pt": "→ estábulo"},
 	"cp_pet_roll": {"en": "roll %d%%  ·  %s", "pt": "rolagem %d%%  ·  %s"},
 	"cp_stables_header": {"en": "STABLES — %d resting", "pt": "ESTÁBULO — %d descansando"},
 	"cp_stable_row": {"en": "%s\nroll %d%%  ·  %s", "pt": "%s\nrolagem %d%%  ·  %s"},
@@ -415,7 +429,7 @@ const S := {
 	"cp_mount_row": {"en": "%s — %s · x%.1f speed%s", "pt": "%s — %s · x%.1f de velocidade%s"},
 	"cp_flying": {"en": "FLYING", "pt": "VOADORA"},
 	"cp_walking": {"en": "walking", "pt": "terrestre"},
-	"cp_active_tag": {"en": "   ← active", "pt": "   ← ativa"},
+	"cp_active_tag": {"en": "   Selected", "pt": "   ← ativa"},
 	"cp_select": {"en": "select", "pt": "selecionar"},
 	"cp_mounts_note": {"en": "Walking mounts respect terrain; FLYING mounts cross water and rock (land on solid ground). Attacking or taking damage dismounts you.",
 			"pt": "Montarias terrestres respeitam o terreno; as VOADORAS cruzam água e rocha (pouse em chão firme). Atacar ou receber dano desmonta você."},

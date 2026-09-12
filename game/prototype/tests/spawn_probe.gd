@@ -11,6 +11,10 @@ var _t := 0.0
 func _ready() -> void:
 	var hunt := preload("res://prototype/main.tscn").instantiate()
 	add_child(hunt)
+	# This gate measures placement. Letting enemies chase for eight seconds
+	# made a legitimate approach to the hunter look like a collapsed world.
+	for creature in get_tree().get_nodes_in_group("creatures"):
+		creature.set_physics_process(false)
 
 func _process(delta: float) -> void:
 	_t += delta

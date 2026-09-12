@@ -22,6 +22,16 @@ player-owned and tradable for real money on a web marketplace built on Brazilian
 while a hard power cap and a strict no-paid-power rule guarantee that skill, not wallet,
 decides every fight. PC, Android, and iOS, cross-play from day one, made in Brazil first.
 
+## Continuity and community (2026-09-12)
+
+Weekly **behavioral item enchantments** are the central buildcraft moat: new
+skills and synergies within a permanent power ceiling, preserving old heroes
+and equipment across seasons. Endless XP rewards cosmetic expression. Open
+code and mod tools let the community nominate content for reviewed official
+promotion, with weighted contribution credit and proposed profit sharing.
+Details and execution gates: [canon §12.47](00-canon.md),
+[design/27](design/27-continuity-and-community.md).
+
 ## Player fantasy
 
 You are a professional monster hunter in a world that is beautiful the way deep ocean is

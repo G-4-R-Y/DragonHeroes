@@ -103,6 +103,7 @@ func _build() -> void:
 	var gap := Control.new()
 	gap.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	buttons.add_child(gap)
+	_btn(buttons, ProtoLang.t("hv_main_menu"), _return_to_menu)
 	var quit := _btn(buttons, ProtoLang.t("hv_quit"), func() -> void: get_tree().quit())
 	quit.add_theme_font_size_override("font_size", nav_font)
 
@@ -281,42 +282,21 @@ func _show_skills() -> void:
 				VIOLET)
 	_line(ProtoLang.t("hv_runes_drop"), DIM)
 
+func _return_to_menu() -> void:
+	Session.leave_character()
+	get_tree().change_scene_to_file("res://prototype/ui/main_menu.tscn")
+
 func _show_pets() -> void:
 	_open(ProtoLang.t("hv_pets_title") % [Session.pets.size(), Session.MAX_PETS])
 	if Session.pets.is_empty():
 		_line(ProtoLang.t("hv_pets_none"), DIM)
 	for pet in Session.pets:
-		_header(str(pet.get("name", "?")))
-		_line(ProtoLang.t("hv_pets_roll") % [int(pet.get("roll_pct", 100)),
-				str(pet.get("species", ""))], PALE)
-		for s in pet.get("skills", []):
-			_line("- %s  (%s)" % [_pretty_id(str(s)), str(s)], GOLD)
+		_panel_body.add_child(ProtoCompanionCard.create(pet, ProtoLang.t("cp_on_hunt")))
 	if not Session.stables.is_empty():
 		_header(ProtoLang.t("hv_stables_header") % Session.stables.size())
 		for pet in Session.stables:
-			_line(ProtoLang.t("hv_stables_row") % [str(pet.get("name", "?")),
-					int(pet.get("roll_pct", 100)),
-					(pet.get("skills", []) as Array).size()], PALE)
-		_line(ProtoLang.t("hv_stables_manage"), DIM)
-	_line(ProtoLang.t("hv_pets_rules"), DIM)
-	var fam := Session.load_content("abyssal")
-	_line(str(fam.get("lore", "")), DIM)
-	_header(ProtoLang.t("hv_family_skills"))
-	for s in fam.get("family_shared_skills", []):
-		_line("- %s  (%s)" % [_pretty_id(str(s)), str(s)], PALE)
-	_header(ProtoLang.t("hv_species"))
-	for sp in fam.get("species", []):
-		var sigs: Array[String] = []
-		for s in sp.get("signature_skills", []):
-			sigs.append(_pretty_id(str(s)))
-		_line(ProtoLang.t("hv_species_row") % [
-				_pretty_id(str(sp.get("creature", "?"))), ", ".join(sigs)], PALE)
-	var rules: Dictionary = fam.get("roll_rules", {})
-	var roll_range: Dictionary = rules.get("attribute_roll_range", {})
-	_line(ProtoLang.t("hv_roll_rules") % [
-			int(rules.get("skill_slots", 0)),
-			int(float(rules.get("family_skill_chance", 0.0)) * 100.0),
-			int(roll_range.get("min_pct", 0)), int(roll_range.get("max_pct", 0))], DIM)
+			_panel_body.add_child(ProtoCompanionCard.create(pet, ProtoLang.t("hv_stable_status")))
+	_btn(_panel_body, ProtoLang.t("hv_stables_manage"), _toggle_character)
 
 func _show_attributes() -> void:
 	_open(ProtoLang.t("hv_attr_title"))

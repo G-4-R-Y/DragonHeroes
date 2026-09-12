@@ -204,6 +204,8 @@ Rules: gameplay content is data (`content/`), validated in CI; IDs are
 | Menu boot | `godot --headless --path game res://prototype/tests/menu_probe.tscn` | MENU OK (asserts the main scene BUILT: MODE/FIT/ENTER/CO-OP/LANGUAGE buttons present) |
 | Hunt boot ×3 | `godot --headless --path game res://prototype/main.tscn --quit-after 150` | no errors |
 | World spawn | `godot --headless --path game res://prototype/tests/spawn_probe.tscn` | SPAWNTEST OK |
+| Stream interruption recovery | `godot --headless --path game res://prototype/tests/stream_recovery.tscn` | STREAM RECOVERY OK |
+| UI / character / action renewal | `godot --headless --path game res://prototype/tests/renewal_probe.tscn` | RENEWAL OK |
 | World stream | `godot --headless --path game res://prototype/tests/stream_test.tscn` | STREAMTEST OK |
 | Click test | `godot --headless --path game res://prototype/tests/click_test.tscn` | CLICKTEST OK ×16 |
 | FX budget | `godot --headless --path game res://prototype/tests/fx_stress.tscn --quit-after 260` | FXSTRESS OK |

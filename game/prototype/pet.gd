@@ -42,7 +42,7 @@ var _shadow: Sprite2D
 # Applies the capture-time instance roll (70-110%) to hp/damage.
 func setup(data: Dictionary) -> void:
 	uid = int(data.get("uid", 0))
-	pet_name = str(data.get("name", "Gloam Stalker"))
+	pet_name = Session.companion_name(data)
 	roll_pct = int(data.get("roll_pct", 100))
 	max_hp = 120.0 * roll_pct / 100.0
 	hp = max_hp

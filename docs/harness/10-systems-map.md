@@ -1,3 +1,38 @@
+# Recovery work in flight — 2026-09-12
+
+All quota-outage requests and new continuity/community directions are tracked
+as R01–R26 in 20-roadmap.md. Full recovered prompts: requests/2026-09-12-recovery.md.
+Canon §12.47; design/27, tech/36 and business/33 distinguish decisions,
+proposals and official-server gates. Original publication e036a7c succeeded.
+
+In-flight 2D slice: authored hero cast/heavy/spin/dodge clips + 8-frame walk,
+finite fallback actions, slash orientation and recycled shader parameters;
+shared companion portraits/nicknames, save isolation on character switches,
+Haven main-menu return, wrapped six-tab navigation, visible Flask and saved
+world-visibility slider. R03/R04/R07 are gated complete; broader UI/art remains.
+115 Python tests pass; renewal_probe and click/flask/level-up pass. GL captures
+in prototype/tests/captures/renewal show remaining floor/hero/HUD art work;
+performance sample must be warmed/settled before claiming 60 FPS. Linux
+launcher installer now also associates the executable PNG using GIO, creates
+an in-folder .desktop shortcut and handles relocation; native desktop proof and
+rebuilt packages remain pending. Rebirth still waits for 2D; "plebs" means
+local CPU/6 GB GPU 3D generation. No public backend/economy deployment implied.
+
+Stream recovery: obsolete loads discarded, nearby ground prioritized, unfinished
+movement fence closed, failed helper retries, unload reversal reconciliation,
+49-chunk peak and bounded 7×7 worker SDF. stream_recovery passes far negative
+travel, stationary retry and deterministic revisit (worst apply 1.07 ms; ordinary
+stream 1.10 ms). Actual biomes and encounter hibernation still pending R08/R09.
+
+Warmed actual GL receipt: 300 gameplay frames at reported 60 FPS; frame median
+16.668 ms / p95 16.911 ms, CPU process median 3.813 ms / p95 4.218 ms. PNG readback stalls
+are excluded. Full captures and reproduction: docs/art/ui-renewal/README.md.
+This is a short desktop sample, not a sustained/mobile guarantee. First playable
+recovery milestone is being committed/pushed and packaged; all remaining R-items
+stay scheduled/in progress.
+
+---
+
 # Systems Map — current state per system (2026-09-10, HEAD = v0.3.0 era)
 
 Format: **status** · law doc(s) · key files · gate · known issues. Pointers,

@@ -334,7 +334,10 @@ func _physics_process(delta: float) -> void:
 						_cast_slot(i)
 	step += _knockback * delta * 8.0
 	_knockback = _knockback.lerp(Vector2.ZERO, delta * 10.0)
+	var previous_position := global_position
 	_try_move(step)
+	# Animate ground actually covered: pushing into a wall is not walking.
+	step = global_position - previous_position
 	if not mounted and _dodging <= 0.0 and step.length() > 0.05:
 		_walk_t += delta   # walk-bob phase only advances while actually stepping
 	_update_anim(step)
@@ -348,22 +351,32 @@ func _update_anim(step: Vector2) -> void:
 		if sprite.animation != "idle":
 			sprite.play("idle")   # the hero sits; the mount does the moving
 		return
-	if sprite.animation == "attack" and sprite.is_playing():
+	if sprite.animation in ["attack", "cast", "heavy", "spin", "dodge"] and sprite.is_playing():
 		return  # let the swing finish
 	if step.length() > 0.05:
 		if absf(step.x) > 0.01:
 			sprite.flip_h = step.x < 0.0
 		if sprite.animation != "walk":
 			sprite.play("walk")
+		sprite.speed_scale = clampf(step.length() / maxf(move_speed / 60.0, 0.01), 0.45, 1.7)
 		if _pose_free():   # step feel: subtle ground-contact bob (<=1.4 px)
 			sprite.position.y = SPRITE_BASE_Y - absf(sin(_walk_t * 10.0)) * 1.4
 	else:
 		if sprite.animation != "idle":
 			sprite.play("idle")
+		sprite.speed_scale = 1.0
 		if _pose_free():
 			sprite.position.y = SPRITE_BASE_Y
 
 # ---- pose juice helpers (transform tweens on the ONE hero sprite) -----------------
+
+func _play_action(action: String, duration := 0.25) -> void:
+	var clip := action if sprite.sprite_frames.has_animation(action) else "attack"
+	var frames := sprite.sprite_frames.get_frame_count(clip)
+	var fps := sprite.sprite_frames.get_animation_speed(clip)
+	sprite.speed_scale = 1.0
+	sprite.play(clip, float(frames) / maxf(fps * duration, 0.01))
+	sprite.frame = 0
 
 func _pose_free() -> bool:
 	return _anim_tw == null or not _anim_tw.is_valid() or not _anim_tw.is_running()
@@ -415,6 +428,7 @@ func _whirl_spin() -> void:
 
 # Dodge: stretch along the dash + 3 pooled afterimage ghosts along the path.
 func _dodge_fx(dir: Vector2, main: Node) -> void:
+	_play_action("dodge", 0.18)
 	_kill_anim_tw()
 	var ax := absf(dir.x)
 	var ay := absf(dir.y)
@@ -518,8 +532,7 @@ func _attack() -> void:
 	if _swing_dir.length() < 0.1:
 		_swing_dir = Vector2.RIGHT
 	sprite.flip_h = _swing_dir.x < 0.0
-	sprite.play("attack")
-	sprite.frame = 0
+	_play_action("attack", minf(attack_cd_s * 0.75, 0.26))
 	_swing_lean(_swing_dir)   # lean into the cleave, elastic snap-back
 	var main := get_tree().get_first_node_in_group("main")
 	if main:
@@ -562,8 +575,7 @@ func _shadow_rend(main: Node) -> void:
 	if _rend_dir.length() < 0.1:
 		_rend_dir = Vector2.RIGHT
 	sprite.flip_h = _rend_dir.x < 0.0
-	sprite.play("attack")
-	sprite.frame = 0
+	_play_action("heavy", 0.28)
 	_swing_lean(_rend_dir, 1.35)   # the bestial cleave throws the whole body
 	main.play_sfx("swing", global_position, -4.0)
 	# Over the DARK world (canon §12.28) fewer layers read as MORE: vortex +
@@ -616,8 +628,7 @@ func _whirlwind() -> void:
 	var lp := leech_pct + _buff_add("leech")
 	if hit_any and lp > 0.0:
 		hp = minf(hp + dmg * lp, max_hp)
-	sprite.play("attack")
-	sprite.frame = 0
+	_play_action("spin", 0.28)
 	_whirl_spin()   # the sprite rides the full-circle strike
 	if main:
 		main.play_sfx("swing", global_position, -6.0)
@@ -640,8 +651,7 @@ func _cast_bolt() -> void:
 	if _swing_dir.length() < 0.1:
 		_swing_dir = Vector2.RIGHT
 	sprite.flip_h = _swing_dir.x < 0.0
-	sprite.play("attack")
-	sprite.frame = 0
+	_play_action("cast", 0.22)
 	_cast_pulse(_swing_dir)   # wind-up pulse + recoil off the bolt
 	var dmg := attack_damage * 0.9 * _buff_mult("damage")
 	if randf() < crit_chance:
@@ -682,8 +692,7 @@ func _frost_nova() -> void:
 			c.take_damage(dmg, to_c.normalized(), Color(0.65, 0.9, 1.0))
 			c.apply_slow(1.5)
 			hit_any = true
-	sprite.play("attack")
-	sprite.frame = 0
+	_play_action("cast", 0.24)
 	_cast_pulse(Vector2.ZERO)   # radial release: pulse without directional recoil
 	if main:
 		main.play_sfx("bolt", global_position, -8.0)
@@ -707,8 +716,7 @@ func _fan_of_knives() -> void:
 	if aim.length() < 0.1:
 		aim = Vector2.RIGHT
 	sprite.flip_h = aim.x < 0.0
-	sprite.play("attack")
-	sprite.frame = 0
+	_play_action("cast", 0.2)
 	_cast_pulse(aim)   # recoil off the fan release
 	for i in 5:
 		var p := ProtoProjectile.new()
@@ -778,8 +786,7 @@ func use_skill(def: Dictionary) -> bool:
 	if crit:
 		dmg *= crit_mult
 	sprite.flip_h = aim.x < 0.0
-	sprite.play("attack")
-	sprite.frame = 0
+	_play_action("heavy" if kind == "melee_arc" else ("dodge" if kind == "dash_strike" else "cast"), 0.26)
 	match kind:   # pose juice: swings lean, casts pulse (transform-only)
 		"melee_arc", "dash_strike":
 			_swing_lean(aim)
@@ -906,10 +913,9 @@ func _exec_arc(def: Dictionary, p: Dictionary, aim: Vector2, dmg: float,
 	if main:
 		if melee:
 			main.play_sfx("swing", global_position, -8.0)
-			main.fx.arc_slash(global_position + aim * reach * 0.6, aim, col)
-			# element-tinted crescent — vfx_lab slash shader
-			main.fx.shader_burst("slash", global_position + aim * reach * 0.55,
-					{"size": maxf(reach * 2.4, 72.0), "dir": aim, "color": col})
+			main.fx.shader_burst("slash", global_position,
+					{"size": reach * 2.8, "dir": aim, "color": col,
+					"uniforms": {"arc_radius": 0.71, "arc_span": deg_to_rad(float(p.get("arc_deg", 90.0))), "arc_thick": 0.11}})
 		else:
 			main.play_sfx("bolt", global_position, -8.0)
 			if str(p.get("element", "ember")) == "ember":

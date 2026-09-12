@@ -90,6 +90,13 @@ def package(platform, review, env):
             f"Run {executable}. No Godot installation is required.\n"
             "Keep dh-server(.exe) next to the game; it generates the world.\n"
             "Codex uses its own save/settings directory: Dragon Heroes Codex.\n\n"
+            "RECOVERY UPDATE: Options (and Hunt Esc) now includes World visibility.\n"
+            "The Flask bottle/R key and HP values are visible on the Hunt HUD.\n"
+            "Haven includes MAIN MENU; stables/mount cards show sprites and saved nicknames.\n"
+            "Character tabs wrap into two rows. Hunter actions have distinct finite clips.\n"
+            "World streaming recovers from interrupted loads and distant travel.\n"
+            "The remaining art/biome/enchanted-build work is tracked in the repository\n"
+            "at docs/harness/20-roadmap.md; this is an incremental playable build.\n\n"
             "CONTENT REVIEW: open content-review/index.html in your browser.\n"
             "PLAYABLE PREVIEW: choose PLAY NEW CONTENT: LAIRS & LEGENDS.\n"
             "EXPLORE SHRINE ENTRANCES starts beside the first doorway; G enters.\n"
@@ -109,7 +116,11 @@ def package(platform, review, env):
             "1-4 skill bar, F capture, Z mount, C character, K keybinds.\n\n"
         )
         if not windows:
-            readme += "LINUX APP-MENU ICON: optionally run python3 install-launcher.py.\n"
+            readme += ("LINUX ICON: the first normal launch installs the application icon and\n"
+                       "a Dragon Heroes Codex.desktop shortcut. GNOME-compatible file managers\n"
+                       "also show the icon on the raw executable. Refresh the folder if needed.\n"
+                       "To install without launching, or after moving the folder:\n"
+                       "  python3 install-launcher.py\n")
         (stage / "LEIA-ME.txt").write_text(readme, encoding="utf-8")
         manifest = {**source_info(), "flavor": "codex", "platform": platform,
                     "executable": executable, "world_helper": helper_name,

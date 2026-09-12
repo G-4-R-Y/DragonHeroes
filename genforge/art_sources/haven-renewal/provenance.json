@@ -1,0 +1,13 @@
+{
+  "provider": "builtin-imagegen",
+  "model": "tool-managed",
+  "reference": "game/living/shrine.png",
+  "request": "R11 Haven sanctuary in the approved shrine style",
+  "status": "raw candidate; visually inspected; runtime hub integration pending",
+  "dimensions": [
+    1672,
+    941
+  ],
+  "sha256": "eb1af64ab00770f352949bdbb6eeb36192b0457c3bd21764bb151e177c4cbca7",
+  "prompt_sha256": "869ea9c46868fa1a1736a6e2a833b15500e973071614122bea1bc643d9f6681e"
+}
