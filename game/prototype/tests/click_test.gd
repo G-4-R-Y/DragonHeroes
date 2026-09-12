@@ -108,6 +108,7 @@ func _run() -> void:
 			_fail("chip click did not open the detail card (no Learn for brutal_edge)")
 		else:
 			print("CLICKTEST OK: node detail card opened via chip click (brutal_edge)")
+			await _scroll_to(learn)   # the upstream detail card is scrollable
 			await _click(learn.get_global_rect().get_center())
 			if Session.node_learned("brutal_edge"):
 				print("CLICKTEST OK: passive learned via the detail card (brutal_edge)")
@@ -123,6 +124,7 @@ func _run() -> void:
 		if learn_act == null:
 			_fail("rv_gash chip click did not open its detail card")
 		else:
+			await _scroll_to(learn_act)   # the upstream detail card is scrollable
 			await _click(learn_act.get_global_rect().get_center())
 			if Session.node_learned("rv_gash"):
 				print("CLICKTEST OK: active skill learned via the detail card (rv_gash)")
@@ -132,6 +134,7 @@ func _run() -> void:
 	if assign == null:
 		_fail("learned active shows no assign chip for slot 1 on the detail card")
 	else:
+		await _scroll_to(assign)   # the upstream detail card is scrollable
 		await _click(assign.get_global_rect().get_center())
 		if str(Session.skill_loadout[0]) == "rv_gash":
 			print("CLICKTEST OK: active assigned to skill-bar slot 1 via click")
@@ -167,11 +170,13 @@ func _run() -> void:
 		if learn_buff == null:
 			_fail("rv_blood_howl chip click did not open its detail card")
 		else:
+			await _scroll_to(learn_buff)   # the upstream detail card is scrollable
 			await _click(learn_buff.get_global_rect().get_center())
 		var assign2 := _btn_with_tooltip(cp, "assign Blood Howl to slot 2")
 		if assign2 == null:
 			_fail("no assign chip for Blood Howl slot 2")
 		else:
+			await _scroll_to(assign2)   # the upstream detail card is scrollable
 			await _click(assign2.get_global_rect().get_center())
 			# slot path (KEY_2 in play): headless physics ticks don't align with
 			# injected-event flush frames, so drive the same code directly.

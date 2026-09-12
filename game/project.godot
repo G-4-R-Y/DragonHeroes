@@ -22,6 +22,10 @@ config/features=PackedStringArray("4.6")
 
 [autoload]
 
+LairJourney="*res://living/journey.gd"
+
+LairJourneyProbe="*res://living/journey_probe.gd"
+
 CodexPackageProbe="*res://tools/package_smoke.gd"
 
 Session="*res://prototype/ui/session.gd"

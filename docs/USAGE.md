@@ -167,9 +167,10 @@ the 2D view remains canon.
 ## Content & data workflows
 
 **Play the new candidates:** run the Codex binary and click **PLAY NEW CONTENT:
-THE BELL BENEATH THE FEN**. In the trial, 1–4 switches artifact rarity, L opens
-lore, Q→E tests Wet/Storm chains, and R tests companion synergies. No account
-is needed. Build with `python3 tools/package_codex.py all`.
+LAIRS & LEGENDS**. Explore Shrine Entrances starts beside the bell doorway;
+press G to enter. Defeat Orun to unlock Boss Rush and earn saved artifacts.
+Practice provides all four presets; L opens lore, Q→E tests Wet/Storm chains
+and R tests companion synergies. No online account is needed. Build with `python3 tools/package_codex.py all`.
 [Full controls, scope and verification](tech/35-playable-living-trial.md).
 
 Modern pixel-art/weekly-chapter review (isolated experimental branch):

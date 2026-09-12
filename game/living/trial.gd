@@ -1,7 +1,7 @@
 # Presentation/input only. The adjacent dh-server owns the 30 Hz trial simulation.
 extends Node2D
 
-const EXPECTED_FLOATS := 439
+const EXPECTED_FLOATS := 452
 const GOLD := Color("d8b875")
 const TEAL := Color("7ed4ba")
 const RARITIES := ["LEGENDARY", "RELIC", "MYTHIC", "DIVINE"]
@@ -21,6 +21,8 @@ var _elapsed := 0.0
 var _last_received := 0.0
 var _artifact := 3
 var _extra_buttons := 0
+var _pending_buttons := 0
+var _pending_sequence := 0
 var _lore_open := false
 var _paused_focus := false
 var _chapter: Dictionary
@@ -49,6 +51,9 @@ var _max_draw_us := 0
 var _effect_colors := {}
 var _skills := {}
 var _creature: Dictionary
+var _lair_index := -1
+var _next_button: Button
+var _exit_button: Button
 
 func _ready() -> void:
 	_small = load(ProtoTheme.FONT_SMALL_PATH)
@@ -59,7 +64,7 @@ func _ready() -> void:
 	for skill in _chapter.release.skills:
 		_skills[skill.id] = skill
 	for creature in _chapter.release.creatures:
-		if creature.id == _chapter.playable.creature: _creature = creature
+		if creature.id == _chapter.playable.lairs[0].creature: _creature = creature
 	_atlas = JSON.parse_string(FileAccess.get_file_as_string("res://living/generated/atlas.json"))
 	_albedo = load("res://living/generated/albedo.png")
 	_emissive = load("res://living/generated/emissive.png")
@@ -87,7 +92,12 @@ func _start_host() -> void:
 	if not FileAccess.file_exists(helper):
 		_status.text = "Trial helper missing. Keep dh-server beside the game. ESC: menu."
 		return
-	_pid = OS.create_process(helper, ["--living-preview", "--client-port", str(_peer.get_local_port()), "--token", str(_token)])
+	if LairJourney.lair_id.is_empty():
+		LairJourney.lair_id = str(_chapter.playable.lairs[0].id)
+	var args := ["--living-preview", "--client-port", str(_peer.get_local_port()), "--token", str(_token),
+		"--mode", LairJourney.mode_name, "--lair", LairJourney.lair_id, "--profile", LairJourney.profile(),
+		"--seed", str(LairJourney.seed), "--entrance-chunk", LairJourney.entrance_chunk]
+	_pid = OS.create_process(helper, args)
 	if _pid < 0:
 		_status.text = "Trial could not start. Check executable permissions. ESC: menu."
 
@@ -106,6 +116,7 @@ func _notification(what: int) -> void:
 
 func _build_ui() -> void:
 	var ui := CanvasLayer.new()
+	ui.layer = 101
 	add_child(ui)
 	var root := Control.new()
 	root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -117,8 +128,10 @@ func _build_ui() -> void:
 	_status.add_theme_font_size_override("font_size", ProtoTheme.SIZE_BODY)
 	_status.text = "Opening the bell shrine..."
 	root.add_child(_status)
-	_button(root, "LORE [L]", Vector2(470, 9), Vector2(74, 20), _toggle_lore)
-	_button(root, "MENU [ESC]", Vector2(550, 9), Vector2(80, 20), _menu)
+	_button(root, "LORE [L]", Vector2(452, 9), Vector2(74, 20), _toggle_lore)
+	_exit_button = _button(root, "RETURN [ESC]", Vector2(534, 9), Vector2(96, 20), _menu)
+	_next_button = _button(root, "CONTINUE [ENTER]", Vector2(225, 202), Vector2(190, 23), func() -> void: _extra_buttons |= 512)
+	_next_button.hide()
 	for i in range(4):
 		var pick := i
 		var button := _button(root, "%d  %s" % [i + 1, RARITIES[i]], Vector2(10+i*157, 286), Vector2(150, 21), func() -> void:
@@ -170,8 +183,8 @@ func _refresh_lore() -> void:
 	var boss_story := ""
 	for lore in _chapter.release.lore:
 		if lore.id == _creature.lore: boss_story = lore.story
-	_lore_text.text = "%s — %s\n\n%s\n\n%s\n\n%s\n\nCLASS CONNECTIONS: %s\n\nORUN, THE LAST BELLWETHER\n%s\n\nTrial controls: WASD move, aim with mouse, LMB/Space cut, Shift/RMB dodge, Q Wet field, E Storm, R companion. Q then E spends Wet for chains on Mythic/Divine; R grants the Divine ward. ENTER restarts; F bonds Orun after victory.\n\nThe new sprite currently has an idle loop. Footwork and attacks use motion and telegraphs while action animation awaits review. Scroll to read; L closes and resumes." % [
-		item.name, RARITIES[_artifact], item.signature, item.tradeoff, story, ", ".join(item.class_hooks), boss_story]
+	_lore_text.text = "%s — %s\n\n%s\n\n%s\n\n%s\n\nCLASS CONNECTIONS: %s\n\n%s\n%s\n\nTrial controls: WASD move, aim with mouse, LMB/Space cut, Shift/RMB dodge, Q Wet field, E Storm, R companion. Q then E spends Wet for chains on Mythic/Divine; R grants the Divine ward. ENTER restarts; F bonds the guardian after victory.\n\nThe new sprite currently has an idle loop. Footwork and attacks use motion and telegraphs while action animation awaits review. Scroll to read; L closes and resumes." % [
+		item.name, RARITIES[_artifact], item.signature, item.tradeoff, story, ", ".join(item.class_hooks), str(_creature.name).to_upper(), boss_story]
 
 func _toggle_lore() -> void:
 	_lore_open = not _lore_open
@@ -179,7 +192,7 @@ func _toggle_lore() -> void:
 	_refresh_lore()
 
 func _menu() -> void:
-	get_tree().change_scene_to_file("res://prototype/ui/main_menu.tscn")
+	LairJourney.leave()
 
 func _unhandled_key_input(event: InputEvent) -> void:
 	if not event is InputEventKey or not event.pressed or event.echo:
@@ -193,7 +206,7 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		_artifact = key - KEY_1
 		_refresh_lore()
 	elif key == KEY_ENTER:
-		_extra_buttons |= 32
+		_extra_buttons |= 512 if _connected and _state[3] == 1 else 32
 	elif key == KEY_F:
 		_extra_buttons |= 128
 
@@ -203,7 +216,10 @@ func _send(button_override := -1) -> void:
 	var movement := Vector2(float(Input.is_physical_key_pressed(KEY_D))-float(Input.is_physical_key_pressed(KEY_A)),
 		float(Input.is_physical_key_pressed(KEY_S))-float(Input.is_physical_key_pressed(KEY_W)))
 	var aim := get_global_mouse_position().clamp(Vector2.ZERO, Vector2(640, 360))
-	var buttons := _extra_buttons
+	if (_extra_buttons & (32 | 128 | 512)) != 0:
+		_pending_buttons |= _extra_buttons & (32 | 128 | 512)
+		_pending_sequence = 0
+	var buttons := _extra_buttons | _pending_buttons
 	_extra_buttons = 0
 	if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) or Input.is_physical_key_pressed(KEY_SPACE): buttons |= 1
 	if Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT) or Input.is_physical_key_pressed(KEY_SHIFT): buttons |= 2
@@ -218,7 +234,14 @@ func _send(button_override := -1) -> void:
 		aim = _position_at(35) if _connected else Vector2(435, 187)
 		buttons = 4 | 8 | 16
 		movement = Vector2(1, 0) if not _connected or _state[10] < 260 else Vector2.ZERO
+	if "--lairs-selftest" in OS.get_cmdline_user_args() and _connected and button_override < 0:
+		aim = Vector2(_state[35], _state[36])
+		var direction := aim - Vector2(_state[10], _state[11])
+		movement = direction.normalized() if direction.length() > 42 else Vector2.ZERO
+		buttons = 1 | 4 | 8 | 16 | _pending_buttons
 	_sequence += 1
+	if _pending_buttons != 0 and _pending_sequence == 0 and (buttons & _pending_buttons) == _pending_buttons:
+		_pending_sequence = _sequence
 	var bytes := PackedByteArray()
 	bytes.resize(36)
 	bytes.encode_u32(0, 0x31494c44)
@@ -240,7 +263,7 @@ func _process(delta: float) -> void:
 	while _peer.get_available_packet_count() > 0 and drained < 64:
 		drained += 1
 		var bytes := _peer.get_packet()
-		if bytes.size() != 20+EXPECTED_FLOATS*4 or bytes.decode_u32(0) != 0x31534c44 or bytes.decode_u32(4) != _token:
+		if bytes.size() != 20+EXPECTED_FLOATS*4 or bytes.decode_u32(0) != 0x32534c44 or bytes.decode_u32(4) != _token:
 			continue
 		if bytes.decode_u32(16) != int(_chapter.simulation_stamp):
 			_status.text = "Trial data and helper versions differ. Re-extract the full package."
@@ -258,10 +281,14 @@ func _process(delta: float) -> void:
 		_last_snapshot = seq
 		_previous = _state
 		_state = bytes.slice(20).to_float32_array()
+		if _pending_sequence > 0 and int(_state[0]) >= _pending_sequence:
+			_pending_buttons = 0
+			_pending_sequence = 0
 		if _previous.is_empty(): _previous = _state
 		_connected = true
 		_last_received = _elapsed
 		_age = 0
+		_select_lair(int(_state[439]))
 		_refresh_status()
 	if _send_time >= 1.0/30.0:
 		_send_time = 0
@@ -295,11 +322,41 @@ func _capture() -> void:
 	print("LIVING CAPTURE: ", OS.get_user_data_dir().path_join("living-trial.png"))
 	get_tree().quit()
 
+func _select_lair(index: int) -> void:
+	if index == _lair_index: return
+	_lair_index = index
+	var lair: Dictionary = _chapter.playable.lairs[index]
+	for creature in _chapter.release.creatures:
+		if creature.id == lair.creature: _creature = creature
+	var folder := "res://living/generated/" if index == 0 else "res://living/generated/lair_%d/" % index
+	_atlas = JSON.parse_string(FileAccess.get_file_as_string(folder + "atlas.json"))
+	_albedo = load(folder + "albedo.png")
+	_emissive = load(folder + "emissive.png")
+	_refresh_lore()
+
 func _refresh_status() -> void:
-	var skill: Dictionary = _skills[_chapter.playable.phases[int(_state[5])].skill]
+	var skill: Dictionary = _skills[_chapter.playable.lairs[_lair_index].phases[int(_state[5])].skill]
 	_status.text = "%s  ·  %s  ·  WASD move / mouse aim" % ["PAUSED" if _lore_open else "BELL SHRINE", skill.name]
 	_feedback.text = "%s  |  Echo %d  Chain %d  Resolve %d  Ward %d" % [_artifacts[_artifact].name, int(_state[24]), int(_state[25]), int(_state[27]), int(_state[28])]
+	if _state[440] == 2:
+		_status.text = "BOSS RUSH  ·  ROUND %d  ·  %s" % [int(_state[441]), skill.name]
+	elif _state[440] == 0:
+		_status.text = "PRACTICE  ·  %s  ·  All artifacts available" % skill.name
+	if _state[442] > 0:
+		_status.text = "Defeat this guardian in its world lair to unlock boss rush. ESC: return."
+	if _state[442] == 2:
+		_status.text = "This doorway is not present in this world. ESC: return."
+	if _state[445] > 0:
+		_status.text = "Collection could not be saved. Keep this fight open to retry."
+	if _state[442] == 3:
+		_status.text = "Collection is busy or unreadable; its save is preserved. ESC: return."
+	if _state[440] != 0 and _artifact > 0 and _state[446+_artifact] == 0:
+		_artifact = int(_state[2])
+	_next_button.visible = _state[3] == 1 and _state[4] == 0
+	_next_button.disabled = _state[445] > 0
 	for i in range(4):
+		_artifact_buttons[i].disabled = _state[440] != 0 and i != 0 and _state[446+i] == 0
+		_artifact_buttons[i].text = "%d  %s%s" % [i+1, RARITIES[i], " ×%d" % int(_state[446+i]) if _state[440] != 0 else ""]
 		_artifact_buttons[i].modulate = COLORS[i] if i == int(_state[2]) else Color(0.65, 0.65, 0.65)
 	for i in range(5):
 		_cast_buttons[i].modulate = TEAL if _state[19+i] == 0 else Color(0.55, 0.6, 0.65)
@@ -325,7 +382,7 @@ func _draw() -> void:
 		var y := 56.0+float((i*37)%220)
 		var alpha := 0.15+0.12*sin(_elapsed*1.3+i)
 		draw_circle(Vector2(x,y), 1.0, Color(0.45, 0.95, 0.8, alpha))
-	_text(Vector2(12,21), str(_chapter.release.title).to_upper(), GOLD, true)
+	_text(Vector2(12,21), "BELL SHRINE" if _lair_index < 0 else str(_chapter.playable.lairs[_lair_index].name).to_upper(), GOLD, true)
 	if not _connected:
 		return
 	for n in range(12):
@@ -377,11 +434,16 @@ func _draw() -> void:
 	_bar(Vector2(149,273), 110, _state[9], 100, TEAL)
 	_text(Vector2(268,278), "HP %d  LUMEN %d  WARD %d%s" % [int(_state[12]),int(_state[9]),int(_state[14]),"  WET" if _state[16] > 0 else ""])
 	if _state[3] > 0 and _state[4] == 0:
-		draw_rect(Rect2(105,114,430,81), Color(0.025,0.05,0.07,0.95))
+		draw_rect(Rect2(82,109,476,122), Color(0.025,0.05,0.07,0.95))
 		_text(Vector2(154,140), "THE BELL REMEMBERS" if _state[3] == 1 else "THE FEN CLAIMS YOU", GOLD, true)
-		_text(Vector2(157,162), "F: bond Orun   ENTER: another trial" if _state[3] == 1 else "ENTER: retry   1-4: change artifact")
+		if _state[3] == 1:
+			var earned := int(_state[443])
+			_text(Vector2(110,163), "EARNED: " + str(_artifacts[earned].name) if earned < 4 else "Practice complete. Find this guardian in the world.", TEAL)
+			_text(Vector2(110,182), "Boss rush unlocked  ·  F: bond guardian  ·  ESC: return" if _state[440] == 1 else "ENTER: next encounter  ·  ESC: collection", GOLD)
+		else:
+			_text(Vector2(157,162), "ENTER: retry   1-4: change artifact")
 	elif _state[4] > 0:
-		_text(Vector2(193,92), "Orun follows. ENTER: another trial", TEAL)
+		_text(Vector2(193,92), "Your guardian follows. ENTER: continue", TEAL)
 	_max_draw_us = maxi(_max_draw_us, Time.get_ticks_usec()-started)
 
 func _draw_actor(kind: int, pos: Vector2) -> void:

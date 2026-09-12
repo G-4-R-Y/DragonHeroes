@@ -161,6 +161,8 @@ func _ready() -> void:
 	# peer generates the identical world locally; only entities cross the wire.
 	if MpNet.pending_seed != 0:
 		world.forced_seed = MpNet.pending_seed
+	if LairJourney.tour and not MpNet.in_game:
+		world.forced_seed = 42
 	add_child(world)
 
 	player = PlayerScene.new()
@@ -182,6 +184,7 @@ func _ready() -> void:
 	camera.position_smoothing_speed = 8.0
 	player.add_child(camera)
 	camera.make_current()
+	add_child(preload("res://living/world_lairs.gd").new())
 
 	_fields_node = Node2D.new()
 	_fields_node.z_index = -5

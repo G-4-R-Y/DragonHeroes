@@ -1,6 +1,7 @@
 add_executable(dh-server
     src/main.cpp
     src/living_preview.cpp
+    src/lair_profile.cpp
 )
 target_link_libraries(dh-server PRIVATE dh-sim dh-procgen dh-net)
 
@@ -8,6 +9,9 @@ add_executable(dh-effect-lab src/effect_lab.cpp)
 target_link_libraries(dh-effect-lab PRIVATE dh-sim)
 
 if(WIN32)
+    if(MINGW)
+        target_link_options(dh-server PRIVATE -municode)
+    endif()
     target_link_libraries(dh-server PRIVATE ws2_32)
     enable_language(RC)
     set(DH_APP_ICON "${CMAKE_CURRENT_SOURCE_DIR}/../../../game/branding/dragon-heroes.ico")

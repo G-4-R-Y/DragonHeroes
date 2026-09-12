@@ -2,9 +2,10 @@
 #pragma once
 #include <array>
 #include <dh/sim/effects.hpp>
+#include <dh/content/lairs.generated.hpp>
 namespace dh::sim::living_data {
-inline constexpr unsigned simulation_stamp = 751964249u;
-struct Phase { unsigned verb, windup, recovery; float damage, radius; };
+inline constexpr unsigned simulation_stamp = 2309054684u;
+using Phase = dh::content::lairs::Phase;
 inline constexpr std::array<EffectDef,4> effects = {{
 {EffectTrigger::hit,1,1,1,EffectAction::chain,250,90,3,24},
 {EffectTrigger::dodge,4,0,0,EffectAction::resource,150,90,1,12},
@@ -14,15 +15,9 @@ inline constexpr std::array<EffectDef,4> effects = {{
 inline constexpr std::array<unsigned,4> visual_ticks = {17,17,17,17};
 inline constexpr std::array<unsigned,4> artifact_masks = {4,6,7,15};
 inline constexpr std::array<float,4> affixes = {82.0f,70.0f,46.0f,26.0f};
-inline constexpr std::array<Phase,5> phases = {{
-{0,30,65,8.000000f,34.000000f},
-{1,36,45,24.000000f,45.000000f},
-{2,24,40,18.000000f,38.000000f},
-{3,24,65,18.000000f,68.000000f},
-{4,45,80,20.000000f,78.000000f},
-}};
+inline constexpr auto phases = dh::content::lairs::definitions[0].phases;
+inline constexpr float boss_hp = dh::content::lairs::definitions[0].boss_hp;
 inline constexpr float hunter_hp = 140.000000f;
-inline constexpr float boss_hp = 1400.000000f;
 inline constexpr float move_speed = 135.000000f;
 inline constexpr float base_damage = 30.000000f;
 inline constexpr float affix_damage_per_point = 0.120000f;

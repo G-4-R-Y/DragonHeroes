@@ -15,7 +15,7 @@ jobs:
       - run: python3 tools/validate_content.py
       - run: python3 tools/stage_living_preview.py
       - name: Playable generated tables stay in sync
-        run: git diff --exit-code -- sim/libs/dh-sim/include/dh/sim/living_content.generated.hpp
+        run: git diff --exit-code -- sim/libs/dh-sim/include/dh/sim/living_content.generated.hpp sim/libs/dh-content/include/dh/content/lairs.generated.hpp
       - run: python3 -m pytest genforge/tests -q
       - run: python3 -m genforge.living.build genforge/releases/bell_beneath_fen.json
       - uses: actions/upload-artifact@v4

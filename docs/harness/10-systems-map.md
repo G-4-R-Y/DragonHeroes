@@ -13,7 +13,9 @@ apply, signals `chunk_loaded/unloaded`, `can_stream/loaded_bounds/
 chunk_map_image`; `forced_seed` for co-op parity; `_find_dh_server()` also
 looks next to the executable). Gates: STREAMTEST (worst apply ≤2 ms),
 SPAWNTEST. Issues: cold 25-chunk teleports take ~700 frames to fill (normal
-walking never sees it); TRELLIS-style POI/feature layers not yet generated.
+walking never sees it). Codex adds versioned lair metadata via `dh-procgen/lairs.hpp`,
+clear-pad placement and streaming-lifetime assertions; richer TRELLIS-style
+features remain pending.
 
 ## Lighting stack (the "physical" cues)
 **LANDED (v0.1.13→v0.1.17).** canon §12.28-12.30, design/18, design/19.
@@ -69,14 +71,20 @@ types / 5 registries). 1000 normals + 100 legendaries from
 `game/prototype/art/<actor>/` (sheet.png + sheet_n.png + atlas.json).
 
 ## GenForge (art & asset pipeline)
-**Playable Codex trial:** main-menu button → `game/living/trial.tscn`.
-`living_trial.hpp` owns five-phase boss AI, movement, real effect application,
-companion commands/bond and victory/retry; `dh-server --living-preview` hosts
-it on loopback. `tools/stage_living_preview.py` compiles chapter + tuning into
-C++ definitions and Godot display assets; schema `living-preview.schema.json`.
-`tools/check_living_preview.py` tests the real controller/host and captures GL
-frames; the packager runs the exported trial as a required gate. Law: tech/35.
-Full action animation and normal Hunt/save/production-server integration remain.
+**Playable Codex lairs + boss rush:** main menu → `game/living/lair_menu.tscn`.
+`dh-procgen/lairs.hpp` emits seeded entrance metadata; `world_lairs.gd` renders
+it and `journey.gd` retains the paused Hunt across a lair visit. `LivingTrial`
+owns combat; `LairCampaign` owns earned unlocks, artifact grants/equipment,
+rush rotation and bounded recovery/difficulty. `lair_profile.cpp` owns stable-ID
+local saves, exclusive writers, atomic replacement and invalid-data preservation.
+`tools/stage_living_preview.py` compiles v2 lair/phase/reward/placement data;
+new guardians within the five-verb interpreter use authored atlases and kits.
+`tools/check_lair_journey.py` exercises real world entry, native victory, saved
+loot, exact-world return, helper restart, rush victory and round advancement.
+The packager requires that exported journey plus the practice and Hunt gates.
+Law: tech/35. Pilot: Orun, four artifact rarities, one local collection. P2P
+lair entry, public authority, full action animation, ordinary gear/class/pet
+migration and production loot balancing remain follow-ups.
 
 **README key art:** `docs/art/readme-banner/dragon-heroes-banner.png`
 (2172×724, 3:1), exact prompt + SHA-256 provenance beside it; relative embed
@@ -168,7 +176,8 @@ installed locally for the Codex desktop exports; no touch controls; no mobile pe
 
 **Codex review packaging:** `tools/package_codex.py` rebuilds both clients and
 helpers, bundles the offline review, records source/file hashes and verifies
-archives. `tools/build_app_icon.py` derives PNG + six-size ICO from a curated
+archives. Windows uses `sim/build-codex-windows` to avoid upstream's tracked
+build cache. `tools/build_app_icon.py` derives PNG + six-size ICO from a curated
 original; `tools/verify_package.py` checks actual Windows PE icon bytes and
 Linux executable formats. Actual release-PCK smoke verifies a streaming Hunt;
 fixed the exported helper capability check that silently selected an island. Source: `genforge/art_sources/app_icon/`; outputs:
@@ -178,8 +187,9 @@ Law/runbook: tech/34 packaging section. Window title and saves are Codex-specifi
 ## Sim workspace (C++20)
 **M0 benchmark harness.** tech/20-22, canon §10. `sim/libs/{dh-math,dh-sim,
 dh-procgen,dh-server,dh-net,dh-env,dh-godot,dh-content}`; `cmake --build
-sim/build`. Only dh-procgen/dh-server are exercised by the game today (world
-dumps). L5 (authority + RL throughput port) is the strategic next step.
+sim/build`. The 2D Hunt exercises dh-procgen/dh-server world dumps; Codex lairs additionally
+exercise the native trial/campaign host. L5 (full Hunt authority + RL throughput
+port) remains the strategic production step.
 
 ## Tests & captures
 `game/prototype/tests/` — vfx_showcase, vfx_iso, ui_capture, stream_test,

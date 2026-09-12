@@ -52,7 +52,7 @@ func _ready() -> void:
 		_start_living.call_deferred()
 
 func _start_living() -> void:
-	get_tree().change_scene_to_file("res://living/trial.tscn")
+	LairJourney.practice()
 
 # The whole menu is code-built, so the language toggle just rebuilds it in
 # place (keeping whatever name was typed).
@@ -71,15 +71,23 @@ func _build() -> void:
 
 	_add_embers()
 
+	# Both upstream quick-play/arena and weekly content must remain reachable at
+	# the 640x360 minimum, including long saved-hunter names and localization.
+	var scroll := ScrollContainer.new()
+	scroll.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	scroll.offset_left = 24.0
+	scroll.offset_right = -24.0
+	scroll.offset_top = 8.0
+	scroll.offset_bottom = -36.0
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.follow_focus = true
+	add_child(scroll)
 	var vb := VBoxContainer.new()
-	vb.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	# side gutters so autowrapping labels (class desc, saved-hunters) never
-	# touch the window edges
-	vb.offset_left = 24.0
-	vb.offset_right = -24.0
+	vb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	vb.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	vb.alignment = BoxContainer.ALIGNMENT_CENTER
-	vb.add_theme_constant_override("separation", 8)
-	add_child(vb)
+	vb.add_theme_constant_override("separation", 6)
+	scroll.add_child(vb)
 
 	# Pixel-grid typography (ProtoTheme doctrine): display text rides the 16 px
 	# font at integer multiples; body text stays on the themed 8 px grid.
@@ -144,12 +152,15 @@ func _build() -> void:
 
 	vb.add_child(_spacer(4.0))
 
+	var play_row := HBoxContainer.new()
+	play_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	vb.add_child(play_row)
 	var btn := Button.new()
 	btn.text = ProtoLang.t("menu_enter")
 	btn.custom_minimum_size = Vector2(190, 0)
 	btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	btn.pressed.connect(_enter)
-	vb.add_child(btn)
+	play_row.add_child(btn)
 
 	# instant offline play (Ricardo: "no work to register... can just put any
 	# name... or not even log in"): one click continues your last hunter (or a
@@ -165,27 +176,30 @@ func _build() -> void:
 		Session.login(str(saves_for_quick[0].name)
 				if not saves_for_quick.is_empty() else "Hunter")
 		get_tree().change_scene_to_file("res://prototype/ui/haven.tscn"))
-	vb.add_child(quick)
+	play_row.add_child(quick)
 	# pre-fill the name with the last hunter so editing starts from something
 	if not saves_for_quick.is_empty():
 		_name_edit.text = str(saves_for_quick[0].name)
 	var living := Button.new()
-	living.text = "PLAY NEW CONTENT: THE BELL BENEATH THE FEN"
+	living.text = "PLAY NEW CONTENT: LAIRS & LEGENDS"
 	living.custom_minimum_size = Vector2(310, 22)
 	living.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	living.add_theme_color_override("font_color", Color("7ed4ba"))
-	living.pressed.connect(_start_living)
+	living.pressed.connect(func() -> void: get_tree().change_scene_to_file("res://living/lair_menu.tscn"))
 	vb.add_child(living)
 
 	# CO-OP (P2P): the friends-and-LAN path (docs/tech/33) — Nakama matchmaking
 	# replaces discovery later; the hunt itself stays host-authoritative either way.
+	var modes_row := HBoxContainer.new()
+	modes_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	vb.add_child(modes_row)
 	var coop := Button.new()
 	coop.text = "CO-OP (P2P)"
 	coop.custom_minimum_size = Vector2(190, 0)
 	coop.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	coop.pressed.connect(func() -> void:
 		get_tree().change_scene_to_file("res://mp/lobby.tscn"))
-	vb.add_child(coop)
+	modes_row.add_child(coop)
 
 	# ARENA — the training console in-game (Ricardo: "players will find that
 	# cool"): same process, BACK returns here; standalone console.tscn still
@@ -196,7 +210,7 @@ func _build() -> void:
 	arena_btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	arena_btn.pressed.connect(func() -> void:
 		get_tree().change_scene_to_file("res://arena/console.tscn"))
-	vb.add_child(arena_btn)
+	modes_row.add_child(arena_btn)
 
 	# saved hunters (user://saves) — entering a listed name continues that character
 	var saves: Array = Session.list_saves()

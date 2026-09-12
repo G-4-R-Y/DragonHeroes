@@ -1,23 +1,41 @@
 # Handoff — modern pixel-art review branch (2026-09-12)
 
-Playable content follow-up (2026-09-12): `PLAY NEW CONTENT: THE BELL BENEATH
-THE FEN` launches the candidate trial directly from the Codex main menu.
-Pure C++ `LivingTrial` (30 Hz) owns Orun's five-phase fight, four artifact
-presets, real echo/chain/refund/ward application, Wet, dodge immunity, companion
-commands, victory/retry and a temporary Orun-following bond. Godot presents
-the generated eight-frame atlas, new shrine plate, cues, counters and lore.
-Authoring stager emits bounded C++ tables + display data with a parity stamp;
-owned loopback helper rejects invalid/stale input, pauses on focus/lore or
-controller silence and exits on scene teardown. Tech/35 is the runnable guide.
-Normal Hunt/class-tree/save/server migration and full action-animation work
-remain production follow-ups. Packaging now REQUIRES the exported trial gate.
-Validation: CTest 2/2; 106 Python tests including transport and authoring rejection;
-full game outcome suite passes (console expected JSON-error fixture). Stream
-1.15ms on isolated recheck. Exported trial proves real damage, chain and ward
-procs; exported normal Hunt proves streaming. Actual GL frame: 60 FPS,
-2.086ms process CPU, 85 draws; 7,573,376 bytes of staged textures / 8 MiB cap.
-Trial/menu captures are committed under `docs/art/playable-shrine/`. Windows
-is cross-built and PE icons verified; Windows gameplay still needs a native run.
+Latest delivery: GitHub sync + world lairs / earned boss rush (2026-09-12).
+Branch `codex/modern-pixel-content-engine` contains `origin/master` **08f92d6**;
+final fetch confirms no upstream commits missing. Kept upstream quick play,
+ARENA, HUD/hordes, Nakama launchers and rebirth. The one menu overlap is resolved;
+compact rows + scrolling preserve all actions at 640×360. Original workspace
+and upstream's tracked Windows build artifacts remain untouched. Our Windows
+build tree is now `sim/build-codex-windows`.
+
+PLAY NEW CONTENT → LAIRS & LEGENDS → EXPLORE SHRINE ENTRANCES starts beside a
+seeded bell arch. G enters Orun's lair. Native victory earns an artifact and
+unlocks him in BOSS RUSH; each rush clear earns another item. ENTER continues;
+ESC restores the exact paused Hunt or collection menu. The native campaign owns
+unlocks/equipment/rewards/rounds; exclusive, flushed atomic stable-ID saves live
+in `user://lair-collection-v1.txt`, separate from regular gear and the economy.
+Practice exposes all four presets and grants nothing. V2 authoring supports
+up to eight lairs with existing phase verbs and distinct creature atlases.
+Runbook: tech/35; actual frames: `docs/art/lair-journey/`.
+
+Validation: **113 Python tests**, content validator, **CTest 4/4**, all **16**
+integrated Godot outcome checks (with intentional console JSON-error fixture).
+Upstream's skill-card scroll required updating the real-click probe; all
+learning/assignment/persistence assertions now pass. Stream 1.12ms isolated,
+2.25ms in the full run (target 2ms / hard 4ms). Windows helper cross-build, client export
+and both six-size PE icons verified. Exported Linux normal Hunt, practice and
+full lair→saved reward→same-Hunt return→rush→second reward→round 2 all pass.
+Discrete impulses survive acknowledgement, packet batching, pause and save
+retry; Unicode native profile paths have an outcome test. Actual GL journey:
+60 FPS, 2.033ms process CPU, 89 draws, doorway draw 277µs peak. Practice final:
+60 FPS, 1.52ms, 85 draws. These are short desktop samples. Windows gameplay remains
+untested natively. Public/P2P lairs, ordinary gear/class/pet migration and full
+action animations remain production follow-ups.
+
+Both Codex packages were verified before commit. Run the packager again after
+committing so BUILD-INFO records clean source; it requires the full exported
+journey. The named interruption stash 06cffd7 can then be dropped; older stashes
+belonging to prior work must remain untouched.
 
 README banner follow-up (2026-09-12): original 3:1 Dragon Heroes key art is
 embedded at the top of README. Asset, exact prompt and hash provenance:
@@ -27,7 +45,7 @@ PNG and relative links validated; artwork visually inspected. Documentation
 only; existing binaries still record tested source commit `60764dc`.
 
 Worktree: `/tmp/dragon-heroes-codex-content-engine`; branch:
-`codex/modern-pixel-content-engine`; rebased base: `8568d26` (originally `b3d41e9`). The original workspace's
+`codex/modern-pixel-content-engine`; rebased base: `08f92d6` (originally `b3d41e9`). The original workspace's
 uncommitted code, training runs, logs and builds remain untouched.
 
 Delivered: `genforge/living/` (draft, grounded explicit provider generation,

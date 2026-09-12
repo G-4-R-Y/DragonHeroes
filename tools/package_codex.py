@@ -21,6 +21,7 @@ from tools.smoke_codex import smoke
 from tools.verify_package import verify
 from tools.stage_living_preview import stage as stage_preview
 from tools.check_living_preview import check as check_preview
+from tools.check_lair_journey import check as check_lairs
 
 OUT = ROOT / "builds/codex"
 
@@ -65,7 +66,7 @@ def package(platform, review, env):
     preset = "Windows Desktop" if windows else "Linux/X11"
     executable = "dragon-heroes-codex.exe" if windows else "dragon-heroes-codex.x86_64"
     helper_name = "dh-server.exe" if windows else "dh-server"
-    helper = ROOT / ("sim/build-windows" if windows else "sim/build") / "libs/dh-server" / helper_name
+    helper = ROOT / ("sim/build-codex-windows" if windows else "sim/build") / "libs/dh-server" / helper_name
     if not helper.is_file():
         raise RuntimeError(f"Missing rebuilt world-generation helper: {helper}")
     with tempfile.TemporaryDirectory(prefix=f".{platform}-", dir=OUT) as temporary:
@@ -90,13 +91,17 @@ def package(platform, review, env):
             "Keep dh-server(.exe) next to the game; it generates the world.\n"
             "Codex uses its own save/settings directory: Dragon Heroes Codex.\n\n"
             "CONTENT REVIEW: open content-review/index.html in your browser.\n"
-            "PLAYABLE PREVIEW: choose PLAY NEW CONTENT: THE BELL BENEATH THE FEN.\n"
+            "PLAYABLE PREVIEW: choose PLAY NEW CONTENT: LAIRS & LEGENDS.\n"
+            "EXPLORE SHRINE ENTRANCES starts beside the first doorway; G enters.\n"
+            "Defeat its guardian to unlock BOSS RUSH and earn a saved artifact.\n"
+            "Rush clears earn more artifacts; ENTER continues to the next round.\n"
+            "Practice lets you compare every artifact without changing your collection.\n"
             "Fight Orun, compare four artifacts and read their stories with L.\n"
             "Trial: WASD move, mouse aim, LMB/Space cut, Shift/RMB dodge,\n"
             "Q Wet field, E Storm, R companion; 1-4 switch artifact tiers.\n"
             "Q then E triggers Mythic chains; R triggers the Divine ward.\n"
-            "ENTER retries; F bonds Orun after victory; ESC returns to menu.\n"
-            "The trial is separate from Hunt progression. Orun's complete\n"
+            "ENTER retries/continues; F bonds the guardian; ESC returns to Hunt/collection.\n"
+            "The saved Codex collection is separate from regular Hunt equipment. Full\n"
             "action animations and full production integration await review.\n\n"
             "SOLO: main menu -> hunter name -> class -> ENTER THE HUNT.\n"
             "CO-OP: CO-OP (P2P); one friend hosts, others join by LAN IP (UDP 7377).\n"
@@ -120,6 +125,7 @@ def package(platform, review, env):
         if not windows:
             smoke(stage, log.parent)
             check_preview(stage)
+            check_lairs(stage)
         archive = stage / f"dragon-heroes-codex-{platform}.zip"
         with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=6) as bundle:
             for path in sorted(stage.rglob("*")):
@@ -151,9 +157,9 @@ def main():
         run(["cmake", "--build", "sim/build", "-j", "4"])
         run(["ctest", "--test-dir", "sim/build", "--output-on-failure"])
         if args.platform in ("windows", "all"):
-            run(["cmake", "-S", "sim", "-B", "sim/build-windows",
+            run(["cmake", "-S", "sim", "-B", "sim/build-codex-windows",
                  "-DCMAKE_TOOLCHAIN_FILE=cmake/mingw-w64-x86_64.cmake", "-DCMAKE_BUILD_TYPE=Release"])
-            run(["cmake", "--build", "sim/build-windows", "-j", "4"])
+            run(["cmake", "--build", "sim/build-codex-windows", "-j", "4"])
         log = ROOT / "genforge/candidates/packaging/import.log"
         with log.open("w") as handle:
             subprocess.run(["godot", "--headless", "--path", "game", "--import", "--quit"],

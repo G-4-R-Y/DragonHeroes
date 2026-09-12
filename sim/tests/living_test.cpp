@@ -43,7 +43,7 @@ int main() {
 
     LivingTrial phases; phases.hunter.hp=100000;
     for(unsigned i=0;i<900;++i) phases.step({{}, {450,180},0,0});
-    REQUIRE(phases.phase_seen==(1u<<living_data::phases.size())-1);
+    REQUIRE(phases.phase_seen==(1u<<phases.definition().phase_count)-1);
     REQUIRE(phases.overflow==0);
     const auto paused_tick=phases.tick;
     phases.step({{1,1},{450,180},pause,0});

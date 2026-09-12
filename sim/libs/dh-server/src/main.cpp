@@ -9,12 +9,21 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <filesystem>
+#include <string>
+#include <vector>
+#ifdef _WIN32
+#define NOMINMAX
+#include <windows.h>
+#endif
 
 #include <dh/math/hash.hpp>
 #include <dh/procgen/chunk.hpp>
+#include <dh/procgen/lairs.hpp>
 #include <dh/sim/world.hpp>
 
-int living_preview(unsigned client_port, unsigned token);
+int living_preview(unsigned client_port, unsigned token, const char* profile, const char* mode, const char* lair, std::uint64_t seed, const char* entrance);
+int lair_profile_query(const char* path);
 
 namespace {
 
@@ -39,7 +48,12 @@ const char* arg_str(int argc, char** argv, const char* name) {
 // the chunks it is missing; determinism comes free from generate_chunk.
 int dump_rect(std::uint64_t seed, std::int64_t cx0, std::int64_t cy0, std::int64_t cx1,
               std::int64_t cy1, const char* out_path) {
+#ifdef _WIN32
+    const auto path=std::filesystem::path(std::u8string(out_path,out_path+std::strlen(out_path)));
+    std::FILE* f = _wfopen(path.c_str(),L"w");
+#else
     std::FILE* f = std::fopen(out_path, "w");
+#endif
     if (!f) {
         std::fprintf(stderr, "cannot open %s\n", out_path);
         return EXIT_FAILURE;
@@ -57,6 +71,13 @@ int dump_rect(std::uint64_t seed, std::int64_t cx0, std::int64_t cy0, std::int64
             for (std::size_t i = 0; i < chunk.tiles.size(); ++i) {
                 std::fprintf(f, "%s%u", i ? "," : "", chunk.tiles[i]);
             }
+            const auto entrances=dh::procgen::lair_entrances(seed,chunk);
+            std::fprintf(f, "],\"entrances\":[");
+            for(unsigned j=0;j<entrances.count;++j) {
+                const auto e=entrances.entries[j];
+                const auto id=dh::content::lairs::definitions[e.lair].id;
+                std::fprintf(f,"%s{\"id\":\"%.*s\",\"x\":%u,\"y\":%u,\"version\":%u}",j?",":"",static_cast<int>(id.size()),id.data(),e.x,e.y,dh::content::lairs::placement_version);
+            }
             std::fprintf(f, "]}");
         }
     }
@@ -71,10 +92,12 @@ int dump_rect(std::uint64_t seed, std::int64_t cx0, std::int64_t cy0, std::int64
 
 } // namespace
 
-int main(int argc, char** argv) {
+int server_main(int argc, char** argv) {
     if(argc>1 && std::strcmp(argv[1],"--living-preview")==0)
         return living_preview(static_cast<unsigned>(arg_u64(argc,argv,"--client-port",0)),
-                              static_cast<unsigned>(arg_u64(argc,argv,"--token",0)));
+                              static_cast<unsigned>(arg_u64(argc,argv,"--token",0)),arg_str(argc,argv,"--profile"),
+                              arg_str(argc,argv,"--mode"),arg_str(argc,argv,"--lair"),arg_u64(argc,argv,"--seed",42),arg_str(argc,argv,"--entrance-chunk"));
+    if(argc>1 && std::strcmp(argv[1],"--lair-profile")==0) return lair_profile_query(argc>2?argv[2]:nullptr);
     const std::uint64_t seed = arg_u64(argc, argv, "--seed", 42);
     const std::uint64_t entities = arg_u64(argc, argv, "--entities", 500);
     const std::uint64_t ticks = arg_u64(argc, argv, "--ticks", 3000);
@@ -128,3 +151,24 @@ int main(int argc, char** argv) {
                 chunk.tile_at(0, 0));
     return EXIT_SUCCESS;
 }
+
+#ifdef _WIN32
+// Godot launches UTF-16 command lines. Convert explicitly instead of losing
+// accented user-profile paths through the system's legacy ANSI code page.
+int wmain(int argc, wchar_t** argv) {
+    std::vector<std::string> encoded;
+    encoded.reserve(static_cast<std::size_t>(argc));
+    for(int i=0;i<argc;++i) {
+        const int count=WideCharToMultiByte(CP_UTF8,WC_ERR_INVALID_CHARS,argv[i],-1,nullptr,0,nullptr,nullptr);
+        if(count<=0) return 2;
+        auto& text=encoded.emplace_back(static_cast<std::size_t>(count),'\0');
+        if(!WideCharToMultiByte(CP_UTF8,WC_ERR_INVALID_CHARS,argv[i],-1,text.data(),count,nullptr,nullptr)) return 2;
+    }
+    std::vector<char*> pointers;
+    for(auto& text:encoded) pointers.push_back(text.data());
+    pointers.push_back(nullptr);
+    return server_main(argc,pointers.data());
+}
+#else
+int main(int argc,char** argv) { return server_main(argc,argv); }
+#endif

@@ -1025,3 +1025,13 @@ Still open:
    actions and enforces a preview texture budget. This advances review into
    a playable slice without claiming the full Hunt/save/class-tree migration,
    public server deployment or finished action animation. Details: tech/35.
+
+   Lair/boss-rush addendum (Ricardo, 2026-09-12): the generated world may
+   contain dungeon entrances; special bosses have authored lairs, and defeating
+   them unlocks repeatable boss-rush item farming. The Codex pilot adds seeded
+   bell-shrine entrances, Orun's lair, C++-owned earned unlocks/reward cycles and
+   a saved local collection. Weekly lairs reuse stable IDs and validated phase,
+   placement and reward data. Rush HP/recovery/drop cadence are preview tuning;
+   the existing global power cap and no-paid-randomness rules remain. Local
+   preview items never enter cashable tables; public authority, co-op lairs and
+   production save/economy migration remain separate gates. Runbook: tech/35.

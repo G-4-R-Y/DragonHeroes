@@ -4,6 +4,65 @@ Ricardo decides DIRECTION (which lever, when); harnesses execute inside it.
 Every item points at its law doc. Statuses: NOW (in flight) · PICK (awaiting
 Ricardo's call) · SCHEDULED (decided, sequenced) · BUDGET (blocked on money).
 
+## DONE — Synchronize GitHub and verify compatibility (Ricardo, 2026-09-12)
+
+Demand: fetch all GitHub changes and ensure the isolated Codex branch is current
+without merge conflicts or incompatibilities. Law: harness/README gate suite;
+preserve the other workspace and work on the latest committed mainline.
+Fetched every configured remote (`origin`) and rebased all Codex commits onto
+`origin/master` **08f92d6**, including 674d57b (HUD/hordes/Nakama/launchers) and
+the rebirth import. Final fetch still reports that revision; ancestry check
+proves zero upstream commits missing. The original workspace remains untouched.
+
+Resolved the one menu conflict by keeping quick play, ARENA and Codex content.
+Grouped navigation rows + scrolling/focus support retain access at 640×360.
+Updated the real-click probe to scroll upstream's new skill detail card before
+learning/assigning; all original outcome assertions remain. Codex Windows builds
+use `sim/build-codex-windows`, avoiding upstream's tracked absolute-path cache.
+Windows helper arguments and file paths support Unicode explicitly.
+
+Gates: **113 Python tests; CTest 4/4; all 16 game outcome checks**, including
+upstream ESC/flask/repopulation and co-op. Console's expected malformed-JSON
+fixture remains qualified. Stream 2.25ms in the full run, **1.12ms** isolated
+with doorway-lifetime assertions (2ms target / 4ms hard cap). Native Windows
+cross-build and both embedded six-size icons pass; actual Linux exports pass
+normal Hunt, practice and the complete lair/reward/rush journey. No unmerged
+paths or whitespace errors; rebirth and upstream Windows artifacts unchanged.
+Both Codex packages verified; re-export after this commit for clean BUILD-INFO.
+Named stash 06cffd7 protected the interruption and can be dropped after commit.
+
+## DONE — World entrances, boss lairs and earned boss-rush farming (Ricardo, 2026-09-12)
+
+Demand: generated-world dungeon entrances, special bosses with their own lairs,
+and earned boss-rush unlocks for item farming. Law: canon §§1,4,7,12.45,
+design/26 and tech/35. Originally started over 8321356; integrated over 08f92d6.
+
+Delivered: v2 data-authored lair catalog (up to eight supported guardians),
+separate versioned C++ POI metadata on clear walkable pads, visual bell arches
+and bearings, G interaction, exact-Hunt pause/return, native eligibility,
+ordinary-input boss victories, once-per-victory artifact rewards, saved local
+collection, owned artifact effects, and repeatable unlocked-roster boss rush
+with bounded difficulty and intermission healing. Orun is the first guardian.
+Practice exposes every preset without awarding items or unlocks. All progression
+belongs to the C++ host and stays outside cashable tables. The full production
+gear/class/pet migration and P2P/public-server lairs remain separate follow-ups.
+
+Gates: native real-fight/replay/lock/death/retry/pause/advance cases; deterministic
+clear-pad generation across positive/negative chunks; atomic saves, exclusive
+writers, Unicode paths and corrupt/unknown/duplicate record preservation;
+authoring and real transport rejection cases. Exported Godot journey proves
+entry → native victory → first artifact/unlock → same-world return → helper
+restart → rush victory → second artifact → scaled round two. Discrete inputs
+are retained until acknowledgement and across host packet batches/pause/save
+retry (a windowed test caught the original missed continue pulse).
+
+Actual GL frames inspected in `docs/art/lair-journey/`: 1280×720, **60 FPS**,
+2.033ms process CPU, 89 draws, peak doorway draw CPU 277µs in the journey sample.
+Final practice capture: 60 FPS, 1.52ms process CPU, 85 draws, draw CPU 745µs.
+Texture working set remains 7,573,376 bytes / 8 MiB per encounter. These are
+short desktop samples, not sustained worst-case or mobile claims. Codex archives
+include the offline review and controls; Windows gameplay needs a native run.
+
 ## DONE — Playable living-content preview binary (Ricardo, 2026-09-12)
 
 Demand: show where pending content can be reviewed and generate a binary
@@ -65,7 +124,7 @@ remain those of code commit `60764dc`; no binary regeneration needed.
 
 New priority: modern 2D pixel-art production and an extensible weekly content
 engine. Branch `codex/modern-pixel-content-engine`, isolated worktree
-`/tmp/dragon-heroes-codex-content-engine`, originally based on `b3d41e9`, now rebased onto committed `8568d26`.
+`/tmp/dragon-heroes-codex-content-engine`, originally based on `b3d41e9`, now rebased onto committed `08f92d6`.
 The original workspace's uncommitted gameplay/training changes remain untouched.
 Law: `docs/design/26-living-pixel-world.md`, canon §§1, 4, 7 and §12.45.
 

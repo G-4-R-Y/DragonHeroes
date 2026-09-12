@@ -225,3 +225,18 @@ beside candidates, eight-direction/contact review where required, 100 enemies
 and co-op effects, and frame-time captures on the named desktop and mid-range
 mobile reference devices. Until that exists, no locked-60-FPS or numerical
 art-quality claim follows from this branch.
+
+## Discoverable lairs and boss memories (Ricardo, 2026-09-12)
+
+The generated world should hide entrances to authored boss spaces. A place,
+its guardian and its artifact stories form one discoverable chapter: the bell
+arch leads beneath the fen to Orun's vigil. A lair victory unlocks that guardian
+in repeatable boss rush, so exploration grows a personal roster to revisit for
+items. Weekly chapters expand both the world and that roster through stable IDs.
+
+The Codex slice implements one guardian, native earned progression and a saved
+local artifact collection (tech/35). Rush cycles earned bosses with short
+intermissions, bounded HP pressure and partial recovery. Practice is freely
+available for comparing builds. Reward cycles are intentionally generous preview
+tuning; production rarity/economy balancing is a separate gate. No paid entry,
+keys, random purchases or permanent power inflation are introduced.

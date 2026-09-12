@@ -1,0 +1,13 @@
+{
+  "draw_calls": 89.0,
+  "earned_artifacts": 2,
+  "entrance_draw_us": 277,
+  "entrances": 1,
+  "fps": 60.0,
+  "frame_cpu_ms": 2.033,
+  "lair_unlocks": 1,
+  "passed": true,
+  "rush_round": 2.0,
+  "seed": 42,
+  "world_return_preserved": true
+}

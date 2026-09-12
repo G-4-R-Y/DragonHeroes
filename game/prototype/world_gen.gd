@@ -20,6 +20,8 @@ extends Node2D
 # Streaming contract (docs/tech/29 §2): consumers snapshot `chunks.keys()` at
 # ready, then follow these deltas. Emitted AFTER a chunk is fully applied; the
 # one-shot fallback path emits chunk_loaded once per dumped chunk after build.
+var entrances := {}  # C++ POI metadata; same lifetime as loaded chunks
+
 signal chunk_loaded(key: Vector2i)
 signal chunk_unloaded(key: Vector2i)
 
@@ -194,6 +196,7 @@ func _boot_sync() -> void:
 	for c in data["chunks"]:
 		var key := Vector2i(int(c["cx"]), int(c["cy"]))
 		chunks[key] = _pack_tiles(c["tiles"])
+		entrances[key] = c.get("entrances", [])
 	_build_all_loaded()
 	_arm_boot_deferred()
 	set_process(true)
@@ -224,6 +227,7 @@ func _boot_fallback() -> void:
 	for c in data["chunks"]:
 		var key := Vector2i(int(c["cx"]), int(c["cy"]))
 		chunks[key] = _pack_tiles(c["tiles"])
+		entrances[key] = c.get("entrances", [])
 	_streaming = false
 	_build_all_loaded()
 	_arm_boot_deferred()
@@ -391,7 +395,7 @@ func _stream_worker(job: Dictionary) -> void:
 						packed[i] = t
 						@warning_ignore("integer_division")
 						img.set_pixel(i % CHUNK, i / CHUNK, MAP_COLS[t])
-					results.append({"key": key, "tiles": packed, "img": img})
+					results.append({"key": key, "tiles": packed, "img": img, "entrances": c.get("entrances", [])})
 	_mutex.lock()
 	for r in results:
 		_ready_chunks.append(r)
@@ -461,6 +465,7 @@ func _begin_next_job() -> void:
 		# read it; the fence (is_walkable) only opens once data is in `chunks`.
 		var st: Dictionary = _staged[key]
 		chunks[key] = st["tiles"]
+		entrances[key] = st.get("entrances", [])
 		_map_blocks[key] = st["img"]
 		_staged.erase(key)
 	elif not chunks.has(key):
@@ -520,6 +525,7 @@ func _step_unload() -> void:
 				_apply_row = 0
 		1:   # drop data + free every per-chunk artifact
 			chunks.erase(key)
+			entrances.erase(key)
 			_map_blocks.erase(key)
 			if _props.has(key):
 				_props[key].queue_free()
@@ -640,6 +646,7 @@ func _scatter_chunk_props(key: Vector2i, r0: int, r1: int) -> void:
 		_props[key] = props
 	var spawn := spawn_point()
 	var skip_r := 3.0 * TILE
+	var pads: Array = entrances.get(key, [])
 	var tiles: PackedByteArray = chunks[key]
 	for ly in range(r0, r1):
 		for lx in CHUNK:
@@ -648,6 +655,12 @@ func _scatter_chunk_props(key: Vector2i, r0: int, r1: int) -> void:
 				continue
 			var gx := key.x * CHUNK + lx
 			var gy := key.y * CHUNK + ly
+			var portal_pad := false
+			for entrance in pads:
+				if Vector2(lx-float(entrance.x), ly-float(entrance.y)).length_squared() < 25:
+					portal_pad = true
+					break
+			if portal_pad: continue
 			var h := ProtoSprites._speck(gx, gy, 4177)
 			var tex: Texture2D = null
 			var shroom := false

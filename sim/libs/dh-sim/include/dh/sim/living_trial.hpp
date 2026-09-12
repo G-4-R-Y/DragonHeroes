@@ -17,7 +17,7 @@ struct TrialVec {
 inline float length(TrialVec p) { return std::sqrt(p.x*p.x+p.y*p.y); }
 inline TrialVec unit(TrialVec p) { const auto l=length(p); return l>0.001f?p*(1.0f/l):TrialVec{1,0}; }
 inline TrialVec arena_clamp(TrialVec p) { return {std::clamp(p.x,40.0f,600.0f),std::clamp(p.y,100.0f,262.0f)}; }
-enum TrialButton : unsigned { strike=1, evade=2, mire=4, storm=8, command_pet=16, restart=32, pause=64, bond=128, stop=256 };
+enum TrialButton : unsigned { strike=1, evade=2, mire=4, storm=8, command_pet=16, restart=32, pause=64, bond=128, stop=256, advance=512 };
 struct TrialInput { TrialVec move{}, aim{440,180}; unsigned buttons{}, artifact{3}; };
 struct TrialActor { TrialVec pos{}; float hp{}, maximum{}, ward{}; unsigned wet{}, hit{}, respawn{}; };
 struct TrialVisual { unsigned kind{}, ttl{}, total{}, hostile{}; TrialVec a{}, b{}; float radius{}; };
@@ -42,8 +42,12 @@ public:
     float mana{100}, total_damage{}, echo_damage{}, chain_damage{}, absorbed{};
     TrialVec dash_dir{1,0}, facing{1,0}, leap_start{}, leap_end{};
 
-    LivingTrial() {
-        enemies[0]={{435,187},living_data::boss_hp,living_data::boss_hp,0,0,0,0};
+    unsigned lair_index{};
+    float difficulty{1};
+    const auto& definition() const { return dh::content::lairs::definitions[lair_index]; }
+    explicit LivingTrial(unsigned lair=0, float scale=1) : lair_index(std::min(lair,static_cast<unsigned>(dh::content::lairs::definitions.size()-1))), difficulty(scale) {
+        const float hp=definition().boss_hp*difficulty;
+        enemies[0]={{435,187},hp,hp,0,0,0,0};
         enemies[1]={{368,235},180,180,0,0,0,0};
         enemies[2]={{515,230},180,180,0,0,0,0};
         enemies[3]={{535,132},180,180,0,0,0,0};
@@ -69,7 +73,7 @@ public:
     float base_damage() const { return living_data::base_damage+living_data::affixes[artifact]*living_data::affix_damage_per_point; }
     void hurt_enemy(unsigned index,float damage) {
         auto& a=enemies[index]; if(a.hp<=0) return;
-        if(index==0 && living_data::phases[phase].verb==4 && phase_clock>living_data::phases[phase].windup) damage*=1.35f;
+        if(index==0 && definition().phases[phase].verb==4 && phase_clock>definition().phases[phase].windup) damage*=1.35f;
         const float shield=std::min(a.ward,damage); a.ward-=shield; damage-=shield;
         const float dealt=std::min(a.hp,damage); a.hp-=dealt; total_damage+=dealt; a.hit=5;
         if(a.hp==0 && index>0) a.respawn=180;
@@ -144,7 +148,7 @@ public:
         }
     }
     void boss_step() {
-        auto& boss=enemies[0]; const auto def=living_data::phases[phase];
+        auto& boss=enemies[0]; const auto def=definition().phases[phase];
         if(phase_clock==0) {
             phase_seen|=1u<<phase;
             if(def.verb==0) {
@@ -169,13 +173,13 @@ public:
         if(def.verb==4 && phase_clock==def.windup) boss.ward=0;
         ++phase_clock;
         if(phase_clock>=def.windup+def.recovery) {
-            phase=(phase+1)%living_data::phases.size(); phase_clock=0;
+            phase=(phase+1)%definition().phase_count; phase_clock=0;
         }
     }
     void step(TrialInput input) {
         const unsigned edges=input.buttons&~previous_buttons;
         previous_buttons=input.buttons;
-        if(edges&restart) { *this=LivingTrial{}; previous_buttons=input.buttons; }
+        if(edges&restart) { *this=LivingTrial{lair_index,difficulty}; previous_buttons=input.buttons; }
         artifact=std::min(input.artifact,3u);
         if(input.buttons&pause) return;
         ++tick;

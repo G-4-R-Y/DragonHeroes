@@ -251,3 +251,6 @@ Windows is cross-built and its archive, executable format and embedded icon
 are verified here; native Windows gameplay and Explorer/taskbar appearance
 require a Windows machine. Headless Linux startup checks are separate from
 visual captures and do not prove 60 FPS or desktop-shell appearance.
+
+Codex Windows cross-builds use the ignored `sim/build-codex-windows/` tree,
+isolated from upstream's tracked `sim/build-windows/` cache and artifacts.

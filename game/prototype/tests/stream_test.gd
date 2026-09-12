@@ -125,6 +125,13 @@ func _run_asserts() -> void:
 	if world.get_node_or_null(NodePath("Water_0_0")) != null:
 		fails.append("Water_0_0 not freed on unload")
 
+	# Lair annotations have exactly the loaded tile-data lifetime, including
+	# empty lists; unloading terrain must not retain orphan doorway metadata.
+	if world.entrances.size() != world.chunks.size():
+		fails.append("lair metadata count differs from loaded chunks")
+	for key in world.entrances:
+		if not world.chunks.has(key): fails.append("orphan lair metadata %s" % str(key))
+
 	# (e) walkability fence holds beyond the loaded window, opens inside it
 	var far := Vector2((20 * CHUNK + CHUNK / 2) * TILE, (CHUNK / 2) * TILE)
 	if world.is_walkable(far):
