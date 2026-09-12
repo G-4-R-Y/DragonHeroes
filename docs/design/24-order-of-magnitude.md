@@ -42,6 +42,41 @@ real level transition, multi-level point awards, party parity and dead players.
 The Codex export smoke repeats a real kill → level-up → HP/dodge/flask refill
 inside the release PCK.
 
+### Progression scaling audit (Ricardo, 2026-09-12)
+
+Question: do hunter levels, monster levels/stats and items all scale indefinitely?
+**No.** Source audit of the playable code at e570acc:
+
+| System | Implemented behavior | Source |
+|---|---|---|
+| Hunter progression | `_level_for_kills` and the XP gauge stop at `LEVEL_CAP = 100`. Points come from earned levels and player allocation; no infinite prestige/mastery track exists. | `game/prototype/main.gd`, `stats.gd` |
+| Ordinary monsters | At spawn, HP × `1 + .02*(hunter_level-1)` and damage × `1 + .01*(hunter_level-1)`, plus chassis/species/elite modifiers. Existing monsters retain their spawn stats. | `game/prototype/creature.gd::_apply_entry` |
+| Boss chassis | Same spawn-time rule with .06 HP / .03 damage per level. Named legendary normalization/species modifiers also apply. | `boss.gd`, `hag.gd`, `duo_boss.gd` |
+| Ordinary gear | Drops use the hunter's level at the kill. Each newly rolled stat is multiplied by `1 + .04*(ilvl-1)` before rounding; existing items do not auto-grow. The helper accepts higher levels, but normal progression only reaches 100. | `items.gd::_roll_value/roll_item`, `main.gd::on_creature_died` |
+| Affix tiers / forge | Prototype selects the first authored affix tier; it does not implement the proposed item-level tier-unlock ladder. Forge upgrades stop at +5. The prototype roller is not the candidate pipeline's 100-point budget evaluator. | `items.gd::_affix_pool`, `FORGE_MAX_TIER` |
+| Frontier distance | Distance increases elite-affix odds, reaching a 40% chance for non-leader pack members. It does not add monster levels; the distance modifier stops growing after 40 chunks. Leader rules are separate. | `main.gd::_frontier_populate/_build_frontier_pack` |
+| Bell Shrine / rush | Separate C++ tuning. Rush boss HP increases 10 percentage points per round, reaching 1.5× on round six; damage and artifact values do not grow with rounds. Round counter saturates at 10,000 and saved item/clear counters at 1,000,000. | `lair_campaign.hpp`, `genforge/playable/fen_bells.json` |
+
+For comparison at hunter level 100, the **level component alone** is 2.98×
+ordinary HP / 1.99× ordinary damage, 6.94× boss HP / 3.97× boss damage, and
+4.96× an item roll's starting band. These are additive linear curves, not
+compounding percentages or final damage/build-power ratios. Spawn modifiers,
+quality, rounding, forging, attributes and resistances also matter.
+
+The permanent gear-power ceiling is an explicit design pillar (canon §4 and
+design/14 §4); the 100-point candidate rarity budget implements a separate
+review contract. The older shipping proposal still says level/ilvl 60, while
+canon decision §12.16 and the playable prototype use 1–100. Neither specifies
+infinite hunter/item power. The streaming specification's former claim of
+actual extra pack levels also exceeded its implementation; tech/29 now labels
+that as intended behavior and describes the current elite-affix substitute.
+
+Endless PvE depth or mastery with a fixed permanent gear budget fits the current
+direction. Unbounded permanent hunter/item power would require an explicit new
+direction and one shared, numerically safe progression model for spawn threat,
+loot, save versions, stat caps and competitive power brackets. This audit does
+not change gameplay, raise any cap or automatically convert existing items.
+
 ## 2. The levers (biggest first)
 
 ### L1 — Data-driven AI profiles for the bestiary (fun × species value)

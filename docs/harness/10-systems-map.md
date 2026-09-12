@@ -70,6 +70,10 @@ Codex archives live in the original workspace under `builds/codex/`.
 refill timers, refresh HUD before feedback; host applies party parity. Preserve
 builds, cooldowns, class stacks and death state. Normal apply_stats never heals.
 Gate: `tests/level_up_probe.tscn` (`LEVEL UP OK`, real creature deaths).
+**Scaling audit:** hunter level cap 100; monsters read level at spawn; item
+rolls use +4%/ilvl (normal progression reaches 100); forge +5. Frontier scales
+elite-affix odds, not extra levels. Rush HP caps at 1.5×. No endless progression
+system exists. Sources, formulas and proposal/runtime drift: design/24 audit.
 
 ## Combat, classes, skills (prototype rules — presentation-side for now)
 **PLAYABLE; overhaul SCHEDULED.** design/10-11 (kits), design/21 M-C (the

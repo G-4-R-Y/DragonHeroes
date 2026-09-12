@@ -89,9 +89,12 @@ Matriarch nests where she nests). Two additions:
 - *Frontier repopulation:* on first `chunk_loaded` of a virgin chunk beyond
   the origin window, a deterministic hash of (hunt seed, key) rolls 0–2
   wandering packs (reusing the pack builder; ~35% one pack, 10% two, wisps
-  ride the existing i%2 cadence). Pack level bias scales with chebyshev
-  chunk distance from origin (+1 per 4 chunks, cap +10) — walking farther IS
-  walking into danger, which is the pull of an infinite world.
+  ride the existing i%2 cadence). Intended pack-level bias is +1 per four
+  Chebyshev chunks, capped at +10. **Current implementation (audit 2026-09-12):**
+  this increases non-leader elite-affix odds by four percentage points per
+  distance step, capped at 40%; it does not add levels to individual monsters.
+  Their base scaling reads hunter level once at spawn. See design/24's
+  progression audit; an actual per-spawn level hook remains unimplemented.
 - *Distance despawn:* creatures (never bosses/legendaries/pets) farther than
   ~1.5 windows from the player are silently recycled — the entity count is
   bounded by exploration speed, not session length.

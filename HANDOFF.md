@@ -1,4 +1,25 @@
-# Handoff — Hunt level-up resource refresh (2026-09-12)
+# Handoff — progression scaling audit (2026-09-12)
+
+Ricardo asked whether hunters, monsters and items scale indefinitely. They do
+not: the playable hunter cap is 100; ordinary items roll with the hunter's level,
+monsters scale at spawn, forge caps at +5, and the separate boss rush stops HP
+growth at 1.5×. Frontier distance raises capped elite-affix odds, not actual
+monster levels. The current model is documented with exact formulas and source
+pointers in design/24, Progression scaling audit; tech/29's implementation
+claim was corrected while preserving the intended level-bias proposal.
+
+This question prompted a source audit only. Infinite permanent gear power would
+change the documented power-ceiling direction; an endless PvE depth/mastery
+track could preserve it. No progression redesign, save migration, cap increase
+or runtime change was made. Existing e570acc Codex packages still contain the
+current game code; the 17-game/113-Python/4-native verification remains relevant.
+Roadmap is updated, and this documentation pass is checked with git diff --check.
+
+---
+
+## Prior delivery (preserved)
+
+### Hunt level-up resource refresh (2026-09-12)
 
 Ricardo requested immediate stat/resource refresh when leveling during a Hunt.
 `ProtoPlayer.refresh_on_level_up()` recomputes the stat block before filling

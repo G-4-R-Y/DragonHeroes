@@ -4,6 +4,30 @@ Ricardo decides DIRECTION (which lever, when); harnesses execute inside it.
 Every item points at its law doc. Statuses: NOW (in flight) · PICK (awaiting
 Ricardo's call) · SCHEDULED (decided, sequenced) · BUDGET (blocked on money).
 
+## DONE — Audit infinite hunter, monster and item scaling (Ricardo, 2026-09-12)
+
+Demand/question: do items and monster levels/stats scale indefinitely alongside
+supposedly infinite hunter levels? Law: canon §3 and §§12.16/12.20/12.45,
+design/14 §4, design/26 and tech/29. Strategy: inspect actual progression caps,
+monster spawn scaling, item-level/affix formulas and the separate boss-rush
+limits; distinguish implemented behavior from proposals and document any drift.
+This is an audit and design clarification, not authorization to remove the
+power ceiling, rebalance existing gear, or migrate saves automatically.
+
+Findings: hunter progression caps at 100; monsters scale once at spawn;
+ordinary gear rolls at hunter level with +4% of its starting band per level;
+forge caps at +5. Frontier distance caps elite-affix odds rather than granting
+extra monster levels. The separate rush stops HP growth at 1.5× (round six),
+uses fixed artifact values and has bounded counters. The item's rolling helper
+accepts higher inputs but does not create an infinite progression loop.
+Design/14 retains the permanent-power ceiling and older ilvl-60 proposal;
+playable 1–100 is recorded in canon §12.16. Full sources/formulas and design
+implications: design/24, Progression scaling audit. Corrected tech/29's
+implementation description while retaining the intended level-bias proposal.
+Gate: source/formula audit + documentation diff check; no runtime changes.
+An endless mastery/depth design is a possible follow-up, not an implemented
+system or an approved change to the permanent item-power ceiling.
+
 ## DONE — Refresh Hunt stats and replenish resources on level-up (Ricardo, 2026-09-12)
 
 Demand: when the hunter levels up during a Hunt, refresh stats and replenish
