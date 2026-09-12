@@ -1,0 +1,47 @@
+; Dragon Heroes: Rebirth — Godot 4 3D vertical slice (EXPERIMENT, rebirth/docs/01-plan.md).
+; Code-built like the canon 2D prototype: one scene, every node created in GDScript.
+;
+; RENDERER: gl_compatibility so it runs from any shell on this box (the harness
+; captures via Intel Mesa GL; NEVER launch a Vulkan window from an agent shell —
+; parent docs/harness/README.md). The SOTA look (Forward+, SDFGI, volumetric fog)
+; is a one-line flip Ricardo does himself: rendering_method="forward_plus".
+; The slice checks the active method at boot and enables the Forward+-only
+; features when present (slice.gd:_build_environment).
+
+config_version=5
+
+[application]
+
+config/name="Dragon Heroes: Rebirth (Godot 3D)"
+run/main_scene="res://slice.tscn"
+config/features=PackedStringArray("4.6", "GL Compatibility")
+run/low_processor_mode=false
+
+[debug]
+
+gdscript/warnings/untyped_declaration=0
+
+[display]
+
+window/size/viewport_width=1280
+window/size/viewport_height=720
+window/stretch/mode="disabled"
+window/vsync/vsync_mode=1
+
+[physics]
+
+; 60 Hz gameplay tick for the FEEL test (dodge i-frames, input buffer are tick-quantized).
+; A shipped 3D client would run the authoritative sim at 30 Hz and interpolate (CLAUDE.md #2);
+; the native/ experiment does exactly that. Here feel wins: 60 Hz sampling = 16 ms input latency.
+common/physics_ticks_per_second=60
+common/max_physics_steps_per_frame=8
+
+[rendering]
+
+renderer/rendering_method="forward_plus"
+renderer/rendering_method.mobile="gl_compatibility"
+textures/vram_compression/import_etc2_astc=true
+anti_aliasing/quality/msaa_3d=1
+lights_and_shadows/directional_shadow/size=2048
+lights_and_shadows/directional_shadow/soft_shadow_filter_quality=2
+lights_and_shadows/positional_shadow/atlas_size=2048

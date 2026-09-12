@@ -1,0 +1,26 @@
+{
+	"FileVersion": 3,
+	"EngineAssociation": "5.4",
+	"Category": "Experiment",
+	"Description": "Dragon Heroes: Rebirth — UE5 vertical slice (research spike, NOT the canon game). rebirth/docs/01-plan.md",
+	"Modules": [
+		{
+			"Name": "Rebirth",
+			"Type": "Runtime",
+			"LoadingPhase": "Default",
+			"AdditionalDependencies": [
+				"Engine",
+				"AIModule",
+				"Niagara",
+				"ProceduralMeshComponent"
+			]
+		}
+	],
+	"Plugins": [
+		{ "Name": "Niagara", "Enabled": true },
+		{ "Name": "ProceduralMeshComponent", "Enabled": true },
+		{ "Name": "Interchange", "Enabled": true },
+		{ "Name": "InterchangeEditor", "Enabled": true },
+		{ "Name": "ModelingToolsEditorMode", "Enabled": true, "TargetAllowList": [ "Editor" ] }
+	]
+}

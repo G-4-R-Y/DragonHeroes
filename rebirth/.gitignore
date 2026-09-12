@@ -1,0 +1,25 @@
+# Rebirth — per-engine experiment folders (docs/01-plan.md). Build products stay out.
+godot3d/.godot/
+# godot3d/captures/*.png and native/captures/*.png are TRACKED (capture-verified visuals)
+native/build*/
+native/captures/*.ppm
+!native/captures/.gitkeep
+unreal/Binaries/
+unreal/Intermediate/
+unreal/DerivedDataCache/
+unreal/Saved/
+unreal/.vs/
+unreal/*.sln
+unity-hdrp/Library/
+unity-hdrp/Temp/
+unity-hdrp/Logs/
+unity-hdrp/obj/
+unity-hdrp/*.csproj
+unity-hdrp/*.sln
+assets/glb/*.glb
+assets/glb/*.dhm
+assets/glb/*.provenance.json
+!assets/glb/.gitkeep
+unreal/Content/Generated/*.glb
+unity-hdrp/Assets/Generated/
+__pycache__/

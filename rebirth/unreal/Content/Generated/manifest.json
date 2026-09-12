@@ -1,0 +1,46 @@
+{
+  "creatures": {
+    "dragon": {
+      "file": "dragon.glb",
+      "asset": "/Game/Generated/dragon.dragon",
+      "provenance": {
+        "name": "dragon",
+        "glb": "dragon.glb",
+        "sha256": "8addab7c409ae85de7b85f247b5128938c9306665a90c64594b6c2b895b06274",
+        "bytes": 181392,
+        "source": "placeholder",
+        "generated_at": "2026-09-12T00:52:08",
+        "pipeline": "rebirth/assets/tools/gen_assets.py",
+        "note": "pure-python stand-in until a concept render exists"
+      }
+    },
+    "hunter": {
+      "file": "hunter.glb",
+      "asset": "/Game/Generated/hunter.hunter",
+      "provenance": {
+        "name": "hunter",
+        "glb": "hunter.glb",
+        "sha256": "e84d1a15b2d50119f98b94b571361dba24c2334fbf357ef392e9685cdff3b796",
+        "bytes": 47036,
+        "source": "placeholder",
+        "generated_at": "2026-09-12T00:52:08",
+        "pipeline": "rebirth/assets/tools/gen_assets.py",
+        "note": "pure-python stand-in until a concept render exists"
+      }
+    },
+    "pet": {
+      "file": "pet.glb",
+      "asset": "/Game/Generated/pet.pet",
+      "provenance": {
+        "name": "pet",
+        "glb": "pet.glb",
+        "sha256": "202c696b84187d97347372b62e7ec1ab8f49029f226049c04ff62680bfb34e74",
+        "bytes": 65496,
+        "source": "placeholder",
+        "generated_at": "2026-09-12T00:52:08",
+        "pipeline": "rebirth/assets/tools/gen_assets.py",
+        "note": "pure-python stand-in until a concept render exists"
+      }
+    }
+  }
+}
