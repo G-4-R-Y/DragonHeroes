@@ -80,6 +80,11 @@ godot --headless --path game res://arena/arena.tscn -- --selftest   # CI gate
 godot --path game res://arena/console.tscn         # training console (below)
 ```
 
+**In-game:** the title menu's **ARENA** button opens the training console
+directly (BACK returns to the menu) — no command line needed. Training runs
+need the local Python stack (`ml/.venv` or system python3 + numpy); if it is
+missing the console says so instead of failing silently.
+
 Creatures, bosses and geared bounty-hunter builds fight 1v1; scripted baselines
 or trained neural policies drive them. Full manual (all flags, roster,
 cosmetics, training): **[game/arena/README.md](../game/arena/README.md)**.

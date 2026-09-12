@@ -1,0 +1,44 @@
+# Dragon Heroes — self-hosted Nakama (roadmap 6f; docs/tech/26).
+# The OPTIONAL online home: auth, leaderboards, tournaments, chat, storage.
+# Solo offline and P2P/LAN NEVER touch this (roadmap 6e — three play modes).
+# No cloud: everything runs on Ricardo's box; state lives in Postgres.
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: nakama
+      POSTGRES_PASSWORD: nakama-local-only   # local dev password — change for exposure
+      POSTGRES_DB: nakama
+    volumes:
+      - nakama-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nakama"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  nakama:
+    image: heroiclabs/nakama:latest   # pin a version after first pull (reproducibility)
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    # client connects with socket.server_key (dev key — change before exposing);
+    # migrate up initializes the schema on first boot
+    entrypoint:
+      - /bin/sh
+      - -ecx
+      - /nakama/nakama migrate up --database.address nakama:nakama-local-only@db:5432/nakama &&
+        exec /nakama/nakama --database.address nakama:nakama-local-only@db:5432/nakama
+        --logger.level INFO --session.token_expiry_sec 86400
+        --socket.server_key dh_local_dev_key
+    ports:
+      - "7349:7349"   # game traffic (gRPC/realtime)
+      - "7350:7350"   # HTTP API
+      - "7351:7351"   # web console (admin)
+    volumes:
+      - ./config:/nakama/data:rw
+
+volumes:
+  nakama-db:

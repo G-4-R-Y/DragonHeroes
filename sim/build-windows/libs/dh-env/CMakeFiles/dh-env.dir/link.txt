@@ -1,0 +1,3 @@
+/usr/bin/cmake -E rm -f CMakeFiles/dh-env.dir/objects.a
+/home/ricz/.local/share/dh-toolchains/llvm-mingw-20260908-ucrt-ubuntu-22.04-x86_64/bin/x86_64-w64-mingw32-llvm-ar qc CMakeFiles/dh-env.dir/objects.a @CMakeFiles/dh-env.dir/objects1.rsp
+/home/ricz/.local/share/dh-toolchains/llvm-mingw-20260908-ucrt-ubuntu-22.04-x86_64/bin/x86_64-w64-mingw32-clang++ -O3 -DNDEBUG -shared -o libdh-env.dll -Wl,--out-implib,libdh-env.dll.a -Wl,--major-image-version,0,--minor-image-version,0 -Wl,--whole-archive CMakeFiles/dh-env.dir/objects.a -Wl,--no-whole-archive @CMakeFiles/dh-env.dir/linklibs.rsp

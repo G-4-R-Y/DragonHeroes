@@ -453,3 +453,13 @@ move a single centavo of money state out of our control. That separation is the 
 - [Portal Tributário — IRF sobre prêmios (30%, DARF 0916)](https://www.portaltributario.com.br/guia/irf_sorteios.html)
 - [Receita Federal — ferramenta de IR para prêmios em bets e competições virtuais (mar/2026)](https://www.gov.br/receitafederal/pt-br/assuntos/noticias/2026/marco/receita-libera-ferramenta-para-calcular-ir-de-premios-em-bets-e-fantasy-sport)
 - [Nakama open source vs managed backend (Heroic Cloud calculus)](https://crux.supercraft.host/blog/nakama-open-source-vs-managed-backend/)
+
+## 9. Self-host quickstart (2026-09-12 — LANDED)
+
+`tools/nakama.sh up` — postgres:16 + heroiclabs/nakama via
+`tools/nakama/docker-compose.yml` (migrate-up entrypoint, dev server key
+`dh_local_dev_key`, session tokens 24 h). Verified live on the dev box:
+console http://localhost:7351, HTTP API :7350, game port 7349. Down/wipe via
+the same script. No cloud, one command; the economy core + marketplace still
+follow §2/§3 — this stack is their runtime home. Game-side client (auth →
+device, leaderboards, tournaments) is the next spike (roadmap 6b).

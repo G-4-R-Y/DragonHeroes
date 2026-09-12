@@ -136,7 +136,7 @@ func _build_skills_tab() -> Control:
 	scroll.add_child(vb)
 	_boxes["Skills"] = vb
 	_sk_detail = PanelContainer.new()
-	_sk_detail.custom_minimum_size = Vector2(0, 92)
+	_sk_detail.custom_minimum_size = Vector2(0, 110)
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = Color(0.04, 0.06, 0.085, 0.98)
 	sb.border_color = ProtoTheme.EMBER_DIM
@@ -147,9 +147,15 @@ func _build_skills_tab() -> Control:
 	sb.content_margin_top = 4.0
 	sb.content_margin_bottom = 4.0
 	_sk_detail.add_theme_stylebox_override("panel", sb)
+	# the card scrolls: long skill text is never CAPPED (Ricardo: "text is
+	# very cluttered and frequently capped") — 110 px viewport, full content
+	var detail_scroll := ScrollContainer.new()
+	detail_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_sk_detail.add_child(detail_scroll)
 	_sk_detail_box = VBoxContainer.new()
+	_sk_detail_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_sk_detail_box.add_theme_constant_override("separation", 2)
-	_sk_detail.add_child(_sk_detail_box)
+	detail_scroll.add_child(_sk_detail_box)
 	root.add_child(_sk_detail)
 	return root
 
@@ -567,9 +573,12 @@ func _refresh_loadout() -> void:
 			b.add_theme_color_override("font_color", DIM)
 			b.tooltip_text = ProtoLang.t("cp_slot_empty_tip") % (i + 1)
 		else:
-			b.text = "%d · %s" % [i + 1, ProtoLang.pick(d, "name", "?")]
+			# first word only — full names clipped the chips into clutter
+			b.text = "%d · %s" % [i + 1,
+					ProtoLang.pick(d, "name", "?").get_slice(" ", 0)]
 			b.add_theme_color_override("font_color", GOLD)
-			b.tooltip_text = ProtoLang.t("cp_slot_cast_tip") % (i + 1)
+			b.tooltip_text = "%s\n%s" % [ProtoLang.pick(d, "name", "?"),
+					ProtoLang.t("cp_slot_cast_tip") % (i + 1)]
 			b.pressed.connect(_do_assign.bind(i, ""))
 			var sb := ProtoTheme.chip_box(GOLD, 0.10)
 			b.add_theme_stylebox_override("normal", sb)

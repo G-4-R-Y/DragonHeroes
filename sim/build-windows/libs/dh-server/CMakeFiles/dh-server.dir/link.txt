@@ -1,0 +1,3 @@
+/usr/bin/cmake -E rm -f CMakeFiles/dh-server.dir/objects.a
+/home/ricz/.local/share/dh-toolchains/llvm-mingw-20260908-ucrt-ubuntu-22.04-x86_64/bin/x86_64-w64-mingw32-llvm-ar qc CMakeFiles/dh-server.dir/objects.a @CMakeFiles/dh-server.dir/objects1.rsp
+/home/ricz/.local/share/dh-toolchains/llvm-mingw-20260908-ucrt-ubuntu-22.04-x86_64/bin/x86_64-w64-mingw32-clang++ -O3 -DNDEBUG -Wl,--whole-archive CMakeFiles/dh-server.dir/objects.a -Wl,--no-whole-archive -o dh-server.exe -Wl,--out-implib,libdh-server.dll.a -Wl,--major-image-version,0,--minor-image-version,0 @CMakeFiles/dh-server.dir/linklibs.rsp

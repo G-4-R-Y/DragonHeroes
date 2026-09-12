@@ -99,30 +99,60 @@ mount dismount lockout, HUD stats → icon chips, skill-bar label clipping.
 Every new ask lands here the moment it arrives; work oldest NOW first.
 
 ### NOW (in flight)
-1. **Ember Flask heal** (design/11 "dodge, heal, or reverse"; Ricardo: "we
-   need a healing mechanism") — player.gd DONE (R key, 2 charges, 40% HoT/2s,
-   0.8s drink slow, 6 kills rekindle, refill fn). TODO: main.gd input +
-   note_kill in the 5 death handlers + haven/respawn refill + HUD pips +
-   lang keys + gate + package.
-2. **Hordes don't keep spawning + always the same mobs** (tech/29 §3;
-   Ricardo 2026-09-12). Diagnosis: origin packs spawn once, frontier chunks
-   roll once (`_visited_chunks`), nothing replaces despawned/killed packs;
-   packs are mono-species from a small ground roster. Plan: (a) timed
-   repopulation — every ~20 s, if living creatures near player < floor,
-   spawn 1-2 packs off-screen (ring 30-45 tiles), entity-capped; (b) pack
-   variety — members mix 2-3 species (affinity + strays), frontier too.
+1. ~~Ember Flask heal~~ DONE 2026-09-12 (gate FLASK OK): R drinks (40% HoT
+   /2s, 0.8s commitment slow), 2 charges, 6 kills rekindle (fed from
+   on_creature_died, covers bosses), haven refills, ember HUD pips with
+   kill-counter fill, EN/PT hints. Probe: prototype/tests/flask_probe.tscn.
+2. ~~Hordes don't keep spawning + always the same mobs~~ DONE 2026-09-12
+   (gate REPOP OK): continuous spawn pressure every 18 s (floor 10 living
+   within 45 tiles -> 1-2 packs prowl in from 30-45 tiles off-screen, cap
+   120), pack mixing 0.25->0.45, half the free packs prowl with 1-2 wisps.
+   Probe: prototype/tests/repop_probe.tscn.
+2b. ~~Strategic horde presets~~ DONE 2026-09-12: game/prototype/data/
+   hordes.json — 5 curated synergies (Conductors = mire+storm DETONATE,
+   Pincer, Burning Ground, Grave Procession, Alpha Hunt elite-led); repop
+   picks 60% preset / 40% free-mixed; species resolve against the hunt
+   roster with graceful substitution. RULE: new creature = synergy review +
+   preset entry (or a retirement) at content time.
+2c. **Synergy review IN the asset pipeline** (Ricardo: new creature ->
+   synergy review + horde preset) — standalone reviewer tool + checklist doc;
+   DO NOT touch genforge/pipeline/* (other agent redesigning it).
+2d. **Biome variation + biome-bound creatures** (Ricardo question) —
+   investigate whether streamed chunks vary biomes and whether spawn rosters
+   are biome-filtered; implement if absent (design/12: 5 biomes).
+4b. **HUD order-of-magnitude** (Ricardo: "plain colored squares, no
+   personality; skills have no icons, no cooldown countdown") — framed HP orb/
+   bar w/ ghost damage, styled charge pips, REAL skill icons + radial cooldown
+   sweep + numeric countdown. Pixel doctrine, bounded draw calls.
 3. **Skills-screen text clutter/capping** (design/polish; Ricardo) — the
    character panel pins a FIXED 92px detail card; text clipped/capped.
    Investigate autowrap/min-size; declutter panels (OPTIONS screen was step 1).
+2b. ~~Strategic horde presets~~ DONE 2026-09-12: game/prototype/data/
+   hordes.json — 5 curated synergies (Conductors = mire+storm DETONATE,
+   Pincer, Burning Ground, Grave Procession, Alpha Hunt elite-led); repop
+   picks 60% preset / 40% free-mixed; species resolve against the hunt
+   roster with graceful substitution. RULE: new creature = synergy review +
+   preset entry (or a retirement) at content time.
+2c. **Synergy review IN the asset pipeline** (Ricardo: new creature ->
+   synergy review + horde preset) — standalone reviewer tool + checklist doc;
+   DO NOT touch genforge/pipeline/* (other agent redesigning it).
+2d. **Biome variation + biome-bound creatures** (Ricardo question) —
+   investigate whether streamed chunks vary biomes and whether spawn rosters
+   are biome-filtered; implement if absent (design/12: 5 biomes).
+4b. **HUD order-of-magnitude** (Ricardo: "plain colored squares, no
+   personality; skills have no icons, no cooldown countdown") — framed HP orb/
+   bar w/ ghost damage, styled charge pips, REAL skill icons + radial cooldown
+   sweep + numeric countdown. Pixel doctrine, bounded draw calls.
 3. **Skills-screen text clutter/capping** (design/polish; Ricardo) — the
    character panel pins a FIXED 92px detail card; text clipped/capped.
    Investigate autowrap/min-size; declutter panels (OPTIONS screen was step 1).
-3b. **ESC→YES return-to-hub broken** (CRITICAL, Ricardo 2026-09-12: clicking
-   yes plays the animation but nothing happens) — investigate _return_to_haven
-   / _confirm flow; possibly linked to the memory blow-up freezing transition.
-3c. **Infinite-map memory growth** (Ricardo: generation "exploding memory") —
-   profile what accumulates per chunk (streamer unload? minimap/SDF caches?
-   entity leaks); canon directive 2 budgets apply to RAM too.
+3b. **ESC→YES return-to-hub broken** — PROBE GREEN IN SOURCE 2026-09-12
+   (ESC OK: esc_probe.tscn returns to haven.tscn). Likely the stale Sept-4
+   package and/or memory-pressure stall. VERIFY on the fresh zip.
+3c. **Infinite-map memory growth** — RAM PROVEN BOUNDED 2026-09-12
+   (mem_soak.tscn: 2 min forced streaming peaks 125 MB then settles ~107-119;
+   nodes recycle). VRAM unmeasurable headless -> F3 in-game readout (fps /
+   RAM / VRAM / nodes) shipped so Ricardo can watch it live windowed.
 3d. **Arena console discoverability + launcher** (Ricardo: "where are the
    commands... perhaps a launcher") — command is `godot --path game
    res://arena/console.tscn`; add a launcher (tools/ + maybe menu entry).
@@ -135,6 +165,41 @@ Every new ask lands here the moment it arrives; work oldest NOW first.
 ### NEXT (queued, decided)
 6. **Bond works with ALL creatures** (design/13 §7.1; Ricardo: creatures are
    core to builds) — capture/bond currently limited; extend to every species.
+6b. **Nakama backend adoption** (tech/26; Ricardo: heroiclabs/nakama link —
+   "clone from it and use when needed"). Nakama (Go, Apache-2.0) is ALREADY
+   the canon backend pick; its Go runtime aligns with the Go economy-core
+   carve-out. Track: vendor it for auth/social/matchmaker/storage; dh-server
+   stays the authoritative sim; economy core = Go module called via RPC
+   (canon §8 hard rules unchanged).
+6e. **P2P + LAN stay first-class FOREVER** (Ricardo: "we want to keep the
+   option to play peer-to-peer and in lan parties!"). Three play modes, by
+   design: (1) solo offline — no account ever; (2) P2P/LAN direct connect —
+   no Nakama, no internet: host-authoritative (mp/), content-hash match, no
+   economy writes (canon §12.37); (3) Nakama online — auth, matchmaking with
+   strangers, marketplace/economy. Nakama ADDS the online track; it never
+   gates play. LAN discovery (UDP broadcast instead of typing IPs) = future
+   polish inside mode 2.
+6c. **Pix checkout for the marketplace** (design/15; Ricardo: "checkout = a
+   simple pix to us, redirect to the player with taxes out"). Brazil-native
+   rails for the WEB-ONLY marketplace: buyer Pix -> escrow -> server-side
+   item transfer -> payout to seller minus rake. No paid randomness (hard
+   rule) — Pix changes settlement, not the anti-RMAH design.
+6d. **Blockchain gamecoin?** (Ricardo's open question) — PICK awaiting his
+   call after reading the trade-offs (regulatory LC 14.478/2022, bot/grind
+   abuse pressure, vs Pix+BRL which already closes the loop).
+3e. ~~Arena console IN the main game + docs~~ DONE 2026-09-12: title-menu
+   ARENA button opens console.tscn in-process; console got a BACK button
+   (selftest-hidden); commands documented in docs/USAGE.md §arena. Gates:
+   CONSOLE SELFTEST OK, MENU OK (11 buttons).
+6f. ~~Nakama self-host, easily launchable~~ DONE 2026-09-12: tools/nakama.sh
+   [up|down|status|logs|wipe] + tools/nakama/docker-compose.yml (postgres:16
+   + heroiclabs/nakama, migrate-up entrypoint, dev server key). VERIFIED
+   LIVE: console http://localhost:7351 (200), api 7350 healthcheck {}, game
+   port 7349. First console boot asks for an admin login.
+6g. **Leaderboards -> ranked rewards** (Ricardo: stats, PvP records, ranking
+   -> legendary items, pets, cosmetics; auras, wings, legendary-creature
+   mounts as top-tier cosmetics) — design note in design/15/16; starts when
+   Nakama lands (6b/6f).
 7. **Every creature ≥3 skills with combos** (design/13; Ricardo: "not boring
    attacks") — game-side kits (arena has 2/species + conduct); synergy pairs.
 8. **Difficulty/reward curve** (Ricardo: "1-hit KO late or ultra-mogged early")

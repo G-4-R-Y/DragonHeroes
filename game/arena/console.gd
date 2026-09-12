@@ -138,6 +138,19 @@ func _build_ui() -> void:
 	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(bg)
 
+	# BACK — the console also opens from the title menu in-process (standalone
+	# console.tscn boots keep working; hidden in the selftest)
+	if not _selftest:
+		var back := Button.new()
+		back.text = "< BACK"
+		back.focus_mode = Control.FOCUS_NONE
+		back.add_theme_font_size_override("font_size", 8)
+		back.position = Vector2(6, 4)
+		back.z_index = 10
+		back.pressed.connect(func() -> void:
+			get_tree().change_scene_to_file("res://prototype/ui/main_menu.tscn"))
+		add_child(back)
+
 	var hb := HBoxContainer.new()
 	hb.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	hb.offset_left = 8.0

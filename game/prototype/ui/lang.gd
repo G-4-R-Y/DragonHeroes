@@ -52,6 +52,7 @@ const S := {
 	"menu_foot": {"en": "offline prototype login — real auth arrives with Nakama (docs/tech/26)",
 			"pt": "login offline do protótipo — a autenticação real chega com o Nakama (docs/tech/26)"},
 	"menu_options": {"en": "OPTIONS", "pt": "OPÇÕES"},
+	"menu_quick": {"en": "QUICK START — %s", "pt": "JOGO RÁPIDO — %s"},
 	"opt_music": {"en": "Music", "pt": "Música"},
 	"opt_sfx": {"en": "Effects", "pt": "Efeitos"},
 	"opt_mode": {"en": "Mode", "pt": "Modo"},

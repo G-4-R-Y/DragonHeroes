@@ -602,3 +602,30 @@ two-creature spike (§5). DH_*_DIR env vars locate adapter checkouts.
 - Windows: dh-server.exe via portable llvm-mingw (sim/cmake/mingw-w64-x86_64.cmake).
 - 10M-step balanced cinder run in background (cinder_drake_ppo3.log).
 - NEXT: gate the balanced run; package windows zip; horde mode; graphics OM.
+
+## 2026-09-12 (day 2) — UX/HUD pass, hordes, flask, Nakama self-host, probes
+- HUD OM (4b): HudSkillChip (ui/hud_chip.gd) — 26px tiles w/ procedural
+  kind-glyphs, top-down cooldown sweep, numeric countdown, ember ready-glow;
+  framed HP bar + white ghost-damage trail; dodge/flask pips are breathing
+  diamonds. SPAWNTEST/CLICKTEST/FLASK green (run --import for class_name).
+- Skills screen: detail card SCROLLS (was fixed 92-110px capper), loadout
+  chips show first word + full name in tooltip.
+- Menu: QUICK START (last hunter, zero typing — offline never registers),
+  ARENA button -> console in-process (console got BACK). USAGE.md documents
+  the console (was already there — discoverability was the gap).
+- Hordes: REPOP pressure every 18s (floor 10 within 45 tiles, cap 120) +
+  hordes.json 5 curated synergy presets (60/40 curated/wild) + wisp support
+  + mixing 0.45. REPOP OK.
+- Ember Flask (R): gated FLASK OK. First level at 6 kills (opening hook).
+- ESC->haven: probe GREEN in source (esc_probe.tscn); RAM bounded ~110-125MB
+  (mem_soak.tscn); F3 readout (fps/RAM/VRAM/nodes) for live checks.
+- PERF SUSPECT: docker container imagesvc-imagesvc-1 (python run.py, ollama,
+  23h+) holds ~3 GB of the 6 GB VRAM — `docker stop imagesvc-imagesvc-1`
+  frees it (Ricardo's call, not ours).
+- Nakama SELF-HOST LIVE: tools/nakama.sh up (postgres:16 + heroiclabs/nakama,
+  compose at tools/nakama/) — console :7351 (admin login on first visit),
+  api :7350, game :7349, dev key dh_local_dev_key. tech/26 §9. Roadmap 6b
+  (game client auth/leaderboards) is next; 6c Pix design; 6d blockchain PICK;
+  6e three play modes canon-locked; 6g leaderboard->cosmetics (auras/wings/
+  legendary mounts) queued.
+- Packages rebuilt (all of the above inside).

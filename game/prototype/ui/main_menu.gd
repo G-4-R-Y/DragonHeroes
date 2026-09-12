@@ -146,6 +146,25 @@ func _build() -> void:
 	btn.pressed.connect(_enter)
 	vb.add_child(btn)
 
+	# instant offline play (Ricardo: "no work to register... can just put any
+	# name... or not even log in"): one click continues your last hunter (or a
+	# fresh "Hunter"), zero typing — the fields stay for named saves
+	var saves_for_quick: Array = Session.list_saves()
+	var quick := Button.new()
+	quick.text = ProtoLang.t("menu_quick") % (str(saves_for_quick[0].name)
+			if not saves_for_quick.is_empty() else "Hunter")
+	quick.custom_minimum_size = Vector2(190, 0)
+	quick.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	quick.pressed.connect(func() -> void:
+		Session.class_id = _class_pick
+		Session.login(str(saves_for_quick[0].name)
+				if not saves_for_quick.is_empty() else "Hunter")
+		get_tree().change_scene_to_file("res://prototype/ui/haven.tscn"))
+	vb.add_child(quick)
+	# pre-fill the name with the last hunter so editing starts from something
+	if not saves_for_quick.is_empty():
+		_name_edit.text = str(saves_for_quick[0].name)
+
 	# CO-OP (P2P): the friends-and-LAN path (docs/tech/33) — Nakama matchmaking
 	# replaces discovery later; the hunt itself stays host-authoritative either way.
 	var coop := Button.new()
@@ -155,6 +174,17 @@ func _build() -> void:
 	coop.pressed.connect(func() -> void:
 		get_tree().change_scene_to_file("res://mp/lobby.tscn"))
 	vb.add_child(coop)
+
+	# ARENA — the training console in-game (Ricardo: "players will find that
+	# cool"): same process, BACK returns here; standalone console.tscn still
+	# works exactly as before
+	var arena_btn := Button.new()
+	arena_btn.text = "ARENA"
+	arena_btn.custom_minimum_size = Vector2(190, 0)
+	arena_btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	arena_btn.pressed.connect(func() -> void:
+		get_tree().change_scene_to_file("res://arena/console.tscn"))
+	vb.add_child(arena_btn)
 
 	# saved hunters (user://saves) — entering a listed name continues that character
 	var saves: Array = Session.list_saves()
@@ -222,6 +252,10 @@ func _open_options() -> void:
 	_options = dim
 	var panel := PanelContainer.new()
 	panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	# grow BOTH ways around the center anchor (default grows down-right and
+	# the panel slides off the bottom of the screen — Ricardo's screenshot)
+	panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	panel.grow_vertical = Control.GROW_DIRECTION_BOTH
 	panel.custom_minimum_size = Vector2(310, 0)
 	dim.add_child(panel)
 	var vb := VBoxContainer.new()

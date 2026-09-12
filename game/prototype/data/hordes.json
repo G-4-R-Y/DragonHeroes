@@ -1,0 +1,58 @@
+{
+ "schema": "hordes.v1",
+ "note": "Curated horde presets (Ricardo 2026-09-12): the top-5 most synergetic pack compositions, reviewed whenever a new creature lands — add the creature to a preset (or retire one) so hordes stay DESIGNED, with free-mixed packs keeping the wildness. Species keys match bestiary bundle/id; missing species are substituted from the hunt roster at spawn time (graceful).",
+ "hordes": [
+  {
+   "id": "conductors",
+   "name": "The Conductors",
+   "synergy": "serpent + golem lay MIRE fields, the wisp's storm volleys DETONATE them (canon §12.41 conduct) — the field combo as a hunting party",
+   "members": [
+    {"species": "mire_serpent", "count": 1, "role": "leader"},
+    {"species": "bog_golem", "count": 2, "role": "wall"},
+    {"species": "gloamfen_wisp", "count": 1, "role": "detonator"}
+   ]
+  },
+  {
+   "id": "pincer",
+   "name": "Pincer Move",
+   "synergy": "boars pounce frontally while stalkers circle — punish the dodge, not the charge",
+   "members": [
+    {"species": "gloamfen_stalker", "count": 1, "role": "leader"},
+    {"species": "fen_boar", "count": 3, "role": "hammer"},
+    {"species": "gloamfen_stalker", "count": 1, "role": "flanker"}
+   ]
+  },
+  {
+   "id": "burning_ground",
+   "name": "Burning Ground",
+   "synergy": "drakes lay FIRE fields and the boars herd the hunter onto them — area denial + charge",
+   "members": [
+    {"species": "cinder_drake", "count": 1, "role": "leader"},
+    {"species": "cinder_drake", "count": 1, "role": "caster"},
+    {"species": "fen_boar", "count": 2, "role": "herder"}
+   ]
+  },
+  {
+   "id": "grave_procession",
+   "name": "Grave Procession",
+   "synergy": "a golem wall advances behind umbral volleys; wisps punish the disengage — slow, certain",
+   "members": [
+    {"species": "grave_shade", "count": 1, "role": "leader"},
+    {"species": "grave_shade", "count": 1, "role": "volley"},
+    {"species": "gloamfen_wisp", "count": 2, "role": "kiter"},
+    {"species": "bog_golem", "count": 1, "role": "wall"}
+   ]
+  },
+  {
+   "id": "alpha_hunt",
+   "name": "Alpha Hunt",
+   "synergy": "an affixed elite leads a full hunting party — the pack-tactics showcase for deep runs",
+   "members": [
+    {"species": "gloamfen_stalker", "count": 1, "role": "leader", "elite": true},
+    {"species": "fen_boar", "count": 2, "role": "hammer"},
+    {"species": "cinder_drake", "count": 1, "role": "caster"},
+    {"species": "mire_serpent", "count": 1, "role": "spitter"}
+   ]
+  }
+ ]
+}
