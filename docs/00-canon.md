@@ -1013,3 +1013,15 @@ Still open:
    identity into GitHub. Asset + exact prompt/provenance live in
    `docs/art/readme-banner/`; root README embeds the local image. This is
    brand key art, not a claim about current gameplay rendering.
+
+   Playable-preview addendum (Ricardo, 2026-09-12: "where do I review what's
+   up for review before being playable? generate a binary with them"). The
+   Codex menu now exposes The Bell Beneath the Fen as a local playable trial:
+   Orun's generated sprite and five-phase encounter, four artifact tiers with
+   real echo/chain/refund/ward effects, lore, retry and a temporary companion
+   bond. Pure C++ `LivingTrial` owns combat at 30 Hz; Godot only sends input
+   and presents interpolated snapshots from an owned loopback helper. The
+   data stager compiles existing authoring definitions, rejects unsupported
+   actions and enforces a preview texture budget. This advances review into
+   a playable slice without claiming the full Hunt/save/class-tree migration,
+   public server deployment or finished action animation. Details: tech/35.

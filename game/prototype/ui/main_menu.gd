@@ -48,6 +48,11 @@ const CLASSES := {
 
 func _ready() -> void:
 	_build()
+	if "--living-selftest" in OS.get_cmdline_user_args() or "--living-capture" in OS.get_cmdline_user_args():
+		_start_living.call_deferred()
+
+func _start_living() -> void:
+	get_tree().change_scene_to_file("res://living/trial.tscn")
 
 # The whole menu is code-built, so the language toggle just rebuilds it in
 # place (keeping whatever name was typed).
@@ -164,6 +169,13 @@ func _build() -> void:
 	# pre-fill the name with the last hunter so editing starts from something
 	if not saves_for_quick.is_empty():
 		_name_edit.text = str(saves_for_quick[0].name)
+	var living := Button.new()
+	living.text = "PLAY NEW CONTENT: THE BELL BENEATH THE FEN"
+	living.custom_minimum_size = Vector2(310, 22)
+	living.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	living.add_theme_color_override("font_color", Color("7ed4ba"))
+	living.pressed.connect(_start_living)
+	vb.add_child(living)
 
 	# CO-OP (P2P): the friends-and-LAN path (docs/tech/33) — Nakama matchmaking
 	# replaces discovery later; the hunt itself stays host-authoritative either way.

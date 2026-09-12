@@ -96,3 +96,5 @@ most work (see also canon §12):
 | [README](harness/README.md) | Start-here for any harness: read order, invariants, gate suite, gotchas, Ricardo's doctrine, environment facts |
 | [10-systems-map](harness/10-systems-map.md) | Every system: status · law doc · key files · gate · known issues |
 | [20-roadmap](harness/20-roadmap.md) | The one consolidated roadmap: NOW / PICK / SCHEDULED / BUDGET / polish |
+
+- [35 — Playable living-content trial](tech/35-playable-living-trial.md): controls, artifact comparisons, C++ host and export gates.

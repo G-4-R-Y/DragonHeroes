@@ -1,5 +1,24 @@
 # Handoff — modern pixel-art review branch (2026-09-12)
 
+Playable content follow-up (2026-09-12): `PLAY NEW CONTENT: THE BELL BENEATH
+THE FEN` launches the candidate trial directly from the Codex main menu.
+Pure C++ `LivingTrial` (30 Hz) owns Orun's five-phase fight, four artifact
+presets, real echo/chain/refund/ward application, Wet, dodge immunity, companion
+commands, victory/retry and a temporary Orun-following bond. Godot presents
+the generated eight-frame atlas, new shrine plate, cues, counters and lore.
+Authoring stager emits bounded C++ tables + display data with a parity stamp;
+owned loopback helper rejects invalid/stale input, pauses on focus/lore or
+controller silence and exits on scene teardown. Tech/35 is the runnable guide.
+Normal Hunt/class-tree/save/server migration and full action-animation work
+remain production follow-ups. Packaging now REQUIRES the exported trial gate.
+Validation: CTest 2/2; 106 Python tests including transport and authoring rejection;
+full game outcome suite passes (console expected JSON-error fixture). Stream
+1.15ms on isolated recheck. Exported trial proves real damage, chain and ward
+procs; exported normal Hunt proves streaming. Actual GL frame: 60 FPS,
+2.086ms process CPU, 85 draws; 7,573,376 bytes of staged textures / 8 MiB cap.
+Trial/menu captures are committed under `docs/art/playable-shrine/`. Windows
+is cross-built and PE icons verified; Windows gameplay still needs a native run.
+
 README banner follow-up (2026-09-12): original 3:1 Dragon Heroes key art is
 embedded at the top of README. Asset, exact prompt and hash provenance:
 `docs/art/readme-banner/`. Gold title, luminous ruins, three adventurers,

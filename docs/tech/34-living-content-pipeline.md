@@ -1,7 +1,8 @@
 # 34 — Living content authoring pipeline
 
 Law: [design/26](../design/26-living-pixel-world.md), canon §12.45.
-This is an offline candidate format and review tool. The existing authoritative
+This is an offline candidate format and review tool, now accompanied by a
+[playable Codex trial](35-playable-living-trial.md). The existing authoritative
 production architecture and `content/` pack format remain in place.
 
 ## Run the review
@@ -154,7 +155,9 @@ Integer tick overflow exhausts the state rather than making it fire endlessly.
 **Integration boundary:** the evaluator does not select targets, schedule an
 echo, subtract HP, grant real resources, spawn a field or mint an item. The
 server must apply those commands to its world and emit presentation cues.
-The probe tests the implemented boundary, not an imaginary complete ARPG.
+The command probe tests that boundary. The additional `LivingTrial` host
+now applies echoes, chains, resources and wards to a real local encounter;
+see [tech/35](35-playable-living-trial.md) for its bounded preview scope.
 
 ## Production integrations still required
 
@@ -208,7 +211,8 @@ The project title and application-data directory are **Dragon Heroes Codex**
 (the window title includes an em dash), keeping review saves/settings separate.
 Each package includes `content-review/index.html` and its complete offline
 candidate bundle. This is an accompanying art/design review: new Orun art,
-artifact tiers and skills are **not yet installed in the playable Hunt**.
+artifact tiers and skills are playable through **PLAY NEW CONTENT: THE BELL
+BENEATH THE FEN**, a separate trial; normal Hunt progression remains unchanged.
 The browser review is outside the PCK and carries its integration blockers.
 
 The original transparent dragon/Lumen emblem is curated at

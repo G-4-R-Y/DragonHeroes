@@ -8,7 +8,12 @@ items and lore. Law: canon §§1, 3–4, 7 and §12.45. Implementation and runbo
 This branch implements an **offline authoring and review pipeline**, generated
 art candidates, an authored chapter, and a C++ effect-command evaluator. It does
 not replace the current Hunt, item roller, animation library or skill executor.
-The combat design below is a proposal for those integrations. The new rarity
+The first chapter is now playable in a separate C++-driven Codex trial
+([tech/35](../tech/35-playable-living-trial.md)): Orun's five phases, the four
+artifact presets, Wet/Storm and companion interactions, lore, victory and a
+temporary bond. It uses the generated idle atlas plus authored movement and
+telegraphs; full action-animation authoring remains pending.
+The broader combat design below is a proposal for production integrations. The new rarity
 rules are enforced in the candidate format; existing live items keep their IDs,
 rarities and save representation until an explicit migration lands.
 

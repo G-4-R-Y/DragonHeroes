@@ -4,6 +4,45 @@ Ricardo decides DIRECTION (which lever, when); harnesses execute inside it.
 Every item points at its law doc. Statuses: NOW (in flight) · PICK (awaiting
 Ricardo's call) · SCHEDULED (decided, sequenced) · BUDGET (blocked on money).
 
+## DONE — Playable living-content preview binary (Ricardo, 2026-09-12)
+
+Demand: show where pending content can be reviewed and generate a binary
+that makes the candidates playable. This explicitly prioritizes the previously
+scheduled integration slice. Law: design/26, tech/34, canon §12.45; preserve
+C++ simulation authority and the Codex branch/save/package isolation.
+Plan: expose a main-menu playable Bell Beneath the Fen trial with the generated
+Orun sprite, candidate artifacts/lore and working skill/effect interactions;
+keep simulation/effect application in C++, presentation/input in Godot, and
+compile candidate definitions from the existing authoring data. Add outcome
+and packaging gates, rebuild Codex desktop binaries, and document exactly
+which preview systems are playable and which remain production follow-ups.
+The offline review remains at genforge/candidates/living/fen_bells-73778038d652aed7/index.html.
+
+Delivered: main-menu PLAY NEW CONTENT entry; generated Orun atlas and new
+shrine plate; a C++ 30-Hz five-phase boss fight, four artifact presets with
+real echo/chain/refund/ward application, Wet setup, dodge i-frames, companion
+commands, lore/pause, retry/victory/defeat and temporary Orun-following bond.
+Authoring/schema/stager → generated C++ tables + display metadata; unsupported
+verbs and unsupplied combat conditions fail staging. Local owned helper with
+loopback-only endpoint/token, finite bounded input, monotonic sequencing,
+content parity, pause-on-silence and clean exit. Runbook: tech/35.
+
+Gates: CTest 2/2 (new living outcome/replay suite); **106 Python tests pass**,
+including authoring rejection and real transport checks; full headless
+game outcome suite passes with the existing intentional console JSON-error
+fixture qualification. Stream: 2.62ms in the full run, 1.15ms isolated
+(2ms target / 4ms hard cap). Real exported Linux trial: 180 native ticks,
+264.516 damage, chain + ward procs, eight animation frames; normal exported
+Hunt streaming smoke also passes. Windows client/helper cross-build and both
+embedded six-size icons verified; native Windows gameplay remains untested.
+Actual GL trial/menu frames inspected; 1280×720 capture reports 60 FPS,
+2.086ms process-frame CPU, 85 draw calls, peak draw CPU 3.076ms. Trial texture
+estimate 7,573,376 bytes / 8 MiB cap. Full action animations, normal Hunt /
+class-tree / save migration and public-server deployment remain scheduled;
+the trial is a playable review slice with temporary progression.
+Rebuild binaries after committing so their BUILD-INFO identifies clean source.
+
+
 ## DONE — GitHub README banner (Ricardo, 2026-09-12)
 
 Demand: create a beautiful banner for the GitHub README, continuing on

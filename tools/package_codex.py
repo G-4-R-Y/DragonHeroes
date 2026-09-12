@@ -17,9 +17,10 @@ import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-from genforge.living.build import build
 from tools.smoke_codex import smoke
 from tools.verify_package import verify
+from tools.stage_living_preview import stage as stage_preview
+from tools.check_living_preview import check as check_preview
 
 OUT = ROOT / "builds/codex"
 
@@ -89,8 +90,14 @@ def package(platform, review, env):
             "Keep dh-server(.exe) next to the game; it generates the world.\n"
             "Codex uses its own save/settings directory: Dragon Heroes Codex.\n\n"
             "CONTENT REVIEW: open content-review/index.html in your browser.\n"
-            "The new art and item/skill definitions are offline candidates.\n"
-            "They are not installed into the playable Hunt yet.\n\n"
+            "PLAYABLE PREVIEW: choose PLAY NEW CONTENT: THE BELL BENEATH THE FEN.\n"
+            "Fight Orun, compare four artifacts and read their stories with L.\n"
+            "Trial: WASD move, mouse aim, LMB/Space cut, Shift/RMB dodge,\n"
+            "Q Wet field, E Storm, R companion; 1-4 switch artifact tiers.\n"
+            "Q then E triggers Mythic chains; R triggers the Divine ward.\n"
+            "ENTER retries; F bonds Orun after victory; ESC returns to menu.\n"
+            "The trial is separate from Hunt progression. Orun's complete\n"
+            "action animations and full production integration await review.\n\n"
             "SOLO: main menu -> hunter name -> class -> ENTER THE HUNT.\n"
             "CO-OP: CO-OP (P2P); one friend hosts, others join by LAN IP (UDP 7377).\n"
             "Controls: WASD move, LMB/Space attack, Shift/RMB dodge, E/Q skills,\n"
@@ -112,6 +119,7 @@ def package(platform, review, env):
             raise
         if not windows:
             smoke(stage, log.parent)
+            check_preview(stage)
         archive = stage / f"dragon-heroes-codex-{platform}.zip"
         with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=6) as bundle:
             for path in sorted(stage.rglob("*")):
@@ -137,6 +145,7 @@ def main():
     try:
         run([sys.executable, "tools/build_app_icon.py"])
         run([sys.executable, "tools/validate_content.py"])
+        review = stage_preview()
         env = export_environment()
         run(["cmake", "-S", "sim", "-B", "sim/build", "-DCMAKE_BUILD_TYPE=Release"])
         run(["cmake", "--build", "sim/build", "-j", "4"])
@@ -149,7 +158,6 @@ def main():
         with log.open("w") as handle:
             subprocess.run(["godot", "--headless", "--path", "game", "--import", "--quit"],
                            cwd=ROOT, env=env, stdout=handle, stderr=subprocess.STDOUT, check=True)
-        review = build(ROOT / "genforge/releases/bell_beneath_fen.json", ROOT / "genforge/candidates/living")
         for platform in ("linux", "windows") if args.platform == "all" else (args.platform,):
             package(platform, review, env)
     except (OSError, ValueError, RuntimeError, subprocess.CalledProcessError) as error:

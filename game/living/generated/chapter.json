@@ -1,0 +1,510 @@
+{
+  "content_hash": "73778038d652aed7fd0b73960de9f800d3bc5e0a5ea885e879c33f73f9ce0c4d",
+  "decoded_texture_bytes": 7573376,
+  "playable": {
+    "affix_damage_per_point": 0.12,
+    "base_damage": 30,
+    "boss_hp": 1400,
+    "creature": "fen_bells.creature.orun",
+    "hunter_hp": 140,
+    "move_speed": 135,
+    "phases": [
+      {
+        "damage": 8,
+        "radius": 34,
+        "recovery": 65,
+        "skill": "fen_bells.skill.mire_chime",
+        "verb": "pools",
+        "windup": 30
+      },
+      {
+        "damage": 24,
+        "radius": 45,
+        "recovery": 45,
+        "skill": "fen_bells.skill.storm_toll",
+        "verb": "storm",
+        "windup": 36
+      },
+      {
+        "damage": 18,
+        "radius": 38,
+        "recovery": 40,
+        "skill": "fen_bells.skill.reed_step",
+        "verb": "leap",
+        "windup": 24
+      },
+      {
+        "damage": 18,
+        "radius": 68,
+        "recovery": 65,
+        "skill": "fen_bells.skill.antler_refrain",
+        "verb": "sweep",
+        "windup": 24
+      },
+      {
+        "damage": 20,
+        "radius": 78,
+        "recovery": 80,
+        "skill": "fen_bells.skill.last_vigil",
+        "verb": "ward",
+        "windup": 45
+      }
+    ],
+    "release": "genforge/releases/bell_beneath_fen.json",
+    "version": 1
+  },
+  "release": {
+    "art": [
+      {
+        "anchor": [
+          0.5,
+          0.92
+        ],
+        "clips": [
+          {
+            "fps": 10,
+            "frames": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7
+            ],
+            "loop": true,
+            "name": "idle"
+          }
+        ],
+        "grid": [
+          4,
+          2
+        ],
+        "id": "fen_bells.art.bellwether",
+        "prompt": "genforge/art_sources/bellwether/prompt.txt",
+        "provider": "built-in image_gen; model identity not exposed",
+        "required_clips": [
+          "idle",
+          "move",
+          "anticipation",
+          "attack",
+          "hit",
+          "death"
+        ],
+        "source": "genforge/art_sources/bellwether/source.png",
+        "subject": "Orun: antlered marsh cervid, bronze bell, mossy bark armor and a luminous heart; an individual, not a recolored normal."
+      }
+    ],
+    "artifacts": [
+      {
+        "affix_budget": 82,
+        "class_hooks": [
+          "Reaver",
+          "Warden"
+        ],
+        "effects": [
+          "fen_bells.effect.returning_cut"
+        ],
+        "id": "fen_bells.item.widows_refrain",
+        "lore": "fen_bells.lore.widows_refrain",
+        "name": "Widow's Refrain",
+        "rarity": "legendary",
+        "signature": "One deliberate melee hit calls a 35% echo after the strike; the echo never triggers another artifact.",
+        "synergy_skills": [
+          "fen_bells.skill.antler_refrain"
+        ],
+        "tradeoff": "The signature spends 18 of the shared 100 slot points. Its 1.5-second internal cooldown rewards clean timing over hit spam."
+      },
+      {
+        "affix_budget": 70,
+        "class_hooks": [
+          "Hunter",
+          "Reaver"
+        ],
+        "effects": [
+          "fen_bells.effect.returning_cut",
+          "fen_bells.effect.keeper_resolve"
+        ],
+        "id": "fen_bells.item.pilgrim_bell",
+        "lore": "fen_bells.lore.pilgrim_bell",
+        "name": "Pilgrim's Bell",
+        "rarity": "relic",
+        "signature": "The remembered stroke gains a second facet: a dodge restores 15% of a resource unit, at most once every three seconds.",
+        "synergy_skills": [
+          "fen_bells.skill.reed_step",
+          "fen_bells.skill.antler_refrain"
+        ],
+        "tradeoff": "Two conditional facets leave 70 points for ordinary affixes. Repeated dodges during the cooldown do not refund resources."
+      },
+      {
+        "affix_budget": 46,
+        "class_hooks": [
+          "Elementalist",
+          "Occultist",
+          "Hunter"
+        ],
+        "effects": [
+          "fen_bells.effect.returning_cut",
+          "fen_bells.effect.keeper_resolve",
+          "fen_bells.effect.bell_surge"
+        ],
+        "id": "fen_bells.item.storm_canticle",
+        "lore": "fen_bells.lore.storm_canticle",
+        "name": "Canticle of the Drowned Storm",
+        "rarity": "mythic",
+        "signature": "A storm hit consumes Wet and requests up to three 25% chain strikes. Pet or field setups can supply Wet once integrated with the Hunt.",
+        "synergy_skills": [
+          "fen_bells.skill.mire_chime",
+          "fen_bells.skill.storm_toll"
+        ],
+        "tradeoff": "Three facets leave 46 affix points. Wet is consumed once; copied strikes cannot chain back into artifact triggers."
+      },
+      {
+        "affix_budget": 26,
+        "class_hooks": [
+          "Ritualist",
+          "Warden",
+          "Occultist"
+        ],
+        "effects": [
+          "fen_bells.effect.returning_cut",
+          "fen_bells.effect.keeper_resolve",
+          "fen_bells.effect.bell_surge",
+          "fen_bells.effect.shared_vigil"
+        ],
+        "id": "fen_bells.item.crown_of_return",
+        "lore": "fen_bells.lore.crown_of_return",
+        "name": "Crown of the First Return",
+        "rarity": "divine",
+        "signature": "The complete keeper vow adds a 25% ward request on a bonded creature hit, plus the three earlier conditional facets.",
+        "synergy_skills": [
+          "fen_bells.skill.last_vigil",
+          "fen_bells.skill.storm_toll",
+          "fen_bells.skill.reed_step"
+        ],
+        "tradeoff": "Four facets leave 26 affix points. The ward has a five-second cooldown and one target; Divine keeps the same 100-point ceiling."
+      }
+    ],
+    "bible": "genforge/lore/world-bible.md",
+    "creatures": [
+      {
+        "art": "fen_bells.art.bellwether",
+        "biome": "Gloamfen",
+        "bond": "A bond keeps the chime-and-storm identity in a reduced pet kit. No new capture restriction: every creature remains intended to support bonding.",
+        "combo": "Mire Chime paints wet lanes; Storm Toll spends them. Reed Step changes the angle, Antler Refrain punishes pursuit, and Last Vigil offers a clear recovery window. These are authored kit contracts; Hunt behavior integration is pending.",
+        "family": "Mireborn",
+        "id": "fen_bells.creature.orun",
+        "lore": "fen_bells.lore.unrung",
+        "name": "Orun, the Last Bellwether",
+        "skills": [
+          "fen_bells.skill.mire_chime",
+          "fen_bells.skill.storm_toll",
+          "fen_bells.skill.reed_step",
+          "fen_bells.skill.antler_refrain",
+          "fen_bells.skill.last_vigil"
+        ],
+        "tier": "legendary"
+      }
+    ],
+    "effects": [
+      {
+        "action": "echo",
+        "budget": 18,
+        "consumes": [],
+        "cooldown_ticks": 45,
+        "id": "fen_bells.effect.returning_cut",
+        "magnitude_permille": 350,
+        "max_targets": 1,
+        "name": "The remembered stroke",
+        "requires": [],
+        "tags": [
+          "melee"
+        ],
+        "trigger": "hit",
+        "vfx": {
+          "anticipation_ms": 60,
+          "color": "#d8b875",
+          "dissipate_ms": 420,
+          "impact_ms": 90,
+          "lights": 1,
+          "particles": 18,
+          "shape": "crescent"
+        }
+      },
+      {
+        "action": "resource",
+        "budget": 12,
+        "consumes": [],
+        "cooldown_ticks": 90,
+        "id": "fen_bells.effect.keeper_resolve",
+        "magnitude_permille": 150,
+        "max_targets": 1,
+        "name": "The path back",
+        "requires": [],
+        "tags": [
+          "dodge"
+        ],
+        "trigger": "dodge",
+        "vfx": {
+          "anticipation_ms": 60,
+          "color": "#7ed4ba",
+          "dissipate_ms": 420,
+          "impact_ms": 90,
+          "lights": 1,
+          "particles": 24,
+          "shape": "sigil"
+        }
+      },
+      {
+        "action": "chain",
+        "budget": 24,
+        "consumes": [
+          "wet"
+        ],
+        "cooldown_ticks": 90,
+        "id": "fen_bells.effect.bell_surge",
+        "magnitude_permille": 250,
+        "max_targets": 3,
+        "name": "The drowned canticle",
+        "requires": [
+          "wet"
+        ],
+        "tags": [
+          "storm"
+        ],
+        "trigger": "hit",
+        "vfx": {
+          "anticipation_ms": 60,
+          "color": "#a7eee1",
+          "dissipate_ms": 420,
+          "impact_ms": 90,
+          "lights": 1,
+          "particles": 44,
+          "shape": "fork"
+        }
+      },
+      {
+        "action": "ward",
+        "budget": 20,
+        "consumes": [],
+        "cooldown_ticks": 150,
+        "id": "fen_bells.effect.shared_vigil",
+        "magnitude_permille": 250,
+        "max_targets": 1,
+        "name": "The first light kept",
+        "requires": [],
+        "tags": [
+          "pet"
+        ],
+        "trigger": "pet_hit",
+        "vfx": {
+          "anticipation_ms": 60,
+          "color": "#f4e8c1",
+          "dissipate_ms": 420,
+          "impact_ms": 90,
+          "lights": 1,
+          "particles": 56,
+          "shape": "crown"
+        }
+      }
+    ],
+    "keyframe": "docs/art/modern-pixel/gloamfen-target.png",
+    "lore": [
+      {
+        "discovery": "Discover the sunken bell shrine, then survive Orun's final silence to recover the keeper's account.",
+        "id": "fen_bells.lore.unrung",
+        "links": [
+          "fen_bells.creature.orun",
+          "fen_bells.lore.widows_refrain"
+        ],
+        "name": "The Bell That Refused the Gloom",
+        "origin": "Gloamfen / Mireborn",
+        "story": "When the drowned Haven lost its well, its keepers tied a warning bell to the antlers of Orun. The beast walked the flooded streets for seven nights, calling the living home. On the eighth, the bell fell silent. Now its clapper hangs inside his luminous ribs, and every stranger hears the voice of someone they failed to save. The Gloom made the warning beautiful enough to follow."
+      },
+      {
+        "discovery": "Read the ferry ledger beside the shrine. The second stroke reveals the keeper's signature.",
+        "id": "fen_bells.lore.widows_refrain",
+        "links": [
+          "fen_bells.lore.unrung",
+          "fen_bells.item.widows_refrain"
+        ],
+        "name": "The Second Stroke",
+        "origin": "Havens / Guilds of the Hunt",
+        "story": "Keeper Ilyra carried a crescent blade to cut ferry ropes during the flood. At each rescue she struck the bronze rail twice: once for the living, once for those still beneath the water. Her blade remembers the second stroke. Its echo answers a deliberate melee hit, but it has no edge for another echo to answer."
+      },
+      {
+        "discovery": "Find the ferryman's empty mooring; the bell's inscription connects the shrine to the nearest Haven.",
+        "id": "fen_bells.lore.pilgrim_bell",
+        "links": [
+          "fen_bells.lore.widows_refrain",
+          "fen_bells.item.pilgrim_bell"
+        ],
+        "name": "The Path Back",
+        "origin": "Havens / Lumen wells",
+        "story": "The last ferryman wore this bell beneath his cloak so frightened children could find him without seeing the flood. Its note held no command to fight; it meant that someone was still coming back. Hunters who step cleanly through danger hear a fragment of that promise and recover their resolve. The bell takes room where a heavier enchantment might have lived."
+      },
+      {
+        "discovery": "Bond a Mireborn companion and trace the wire between the three submerged shrines.",
+        "id": "fen_bells.lore.storm_canticle",
+        "links": [
+          "fen_bells.lore.pilgrim_bell",
+          "fen_bells.item.storm_canticle"
+        ],
+        "name": "A Song for Two Spirits",
+        "origin": "Gloamfen / Mireborn bonds",
+        "story": "A Mireborn kit once followed Ilyra between islands, carrying a silver wire in its teeth. When lightning struck the wire, both spirits answered in the same rhythm. The Canticle keeps that imperfect duet: a hunter's storm can spend a creature's wet mark to leap between enemies. No mark survives the song, and no borrowed strike can begin it again."
+      },
+      {
+        "discovery": "Recover the four keeper fragments. The final fragment belongs to the creature that chose to return.",
+        "id": "fen_bells.lore.crown_of_return",
+        "links": [
+          "fen_bells.lore.unrung",
+          "fen_bells.lore.storm_canticle",
+          "fen_bells.item.crown_of_return"
+        ],
+        "name": "The First Light Kept",
+        "origin": "Gloamfen / Lumen / Guilds of the Hunt",
+        "story": "The keepers never crowned a king. They made this circlet for the hunter who returned with everyone accounted for, human and creature alike. Orun hid it beneath the bell shrine before the Gloom learned its shape. Its highest light awakens when a bonded spirit strikes beside its hunter, briefly sheltering the bond. It is called Divine for the vow it preserves, not because its bearer stands above another hunter."
+      }
+    ],
+    "pack": "fen_bells",
+    "review": {
+      "notes": "Generated idle source only. Attack/move/hit/death, coherent directional animation, manual cleanup, class-resource mappings, live combat application and target-device capture remain review gates.",
+      "status": "candidate"
+    },
+    "season": "genforge/seasons/2026-s1.example.json",
+    "skills": [
+      {
+        "counterplay": "Pools appear in a crescent, leaving a dry inner lane. Move inside before the bell sounds.",
+        "effects": [],
+        "id": "fen_bells.skill.mire_chime",
+        "lore": "fen_bells.lore.unrung",
+        "name": "Mire Chime",
+        "role": "setup",
+        "tags": [
+          "field"
+        ]
+      },
+      {
+        "counterplay": "A rising antler spark points to the wet target. Leave the pool before the three-pronged discharge.",
+        "effects": [
+          "fen_bells.effect.bell_surge"
+        ],
+        "id": "fen_bells.skill.storm_toll",
+        "lore": "fen_bells.lore.unrung",
+        "name": "Storm Toll",
+        "role": "payoff",
+        "tags": [
+          "storm"
+        ]
+      },
+      {
+        "counterplay": "Orun lowers one antler before a lateral leap. Follow the landing, not the afterimage.",
+        "effects": [
+          "fen_bells.effect.keeper_resolve"
+        ],
+        "id": "fen_bells.skill.reed_step",
+        "lore": "fen_bells.lore.unrung",
+        "name": "Reed Step",
+        "role": "movement",
+        "tags": [
+          "dodge"
+        ]
+      },
+      {
+        "counterplay": "Two asymmetric sweeps: dodge the first, punish the long recovery after the echo.",
+        "effects": [
+          "fen_bells.effect.returning_cut"
+        ],
+        "id": "fen_bells.skill.antler_refrain",
+        "lore": "fen_bells.lore.unrung",
+        "name": "Antler Refrain",
+        "role": "payoff",
+        "tags": [
+          "melee"
+        ]
+      },
+      {
+        "counterplay": "The bell goes still and a ward gathers. Strike the exposed chest after the light collapses.",
+        "effects": [
+          "fen_bells.effect.shared_vigil"
+        ],
+        "id": "fen_bells.skill.last_vigil",
+        "lore": "fen_bells.lore.unrung",
+        "name": "Last Vigil",
+        "role": "defense",
+        "tags": [
+          "pet"
+        ]
+      }
+    ],
+    "style": {
+      "direction": "Modern hand-clustered pixel art, 3/4 angled top-down, distinct anatomy and materials, deep indigo shadows, moss and bronze, local turquoise Lumen and ivory highlights. Crisp silhouettes; no baked bloom, chibi proportions, blur, or generic recolor-only bosses.",
+      "emissive_colors": [
+        "#7ed4ba",
+        "#a7eee1",
+        "#d7fff2",
+        "#f4e8c1"
+      ],
+      "frame_px": 128,
+      "id": "fen_bells.style.lumen_nocturne",
+      "max_atlas_bytes": 4194304,
+      "max_lights": 4,
+      "max_particles": 192,
+      "palette": [
+        "#080e17",
+        "#0e1822",
+        "#16232c",
+        "#20313a",
+        "#2d4249",
+        "#3d5358",
+        "#54696b",
+        "#728582",
+        "#9aa59a",
+        "#c2c5ad",
+        "#edf0d5",
+        "#152b2a",
+        "#1c3b34",
+        "#284d3b",
+        "#3b5f47",
+        "#577457",
+        "#78906a",
+        "#a2b88a",
+        "#123e42",
+        "#175757",
+        "#217470",
+        "#32968a",
+        "#50b5a0",
+        "#7ed4ba",
+        "#a7eee1",
+        "#d7fff2",
+        "#251f27",
+        "#393039",
+        "#514248",
+        "#71615d",
+        "#968471",
+        "#b7a084",
+        "#392b22",
+        "#55402b",
+        "#775734",
+        "#987143",
+        "#ba9455",
+        "#d8b875",
+        "#efcf95",
+        "#f4e8c1",
+        "#262b40",
+        "#3e4661",
+        "#5e6b87",
+        "#8b9bae",
+        "#374739",
+        "#5a6247",
+        "#8a8b64",
+        "#c4bf93"
+      ]
+    },
+    "title": "The Bell Beneath the Fen",
+    "version": 1
+  },
+  "simulation_stamp": 751964249
+}

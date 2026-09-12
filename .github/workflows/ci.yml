@@ -13,6 +13,9 @@ jobs:
         with: { python-version: "3.12" }
       - run: pip install -r genforge/requirements.txt
       - run: python3 tools/validate_content.py
+      - run: python3 tools/stage_living_preview.py
+      - name: Playable generated tables stay in sync
+        run: git diff --exit-code -- sim/libs/dh-sim/include/dh/sim/living_content.generated.hpp
       - run: python3 -m pytest genforge/tests -q
       - run: python3 -m genforge.living.build genforge/releases/bell_beneath_fen.json
       - uses: actions/upload-artifact@v4
@@ -32,5 +35,6 @@ jobs:
         with: { python-version: "3.12" }
       - run: pip install pillow jsonschema pytest
       - run: python3 -m pytest genforge/tests/test_living.py -q
+      - run: python3 -m pytest genforge/tests/test_living_transport.py -q
       - name: M0 benchmark harness (informational)
         run: ./sim/build/libs/dh-server/dh-server --entities 2000 --ticks 3000

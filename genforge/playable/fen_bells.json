@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "release": "genforge/releases/bell_beneath_fen.json",
+  "creature": "fen_bells.creature.orun",
+  "hunter_hp": 140,
+  "boss_hp": 1400,
+  "move_speed": 135,
+  "base_damage": 30,
+  "affix_damage_per_point": 0.12,
+  "phases": [
+    {"skill": "fen_bells.skill.mire_chime", "verb": "pools", "windup": 30, "recovery": 65, "damage": 8, "radius": 34},
+    {"skill": "fen_bells.skill.storm_toll", "verb": "storm", "windup": 36, "recovery": 45, "damage": 24, "radius": 45},
+    {"skill": "fen_bells.skill.reed_step", "verb": "leap", "windup": 24, "recovery": 40, "damage": 18, "radius": 38},
+    {"skill": "fen_bells.skill.antler_refrain", "verb": "sweep", "windup": 24, "recovery": 65, "damage": 18, "radius": 68},
+    {"skill": "fen_bells.skill.last_vigil", "verb": "ward", "windup": 45, "recovery": 80, "damage": 20, "radius": 78}
+  ]
+}

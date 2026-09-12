@@ -207,6 +207,13 @@ def main() -> int:
         except (ValueError, OSError) as problem:
             err(release, f"expansion candidate: {problem}")
 
+    from tools.stage_living_preview import load_config
+    for preview in sorted((ROOT / "genforge/playable").glob("*.json")):
+        try:
+            load_config(preview)
+        except (ValueError, OSError) as problem:
+            err(preview, str(problem))
+
     if errors:
         print(f"CONTENT VALIDATION FAILED — {len(errors)} problem(s):")
         for e in errors:

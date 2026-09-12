@@ -1,0 +1,12 @@
+{
+  "provider": "built-in image_gen",
+  "model": "not exposed by tool",
+  "prompt": "prompt.txt",
+  "asset": "../../../game/living/shrine.png",
+  "size": [
+    2120,
+    742
+  ],
+  "sha256": "a550aa7f9a08ee48de8fc5f752c4e25ed30d95e89fac3e5d179e693cf34e1807",
+  "post_processing": "none; scaled by Godot to the arena rectangle"
+}

@@ -69,6 +69,15 @@ types / 5 registries). 1000 normals + 100 legendaries from
 `game/prototype/art/<actor>/` (sheet.png + sheet_n.png + atlas.json).
 
 ## GenForge (art & asset pipeline)
+**Playable Codex trial:** main-menu button → `game/living/trial.tscn`.
+`living_trial.hpp` owns five-phase boss AI, movement, real effect application,
+companion commands/bond and victory/retry; `dh-server --living-preview` hosts
+it on loopback. `tools/stage_living_preview.py` compiles chapter + tuning into
+C++ definitions and Godot display assets; schema `living-preview.schema.json`.
+`tools/check_living_preview.py` tests the real controller/host and captures GL
+frames; the packager runs the exported trial as a required gate. Law: tech/35.
+Full action animation and normal Hunt/save/production-server integration remain.
+
 **README key art:** `docs/art/readme-banner/dragon-heroes-banner.png`
 (2172×724, 3:1), exact prompt + SHA-256 provenance beside it; relative embed
 and descriptive alt text in root README. Law: design/26 + design/17. Gate:

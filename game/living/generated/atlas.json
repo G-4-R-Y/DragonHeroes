@@ -1,0 +1,101 @@
+{
+  "albedo": "albedo.png",
+  "anchor": [
+    64,
+    118
+  ],
+  "blockers": [
+    "missing clip: move",
+    "missing clip: anticipation",
+    "missing clip: attack",
+    "missing clip: hit",
+    "missing clip: death"
+  ],
+  "clips": [
+    {
+      "fps": 10,
+      "frame_ticks": [
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3
+      ],
+      "frames": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "loop": true,
+      "name": "idle",
+      "rects": [
+        [
+          2,
+          2,
+          128,
+          128
+        ],
+        [
+          134,
+          2,
+          128,
+          128
+        ],
+        [
+          266,
+          2,
+          128,
+          128
+        ],
+        [
+          398,
+          2,
+          128,
+          128
+        ],
+        [
+          530,
+          2,
+          128,
+          128
+        ],
+        [
+          662,
+          2,
+          128,
+          128
+        ],
+        [
+          794,
+          2,
+          128,
+          128
+        ],
+        [
+          926,
+          2,
+          128,
+          128
+        ]
+      ]
+    }
+  ],
+  "emissive": "emissive.png",
+  "frame_px": 128,
+  "id": "fen_bells.art.bellwether",
+  "metrics": {
+    "area_variation": 0.0207,
+    "decoded_bytes": 1115136,
+    "mean_oklab_error": 0.0254,
+    "unique_frames": 8
+  },
+  "review_status": "candidate"
+}

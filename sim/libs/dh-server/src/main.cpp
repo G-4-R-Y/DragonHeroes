@@ -14,6 +14,8 @@
 #include <dh/procgen/chunk.hpp>
 #include <dh/sim/world.hpp>
 
+int living_preview(unsigned client_port, unsigned token);
+
 namespace {
 
 std::uint64_t arg_u64(int argc, char** argv, const char* name, std::uint64_t fallback) {
@@ -70,6 +72,9 @@ int dump_rect(std::uint64_t seed, std::int64_t cx0, std::int64_t cy0, std::int64
 } // namespace
 
 int main(int argc, char** argv) {
+    if(argc>1 && std::strcmp(argv[1],"--living-preview")==0)
+        return living_preview(static_cast<unsigned>(arg_u64(argc,argv,"--client-port",0)),
+                              static_cast<unsigned>(arg_u64(argc,argv,"--token",0)));
     const std::uint64_t seed = arg_u64(argc, argv, "--seed", 42);
     const std::uint64_t entities = arg_u64(argc, argv, "--entities", 500);
     const std::uint64_t ticks = arg_u64(argc, argv, "--ticks", 3000);
