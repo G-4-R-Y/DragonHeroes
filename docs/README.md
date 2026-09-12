@@ -36,6 +36,8 @@
 | [24-order-of-magnitude](design/24-order-of-magnitude.md) | The OM levers: AI profiles, run structure, systemic bosses, pets as a build axis, C++ port, RC, audio |
 | [25-arena-training-console](design/25-arena-training-console.md) | The arena training console: pick trainee/opponents, drive the ES trainer, live fitness over the progress JSONL seam, gate, watch one episode |
 | [USAGE.md](USAGE.md) | **The usage manual: play, co-op, arena, training, content workflows, gates** |
+| [26-living-pixel-world](design/26-living-pixel-world.md) | Modern pixel art direction, storied artifact rarity, skill-system audit and proposal, weekly chapter design |
+| [34-living-content-pipeline](tech/34-living-content-pipeline.md) | Reproducible candidate generation/ingest, review UI, schemas, C++ effect probe and runbook |
 | **tech/** | |
 | [20-architecture-overview](tech/20-architecture-overview.md) | System map, one-sim-three-consumers, data flows, decision table |
 | [21-simulation-core](tech/21-simulation-core.md) | C++ sim workspace, entity store, tick pipeline, fields, determinism |

@@ -69,6 +69,17 @@ types / 5 registries). 1000 normals + 100 legendaries from
 `game/prototype/art/<actor>/` (sheet.png + sheet_n.png + atlas.json).
 
 ## GenForge (art & asset pipeline)
+**Review-branch addition (2026-09-12):** modern pixel-art weekly chapter
+pipeline in `genforge/living/`; strict `content/schemas/expansion.schema.json`;
+sample `genforge/releases/bell_beneath_fen.json`; generated source art in
+`genforge/art_sources/` and `docs/art/modern-pixel/`. Run
+`python3 tools/review_living.py` for the offline review + C++ command probe.
+Law: design/26, tech/34, canon §12.45. Gates: content validator, 24 living
+tests (included in full 93-test Python run), CTest and `dh-effect-lab`.
+This does not install candidates into the Hunt. Complete motion/attack
+animation, gameplay application, rarity migration, mobile capture and pack
+promotion remain explicit follow-ups on the roadmap.
+
 **LIVE; mesh stage scaffolded.** tech/28, tech/31, canon §12.34/12.38.
 `pipeline/{stub_provider,model_provider,providers}.py` (parts protocol),
 `actor_art/bestiary_art/bake_game_art/assemble/manifest`, `normal_gen.py`,

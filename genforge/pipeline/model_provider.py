@@ -41,9 +41,10 @@ except ImportError:  # invoked as a plain script path, not as a module
 # The style lock: every prompt is wrapped so output stays on-brand (docs/design
 # /17). The Veilands = dark-fantasy Lumen/Gloom world.
 _STYLE_LOCK = (
-    "dark-fantasy pixel-art game sprite, painterly pixel shading with a 1px dark "
-    "outline, dramatic rim light, muted desaturated palette with a single glowing "
-    "accent; single centered full-body character, orthographic front view, "
+    "modern dark-fantasy pixel-art game sprite, deliberate crisp pixel clusters, "
+    "selective outlines, readable anatomy, distinct metal, cloth and organic materials, "
+    "deep indigo shadows and restrained luminous accents without baked bloom; "
+    "single centered full-body character, fixed three-quarter angled top-down view, "
     "transparent background, no text, no logos, no border, no ground shadow"
 )
 

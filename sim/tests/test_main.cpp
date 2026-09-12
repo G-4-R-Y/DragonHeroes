@@ -11,6 +11,7 @@
 #include <dh/procgen/chunk.hpp>
 #include <dh/sim/arena.hpp>
 #include <dh/sim/world.hpp>
+#include <dh/sim/effects.hpp>
 
 static int g_failures = 0;
 
@@ -213,7 +214,40 @@ static void test_arena_squad_mode() {
     CHECK(arena.winner() >= -1 && arena.winner() <= 1);
 }
 
+static void test_effect_commands() {
+    using namespace dh::sim;
+    // Storm on Wet consumes the setup exactly once; subsequent procs cannot recurse.
+    EffectDef def{EffectTrigger::hit,1,1,1,EffectAction::chain,250,90,3,24};
+    EffectState owner_a, owner_b;
+    EffectEvent e{EffectTrigger::hit,1,1,0,0};
+    const auto command=evaluate_effect(def,owner_a,e);
+    CHECK(command && command->max_targets==3 && command->magnitude_permille==250);
+    CHECK(e.statuses==0);
+    e.statuses=1;
+    CHECK(!evaluate_effect(def,owner_a,e)); // same owner's cooldown
+    CHECK(evaluate_effect(def,owner_b,e)); // independent owner
+    e={EffectTrigger::hit,1,1,90,1};
+    CHECK(!evaluate_effect(def,owner_a,e)); // child proc is forbidden
+    e.proc_depth=0; e.tags=2;
+    CHECK(!evaluate_effect(def,owner_a,e)); // tag mismatch
+    e.tags=1; e.statuses=0;
+    CHECK(!evaluate_effect(def,owner_a,e)); // setup absent
+    e.statuses=1; e.trigger=EffectTrigger::dodge;
+    CHECK(!evaluate_effect(def,owner_a,e)); // trigger mismatch
+    e.trigger=EffectTrigger::hit;
+    CHECK(evaluate_effect(def,owner_a,e)); // exact cooldown boundary
+    CHECK(!evaluate_effect(def,owner_b,e)); // status cannot be consumed twice
+    def.max_targets=9;
+    CHECK(!valid_effect(def));
+    def.max_targets=3;
+    e.tick=std::numeric_limits<std::uint64_t>::max(); e.statuses=1;
+    CHECK(evaluate_effect(def,owner_a,e));
+    e.statuses=1;
+    CHECK(!evaluate_effect(def,owner_a,e)); // tick overflow fails closed
+}
+
 int main() {
+    test_effect_commands();
     test_entity_generational_ids();
     test_world_determinism();
     test_geometry();

@@ -30,8 +30,10 @@
   earthquake cracks. Quality bar: beyond Wizard of Legend's VFX. Bloom requires the
   Vulkan renderers (verified on target hardware); gl_compatibility fallback fakes
   glow with additive sprites.
-- **Art identity:** high-fidelity retro pixel art — "the 2D games a 64-bit console
-  generation would have produced". Dark fantasy tone with deliberate contrast: a
+- **Art identity (revised 2026-09-12, Ricardo; §12.45):** modern, richly
+  clustered pixel art with expressive animation, material detail and readable
+  action. Console-generation/retro fidelity is no longer the target. Dark
+  fantasy tone with deliberate contrast: a
   beautiful, luminous world under a dark surface. See `design/17-art-direction.md`.
 - **Perspective:** the simulation runs on a **flat 2D top-down plane** (precise 2D
   hitboxes: circles, capsules, swept arcs) with a scalar **z-height** for flight/jumps.
@@ -147,6 +149,11 @@
   the meta stays fresh through diversity (new bases, affixes, Bestial Skills, Spirit
   Essences), never through power inflation. Best-in-slot must be reachable by playing —
   the marketplace accelerates, it must never exceed the cap.
+  **Review-branch extension (2026-09-12, §12.45):** the candidate ladder adds
+  Relic → Mythic → Divine after Legendary, with connected lore and increasing
+  behavioral/VFX identity within the same power ceiling. Existing live item
+  schemas, drop odds and saves retain the five-tier representation pending
+  explicit integration/migration; creature tiers and the `relic` slot are unchanged.
 - **Party size (Hunt mode):** 1–4 **(proposal)**.
 
 ## 5. PvP & tournaments
@@ -231,7 +238,7 @@
   (`genforge/`) holding the **world bible** (history, factions, biome lore,
   creature-family stories) and **season themes**, exposing internal endpoints that,
   grounded in that corpus, generate NEW candidate content — creatures, items, skills:
-  (a) 64-bit-style sprite sheets + animation frames via image generation, and
+  (a) modern pixel-art sprite sheets + animation frames via image generation, and
   (b) schema-conforming JSON metadata (stats, effects, descriptions, mechanics) via
   text generation. Output lands as **candidates** in the weekly-drop authoring stage —
   human curation, the CI validation gauntlet, and balance lints remain mandatory
@@ -968,3 +975,27 @@ Still open:
    trio in rebirth/ + siblings rebirth-native/ (links dh-sim, the §10 proof)
    and rebirth-unity/. Nothing removed; Ricardo picks the layout. 2D stays
    canon; Rebirth remains a research spike (§12.27).
+
+45. **Modern pixel-art living content engine — isolated review branch
+   (2026-09-12, Ricardo: "less like retro game more like modern day pixel
+   art... an engine for releasing new creatures, effects, items and lore
+   every week... separate codex branch").** Direction: modern, richly
+   clustered 2D art, expressive movement, luminous dark fantasy and readable
+   fast combat supersede the console-generation quality metaphor. Creature
+   buildcraft, the 2D plane, 60 FPS target and fixed power ceiling remain.
+   The review-branch artifact ladder extends Legendary with Relic, Mythic,
+   Divine: connected histories and increasing behavioral/VFX facets, all
+   sharing a proposed 100-point slot ceiling. This is a candidate contract;
+   live rarity/save/loot migration is not implied. Creature tiers and the
+   `relic` slot are separate concepts. Implemented: strict expansion schema,
+   grounded briefs and explicit provider generation, namespace drafting,
+   OKLab palette/animation/emissive ingest, reproducible immutable review
+   bundles, C++ bounded effect commands, and CI gates. Example: The Bell
+   Beneath the Fen (Orun's five-skill kit, four artifacts, linked stories,
+   generated target keyframe and eight-frame idle candidate). Human art
+   approval, full animation, target-device captures and Hunt integration
+   remain required; no live deployment occurs. Design/skill-system review:
+   docs/design/26. Runbook and implementation boundary: docs/tech/34.
+   Branch `codex/modern-pixel-content-engine` starts at committed b3d41e9 in
+   `/tmp/dragon-heroes-codex-content-engine`; the original dirty workspace
+   is untouched, including its additional simulation/training work.

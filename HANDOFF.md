@@ -1,4 +1,42 @@
-# Handoff — running state (updated 2026-09-11; HEAD = v0.3.0 + mesh/harness + arena console/speed)
+# Handoff — modern pixel-art review branch (2026-09-12)
+
+Worktree: `/tmp/dragon-heroes-codex-content-engine`; branch:
+`codex/modern-pixel-content-engine`; base: `b3d41e9`. The original workspace's
+uncommitted code, training runs, logs and builds remain untouched.
+
+Delivered: `genforge/living/` (draft, grounded explicit provider generation,
+OKLab animation/emissive ingest, strict validation, immutable hash manifests,
+offline interactive review); expansion schema and authored `fen_bells`
+chapter; generated Gloamfen keyframe and eight-frame Bellwether idle source;
+bounded C++ effect commands/probe; CI integration. `tools/review_living.py`
+builds everything and prints the review HTML path. Law/specs: canon §12.45,
+design/26 and tech/34. The skill/class/run-system work is a documented
+proposal; existing Hunt behavior is unchanged.
+
+Verification so far: full GenForge + ML Python suite **93 passed**; content
+validator (46 legacy definitions + one candidate) green; CTest green; four
+compiled effects pass cooldown/recursion/bounded-output fixtures. Sample
+atlases use 1,115,136 decoded bytes (1.064 MiB). Microbench varies with host
+load (~3–10 ns/evaluation); it proves no rendered-frame or full-sim budget.
+Headless game outcomes passed (import/menu/Hunt×3/spawn/stream/click/FX/arena/
+console/cosmetics/co-op). Logs: `genforge/candidates/game-gates/`. Console's
+intentional malformed-JSON fixture logs an error despite passing its outcome
+assertions; stream measured 2.22ms initially and 2.16ms on isolated rerun
+(2ms target, 4ms hard cap). This offline change adds no live streamer work.
+
+The candidate is deliberately non-publishable. Remaining work is listed in
+the roadmap: full directional/action animation + manual cleanup; authoritative
+effect application/pet events/resources; live rarity/save/UI/loot migration;
+crowded Hunt and mid-mobile profiling; signed pack promotion/rollback.
+The keyframe is a concept, not a screenshot. Firefox Snap could not use the
+isolated `/tmp` profile for a review-page screenshot; no browser visual gate
+is claimed. Raw generated art and the quantized atlas were inspected directly.
+
+---
+
+## Prior session context (preserved)
+
+### Handoff — running state (updated 2026-09-11; HEAD = v0.3.0 + mesh/harness + arena console/speed)
 
 DURABLE MEMORY IS NOW docs/harness/ (README = start here, 10-systems-map,
 20-roadmap). This file is only the volatile delta. Canon §12 current through 39.

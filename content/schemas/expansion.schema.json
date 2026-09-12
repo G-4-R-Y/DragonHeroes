@@ -1,0 +1,105 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Living world release candidate v1 (not a live pack)",
+  "type": "object", "additionalProperties": false,
+  "required": ["version", "pack", "title", "season", "bible", "style", "lore", "effects", "skills", "creatures", "artifacts", "art", "review"],
+  "properties": {
+    "version": {"const": 1},
+    "pack": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"},
+    "title": {"$ref": "#/definitions/text"},
+    "keyframe": {"$ref": "#/definitions/text"},
+    "season": {"$ref": "#/definitions/text"}, "bible": {"$ref": "#/definitions/text"},
+    "style": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "direction", "palette", "emissive_colors", "frame_px", "max_atlas_bytes", "max_particles", "max_lights"],
+      "properties": {
+        "id": {"$ref": "#/definitions/id"}, "direction": {"$ref": "#/definitions/text"},
+        "palette": {"type": "array", "minItems": 16, "maxItems": 64, "uniqueItems": true, "items": {"$ref": "#/definitions/color"}},
+        "emissive_colors": {"type": "array", "maxItems": 8, "uniqueItems": true, "items": {"$ref": "#/definitions/color"}},
+        "frame_px": {"enum": [64, 96, 128]},
+        "max_atlas_bytes": {"type": "integer", "minimum": 65536, "maximum": 33554432},
+        "max_particles": {"type": "integer", "minimum": 0, "maximum": 512},
+        "max_lights": {"type": "integer", "minimum": 0, "maximum": 8}
+      }
+    },
+    "lore": {"type": "array", "minItems": 1, "items": {"$ref": "#/definitions/lore"}},
+    "effects": {"type": "array", "minItems": 1, "maxItems": 64, "items": {"$ref": "#/definitions/effect"}},
+    "skills": {"type": "array", "minItems": 3, "items": {"$ref": "#/definitions/skill"}},
+    "creatures": {"type": "array", "minItems": 1, "items": {"$ref": "#/definitions/creature"}},
+    "artifacts": {"type": "array", "minItems": 1, "items": {"$ref": "#/definitions/artifact"}},
+    "art": {"type": "array", "minItems": 1, "items": {"$ref": "#/definitions/art"}},
+    "review": {
+      "type": "object", "additionalProperties": false, "required": ["status", "notes"],
+      "properties": {"status": {"const": "candidate"}, "notes": {"$ref": "#/definitions/text"}}
+    }
+  },
+  "definitions": {
+    "text": {"type": "string", "minLength": 1},
+    "id": {"type": "string", "pattern": "^[a-z][a-z0-9_]*\\.[a-z][a-z0-9_]*\\.[a-z][a-z0-9_]*$"},
+    "refs": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/definitions/id"}},
+    "color": {"type": "string", "pattern": "^#[0-9a-fA-F]{6}$"},
+    "tags": {"type": "array", "uniqueItems": true, "items": {"enum": ["storm", "melee", "dodge", "pet", "field", "fire", "frost", "umbral"]}},
+    "statuses": {"type": "array", "uniqueItems": true, "items": {"enum": ["wet", "marked", "ignited", "chilled"]}},
+    "lore": {
+      "type": "object", "additionalProperties": false, "required": ["id", "name", "origin", "story", "discovery", "links"],
+      "properties": {"id": {"$ref": "#/definitions/id"}, "name": {"$ref": "#/definitions/text"}, "origin": {"$ref": "#/definitions/text"}, "story": {"type": "string", "minLength": 100}, "discovery": {"$ref": "#/definitions/text"}, "links": {"$ref": "#/definitions/refs"}}
+    },
+    "effect": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "name", "trigger", "tags", "requires", "consumes", "action", "magnitude_permille", "cooldown_ticks", "max_targets", "budget", "vfx"],
+      "properties": {
+        "id": {"$ref": "#/definitions/id"}, "name": {"$ref": "#/definitions/text"},
+        "trigger": {"enum": ["hit", "dodge", "pet_hit", "field_combo"]}, "tags": {"$ref": "#/definitions/tags"},
+        "requires": {"$ref": "#/definitions/statuses"}, "consumes": {"$ref": "#/definitions/statuses"},
+        "action": {"enum": ["echo", "chain", "burst", "resource", "ward"]},
+        "magnitude_permille": {"type": "integer", "minimum": 1, "maximum": 1000},
+        "cooldown_ticks": {"type": "integer", "minimum": 1, "maximum": 900},
+        "max_targets": {"type": "integer", "minimum": 1, "maximum": 8},
+        "budget": {"type": "integer", "minimum": 1, "maximum": 60},
+        "vfx": {
+          "type": "object", "additionalProperties": false,
+          "required": ["shape", "color", "anticipation_ms", "impact_ms", "dissipate_ms", "particles", "lights"],
+          "properties": {
+            "shape": {"enum": ["crescent", "ring", "fork", "sigil", "crown"]}, "color": {"$ref": "#/definitions/color"},
+            "anticipation_ms": {"type": "integer", "minimum": 0, "maximum": 500},
+            "impact_ms": {"type": "integer", "minimum": 30, "maximum": 200},
+            "dissipate_ms": {"type": "integer", "minimum": 50, "maximum": 1000},
+            "particles": {"type": "integer", "minimum": 0, "maximum": 128}, "lights": {"type": "integer", "minimum": 0, "maximum": 2}
+          }
+        }
+      }
+    },
+    "skill": {
+      "type": "object", "additionalProperties": false, "required": ["id", "name", "role", "tags", "effects", "lore", "counterplay"],
+      "properties": {"id": {"$ref": "#/definitions/id"}, "name": {"$ref": "#/definitions/text"}, "role": {"enum": ["setup", "payoff", "movement", "defense", "command"]}, "tags": {"$ref": "#/definitions/tags"}, "effects": {"$ref": "#/definitions/refs"}, "lore": {"$ref": "#/definitions/id"}, "counterplay": {"$ref": "#/definitions/text"}}
+    },
+    "creature": {
+      "type": "object", "additionalProperties": false, "required": ["id", "name", "family", "biome", "tier", "skills", "lore", "art", "combo", "bond"],
+      "properties": {"id": {"$ref": "#/definitions/id"}, "name": {"$ref": "#/definitions/text"}, "family": {"$ref": "#/definitions/text"}, "biome": {"$ref": "#/definitions/text"}, "tier": {"enum": ["normal", "elite", "legendary"]}, "skills": {"$ref": "#/definitions/refs"}, "lore": {"$ref": "#/definitions/id"}, "art": {"$ref": "#/definitions/id"}, "combo": {"$ref": "#/definitions/text"}, "bond": {"$ref": "#/definitions/text"}}
+    },
+    "artifact": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "name", "rarity", "lore", "effects", "synergy_skills", "class_hooks", "tradeoff", "affix_budget", "signature"],
+      "properties": {
+        "id": {"$ref": "#/definitions/id"}, "name": {"$ref": "#/definitions/text"}, "rarity": {"enum": ["legendary", "relic", "mythic", "divine"]},
+        "lore": {"$ref": "#/definitions/id"}, "effects": {"$ref": "#/definitions/refs"}, "synergy_skills": {"$ref": "#/definitions/refs"},
+        "class_hooks": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"enum": ["Warden", "Reaver", "Hunter", "Occultist", "Elementalist", "Ritualist"]}},
+        "tradeoff": {"$ref": "#/definitions/text"}, "affix_budget": {"type": "integer", "minimum": 0, "maximum": 100}, "signature": {"$ref": "#/definitions/text"}
+      }
+    },
+    "art": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "subject", "source", "prompt", "provider", "grid", "anchor", "clips", "required_clips"],
+      "properties": {
+        "id": {"$ref": "#/definitions/id"}, "subject": {"$ref": "#/definitions/text"}, "source": {"$ref": "#/definitions/text"}, "prompt": {"$ref": "#/definitions/text"}, "provider": {"$ref": "#/definitions/text"},
+        "grid": {"type": "array", "minItems": 2, "maxItems": 2, "items": {"type": "integer", "minimum": 1, "maximum": 16}},
+        "anchor": {"type": "array", "minItems": 2, "maxItems": 2, "items": {"type": "number", "minimum": 0, "maximum": 1}},
+        "required_clips": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/definitions/text"}},
+        "clips": {"type": "array", "minItems": 1, "items": {
+          "type": "object", "additionalProperties": false, "required": ["name", "frames", "fps", "loop"],
+          "properties": {"name": {"$ref": "#/definitions/text"}, "frames": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "integer", "minimum": 0, "maximum": 255}}, "fps": {"type": "integer", "minimum": 1, "maximum": 30}, "loop": {"type": "boolean"}}
+        }}
+      }
+    }
+  }
+}

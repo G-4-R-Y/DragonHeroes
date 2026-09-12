@@ -4,6 +4,75 @@ Ricardo decides DIRECTION (which lever, when); harnesses execute inside it.
 Every item points at its law doc. Statuses: NOW (in flight) · PICK (awaiting
 Ricardo's call) · SCHEDULED (decided, sequenced) · BUDGET (blocked on money).
 
+## NOW — Ricardo's isolated review branch (2026-09-12)
+
+New priority: modern 2D pixel-art production and an extensible weekly content
+engine. Branch `codex/modern-pixel-content-engine`, isolated worktree
+`/tmp/dragon-heroes-codex-content-engine`, based on committed `b3d41e9`.
+The original workspace's uncommitted gameplay/training changes remain untouched.
+Law: `docs/design/26-living-pixel-world.md` (to be authored), canon §§1, 4, 7.
+
+1. **DONE — Review moats and existing art/combat/content systems.** Translate
+   the requested modern, luminous dark-fantasy direction into measurable art
+   standards while retaining readable action, creature buildcraft and 60 FPS.
+2. **DONE (authoring/review scope) — Redesign asset generation.** Style-locked briefs, animation/material
+   contracts, quality gates, reproducible manifests and a visual review surface.
+3. **DONE (candidate + proposal) — Story-bearing rarity and skill evolution.** Legendary, Relic,
+   Mythic and Divine artifacts receive lore and bounded gameplay/VFX identity;
+   review skill systems and propose fast, expressive class/pet/rune synergies.
+4. **DONE (offline engine) — Automated weekly expansion.** Validated, data-only creature/item/
+   effect/lore packs, reusable tooling, example release, regression gates and
+   documented review/test commands. No claim of live integration until proven.
+
+Strategy: inspect canon and implementation first; extend existing GenForge
+seams and content validation; keep authoring offline and combat authority in C++;
+ship a concrete reviewable example with automated gates. This demand takes
+priority in this isolated branch; existing NOW work remains in the original tree.
+
+Interruption checkpoint (2026-09-12): isolated branch created; generated and
+saved Gloamfen keyframe + Bellwether eight-frame idle source. Implemented
+`genforge/living/` draft/generate/build/atlas/validation/review tooling,
+`content/schemas/expansion.schema.json`, authored `fen_bells` release (five-skill
+boss, four artifact rarities, connected lore), C++ bounded effect evaluator and
+`dh-effect-lab`, CI integration. Initial 22 new tests + CTest + content validator
+passed; expanded Python suite was running (session 41152). Raw atlas inspected:
+128px frames, 48-color palette, 8 unique frames, 1.064 MiB albedo+emissive.
+Remaining: finish design/canon/usage/handoff updates, finish regression gates,
+inspect final diff and commit this branch. Browser capture blocked by Firefox
+Snap profile isolation; Godot import completed but sandbox blocked editor
+settings/socket access. Neither is a successful visual runtime gate. Candidate
+is explicitly non-publishable; movement/attack/hit/death animation and live Hunt
+integration are not implemented and must stay visible as follow-up work.
+
+Final review-branch evidence: design/26 + tech/34, generated source art and
+palette-constrained atlas inspected; full Python suite **93 passed**, including
+**24 living-pipeline tests**; content validator **46 legacy definitions + one
+candidate / zero problems**; CTest and the four-effect compiled C++ probe pass.
+Headless outcome checks pass: import, menu, Hunt ×3, spawn, stream, click,
+FX stress, arena, console, cosmetics, co-op. The console deliberately feeds
+`not json at all` (`console.gd:876`), which logs an expected parse error while
+all selftest assertions pass. Stream initially measured 2.22ms apply (above
+the 2ms target, below its 4ms hard limit); preserve that qualification.
+An isolated rerun measured 2.16ms, also within the hard cap and above target;
+there is no evidence that this offline change altered the live streamer.
+Firefox Snap could not access the isolated profile, so the HTML screenshot
+gate remains unverified. Review JavaScript syntax passed; the artwork and
+compiled atlas were inspected directly. No whole-game visual gain is claimed.
+
+### SCHEDULED — production follow-ups to this review branch
+
+- Complete Orun's movement, directional/action, contact, hit/death animation
+  and manual cleanup; verify native-scale Hunt captures (design/26, tech/34).
+- Connect effect commands to authoritative world targeting/damage/resources,
+  status ownership, pet kit execution and animation events; add integration
+  and replay gates (tech/34). The C++ probe currently tests commands only.
+- Integrate new item rarities into live item/save/UI/loot schemas with stable
+  IDs and a migration; map class/resource/rune/companion proposal onto the
+  current prototype and C++ port (design/26). Existing live items are unchanged.
+- Profile the crowded composite on desktop and mid-mobile; apply global
+  VFX/light/texture budgets; promote only curated assets and reviewed lore
+  through signed data-only client/server packs with canary/rollback (tech/34).
+
 ## NOW — finish what is open
 
 - **Arena training console + speed lever** (design/25, canon §12.39) — LANDED

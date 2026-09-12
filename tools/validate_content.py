@@ -56,12 +56,12 @@ def load_json(path: Path):
 
 
 def main() -> int:
+    errors.clear()
     try:
         import jsonschema
     except ImportError:
-        jsonschema = None
-        print("note: python3-jsonschema not installed — schema conformance SKIPPED "
-              "(pip install jsonschema)", file=sys.stderr)
+        print("CONTENT VALIDATION FAILED: jsonschema is required; install it before validating.", file=sys.stderr)
+        return 1
 
     schemas = {name: load_json(SCHEMAS / fname) for name, (fname, _) in TYPE_MAP.items()}
 
@@ -197,6 +197,16 @@ def main() -> int:
             if len(fams) != 1:
                 err(path, f"capturable creature must belong to exactly one pet family, found {fams or 'none'}")
 
+    # Offline expansion candidates share this gate, but are never live pack roots.
+    sys.path.insert(0, str(ROOT))
+    from genforge.living.validation import load_validated
+    releases = sorted((ROOT / "genforge/releases").glob("*.json"))
+    for release in releases:
+        try:
+            load_validated(release)
+        except (ValueError, OSError) as problem:
+            err(release, f"expansion candidate: {problem}")
+
     if errors:
         print(f"CONTENT VALIDATION FAILED — {len(errors)} problem(s):")
         for e in errors:
@@ -204,6 +214,7 @@ def main() -> int:
         return 1
     print(f"content OK: {len(defs)} definitions across {len(TYPE_MAP)} types, "
           f"{len(registries)} registries, 0 problems")
+    print(f"expansion candidates OK: {len(releases)} (authoring only; not approved for publication)")
     return 0
 
 

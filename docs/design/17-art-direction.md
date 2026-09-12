@@ -1,5 +1,12 @@
 # 17 — Art Direction
 
+**2026-09-12 direction update:** [design/26](26-living-pixel-world.md) and
+canon §12.45 supersede this document's console-generation/retro quality
+metaphor. Modern clustered pixel art, expressive animation and material detail
+are the target. Existing camera, palette, readability and performance rules
+still apply. The new pipeline and candidates are described in
+[tech/34](../tech/34-living-content-pipeline.md).
+
 > **Status:** v0.2 draft — 2026-07-08. Conforms to [canon](../00-canon.md) v0.2 §1 (art
 > identity, perspective, 60 FPS performance identity), §4 (creature archetypes, biomes, boss
 > canon), §6 (client rendering, particle/frame budgets), §7 (art pipeline, gen-AI production).

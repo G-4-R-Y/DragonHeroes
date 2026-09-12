@@ -1,5 +1,11 @@
 # 14 — Items, Loot & Affixes
 
+**2026-09-12 review extension:** [design/26](26-living-pixel-world.md) defines
+the Legendary / Relic / Mythic / Divine candidate artifact ladder, connected
+lore and budgeted effect facets. Its offline schema does not migrate existing
+items or saves. The shared power ceiling and all acquisition rules below
+remain in force; the equipment slot `relic` is distinct from Relic rarity.
+
 > Part of the Dragon Heroes document set. Canon: [00-canon.md](../00-canon.md). Adjacent docs:
 > [creatures & bestiary](13-creatures-and-bestiary.md), [economy & marketplace](15-economy-and-marketplace.md),
 > [content pipeline](../tech/23-content-pipeline.md), [economy integrity](../tech/27-security-anticheat-and-economy-integrity.md).

@@ -159,6 +159,19 @@ the 2D view remains canon.
 
 ## Content & data workflows
 
+Modern pixel-art/weekly-chapter review (isolated experimental branch):
+
+```bash
+python3 tools/review_living.py
+```
+
+Open the printed `index.html` locally to inspect the animation, emission,
+artifact rarities, linked lore and VFX anatomy. This builds the candidate and
+runs the C++ effect probe; it does not install the content into a Hunt.
+Authoring/generation commands and remaining integration gates:
+[tech/34](tech/34-living-content-pipeline.md). Direction and skill proposal:
+[design/26](design/26-living-pixel-world.md).
+
 ```bash
 python3 tools/validate_content.py      # the CI gauntlet for content packs
 python3 -m genforge.pipeline.bestiary_gen --seed 2026   # regenerate bestiary data

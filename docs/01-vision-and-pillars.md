@@ -14,8 +14,8 @@ with [the canon](00-canon.md); numbers introduced here first are marked **(propo
 ## Elevator pitch
 
 Dragon Heroes is a fast-paced online action-RPG hunter set in an infinite, procedurally
-generated dark-fantasy world rendered in high-fidelity retro pixel art — "the 2D game a 64-bit
-console generation would have produced." Players hunt creature packs across luminous, dangerous
+generated dark-fantasy world rendered in richly detailed modern pixel art
+(art direction revised with Ricardo, 2026-09-12; canon §12.45). Players hunt creature packs across luminous, dangerous
 biomes, capture Pets, socket Bestial Skills, and chase genuinely rare Legendary drops; new
 items, creatures, and skills ship **every week**, a new biome every 4–6 weeks. Items are
 player-owned and tradable for real money on a web marketplace built on Brazilian Pix rails,
