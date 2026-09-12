@@ -28,6 +28,16 @@ Ricardo's call) · SCHEDULED (decided, sequenced) · BUDGET (blocked on money).
   (business/32) and fetch export templates (~1 GB) to package for friends.
 - **Watch item**: spawn_probe flaked once after `--import`; rerun-then-judge.
 
+- **Rebirth engine experiments — Ricardo's three picks** (rebirth/docs/02-status.md
+  §4–5): (1) layout — root-level UE scaffold from the parallel session vs
+  `rebirth/unreal/`, siblings `rebirth-native/` + `rebirth-unity/` vs folders
+  inside `rebirth/`; (2) flip `rebirth/godot3d` to Forward+ on your window and
+  judge the graphics honestly; (3) install UE 5.4 (Epic account, ~45 GB) and
+  run the compile-fix pass + R0–R3 gates in `rebirth/unreal/INSTALL.md`. Then
+  R4: PLAY the Godot slice — the gates prove the loop closes, not that it is fun.
+  A real Gen-AI mesh through `rebirth/assets/tools/gen_assets.py` rides the same
+  concept-render unblock as the image-to-3D spike below.
+
 ## PICK — the order-of-magnitude levers (design/24 §2; Ricardo's call)
 
 L1 data-driven AI profiles for the 1000-species bestiary (arena `bot_drive`

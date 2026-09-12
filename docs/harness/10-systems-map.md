@@ -118,6 +118,22 @@ scope: friends/LAN; ranked/economy stays official-server-only.
 bundles as billboards + extruded rock + real lights. Feeds from mesh_gen
 later. 2D stays canon.
 
+## Engine experiments — Rebirth (`rebirth/`, own git repo, parent-ignored)
+**Godot 3D + native C++ slices RUN and are GATED; UE 5.4 scaffold complete,
+UNCOMPILED (no engine on the box); Unity parked by decision.** Plan
+`rebirth/docs/01-plan.md`, execution log + open picks `rebirth/docs/02-status.md`,
+canon §12.44. One combat table (five-skill dragon, enrage → retreat leap →
+meteors → pounce, hunter i-frames/buffer/combo, pet howl) implemented in
+`rebirth/godot3d/scripts/`, `rebirth/native/src/sim.cpp`,
+`rebirth/unreal/Source/Rebirth/Combat/RebirthCombat.h`. Shared asset staging
+`rebirth/assets/tools/gen_assets.py` (GenForge mesh_gen → GLB/.dhm/UE manifest).
+Gates: `REBIRTH_SELFTEST=1 godot --headless --fixed-fps 60 --path rebirth/godot3d`
+→ `REBIRTH3D OK`; `rebirth/native/build/rebirth-native --sim-only --verify` →
+`REBIRTH-NATIVE OK` (+ ctest determinism). Captures: `rebirth/{godot3d,native}/captures/`.
+OPEN (Ricardo): layout collision with the parallel session's root-level UE
+scaffold + `rebirth-native/`/`rebirth-unity/` siblings; Godot Forward+ flip;
+UE install (Epic account, ~45 GB).
+
 ## Packaging & platforms
 **Desktop packaging LANDED; Android documented, not exported.** docs/USAGE.md,
 tech/30 (Android/LAN), business/32 (open source: MIT code, CC BY-NC art
