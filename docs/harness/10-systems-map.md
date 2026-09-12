@@ -69,6 +69,11 @@ types / 5 registries). 1000 normals + 100 legendaries from
 `game/prototype/art/<actor>/` (sheet.png + sheet_n.png + atlas.json).
 
 ## GenForge (art & asset pipeline)
+**README key art:** `docs/art/readme-banner/dragon-heroes-banner.png`
+(2172×724, 3:1), exact prompt + SHA-256 provenance beside it; relative embed
+and descriptive alt text in root README. Law: design/26 + design/17. Gate:
+visual title/composition review, PNG decode/dimensions/hash and link validation.
+
 **Review-branch addition (2026-09-12):** modern pixel-art weekly chapter
 pipeline in `genforge/living/`; strict `content/schemas/expansion.schema.json`;
 sample `genforge/releases/bell_beneath_fen.json`; generated source art in

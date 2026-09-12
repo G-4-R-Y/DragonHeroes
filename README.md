@@ -1,3 +1,5 @@
+![Dragon Heroes — gold title above a luminous ruined kingdom, three adventurers and a spectral wolf facing an ivory dragon](docs/art/readme-banner/dragon-heroes-banner.png)
+
 # Dragon Heroes
 
 As a kid I started programming to create anything. What fueled me at first were fantastic worlds like the lord of rings, narnia and all those cartoon and videogame universes. I started off programming to create anything, at the time specifically something to play with my friends, and RPG or TCG we would create together (we were a bunch of creatives).

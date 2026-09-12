@@ -1,0 +1,11 @@
+{
+  "provider": "built-in image_gen",
+  "model": "not exposed by tool",
+  "purpose": "GitHub README key art",
+  "prompt": "prompt.txt",
+  "asset": "dragon-heroes-banner.png",
+  "width": 2172,
+  "height": 724,
+  "sha256": "c8767d702ad535b679db1a291b1ee731574699532660b20a3c6798a08f529d69",
+  "post_processing": "none; original generated PNG copied byte-for-byte"
+}

@@ -4,6 +4,24 @@ Ricardo decides DIRECTION (which lever, when); harnesses execute inside it.
 Every item points at its law doc. Statuses: NOW (in flight) · PICK (awaiting
 Ricardo's call) · SCHEDULED (decided, sequenced) · BUDGET (blocked on money).
 
+## DONE — GitHub README banner (Ricardo, 2026-09-12)
+
+Demand: create a beautiful banner for the GitHub README, continuing on
+`codex/modern-pixel-content-engine`. Law: design/26 modern pixel-art direction
+and design/17; brand source: `genforge/art_sources/app_icon/`.
+Plan: generate original wide dark-fantasy key art with the Dragon Heroes title,
+inspect readability/composition, save the artwork and prompt/provenance under
+`docs/art/readme-banner/`, embed a relative image link with descriptive alt text
+at the top of README, validate the asset and link, and commit this documentation
+change. Existing Codex binaries continue to identify their tested code commit.
+Delivered: `docs/art/readme-banner/dragon-heroes-banner.png` (2172×724,
+3:1, 2,824,106 bytes), exact generation prompt and SHA-256 provenance;
+root README embeds the repository-relative image with descriptive alt text.
+Gate: original artwork visually inspected for title spelling, composition and
+readability; PNG decoding/dimensions/hash and local Markdown links validated.
+Documentation/art only: existing runtime test evidence and packaged binaries
+remain those of code commit `60764dc`; no binary regeneration needed.
+
 ## NOW — Ricardo's isolated review branch (2026-09-12)
 
 New priority: modern 2D pixel-art production and an extensible weekly content

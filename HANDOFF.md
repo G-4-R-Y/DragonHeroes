@@ -1,5 +1,12 @@
 # Handoff — modern pixel-art review branch (2026-09-12)
 
+README banner follow-up (2026-09-12): original 3:1 Dragon Heroes key art is
+embedded at the top of README. Asset, exact prompt and hash provenance:
+`docs/art/readme-banner/`. Gold title, luminous ruins, three adventurers,
+spectral companion and ivory dragon; aligned with design/26 and the app icon.
+PNG and relative links validated; artwork visually inspected. Documentation
+only; existing binaries still record tested source commit `60764dc`.
+
 Worktree: `/tmp/dragon-heroes-codex-content-engine`; branch:
 `codex/modern-pixel-content-engine`; rebased base: `8568d26` (originally `b3d41e9`). The original workspace's
 uncommitted code, training runs, logs and builds remain untouched.

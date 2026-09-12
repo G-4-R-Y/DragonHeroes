@@ -1007,3 +1007,9 @@ Still open:
    onto the other agent's latest committed mainline before final builds.
    Packaging automates rebuilds, manifests and actual PE icon checks (tech/34).
    The accompanying offline candidate remains distinct from the playable Hunt.
+
+   README banner addendum (Ricardo, 2026-09-12): original wide promotional
+   key art carries the Dragon Heroes title and the gold/ivory, turquoise-Lumen
+   identity into GitHub. Asset + exact prompt/provenance live in
+   `docs/art/readme-banner/`; root README embeds the local image. This is
+   brand key art, not a claim about current gameplay rendering.
