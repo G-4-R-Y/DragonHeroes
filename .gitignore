@@ -1,5 +1,10 @@
 # C++ / CMake
 sim/build/
+sim/build-godot*/
+# godot-cpp is vendored by tools/vendor_godot_cpp.sh, pinned to a tag
+sim/libs/dh-godot/third_party/
+# built by tools/build_dh_godot.sh; the arena falls back to GDScript without it
+game/addons/dh_godot/*.so
 sim/build-windows/
 sim/build-codex-windows/
 builds/codex/

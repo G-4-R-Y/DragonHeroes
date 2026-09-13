@@ -1,0 +1,12 @@
+{
+  "enabled_classes": [
+    "RefCounted",
+    "ClassDB",
+    "FileAccess",
+    "Image",
+    "Mutex",
+    "OS",
+    "WorkerThreadPool",
+    "XMLParser"
+  ]
+}

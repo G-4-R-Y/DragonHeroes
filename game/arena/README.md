@@ -214,7 +214,12 @@ slope (same matchup at two `--time-limit` values, so startup cancels):
 | neural vs native | ~2,540 |
 | neural vs neural | ~4,740–4,950 |
 
-One neural side costs ~2,200 µs/tick for 7,744 multiply-adds. `_forward` in
+**Since 2026-09-13 the forward pass runs in C++** when the `dh-godot`
+GDExtension is built (`tools/build_dh_godot.sh`): 566 µs/tick -> 105 µs/tick,
+bit-identical. `neural_policy.gd` falls back to its own GDScript implementation
+when the extension is absent, so nothing breaks without it.
+
+One neural side cost ~2,200 µs/tick for 7,744 multiply-adds. `_forward` in
 `neural_policy.gd` is therefore written flat — weights in one
 `PackedFloat64Array` indexed `o * n_in + j`, not an `Array` of `Array`. The
 nested version cost 1.74× more because every element went through a Variant.

@@ -224,6 +224,18 @@ its own `registry.json` (seeded from the deployed one, so runs are cumulative;
 `ml/serving/` — what the game and console read — is untouched until you promote.
 Under the hood it is `DH_SERVING_DIR`, honoured by league, ppo and evolve.
 
+**Build the C++ forward pass once.** The arena's neural policy runs in C++ when
+the `dh-godot` GDExtension is built — 566 µs/tick becomes 105 µs/tick, with
+bit-identical fights. It is optional: without it the GDScript path runs and
+results are the same, just slower.
+
+```bash
+tools/build_dh_godot.sh        # vendors godot-cpp if needed, ~1 min, then seconds
+```
+
+Rebuild it after changing `sim/libs/dh-godot/`. Note the per-tick win no longer
+dominates a generation — see `docs/tech/37` for where the time actually goes now.
+
 **Matches reuse one engine by default.** Booting Godot costs more than the
 fight does, so `league.py` keeps a resident arena worker per job (`--serve`) and
 feeds it matchups instead of starting an engine per match. Results are identical

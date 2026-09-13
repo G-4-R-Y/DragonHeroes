@@ -1,0 +1,15 @@
+; dh-godot — the arena policy forward pass in C++ (sim/libs/dh-godot).
+; Built by tools/build_dh_godot.sh. The GDScript runtime in
+; game/arena/neural_policy.gd falls back to its own implementation when this
+; extension is absent, so the game and the trainer work without it — just
+; slower.
+[configuration]
+entry_symbol = "dh_godot_library_init"
+; godot-cpp has no 4.6 branch; godot-4.5-stable is the newest tag and
+; GDExtension is forward compatible, so this targets 4.5 and loads in 4.6.
+compatibility_minimum = "4.5"
+reloadable = false
+
+[libraries]
+linux.debug.x86_64 = "res://addons/dh_godot/libdhgodot.linux.template_debug.x86_64.so"
+linux.release.x86_64 = "res://addons/dh_godot/libdhgodot.linux.template_release.x86_64.so"

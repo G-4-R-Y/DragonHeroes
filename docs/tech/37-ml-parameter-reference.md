@@ -550,6 +550,38 @@ Two traps, both found by running it rather than reasoning about it:
   reads stdout from a file after exit will NOT catch this — it has to probe
   over a live pipe, which is what `tools/build_arena.sh` now does.
 
+#### The forward pass in C++ — and the bottleneck moving
+
+`sim/libs/dh-godot` is now built (`tools/build_dh_godot.sh`) and exposes
+`DhPolicyNet`. Per tick, neural vs neural, idle box:
+
+| forward pass | µs/tick |
+|---|---|
+| nested `Array` of `Array` (original) | ~986 |
+| flat `PackedFloat64Array` (GDScript) | 566 |
+| `DhPolicyNet` (C++) | **105** |
+
+Bit-identical fights at every step — verified, because the registry's nets were
+trained against the GDScript runtime.
+
+**But 5.4× per tick did not become 5.4× per generation.** Measured end to end on
+the best configuration (release export + resident workers, pop 10, 13 episodes,
+2 opponents, candidates perturbed from a *trained* net so the fights run long),
+interleaved A/B/A/B: C++ 12.4 s/gen vs GDScript 13.2 s/gen — **~1.06×, inside
+the noise**.
+
+That is the honest result, and it is worth understanding rather than hiding: the
+forward pass *was* 93% of the tick, and now the tick is no longer where a
+generation's time goes. What is left is per-episode scene teardown and rebuild
+(`_start_episode` frees both fighters, clears summons, projectiles and fields,
+then respawns from the build defs — 13 times per match) and per-match process
+overhead. **That is the next thing to profile**, not the tick.
+
+A warning for anyone benchmarking this: an earlier version of the end-to-end
+test used *random* candidate nets. They lose in seconds, so the generation was
+engine-startup bound and showed nothing at all. Perturb a trained net, or the
+measurement answers a question nobody asked.
+
 #### Can the GPU do the physics? (asked 2026-09-13)
 
 No, and the premise is worth correcting. Godot's 2D physics is CPU-only — there
