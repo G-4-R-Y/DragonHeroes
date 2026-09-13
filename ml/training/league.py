@@ -83,9 +83,11 @@ console tails (docs/design/25 §2). stdout stays the human/script log.
 from __future__ import annotations
 
 import argparse
+import atexit
 import itertools
 import json
 import os
+import queue
 import shutil
 import subprocess
 import sys
@@ -143,6 +145,154 @@ def parse_speed(spec: str | float) -> str:
 # ---- arena subprocess ---------------------------------------------------------
 
 
+# ---- resident arena workers -----------------------------------------------------------
+# A match costs ~4.01 s of engine boot before a single tick runs (2.53 s for the
+# release export, tools/build_arena.sh). A generation is pop x opponents matches,
+# so a 20-match generation spends ~80 s booting engines that are identical every
+# time. `--serve` keeps ONE engine alive per job and feeds it matchups on stdin.
+#
+# Verified equal to a fresh process, including the same matchup sent first AND
+# last in a batch with others in between — state leaking across matches was the
+# risk, and order dependence is how it would show. See ml/tests/test_arena_pool.py.
+#
+# DH_ARENA_POOL=0 disables it (every match gets a fresh engine again).
+# A worker that dies or hangs is dropped and the match is retried one-shot, so a
+# flaky engine can never fail a generation.
+
+_POOL: queue.Queue = queue.Queue()
+_POOL_LOCK = threading.Lock()
+_POOL_LIVE: list = []
+_POOL_FAILS = 0            # consecutive spawn failures
+_POOL_OFF = False          # circuit breaker, see _pool_take
+POOL_MAX_FAILS = 2
+SERVE_READY = "ARENA SERVE READY"
+SERVE_DONE = "ARENA SERVE DONE"
+
+
+def pool_enabled() -> bool:
+    if _POOL_OFF:
+        return False
+    return os.environ.get("DH_ARENA_POOL", "1").strip() not in ("0", "false", "no")
+
+
+class _ArenaWorker:
+    """One resident headless Godot, driven over stdin/stdout.
+
+    A reader THREAD drains stdout into a queue rather than calling readline()
+    with a deadline: readline blocks with no timeout, so a wedged engine would
+    hang the whole sweep instead of being dropped and replaced.
+    """
+
+    def __init__(self, cmd: list[str]) -> None:
+        self.proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                                     stderr=subprocess.DEVNULL, text=True, bufsize=1)
+        self.lines: queue.Queue = queue.Queue()
+        self.reader = threading.Thread(target=self._drain, daemon=True)
+        self.reader.start()
+        try:
+            self._await(SERVE_READY, 90.0)
+        except Exception:
+            self.close()
+            raise
+
+    def _drain(self) -> None:
+        try:
+            for line in self.proc.stdout:          # ends when the process exits
+                self.lines.put(line.rstrip("\n"))
+        except Exception:
+            pass
+        finally:
+            self.lines.put(None)                   # EOF sentinel
+
+    def _await(self, prefix: str, timeout: float) -> None:
+        deadline = time.monotonic() + timeout
+        while True:
+            left = deadline - time.monotonic()
+            if left <= 0:
+                raise TimeoutError(f"arena worker: no '{prefix}' within {timeout:.0f}s")
+            try:
+                line = self.lines.get(timeout=left)
+            except queue.Empty:
+                continue
+            if line is None:
+                raise RuntimeError("arena worker exited")
+            if line.startswith(prefix):
+                return
+
+    def run(self, req: dict, timeout: float) -> None:
+        self.proc.stdin.write(json.dumps(req) + "\n")
+        self.proc.stdin.flush()
+        self._await(SERVE_DONE, timeout)
+
+    def close(self) -> None:
+        try:
+            self.proc.stdin.write('{"quit":true}\n')
+            self.proc.stdin.flush()
+            self.proc.wait(timeout=10)
+            return
+        except Exception:
+            pass
+        try:
+            self.proc.kill()
+            self.proc.wait(timeout=10)   # REAP it: kill() alone leaves a zombie,
+        except Exception:                # and a wedged worker never reads "quit"
+            pass
+
+
+def _pool_take(cmd: list[str]) -> _ArenaWorker:
+    global _POOL_FAILS, _POOL_OFF
+    try:
+        return _POOL.get_nowait()
+    except queue.Empty:
+        pass
+    try:
+        w = _ArenaWorker(cmd + ["--serve", "--fast", "--speed", "max"])
+    except Exception:
+        # A binary that cannot serve will fail for EVERY match, and each attempt
+        # costs the full boot timeout. The usual cause is a stale $DH_ARENA_BIN:
+        # the export is a snapshot of game/, so one taken before --serve existed
+        # boots fine and then never answers. Trip a breaker instead of paying
+        # that timeout once per match for the rest of the run.
+        with _POOL_LOCK:
+            _POOL_FAILS += 1
+            if _POOL_FAILS > POOL_MAX_FAILS and not _POOL_OFF:
+                _POOL_OFF = True
+                print("[arena] resident workers cannot start — falling back to one "
+                      "engine per match for the rest of this run. If $DH_ARENA_BIN "
+                      "is set, rebuild it: tools/build_arena.sh", flush=True)
+        raise
+    with _POOL_LOCK:
+        _POOL_FAILS = 0
+        _POOL_LIVE.append(w)
+    return w
+
+
+def _pool_drop(w: _ArenaWorker) -> None:
+    with _POOL_LOCK:
+        if w in _POOL_LIVE:
+            _POOL_LIVE.remove(w)
+    w.close()
+
+
+def shutdown_arena_pool() -> None:
+    """Kill every resident engine. Registered atexit, because a leaked worker is
+    a headless Godot holding a core for as long as the box is up."""
+    global _POOL_FAILS, _POOL_OFF
+    _POOL_FAILS, _POOL_OFF = 0, False
+    while True:
+        try:
+            _POOL.get_nowait()
+        except queue.Empty:
+            break
+    with _POOL_LOCK:
+        live, _POOL_LIVE[:] = list(_POOL_LIVE), []
+    for w in live:
+        w.close()
+
+
+atexit.register(shutdown_arena_pool)
+
+
 def run_match(a: str, b: str, policy_a: str, policy_b: str, episodes: int,
               seed: int, time_limit: float = 45.0, record: bool = False,
               timeout: float | None = None, speed: str | float = DEFAULT_SPEED) -> dict:
@@ -160,30 +310,56 @@ def run_match(a: str, b: str, policy_a: str, policy_b: str, episodes: int,
     # startup alone: 4.01 s -> 2.53 s per match, and a generation is 20 matches.
     arena_bin = os.environ.get("DH_ARENA_BIN", "").strip()
     if arena_bin and Path(arena_bin).is_file():
-        cmd = [arena_bin, *engine_opts, "--"]
+        base = [arena_bin, *engine_opts, "--"]
     else:
         godot = shutil.which("godot")
         if godot is None:
             raise RuntimeError("godot not on PATH")
-        cmd = [godot, *engine_opts, "--path", str(ROOT / "game"), ARENA_SCENE, "--"]
-    cmd += ["--a", a, "--b", b, "--policy-a", policy_a, "--policy-b", policy_b,
-            "--episodes", str(episodes), "--time-limit", str(time_limit),
-            "--seed", str(seed), "--fast", "--speed", speed, "--out", str(out)]
+        base = [godot, *engine_opts, "--path", str(ROOT / "game"), ARENA_SCENE, "--"]
+    match_args = ["--a", a, "--b", b, "--policy-a", policy_a, "--policy-b", policy_b,
+                  "--episodes", str(episodes), "--time-limit", str(time_limit),
+                  "--seed", str(seed), "--fast", "--speed", speed, "--out", str(out)]
     if record:
-        cmd += ["--record-dir", str(EPISODES_DIR)]
+        match_args += ["--record-dir", str(EPISODES_DIR)]
     if timeout is None:
         # a hang guard, not an estimate: a wall-locked N x match never beats N x
         # (assume no better than the legacy 4x); "max" is CPU-bound, so bound it
         # by real time — an oversubscribed box still finishes well inside that
         wall = 1.0 if speed == "max" else 1.0 / min(float(speed), 4.0)
         timeout = episodes * time_limit * wall + 120.0
-    proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+
+    def _read() -> dict:
+        result = json.loads(out.read_text())
+        out.unlink()
+        return result
+
+    # A resident worker only serves "max": it was booted with --fixed-fps 60, so
+    # a wall-locked multiplier would not mean the same thing inside it.
+    if speed == "max" and pool_enabled():
+        worker = None
+        try:
+            worker = _pool_take(base)
+            req = {"a": a, "b": b, "policy_a": policy_a, "policy_b": policy_b,
+                   "episodes": episodes, "time_limit": time_limit, "seed": seed,
+                   "speed": speed, "out": str(out)}
+            if record:
+                req["record_dir"] = str(EPISODES_DIR)
+            worker.run(req, timeout)
+            if out.exists():
+                result = _read()
+                _POOL.put(worker)          # healthy: back on the bench
+                return result
+            raise RuntimeError("arena worker reported done but wrote no result")
+        except Exception as e:                 # noqa: BLE001 — any failure, same answer
+            if worker is not None:
+                _pool_drop(worker)
+            print(f"[arena] resident worker failed ({e}) — retrying one-shot", flush=True)
+
+    proc = subprocess.run(base + match_args, capture_output=True, text=True, timeout=timeout)
     if not out.exists():
         raise RuntimeError(f"arena produced no result (rc={proc.returncode}):\n"
                            f"{proc.stdout[-2000:]}\n{proc.stderr[-2000:]}")
-    result = json.loads(out.read_text())
-    out.unlink()
-    return result
+    return _read()
 
 
 def fitness(result: dict, side: str = "a") -> float:

@@ -22,6 +22,11 @@ run/main_scene="res://prototype/ui/main_menu.tscn"
 ; refuses a scene path on the command line (disable_path_overrides), and a
 ; release build is the whole point — it drops GDScript's debug checks.
 run/main_scene.trainer="res://arena/arena.tscn"
+; Godot flushes stdout per print in DEBUG builds but not in release ones,
+; so a release trainer's "ARENA SERVE READY" sat in the C buffer and the
+; worker pool timed out waiting for a line the engine had already written.
+; The arena prints ~2 lines per match, so the flush costs nothing.
+run/flush_stdout_on_print=true
 config/features=PackedStringArray("4.6")
 
 [autoload]

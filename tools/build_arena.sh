@@ -52,4 +52,32 @@ else
   dh_err "the binary did not produce a match result — do NOT use it for training"
   exit 1
 fi
+# ...and that it can SERVE, which is how training actually drives it. A binary
+# exported before --serve existed boots fine and then never answers, so checking
+# only the one-shot path would pass a binary that stalls every match.
+# The probe drives the binary through the REAL pool class, over a live pipe. An
+# earlier version redirected stdout to a file and grepped it after exit, which
+# passed a binary whose stdout was block-buffered — exactly the failure the pool
+# then hit on every match (release builds do not flush stdout per print).
+if DH_ARENA_BIN="$OUT" python3 - "$OUT" <<'PY'
+import sys, tempfile, os
+sys.path.insert(0, os.getcwd())
+from ml.training.league import _ArenaWorker
+out = os.path.join(tempfile.mkdtemp(), "serve.json")
+w = _ArenaWorker([sys.argv[1], "--headless", "--fixed-fps", "60", "--",
+                  "--serve", "--fast", "--speed", "max"])
+try:
+    w.run({"a": "core.arena.fen_boar_alpha", "b": "core.arena.gloam_wisp",
+           "policy_a": "scripted", "policy_b": "scripted", "episodes": 1,
+           "time_limit": 5, "seed": 4242, "speed": "max", "out": out}, timeout=120)
+    sys.exit(0 if os.path.getsize(out) > 0 else 1)
+finally:
+    w.close()
+PY
+then
+  dh_ok "serves matchups on stdin over a live pipe (resident worker mode)"
+else
+  dh_err "the binary does not answer --serve — training would stall on every match"
+  exit 1
+fi
 dh_say "use it with:  export DH_ARENA_BIN=$OUT"

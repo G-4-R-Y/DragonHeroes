@@ -58,7 +58,9 @@ var _selftest := false
 var _selftest_stage := 0
 var _selftest_damage := 0.0
 var _selftest_player_damage := 0.0
-var _state := "boot"               # intro | fight | end | done
+var _state := "boot"               # intro | fight | end | done | idle (serve)
+var _serve := false                # --serve: stay alive, take matchups on stdin
+var _stdin_buf := ""               # stdin is a byte stream, not a line reader
 var _episode := 0
 var _episodes := 1
 var _timer := 0.0
@@ -77,7 +79,8 @@ var _ended := false
 func _ready() -> void:
 	add_to_group("main")
 	_parse_cli()
-	_fast = bool(_cfg.get("fast", false)) or _selftest
+	_serve = bool(_cfg.get("serve", false))
+	_fast = bool(_cfg.get("fast", false)) or _selftest or _serve
 	ProtoFx.intensity = 0.3 if _fast else 1.0
 	# the selftest runs the spectator stack too: the camera/HUD _process path
 	# is where freed-body dereferences bite (2026-09-11) — gate it, don't skip it
@@ -115,6 +118,15 @@ func _ready() -> void:
 	_rec_dir = str(_cfg.get("record_dir", ""))
 	_rng.seed = int(_cfg.get("seed", 2026))
 	Session.level = int(_cfg.get("level", 20))
+	if _serve:
+		# The engine is the expensive part (measured 4.01 s of boot per match,
+		# 2.53 s for the release export). A sweep pays it 20 times per
+		# generation for nothing: the project, the scene and every art bundle
+		# are identical every time. In serve mode we boot ONCE and then take
+		# matchups on stdin, so that cost is paid once per worker per run.
+		_state = "idle"
+		print(SERVE_READY)
+		return
 	if _rotation.is_empty():
 		push_error("arena: no matchups (builds.json missing or empty)")
 		get_tree().quit(1)
@@ -150,7 +162,7 @@ func _apply_speed(spec: String) -> void:
 	Engine.time_scale = n
 
 func _parse_cli() -> void:
-	const FLAGS := ["--selftest", "--fast", "--spectate"]
+	const FLAGS := ["--selftest", "--fast", "--spectate", "--serve"]
 	var args := OS.get_cmdline_user_args()
 	var i := 0
 	while i < args.size():
@@ -290,6 +302,10 @@ func _finish_match() -> void:
 					"wins_a": _wins[0], "wins_b": _wins[1], "draws": _wins[2],
 					"episodes": _results}, "  "))
 			f.close()
+	if _serve:
+		print(SERVE_DONE, out)   # the pool waits for exactly this line
+		_state = "idle"
+		return
 	if _selftest:
 		_selftest_stage += 1
 		if _selftest_stage < _rotation.size():
@@ -416,7 +432,75 @@ func _physics_process(delta: float) -> void:
 		_end_episode(null if absf(a - b) < 0.001 \
 				else (_fighters[0] if a > b else _fighters[1]))
 
+# ---- serve mode ----------------------------------------------------------------------
+# Protocol, one JSON object per line each way:
+#   in   {"a":.., "b":.., "policy_a":.., "policy_b":.., "episodes":N, "time_limit":..,
+#         "seed":N, "out":"/abs/path.json"}   -> runs it, writes the SAME result file
+#                                                a one-shot run writes
+#        {"quit":true}                        -> exit
+#   out  "ARENA SERVE READY"                  -> boot finished, send work
+#        "ARENA SERVE DONE <out path>"        -> that matchup is written and closed
+# The result still goes to a FILE rather than stdout, so the reader is unchanged
+# and Godot's own prints (art bundles, warnings) cannot corrupt a result.
+
+const SERVE_READY := "ARENA SERVE READY"
+const SERVE_DONE := "ARENA SERVE DONE "
+
+func _serve_read_request() -> Variant:
+	# OS.read_string_from_stdin() is LINE oriented and returns the line with the
+	# newline ALREADY STRIPPED (verified on 4.6 — an earlier version of this
+	# waited for a "\n" that never arrives and hung on the first request). A
+	# request is ~250 bytes, far under the buffer, so one call is one request;
+	# the accumulator exists only so a line that ever did exceed the buffer gets
+	# assembled rather than silently truncated. Completeness is decided by
+	# "does it parse as JSON yet", not by counting bytes.
+	# GDScript's analyser does not treat `while true` as exhaustive, so the loop
+	# condition is explicit and EOF is the single other exit.
+	var eof := false
+	while not eof:
+		var chunk := OS.read_string_from_stdin(4096)
+		if chunk.is_empty():
+			eof = true           # the pool closed our stdin
+			continue
+		_stdin_buf += chunk
+		var parsed: Variant = JSON.parse_string(_stdin_buf.strip_edges())
+		if parsed != null:
+			_stdin_buf = ""
+			return parsed
+	return null
+
+func _serve_accept() -> void:
+	var req: Variant = _serve_read_request()
+	if req == null:
+		get_tree().quit(0)       # stdin closed: the pool is done with us
+		return
+	if not (req is Dictionary):
+		printerr("arena serve: not a JSON object")
+		return
+	if bool((req as Dictionary).get("quit", false)):
+		get_tree().quit(0)
+		return
+	for k in (req as Dictionary):
+		_cfg[k] = (req as Dictionary)[k]
+	# EVERY per-match field is re-read here. A worker that kept a stale episode
+	# count or time limit from the previous request would produce results that
+	# silently disagree with a one-shot run.
+	_rotation = [[str(_cfg.get("a", "")), str(_cfg.get("b", _cfg.get("a", ""))),
+			str(_cfg.get("policy_a", "")), str(_cfg.get("policy_b", ""))]]
+	_rotation_idx = 0
+	_episodes = int(_cfg.get("episodes", 4))
+	_time_limit = float(_cfg.get("time_limit", 90.0))
+	_rec_dir = str(_cfg.get("record_dir", ""))
+	_rng.seed = int(_cfg.get("seed", 2026))
+	Session.level = int(_cfg.get("level", 20))
+	_apply_speed(str(_cfg.get("speed", "max")))
+	_state = "boot"
+	_start_match()
+
 func _process(delta: float) -> void:
+	if _serve and _state == "idle":
+		_serve_accept()          # blocks on stdin: an idle worker burns no CPU
+		return
 	if not _spectate or _fighters.size() < 2:
 		return
 	var fa: ArenaFighter = _fighters[0]

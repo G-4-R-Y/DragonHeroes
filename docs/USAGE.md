@@ -224,6 +224,14 @@ its own `registry.json` (seeded from the deployed one, so runs are cumulative;
 `ml/serving/` — what the game and console read — is untouched until you promote.
 Under the hood it is `DH_SERVING_DIR`, honoured by league, ppo and evolve.
 
+**Matches reuse one engine by default.** Booting Godot costs more than the
+fight does, so `league.py` keeps a resident arena worker per job (`--serve`) and
+feeds it matchups instead of starting an engine per match. Results are identical
+either way; `DH_ARENA_POOL=0` goes back to one engine per match. Combined with
+the release build below, a generation of the standard shape (pop 10, 13
+episodes, 2 opponents) drops from 13.0 s to 7.1 s — 3.6 h to 2.0 h for a
+1000-generation key.
+
 **Faster matches: the release trainer build.** Training runs matches through the
 Godot *editor* binary, which is a debug build. `tools/build_arena.sh` exports a
 release build that boots straight into the arena, verified bit-identical:

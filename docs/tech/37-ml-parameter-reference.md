@@ -464,9 +464,19 @@ Answering (3): **the GPU cannot help this path at all.** A `--headless` Godot
 draws nothing, so the arena never touches the GPU — an idle card during
 training means there is no rendering to do, not that throughput is being left
 unused. The GPU tier is PPO over `libdh-env`. Nor does running more keys in
-parallel help: measured during the live sweep, `JOBS=20` already puts 20 Godot
-processes (24 threads each) on **10 physical cores** at load 23–24. The box is
-oversubscribed as it stands, so more concurrency would only add contention.
+parallel help — though my first reason for saying so was wrong. I read load
+average 23–24 on 10 physical cores as oversubscription. Measured afterwards on
+an idle box, `--jobs` does not plateau until 16:
+
+| `--jobs` | 4 | 8 | 10 | 12 | 16 | 20 |
+|---|---|---|---|---|---|---|
+| steady s/generation | 9.6 | 7.4 | 7.1 | 7.0 | 6.4 | 6.4 |
+
+`JOBS=$(nproc)` is correct; hyperthreading earns its keep. The real reason
+parallel keys buy nothing is **throughput, not contention**: a generation is 20
+matches, and one key at `jobs=20` already saturates the box at ~3.1 matches per
+second. Two keys at `jobs=10` each push the same 40 matches through the same
+pipe in the same total time.
 
 #### The arena was not reproducible (fixed 2026-09-13)
 
@@ -492,6 +502,72 @@ gone, and not the order-of-magnitude effect a first glance suggests.
 The fix is one line in `_start_episode`: seed the global stream from the match
 seed, the rotation index and the episode index, so episodes still differ from
 each other while reproducing exactly across runs.
+
+#### Resident arena workers (`--serve`)
+
+The engine boot is pure overhead repeated 20 times a generation. `--serve`
+keeps one engine alive and takes matchups as JSON on stdin:
+
+```
+in   {"a":..,"b":..,"policy_a":..,"policy_b":..,"episodes":N,"time_limit":..,
+      "seed":N,"speed":"max","out":"/abs/path.json"}
+     {"quit":true}
+out  ARENA SERVE READY            (boot finished, send work)
+     ARENA SERVE DONE <out path>  (that matchup is written and closed)
+```
+
+The result still goes to a **file**, not stdout, so the reader is unchanged and
+Godot's own prints cannot corrupt a result. `league.py` keeps a pool of these,
+one per job, booted once per run. `DH_ARENA_POOL=0` turns it off.
+
+Steady-state cost of one generation (idle box; pop 10, 13 episodes, 2
+opponents, jobs 10; every row includes the flat-MLP fix):
+
+| configuration | s/generation | speedup |
+|---|---|---|
+| editor binary, one engine per match | 13.0 | 1.00× |
+| editor binary + resident workers | 9.3 | 1.39× |
+| release export, one engine per match | 9.5 | 1.36× |
+| release export + resident workers | 7.1 | **1.83×** |
+
+All four produce identical scores. A 1000-generation key goes 3.6 h → 2.0 h.
+
+**The correctness gate is state leaking between matches.** A reused engine
+could carry a cache, a static or a surviving node into the next fight. The test
+sends the same matchup **first and last** in a batch with others between, and
+demands the one-shot result for both — order dependence is how leakage shows.
+A worker that hangs or dies is dropped and the match is retried one-shot, so a
+flaky engine can never fail a generation, and every worker is killed at exit
+(a leaked one is a headless Godot holding a core until reboot).
+
+Two traps, both found by running it rather than reasoning about it:
+
+- `OS.read_string_from_stdin()` is **line-oriented and strips the newline**, so
+  code that waits for a `"\n"` hangs on the very first request.
+- Godot flushes stdout per print in **debug** builds but not in **release**, so
+  a release trainer's `ARENA SERVE READY` sits in the C buffer and every worker
+  times out. Fixed with `run/flush_stdout_on_print=true`. A build check that
+  reads stdout from a file after exit will NOT catch this — it has to probe
+  over a live pipe, which is what `tools/build_arena.sh` now does.
+
+#### Can the GPU do the physics? (asked 2026-09-13)
+
+No, and the premise is worth correcting. Godot's 2D physics is CPU-only — there
+is no CUDA backend to enable, and writing one is an engine project rather than a
+setting. But the deeper answer is that **physics is not the cost**: the forward
+pass is ~93% of the tick and everything else — physics, projectiles, fields,
+node processing — is the remaining ~7%. Taking physics to zero buys 7%.
+
+The shape is also wrong for a GPU. A GPU wins on *throughput*: thousands of
+independent items in one launch. One arena match has two fighters and a handful
+of projectiles, and a kernel launch costs ~5–10 µs against a ~250–380 µs step of
+branchy, data-dependent scalar logic — the transfers would cost more than the
+math. The same applies to the MLP: 7,744 multiply-adds is far too small a call
+to be worth a round trip on its own.
+
+The GPU-shaped version of this problem is *"simulate ten thousand fights at
+once"*, and that already exists: `libdh-env` + PPO, batched, on the GPU, at
+56k steps/s. For the **Godot** arena the next step is C++ (`dh-godot`), not CUDA.
 
 #### The release trainer export
 

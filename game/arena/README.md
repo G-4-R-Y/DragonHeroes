@@ -234,6 +234,43 @@ For faster matches, `tools/build_arena.sh` exports a release build that boots
 straight into the arena (startup 4.01 s → 2.53 s, bit-identical results); point
 training at it with `DH_ARENA_BIN`.
 
+## 6c. `--serve`: one engine, many matchups
+
+Booting the engine costs more than most fights do, so training does not start a
+Godot per match. `--serve` boots once and then takes matchups as JSON lines on
+stdin:
+
+```bash
+printf '%s\n%s\n' \
+  '{"a":"core.arena.dusk_revenant","b":"core.arena.gloam_wisp","policy_a":"scripted","policy_b":"scripted","episodes":2,"time_limit":45,"seed":77,"speed":"max","out":"/tmp/r.json"}' \
+  '{"quit":true}' \
+| godot --headless --fixed-fps 60 --path game res://arena/arena.tscn -- --serve --fast --speed max
+```
+
+It answers `ARENA SERVE READY` once booted and `ARENA SERVE DONE <path>` after
+each matchup; the result still goes to the file named in the request, so nothing
+downstream changed. `ml/training/league.py` keeps a pool of these, one per job.
+
+**Every per-match field is re-read on each request** (`_serve_accept`). A worker
+that kept a stale episode count or time limit would produce results that
+silently disagree with a one-shot run — which is the whole risk of reusing an
+engine, and why `ml/tests/test_arena_pool.py` sends the same matchup first and
+last in a batch and demands the one-shot result for both.
+
+Two things that will bite you here:
+
+- `OS.read_string_from_stdin()` is **line oriented and strips the newline**.
+  Code that waits for a `"\n"` hangs on the first request.
+- Godot flushes stdout per print in debug builds but **not in release**, so a
+  release export's `ARENA SERVE READY` sits in the C buffer forever. That is
+  what `run/flush_stdout_on_print=true` in `project.godot` is for — do not
+  remove it.
+
+**The arena runs physics at 60 Hz and stays there.** Canon's sim target is
+30 Hz and halving the tick rate would halve the cost, but Ricardo decided
+2026-09-13 to keep 60 "as to be fully capable". It is a deliberate choice, not
+an oversight — do not "optimise" it.
+
 ## 7. Troubleshooting
 
 | Symptom | Cause / fix |
