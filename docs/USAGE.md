@@ -429,8 +429,95 @@ verification: [tech/35](tech/35-playable-living-trial.md), pipeline:
 
 ## 7. Content, art and data workflows
 
+### The counter: create, check, approve
+
+```bash
+tools/genforge.py list                # every pack, its bundles, its approval state
+tools/genforge.py check               # audit EVERYTHING; exit 1 if anything fails
+tools/genforge.py check fen_bells     # one pack
+```
+
+`check` is the machine half of the gate and it is deliberately blunt. Run it
+first; it is the fastest way to see what is actually wrong.
+
+### The pipeline, in order
+
+**1. A release** — `genforge/releases/<name>.json` is the authoring source: the
+world bible it is grounded in, the season, the palette/style budget, the
+narrative threads and their links to earlier chapters, the skills and creatures,
+and one `art` entry per asset (its `source` image, its `prompt`, and the
+`required_clips` it owes). Start a new one from an existing chapter:
+
+```bash
+tools/genforge.py create --from bell_beneath_fen --pack ash_wake \
+    --title "The Ash Wake" --build
+```
+
+That remaps the namespace and pins an immutable dependency on the chapter it
+came from. **It is a template remap, not new content** — replace the inherited
+stories, kits, art sources and season before it means anything.
+
+**2. The art source** — `genforge/art_sources/<name>/`. A folder there must
+carry, at minimum:
+
+| file | what it is |
+|---|---|
+| `prompt.txt` | the prompt that produced the image |
+| `source-v1.png` (or `source.png`) | the generated image |
+| `provenance-v1.json` | `sha256` of the image + `prompt_sha256` of the prompt, plus provider/model/request/status |
+| `cleanup-prompt.txt`, `cleanup-rejection.json` | optional: a rejected generation and why, so the next pass knows |
+
+**The provenance record is what makes an asset auditable.** Without it the image
+cannot be checked against its prompt in either direction, which means the asset
+is unreproducible no matter how good it looks. `check` treats a missing
+`provenance-v1.json` as a FAILURE, not a warning — that is exactly how the
+dungeon boss (`bellwether`, the Gloamfen Bellwether) got into the catalog
+unverifiable while every other gate passed it.
+
+**3. The bake** — `tools/genforge.py build <pack>` runs the deterministic
+pipeline: it rigs the parts onto the archetype skeleton, poses them through the
+shared animation library, bakes plain frame strips, and writes an **immutable**
+bundle to `genforge/candidates/living/<pack>-<content_hash16>/`:
+
+```
+release.json      the exact authoring data that produced this bundle
+art/<name>/       albedo.png, emissive.png, atlas.json (clips), brief.txt
+effects.bin       the compiled effect program + effects.index.json
+manifest.json     content_hash, every file's digest, and the open BLOCKERS
+index.html        the browser review page — open this one
+```
+
+The hash names the bundle, so changing a pixel produces a different bundle
+rather than mutating this one. Rebuilding identical inputs re-verifies the
+existing bundle instead of rewriting it.
+
+**4. Review it** — open `index.html` from the bundle in a browser (the path is
+printed by `build` and by `tools/genforge.py show <pack>`). That page is the
+sprite sheets, the clips, the stats and the blockers, offline.
+
+**5. Approve or reject** — the human half:
+
+```bash
+tools/genforge.py show fen_bells
+tools/genforge.py approve fen_bells --note "art reviewed, frame time captured on the deck"
+tools/genforge.py reject  fen_bells --reason "bellwether has only idle"
+```
+
+The decision lands in `genforge/approvals/<content_hash>.json`, never inside the
+bundle, and it names the exact `content_hash` **and** manifest digest it
+approved. Rebuild the pack and the old approval no longer applies to anything —
+which is the point. Any blockers still open at the moment of approval are copied
+into the record, so an approval can never quietly mean more than it did.
+
+`check` reports **READY** only when both halves are clean: no machine failures,
+no open items, and a recorded human approval. Nothing here writes to
+`content/drops/` — promotion stays a separate, deliberate step.
+
+### The rest of the toolbox
+
 ```bash
 python3 tools/validate_content.py                       # CI gate for every content pack
+python3 tools/review_living.py                          # build + the real C++ outcome probe
 python3 -m genforge.pipeline.bestiary_gen --seed 2026    # regenerate bestiary data
 python3 genforge/vfx_lab/auras/render.py                # re-render VFX previews
 python3 -m genforge.pipeline.mesh_gen --actor fen_boar --image <concept.png> --provider triposr
