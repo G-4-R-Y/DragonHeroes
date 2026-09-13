@@ -104,6 +104,16 @@ This is a short desktop sample, not a sustained/mobile guarantee. First playable
 recovery milestone is being committed/pushed and packaged; all remaining R-items
 stay scheduled/in progress.
 
+Interruption checkpoint (Ricardo, 2026-09-13): "resume work" — exact prompt
+appended to the archive. Continue R01–R26, 2D first, preserving all earlier
+requests. Commit 3f52b35 is pushed to origin/master. Linux/Windows packages built
+and exported gameplay/icon checks passed; staging correctly updated the tracked
+chapter texture-budget count for the larger hero atlas, so those initial manifests
+are dirty-source. Commit that generated metadata and the publication record,
+rebuild clean-source packages and associate the Linux executable icon, then
+continue encounter hibernation/biomes/art/Haven/enchantment systems. No other
+agent/worktree changes or stashes were touched.
+
 ## DONE — Commit and push all completed work (Ricardo, 2026-09-12)
 
 Demand: commit everything and push the changes, resolving any merge issues.

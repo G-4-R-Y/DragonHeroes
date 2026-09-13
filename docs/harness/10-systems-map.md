@@ -31,6 +31,16 @@ This is a short desktop sample, not a sustained/mobile guarantee. First playable
 recovery milestone is being committed/pushed and packaged; all remaining R-items
 stay scheduled/in progress.
 
+Publication checkpoint 2026-09-13: recovery milestone 3f52b35 pushed to GitHub.
+Both initial Codex exports pass ZIP/hash/icon checks; Linux passes real menu,
+Hunt/resource refill, practice effects and saved lair→Hunt→rush journey. Windows
+has verified PE icons but no native Windows gameplay test. Staging changed only
+chapter.json's decoded texture count 7573376→8049280 for the larger hero sheet;
+initial manifests correctly flag dirty source. Commit this generated metadata
+and rebuild with new --require-clean so both final manifests identify one clean
+revision. Linux GIO/file-manager association still to verify, then resume R08/R09
+and the larger 2D backlog. New "resume work" prompt archived verbatim.
+
 ---
 
 # Systems Map — current state per system (2026-09-10, HEAD = v0.3.0 era)

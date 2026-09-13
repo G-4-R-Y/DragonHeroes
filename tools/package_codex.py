@@ -157,12 +157,16 @@ def package(platform, review, env):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("platform", choices=("linux", "windows", "all"), nargs="?", default="all")
+    parser.add_argument("--require-clean", action="store_true",
+                        help="Abort before building if source or staged generated metadata is uncommitted")
     args = parser.parse_args()
     OUT.mkdir(parents=True, exist_ok=True)
     try:
         run([sys.executable, "tools/build_app_icon.py"])
         run([sys.executable, "tools/validate_content.py"])
         review = stage_preview()
+        if args.require_clean and source_info()["working_tree_dirty"]:
+            raise RuntimeError("Generated staging or source is uncommitted. Review and commit it, then rebuild.")
         env = export_environment()
         run(["cmake", "-S", "sim", "-B", "sim/build", "-DCMAKE_BUILD_TYPE=Release"])
         run(["cmake", "--build", "sim/build", "-j", "4"])
