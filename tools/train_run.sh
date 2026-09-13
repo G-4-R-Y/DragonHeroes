@@ -26,11 +26,18 @@
 #   tools/train_run.sh --ppo --key cinder_drake --build core.arena.cinder_drake \
 #       --opp-build core.arena.fen_boar_alpha                  # GPU PPO instead of ES
 #   tools/train_run.sh --run-dir ml/runs/<name> --key ... --build ...   # caller names it
+#   tools/train_run.sh --resume ml/runs/<run>                  # continue a killed run
 #   tools/train_run.sh --list                                  # every past run, oldest first
 #   tools/train_run.sh --promote ml/runs/<run>                 # copy PASSING nets into ml/serving
 #
 # Env knobs (ES): GENERATIONS (20) POP (8) EPISODES (4) JOBS (nproc) SEED (2026)
-#                 SPEED (max) OPPONENTS ("")
+#                 SPEED (max) OPPONENTS ("") CHECKPOINT_EVERY (25)
+#
+# CHECKPOINT_EVERY exists because the trainer registers its net only when the
+# WHOLE generation loop finishes: without it, killing a 1000-generation run
+# throws away every hour of it. With it, --resume continues from the last saved
+# generation, reusing the same run folder (and therefore the same registry,
+# weights and progress feed).
 # Env knobs (PPO): STEPS (2000000) ENVS (512) ARCH (mlp) SELFPLAY_EVERY (4)
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -40,13 +47,14 @@ source "$REPO/tools/dh_term.sh"      # palette, dragon banner, rules, bars
 
 GENERATIONS="${GENERATIONS:-20}"; POP="${POP:-8}"; EPISODES="${EPISODES:-4}"
 JOBS="${JOBS:-$(nproc)}"; SEED="${SEED:-2026}"; SPEED="${SPEED:-max}"
-OPPONENTS="${OPPONENTS:-}"
+OPPONENTS="${OPPONENTS:-}"; CHECKPOINT_EVERY="${CHECKPOINT_EVERY:-25}"
 STEPS="${STEPS:-2000000}"; ENVS="${ENVS:-512}"; ARCH="${ARCH:-mlp}"  # ENVS was 32 pre-batching
 SELFPLAY_EVERY="${SELFPLAY_EVERY:-4}"
 PYVENV="$REPO/ml/.venv/bin/python"
 
 MODE="es"; ALL=0; KEY=""; BUILD=""; OPP_BUILD=""; LABEL=""; FRESH=0; NOTE=""
 RUN_DIR=""            # --run-dir: the caller names the folder (the console does)
+RESUME_RUN=""         # --resume: continue that run folder from its checkpoints
 while [ $# -gt 0 ]; do
   case "$1" in
     --all) ALL=1; shift;;
@@ -57,6 +65,7 @@ while [ $# -gt 0 ]; do
     --note) NOTE="$2"; shift 2;;
     --fresh) FRESH=1; shift;;
     --run-dir) RUN_DIR="$2"; shift 2;;
+    --resume) RESUME_RUN="$2"; shift 2;;
     --ppo) MODE="ppo"; shift;;
     --list) MODE="list"; shift;;
     --promote) MODE="promote"; RUN_IN="${2:-}"; shift 2 || shift;;
@@ -139,8 +148,10 @@ PY
 fi
 
 # ---------- start a run ------------------------------------------------------
-[ $ALL -eq 1 ] || [ -n "$KEY" ] || { echo "need --all or --key KEY --build BUILD" >&2; exit 2; }
-[ $ALL -eq 1 ] || [ -n "$BUILD" ] || { echo "--key needs --build" >&2; exit 2; }
+if [ -z "$RESUME_RUN" ]; then      # a resume reads all of this back from config.json
+  [ $ALL -eq 1 ] || [ -n "$KEY" ] || { echo "need --all or --key KEY --build BUILD" >&2; exit 2; }
+  [ $ALL -eq 1 ] || [ -n "$BUILD" ] || { echo "--key needs --build" >&2; exit 2; }
+fi
 [ "$MODE" != "ppo" ] || [ -n "$OPP_BUILD" ] || { echo "--ppo needs --opp-build" >&2; exit 2; }
 [ "$MODE" != "ppo" ] || [ -x "$PYVENV" ] || { echo "PPO needs ml/.venv (torch)" >&2; exit 2; }
 
@@ -151,8 +162,27 @@ if [ "$MODE" = "ppo" ]; then
 else
   KNOBS="g${GENERATIONS}_p${POP}_e${EPISODES}_j${JOBS}_s${SEED}"
 fi
+# Decide the key/build pairs up front and RECORD them: that is what makes
+# `--resume <run>` need no other flags — the folder knows what it was training.
+if [ $ALL -eq 1 ]; then
+  KEYS=$(python3 - <<'PY'
+import json
+for b in json.load(open("game/arena/data/builds.json"))["builds"]:
+    if b.get("kind") == "creature":
+        print(f"{b['id'].split('.')[-1]} {b['id']}")
+PY
+)
+elif [ -n "$KEY" ]; then
+  KEYS="$KEY $BUILD"
+else
+  KEYS=""
+fi
+
 STAMP="$(date +%Y-%m-%d_%H%M)"                     # DATE FIRST: the folder sorts by time
-if [ -n "$RUN_DIR" ]; then
+if [ -n "$RESUME_RUN" ]; then
+  case "$RESUME_RUN" in /*) RUN="$RESUME_RUN";; *) RUN="$REPO/$RESUME_RUN";; esac
+  [ -f "$RUN/config.json" ] || { echo "not a run folder: $RESUME_RUN" >&2; exit 2; }
+elif [ -n "$RUN_DIR" ]; then
   case "$RUN_DIR" in /*) RUN="$RUN_DIR";; *) RUN="$REPO/$RUN_DIR";; esac
 else
   RUN="$REPO/ml/runs/${STAMP}__${KEYS_LABEL}__${KNOBS}"
@@ -162,7 +192,41 @@ mkdir -p "$RUN/weights" "$RUN/progress" "$RUN/logs"
 
 ACTIVE="$(pgrep -fa 'ml\.training\.(league|ppo|evolve)' | grep -v train_run | head -3 || true)"
 DEPLOYED="$REPO/ml/serving/registry.json"
-if [ $FRESH -eq 0 ] && [ -f "$DEPLOYED" ]; then
+if [ -n "$RESUME_RUN" ]; then
+  SEEDED="resumed — this run's own registry, untouched"
+  KEYS_FROM_CONFIG=1
+  # the knobs must match the killed run or the checkpoint will not apply;
+  # read them back instead of trusting the environment
+  eval "$(python3 - "$RUN" <<'PY'
+import json, sys
+from pathlib import Path
+cfg = json.loads((Path(sys.argv[1]) / "config.json").read_text())
+es = cfg.get("es", {})
+for k, v in (("GENERATIONS", es.get("generations")), ("POP", es.get("pop")),
+             ("EPISODES", es.get("episodes")), ("SEED", es.get("seed")),
+             ("SPEED", es.get("speed")), ("KEYS_LABEL", cfg.get("keys_label")),
+             ("OPPONENTS", es.get("opponents")), ("MODE", cfg.get("mode"))):
+    if v is not None:
+        print(f"{k}={json.dumps(str(v))}")
+pairs = cfg.get("keys") or []
+if pairs:
+    print("KEYS=" + json.dumps("\n".join(f"{k} {b}" for k, b in pairs)))
+else:      # runs created before config.json recorded the pairs
+    print("KEYS_FROM_CONFIG=0")
+PY
+)"
+  if [ "${KEYS_FROM_CONFIG:-1}" = "0" ]; then
+    # an older run folder: fall back to the label, or make the caller say
+    [ "${KEYS_LABEL#all}" != "$KEYS_LABEL" ] && KEYS=$(python3 - <<'PY'
+import json
+for b in json.load(open("game/arena/data/builds.json"))["builds"]:
+    if b.get("kind") == "creature":
+        print(f"{b['id'].split('.')[-1]} {b['id']}")
+PY
+)
+    [ -n "$KEYS" ] || { echo "this run folder predates recorded keys — add --key KEY --build BUILD" >&2; exit 2; }
+  fi
+elif [ $FRESH -eq 0 ] && [ -f "$DEPLOYED" ]; then
   cp "$DEPLOYED" "$RUN/registry.json"              # cumulative: start from what is deployed
   SEEDED="deployed registry ($(python3 -c "import json,sys;print(len(json.load(open(sys.argv[1]))['policies']))" "$DEPLOYED") policies)"
 else
@@ -182,6 +246,7 @@ json.dump({
   "started": time.strftime("%Y-%m-%dT%H:%M:%S"),
   "mode": "$MODE",
   "keys_label": "$KEYS_LABEL",
+  "keys": [tuple(l.split(None, 1)) for l in """$KEYS""".strip().splitlines() if l.strip()],
   "knobs": "$KNOBS",
   "note": """$NOTE""",
   "seeded_from": """$SEEDED""",
@@ -201,6 +266,7 @@ dh_banner "DRAGON HEROES" "TRAINING FORGE · isolated, cumulative runs"
 dh_kv run "${RUN#"$REPO"/}"
 dh_kv mode "$MODE · $KEYS_LABEL · $KNOBS"
 dh_kv seeded "$SEEDED"
+dh_kv checkpoint "every $CHECKPOINT_EVERY generations — kill it and resume with: tools/train_run.sh --resume ${RUN#"$REPO"/}"
 dh_kv isolated "DH_SERVING_DIR=$RUN — ml/serving is untouched"
 dh_kv watch "tools/train_watch.py ${RUN#"$REPO"/}"
 [ -z "$NOTE" ] || dh_kv note "$NOTE"
@@ -223,18 +289,8 @@ if [ "$MODE" = "ppo" ]; then
       --episodes "$EPISODES" 2>&1 | tee -a "$RUN/logs/$KEY.log" \
       | python3 -u "$REPO/tools/dh_trainfmt.py" --key "$KEY" || true
 else
-  if [ $ALL -eq 1 ]; then
-    KEYS=$(python3 - <<'PY'
-import json
-for b in json.load(open("game/arena/data/builds.json"))["builds"]:
-    if b.get("kind") == "creature":
-        print(f"{b['id'].split('.')[-1]} {b['id']}")
-PY
-)
-  else
-    KEYS="$KEY $BUILD"
-  fi
   OPP_ARG=(); [ -z "$OPPONENTS" ] || OPP_ARG=(--opponents "$OPPONENTS")
+  RESUME_ARG=(); [ -z "$RESUME_RUN" ] || RESUME_ARG=(--resume)
   N_KEYS=$(echo "$KEYS" | grep -c . || true); I_KEY=0
   echo "$KEYS" | while read -r key build; do
     [ -n "$key" ] || continue
@@ -247,7 +303,8 @@ PY
     # untouched trainer text still lands in logs/<key>.log through tee.
     python3 -u -m ml.training.league train --key "$key" --build "$build" \
         --generations "$GENERATIONS" --pop "$POP" --episodes "$EPISODES" \
-        --jobs "$JOBS" --seed "$SEED" --speed "$SPEED" "${OPP_ARG[@]}" 2>&1 \
+        --jobs "$JOBS" --seed "$SEED" --speed "$SPEED" \
+        --checkpoint-every "$CHECKPOINT_EVERY" "${RESUME_ARG[@]}" "${OPP_ARG[@]}" 2>&1 \
         | tee "$RUN/logs/$key.log" \
         | python3 -u "$REPO/tools/dh_trainfmt.py" --key "$key" \
             --generations "$GENERATIONS" --pop "$POP" \

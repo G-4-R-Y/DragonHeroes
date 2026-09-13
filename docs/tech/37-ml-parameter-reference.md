@@ -45,6 +45,8 @@ net from any of them can be gated and deployed by the same path.
 | `train` | `--seed` | 2026 | Seeds candidate noise and match RNG (gear rolls, spawn jitter) |
 | `train` | `--opponents` | `native`, `scripted` (both = the trainee's own build) | `policy@build` list, e.g. `native@core.arena.gloamfen_stalker,scripted@core.arena.dusk_revenant` |
 | `train` | `--jobs` | 1 | Concurrent headless workers. **Useless past `pop × opponents`** — that is how many matches exist per generation |
+| `train` | `--checkpoint-every` | 25 | Save the search state (theta + the RNG stream) every N generations; 0 disables. Without it a killed run loses everything — the net registers only after the FULL loop completes |
+| `train` | `--resume` | off | Continue this key's checkpoint instead of restarting the search. **Exact, not approximate:** match seeds are derived from the generation index, and the perturbation RNG is restored from its saved bit-generator state, so a resumed run is the run that would have happened (asserted bit-for-bit in `ml/tests/test_league.py`) |
 | `train-global` | `--builds` | required | Comma-separated builds the one global net trains across |
 | `train-global` | same knobs | gens 3, pop 6, episodes 2 | Every episode of every matchup updates the same weights |
 | `gate` | `--key` / `--build` / `--episodes` | required, required, 4 | Runs §5's checks on the newest candidate |
@@ -232,6 +234,34 @@ with `act` = tanh for hidden layers, linear for the head.
 `state_dict` for architectures with no Godot runtime yet — they gate through
 dh-env evaluation only, and are the reason the registry entry records `arch`.
 
+### 4.2b `_ckpt_<key>.npz` — the interruptible search
+
+A long ES run used to be all-or-nothing: `train_es` registers its net only when
+the whole generation loop finishes, so a 1000-generation sweep killed at
+generation 488 left nothing behind. The checkpoint fixes that.
+
+| Array in the `.npz` | Holds |
+|---|---|
+| `theta` | the current search centre |
+| `meta` | a JSON blob: `next_g`, `theta_size`, `rng_state` (the bit-generator state), the knobs the run was using, and when it was saved |
+
+- **One file, deliberately.** The first cut wrote theta and the metadata as two
+  files. Each rename was atomic but the *pair* was not, so a kill landing
+  between them left weights from generation N beside metadata claiming N-k, and
+  the resume would silently replay generations it had already done. Both now
+  ride in one `.npz`, so the single rename commits the whole checkpoint —
+  it either exists completely or does not exist. `test_checkpoint_commits_in_a_single_rename`
+  holds that line.
+- **Produced by** `league train` every `--checkpoint-every` generations, written
+  to a temp name and renamed. It lands in `$DH_SERVING_DIR/weights/`, meaning an
+  isolated run checkpoints inside its own folder.
+- **Consumed by** `league train --resume` and `tools/train_run.sh --resume <run>`.
+- **Deleted** the moment the run completes and registers, so a later `--resume`
+  cannot pick up a finished search.
+- **Refused** when the checkpoint is for a different parameter count (the
+  warm-start moved) or is already at or past the requested generation count —
+  the run says so and starts fresh rather than half-applying it.
+
 ### 4.3 `registry.json` — `arena.registry.v1`
 
 One entry per trained net:
@@ -343,6 +373,48 @@ python3 -m pytest ml/tests/ -q                                   # league, polic
 *Measured 2026-09-13 (idle box):* bench 527,665 steps/s; one 4-episode Godot
 match 0.72 s; 16 concurrent 1.4 s; 20 concurrent 1.7 s; a gate (3 sequential
 match sets) 3.1 s; PPO end to end 32,343 steps/s at `--envs 32`.
+
+### Why a Godot episode costs what it costs
+
+Ricardo, 2026-09-13: *"what is it about episodes that take them so long? won't
+they be only calculated computationally? we don't need to render images"*.
+
+Rendering is already off — `--headless` draws nothing. The cost is that the
+match is a **real fight simulated frame by frame by the Godot engine**: an
+episode covers ~28.5 simulated seconds at 60 physics ticks per second, so
+~1,700 frames, each running GDScript `_physics_process` across every node in
+the arena, plus a fresh engine process per match.
+
+*Measured 2026-09-13, one process at a time, on a box already running a 20-job
+sweep:*
+
+| Episodes in the match | Wall |
+|---|---|
+| 1 | 4.07 s |
+| 4 | 7.74 s |
+| 13 | 16.58 s |
+
+That is a straight line: **~3.0 s fixed per match** (engine boot, project and
+scene load) plus **~1.04 s per episode**. So episodes are not what is
+expensive per unit — the engine is. Two consequences:
+
+- More episodes per match is *cheaper per episode*, because the 3 s startup
+  amortises. Thirteen episodes cost 1.28 s each; one episode costs 4.07 s.
+- A live sweep sees far worse than 16.58 s per 13-episode match — the run of
+  2026-09-13 averages 86 s — because `--jobs 20` puts 20 of these engines on 20
+  cores at once and they contend.
+
+The comparison that matters, both measured on the same loaded box:
+
+| Simulator | Simulated seconds per wall second |
+|---|---|
+| Godot arena, headless | 27.5× |
+| `libdh-env` (the C++ twin), 64 envs | 6,076× |
+
+**~220× apart.** That is the whole argument for dh-env: the PPO tier already
+trains there, and the ES league still pays the Godot price because its fitness
+is deliberately the *deployment* environment. The gate must stay in Godot; the
+search does not have to.
 
 ### The batched environment (`dh_env_step_many`)
 

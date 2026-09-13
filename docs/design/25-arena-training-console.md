@@ -59,6 +59,8 @@ per line, `t` = unix seconds, `ev` = event:
 {"t":..,"ev":"generation","g":0,"best":0.52,"mean":0.38}
 {"t":..,"ev":"registered","version":1,"npz":"ml/serving/weights/fen_boar_v1.npz"}
 {"t":..,"ev":"gate","version":1,"pass":false,"metrics":{...}}     # from `league gate`
+{"t":..,"ev":"checkpoint","g":25,"path":".../weights/_ckpt_fen_boar.npz"}
+{"t":..,"ev":"resumed","g":25,"generations":1000,"saved":"2026-09-13T17:20:04"}
 {"t":..,"ev":"error","message":"..."}
 ```
 The head-to-head bench (`league versus`) rides the same feed under the key

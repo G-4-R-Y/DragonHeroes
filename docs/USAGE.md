@@ -213,6 +213,7 @@ tools/train_run.sh --key fen_boar --build core.arena.fen_boar_alpha --label swee
 GENERATIONS=200 POP=10 EPISODES=6 tools/train_run.sh --all  # the real budget
 tools/train_run.sh --ppo --key cinder_drake --build core.arena.cinder_drake \
     --opp-build core.arena.fen_boar_alpha                   # GPU PPO in the same shape
+tools/train_run.sh --resume ml/runs/<run>                   # continue a killed run
 tools/train_run.sh --list                                   # every run, oldest first
 tools/train_run.sh --promote ml/runs/<run>                  # copy PASSING nets into ml/serving
 ```
@@ -222,6 +223,15 @@ its own `registry.json` (seeded from the deployed one, so runs are cumulative;
 `--fresh` starts empty), `weights/`, `progress/`, `logs/` and `summary.txt`.
 `ml/serving/` — what the game and console read — is untouched until you promote.
 Under the hood it is `DH_SERVING_DIR`, honoured by league, ppo and evolve.
+
+**A long run is interruptible.** The ES trainer registers its net only when the
+whole generation loop finishes, so it checkpoints the search (theta plus the RNG
+stream) every `CHECKPOINT_EVERY` generations — 25 by default. Kill the run and
+continue it with `tools/train_run.sh --resume ml/runs/<run>`: the folder records
+its own keys, builds and knobs, so no other flags are needed, and it reuses the
+same registry, weights and progress feed. Resuming is exact rather than
+approximate — match seeds come from the generation index and the perturbation
+RNG is restored — so the resumed run is the run that would have happened.
 
 The run prints every generation as it closes — a bar, the fitness sparkline,
 seconds per generation and an ETA — and a second window can watch the same run

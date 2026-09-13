@@ -51,6 +51,13 @@ this module ships, not the ones tools/train_run.sh passes:
     --speed max       "max" = CPU-bound with --fixed-fps 60, bit-identical to
                       a wall-locked run; a number is a wall multiplier
     --opponents ""    "policy@build,..."; empty = native + scripted
+    --checkpoint-every 25   save theta + the RNG stream every N generations
+                      (0 disables). Without it a killed 1000-generation run
+                      loses everything: the net registers only at the END.
+    --resume          continue this key's checkpoint instead of restarting the
+                      search. Exact, not approximate: match seeds are derived
+                      from the generation index and the perturbation RNG is
+                      restored from its saved state.
 ARTIFACTS — what a run leaves behind and who eats it:
     ml/serving/weights/<key>_v<N>.json   arena.policy.v1, loaded by the Godot
                                          arena (game/arena/neural_policy.gd)
@@ -335,10 +342,98 @@ def evaluate_candidates(cands: list[PolicyNet], build: str,
     return [float(np.mean(s)) for s in scores]
 
 
+# ---- checkpoints: a long ES run must survive being killed -------------------------
+
+# Ricardo, 2026-09-13, after a 10.4-hour run turned out to have nothing on disk:
+# "Periodic checkpointing in the ES trainer, so a long run becomes interruptible
+# instead of all-or-nothing. And a resume flag... --> do it".
+#
+# train_es only registered its net AFTER the whole generation loop, so killing a
+# 1000-generation sweep at generation 488 discarded every hour of it. Now the
+# search state (theta, the next generation, the RNG stream) lands every
+# CHECKPOINT_EVERY generations, and --resume picks it back up.
+#
+# What makes resuming EXACT rather than approximate: every generation's match
+# seeds are derived as `seed + g * 1000`, so replaying from generation g uses
+# the same seeds it would have used; and the perturbation RNG is restored from
+# its saved bit-generator state, so the noise draws continue the same stream
+# instead of restarting it. A resumed run is the run that would have happened.
+CHECKPOINT_EVERY = 25
+
+
+def checkpoint_path(key: str) -> Path:
+    """ONE file, deliberately. An earlier version wrote theta and the metadata
+    separately; each rename was atomic but the PAIR was not, so a kill landing
+    between them left weights from generation N beside metadata claiming N-k —
+    and a resume would then replay generations it had already done, silently.
+    Everything now lives in a single .npz written temp-then-renamed, so a
+    checkpoint either exists completely or does not exist.
+
+    It sits beside the run's other artifacts, so an isolated run
+    ($DH_SERVING_DIR) checkpoints inside its own folder."""
+    return WEIGHTS_DIR / f"_ckpt_{key}.npz"
+
+
+def save_checkpoint(key: str, theta: np.ndarray, next_g: int, rng: np.random.Generator,
+                    meta: dict) -> Path:
+    path = checkpoint_path(key)
+    WEIGHTS_DIR.mkdir(parents=True, exist_ok=True)
+    state = {"key": key, "next_g": int(next_g), "theta_size": int(theta.size),
+             "rng_state": rng.bit_generator.state,
+             "saved": time.strftime("%Y-%m-%dT%H:%M:%S"), **meta}
+    # NOTE: np.savez* appends ".npz" unless the name already ends in it, so the
+    # temp name has to keep that suffix or the rename below has nothing to move
+    tmp = path.with_suffix(".tmp.npz")
+    np.savez_compressed(tmp, theta=theta, meta=np.array(json.dumps(state, default=str)))
+    tmp.replace(path)                      # the one atomic step
+    return path
+
+
+def read_checkpoint(key: str) -> dict | None:
+    """The raw saved state, or None when there is no readable checkpoint."""
+    path = checkpoint_path(key)
+    if not path.exists():
+        return None
+    try:
+        with np.load(path, allow_pickle=False) as data:
+            state = json.loads(str(data["meta"]))
+            state["theta"] = data["theta"]
+        return state
+    except Exception as e:
+        print(f"[train:{key}] checkpoint unreadable ({e}) — starting fresh")
+        return None
+
+
+def load_checkpoint(key: str, theta_size: int, generations: int) -> dict | None:
+    """The saved search state, or None when there is nothing usable. A
+    checkpoint from a different net shape (the warm-start moved) or from an
+    already finished run is refused rather than half-applied."""
+    state = read_checkpoint(key)
+    if state is None:
+        return None
+    theta = state["theta"]
+    if int(state.get("theta_size", -1)) != theta_size or theta.size != theta_size:
+        print(f"[train:{key}] checkpoint is for a {state.get('theta_size')}-parameter net, "
+              f"this run has {theta_size} — starting fresh")
+        return None
+    if int(state.get("next_g", 0)) >= generations:
+        print(f"[train:{key}] checkpoint is already at generation "
+              f"{state.get('next_g')}/{generations} — nothing to resume")
+        return None
+    return state
+
+
+def clear_checkpoint(key: str) -> None:
+    """A completed run leaves no checkpoint, so a later --resume cannot pick up
+    a finished search and think it has work to do."""
+    checkpoint_path(key).unlink(missing_ok=True)
+
+
 def train_es(key: str, build: str, generations: int, pop: int, episodes: int,
              sigma: float, lr: float, seed: int, opponents: list[tuple[str, str | None]],
              jobs: int = 1, progress: Progress | None = None,
-             speed: str | float = DEFAULT_SPEED) -> dict:
+             speed: str | float = DEFAULT_SPEED, checkpoint_every: int = CHECKPOINT_EVERY,
+             resume: bool = False) -> dict:
     if progress is None:
         progress = Progress(None)
     speed = parse_speed(speed)
@@ -360,7 +455,21 @@ def train_es(key: str, build: str, generations: int, pop: int, episodes: int,
                   warm_start=warm_start)
     rng = np.random.default_rng(seed)
     theta = base.flat()
-    for g in range(generations):
+    start_g = 0
+    if resume:
+        state = load_checkpoint(key, theta.size, generations)
+        if state is not None:
+            theta = state["theta"]
+            base.set_flat(theta)
+            start_g = int(state["next_g"])
+            rng.bit_generator.state = state["rng_state"]   # continue the stream
+            print(f"[train:{key}] resumed from generation {start_g}/{generations} "
+                  f"(checkpoint saved {state.get('saved', '?')})")
+            progress.emit("resumed", g=start_g, generations=generations,
+                          saved=str(state.get("saved", "")))
+    ckpt_meta = {"build": build, "seed": seed, "pop": pop, "sigma": sigma, "lr": lr,
+                 "episodes": episodes, "generations": generations}
+    for g in range(start_g, generations):
         noises = [rng.normal(0.0, 1.0, theta.size) for _ in range(pop)]
         cands = []
         for noise in noises:
@@ -379,10 +488,16 @@ def train_es(key: str, build: str, generations: int, pop: int, episodes: int,
         base.set_flat(theta)
         print(f"[train:{key}] g{g} best={max(scores):.3f} mean={np.mean(scores):.3f}")
         progress.emit("generation", g=g, best=float(max(scores)), mean=float(np.mean(scores)))
+        if checkpoint_every > 0 and ((g + 1) % checkpoint_every == 0
+                                     or g + 1 == generations):
+            path = save_checkpoint(key, theta, g + 1, rng, ckpt_meta)
+            print(f"[train:{key}] checkpoint g{g + 1} -> {path.name}")
+            progress.emit("checkpoint", g=g + 1, path=str(path))
     entry = registry_add(reg, key, "species" if key != "global" else "global",
                          f"v{dep['version']}" if dep else None)
     save_net(base, entry)
     save_registry(reg)
+    clear_checkpoint(key)          # the search finished; nothing left to resume
     print(f"[train:{key}] registered v{entry['version']} (candidate — run the gate)")
     progress.emit("registered", version=entry["version"], npz=entry["npz"])
     return entry
@@ -615,6 +730,12 @@ def main() -> int:
     p_tr.add_argument("--jobs", type=int, default=1,
                       help="parallel headless godot workers (docs/tech/32); useful "
                            "only up to pop x opponents = matches per generation")
+    p_tr.add_argument("--checkpoint-every", type=int, default=CHECKPOINT_EVERY,
+                      help="save the search state (theta + the RNG stream) every N "
+                           "generations so a killed run is not lost; 0 disables")
+    p_tr.add_argument("--resume", action="store_true",
+                      help="continue from this key's checkpoint instead of starting "
+                           "the search over")
     p_tg = sub.add_parser("train-global")
     p_tg.add_argument("--builds", required=True)
     p_tg.add_argument("--generations", type=int, default=3)
@@ -676,7 +797,8 @@ def main() -> int:
         with progress.guard():
             train_es(args.key, args.build, args.generations, args.pop, args.episodes,
                      args.sigma, args.lr, args.seed, opponents, args.jobs, progress,
-                     speed=args.speed)
+                     speed=args.speed, checkpoint_every=args.checkpoint_every,
+                     resume=args.resume)
         return 0
 
     if args.cmd == "train-global":

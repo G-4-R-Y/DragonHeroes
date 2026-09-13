@@ -80,7 +80,15 @@ def test_train_es_emits_contract_in_order(sandbox):
     assert all(isinstance(e["t"], (int, float)) and isinstance(e["ev"], str) for e in events)
     evs = [e["ev"] for e in events]
     assert evs[0] == "start" and evs[-1] == "registered"
-    assert set(evs) == {"start", "match", "candidate", "generation", "registered"}
+    assert set(evs) == {"start", "match", "candidate", "generation", "checkpoint",
+                        "registered"}
+    # the checkpoint that makes a long run resumable: it lands after the
+    # generation whose state it saves, and the LAST one is the final generation,
+    # immediately before the net is registered (league.py CHECKPOINT_EVERY)
+    ckpts = [e for e in events if e["ev"] == "checkpoint"]
+    assert [c["g"] for c in ckpts] == [2], [c["g"] for c in ckpts]
+    assert evs[-2] == "checkpoint"
+    assert evs.index("checkpoint") > evs.index("generation")
 
     start = events[0]
     assert start["key"] == "fen_boar" and start["build"] == BUILD
