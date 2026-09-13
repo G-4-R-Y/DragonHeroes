@@ -224,8 +224,12 @@ func setup(def: Dictionary, arena: Node, at: Vector2, policy_spec: String,
 		pet.owner_override = body
 		pet.global_position = at + Vector2(24, 0)
 		arena.add_child(pet)
-	# Policy
-	if spec == "native":
+	# Policy. "default" defers to game/arena/data/ai_defaults.json — the game's
+	# default AI per build, which the training console's NETS tab writes and the
+	# deployed registry pin feeds (ai_defaults.gd).
+	if spec == "default":
+		policy = ArenaAIDefaults.policy_for(build_id)
+	elif spec == "native":
 		policy = ArenaPolicy.new()   # inert: the body's own AI runs
 	elif spec == "scripted" or spec == "":
 		policy = ArenaScriptedPolicy.new()

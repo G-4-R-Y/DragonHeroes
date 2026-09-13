@@ -941,6 +941,11 @@ def main() -> int:
         p.add_argument("--speed", default=DEFAULT_SPEED,
                        help="per-match sim speed: 'max' (CPU-bound, deterministic; the "
                             "default) or a wall-clock multiplier such as 4 (the old 4x)")
+    p_to = sub.add_parser("tournament",
+                          help="every training method trains this key, then the "
+                               "candidates fight; the winner takes the pin")
+    from ml.training.tournament import build_parser as _tourney_args   # lazy: it imports us
+    _tourney_args(p_to)
     p_rr = sub.add_parser("round-robin")
     p_rr.add_argument("--episodes", type=int, default=2)
     p_vs = sub.add_parser("versus", help="best-of-N head to head between two nets")
@@ -1016,6 +1021,10 @@ def main() -> int:
         progress.emit("gate", **{"version": cand["version"], "pass": bool(ok),
                                  "metrics": cand["eval"].get("checks", {})})
         return 0 if ok else 1
+
+    if args.cmd == "tournament":
+        from ml.training.tournament import run as run_tournament
+        return run_tournament(args)
 
     if args.cmd == "versus":
         progress = Progress(args.progress_file or progress_path("versus"))

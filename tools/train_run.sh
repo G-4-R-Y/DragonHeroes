@@ -30,7 +30,7 @@
 #   tools/train_run.sh --list                                  # every past run, oldest first
 #   tools/train_run.sh --promote ml/runs/<run>                 # copy PASSING nets into ml/serving
 #
-# Env knobs (ES): GENERATIONS (20) POP (8) EPISODES (4) JOBS (nproc) SEED (2026)
+# Env knobs (ES): GENERATIONS (20) POP (8) EPISODES (4) JOBS (desktop: min(nproc-4, 16); throughput: nproc) SEED (2026)
 #                 SPEED (max) OPPONENTS ("") CHECKPOINT_EVERY (25)
 #
 # CHECKPOINT_EVERY exists because the trainer registers its net only when the
@@ -46,7 +46,27 @@ REPO="$PWD"
 source "$REPO/tools/dh_term.sh"      # palette, dragon banner, rules, bars
 
 GENERATIONS="${GENERATIONS:-20}"; POP="${POP:-8}"; EPISODES="${EPISODES:-4}"
-JOBS="${JOBS:-$(nproc)}"; SEED="${SEED:-2026}"; SPEED="${SPEED:-max}"
+# Leave room for the game/desktop. Explicit JOBS keeps its requested value;
+# TRAIN_PROFILE=throughput opts into the old all-CPU default for an idle machine.
+TRAIN_PROFILE="${TRAIN_PROFILE:-desktop}"
+case "$TRAIN_PROFILE" in desktop|throughput) ;; *) echo "TRAIN_PROFILE must be desktop or throughput" >&2; exit 2;; esac
+TRAIN_CPUS="$(nproc)"
+TRAIN_DEFAULT_JOBS="$TRAIN_CPUS"
+if [ "$TRAIN_PROFILE" = desktop ]; then
+  # Measured 2026-09-13, idle 20-thread box, pop 10 / 13 episodes / 2 opponents,
+  # resident arena workers: jobs 4 -> 9.6 s/gen, 8 -> 7.4, 10 -> 7.1, 12 -> 7.0,
+  # 16 -> 6.4, 20 -> 6.4. 16 and 20 TIE, so capping at 16 costs nothing and still
+  # hands 4 threads back to the desktop. Ricardo, 2026-09-13: "perhaps we should
+  # cap at 16? ... we are compute bound, not parallel worker bound" — he is right.
+  # PREVIOUS DEFAULT (kept for reference, min(nproc/2, 4) = 4 jobs here = 1.5x slower):
+  #   TRAIN_DEFAULT_JOBS=$((TRAIN_CPUS / 2))
+  #   [ "$TRAIN_DEFAULT_JOBS" -ge 1 ] || TRAIN_DEFAULT_JOBS=1
+  #   [ "$TRAIN_DEFAULT_JOBS" -le 4 ] || TRAIN_DEFAULT_JOBS=4
+  TRAIN_DEFAULT_JOBS=$((TRAIN_CPUS - 4))
+  [ "$TRAIN_DEFAULT_JOBS" -ge 1 ] || TRAIN_DEFAULT_JOBS=1
+  [ "$TRAIN_DEFAULT_JOBS" -le 16 ] || TRAIN_DEFAULT_JOBS=16
+fi
+JOBS="${JOBS:-$TRAIN_DEFAULT_JOBS}"; SEED="${SEED:-2026}"; SPEED="${SPEED:-max}"
 OPPONENTS="${OPPONENTS:-}"; CHECKPOINT_EVERY="${CHECKPOINT_EVERY:-25}"
 STEPS="${STEPS:-2000000}"; ENVS="${ENVS:-512}"; ARCH="${ARCH:-mlp}"  # ENVS was 32 pre-batching
 SELFPLAY_EVERY="${SELFPLAY_EVERY:-4}"

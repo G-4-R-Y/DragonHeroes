@@ -1,0 +1,7 @@
+{
+ "schema": "arena.ai_defaults.v1",
+ "_doc": "Which mind drives a build when a match asks for --policy-a default. Written by the training console (NETS tab -> DEFAULT AI); read by game/arena/ai_defaults.gd.",
+ "mode": "deployed",
+ "per_build": {},
+ "fallback": "native"
+}

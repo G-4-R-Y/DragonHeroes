@@ -53,6 +53,12 @@ const BENCH_DIR := "ml/data/benchmarks"         # versus verdicts accumulate her
 const TRAIN_RUN := "tools/train_run.sh"
 const BASELINES := ["native", "scripted"]       # selectable as a versus side
 const DEFAULTS := {"generations": 3, "pop": 6, "episodes": 4}   # league.py's; jobs = cores
+# TOURNAMENT (ml/training/tournament.py). ES reuses the knobs above; PPO has no
+# spinbox here, so it gets a console-sized budget rather than its 2,000,000-step
+# default — a tournament launched from a button should finish in an evening.
+const TOURNEY_BEST_OF := 5
+const TOURNEY_PPO_STEPS := 500000
+const AI_DEFAULTS := "game/arena/data/ai_defaults.json"
 # --speed choices: [arena spec, label]. "max" = CPU-bound (league.py adds --fixed-fps
 # 60); numbers are wall-locked multipliers (4 = the original fast mode).
 const SPEEDS := [["max", "max (CPU-bound)"], ["16", "16x wall"], ["8", "8x wall"],
@@ -80,6 +86,13 @@ var _jobs: SpinBox
 var _speed: OptionButton
 var _hint: Label
 var _train_btn: Button
+var _train_all_btn: Button
+var _tourney_btn: Button
+var _ai_mode: OptionButton
+var _ai_info: Label
+var _ai_stamp := ""          # trainee + config/registry mtimes; see _refresh_ai_default
+var _previous_canvas := Vector2i.ZERO
+var _sweep_progress := ""
 var _stop_btn: Button
 var _gate_btn: Button
 var _watch_btn: Button
@@ -253,7 +266,10 @@ func _build_ui() -> void:
 	_gens = _spin(grid, "gens", 1, 999, int(DEFAULTS.generations))
 	_pop = _spin(grid, "pop", 2, 256, int(DEFAULTS.pop))
 	_eps = _spin(grid, "eps", 1, 64, int(DEFAULTS.episodes))
-	_jobs = _spin(grid, "jobs", 1, 64, clampi(OS.get_processor_count(), 1, 64))
+	# jobs default: leave 4 threads for the desktop, cap at 16 — measured
+	# 2026-09-13, jobs 16 and 20 both 6.4 s/gen, so the cap is free.
+	# PREVIOUS: clampi(OS.get_processor_count() / 2, 1, 4)  # 4 jobs, 1.5x slower
+	_jobs = _spin(grid, "jobs", 1, 64, clampi(OS.get_processor_count() - 4, 1, 16))
 	left.add_child(grid)
 
 	var speed_row := HBoxContainer.new()
@@ -296,13 +312,23 @@ func _build_ui() -> void:
 	mode_row.add_child(_gpu)
 	left.add_child(mode_row)
 
-	var btns := HBoxContainer.new()
-	btns.add_theme_constant_override("separation", 4)
+	var btns := GridContainer.new()
+	btns.columns = 3
+	btns.add_theme_constant_override("h_separation", 4)
+	btns.add_theme_constant_override("v_separation", 3)
 	_train_btn = _button(btns, "TRAIN", _train)
+	_train_all_btn = _button(btns, "TRAIN ALL", _train_all)
+	_train_all_btn.tooltip_text = "Train every creature in an isolated run. Each species is trained and gated in sequence."
+	_tourney_btn = _button(btns, "TOURNAMENT", _tournament)
+	_tourney_btn.tooltip_text = ("Every training method trains this creature, then the candidates FIGHT "
+			+ "(best-of-%d) and the winner takes the deployed pin. ES uses the knobs above; PPO runs %s steps "
+			+ "and is skipped if ml/.venv is missing. No trainee selected = every creature.") % [
+			TOURNEY_BEST_OF, TOURNEY_PPO_STEPS]
 	_stop_btn = _button(btns, "STOP", _stop)
 	_gate_btn = _button(btns, "GATE", _gate)
 	_watch_btn = _button(btns, "WATCH", _watch)
-	left.add_child(btns)
+	left_frame.add_child(btns)
+	left_frame.move_child(btns, 1)   # launch/stop actions stay above the scrolling roster
 
 	_cmd_label = _label("", DIM)
 	_cmd_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -406,6 +432,99 @@ func _build_nets_tab(tabs: TabContainer) -> void:
 	_button(row, "SET B", func() -> void: _set_side("b"))
 	_button(row, "REFRESH", _refresh_nets)
 	v.add_child(row)
+	_build_ai_default_row(v)
+
+# ---- DEFAULT AI: which mind the GAME gives a build when nothing names one ------------
+# The deployed pin says WHICH net is best for a key; this says whether the game
+# should use a net at all. Written to game/arena/data/ai_defaults.json, read by
+# game/arena/ai_defaults.gd, which fighter.gd consults for `--policy-a default`.
+
+func _build_ai_default_row(v: VBoxContainer) -> void:
+	v.add_child(_label("DEFAULT AI — what drives a creature when a match asks for "
+			+ "'default' (game/arena/data/ai_defaults.json)", EMBER))
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 4)
+	_ai_mode = OptionButton.new()
+	for m in ArenaAIDefaults.MODES:
+		_ai_mode.add_item(m)
+	_ai_mode.tooltip_text = ("deployed = the pinned trained net for that creature (falls back "
+			+ "to `fallback` when none is pinned) · scripted = the utility heuristics · "
+			+ "native = the creature's own built-in AI")
+	row.add_child(_ai_mode)
+	_button(row, "SET FOR ALL", func() -> void: _set_ai_default(false))
+	_button(row, "SET FOR BUILD", func() -> void: _set_ai_default(true))
+	_button(row, "CLEAR BUILD", _clear_ai_default)
+	v.add_child(row)
+	_ai_info = _label("", PALE)
+	_ai_info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	v.add_child(_ai_info)
+	_refresh_ai_default()
+
+func _ai_config_path() -> String:
+	return _repo.path_join(AI_DEFAULTS)
+
+# _refresh_ui runs every frame, and resolving a default means parsing the whole
+# registry off disk — so this recomputes only when the answer could have changed:
+# a different trainee, or a rewritten config/registry.
+func _refresh_ai_default(force: bool = false) -> void:
+	if _ai_info == null:
+		return
+	var stamp := "%s|%d|%d" % [_selected_build(),
+			FileAccess.get_modified_time(_ai_config_path()),
+			FileAccess.get_modified_time(_registry_path)]
+	if not force and stamp == _ai_stamp:
+		return
+	_ai_stamp = stamp
+	var cfg := ArenaAIDefaults.load_config()
+	var build := _selected_build()
+	var per: Dictionary = cfg.get("per_build", {})
+	var line := "global: %s · fallback: %s · %d per-build override(s)" % [
+			str(cfg.get("mode", "deployed")), str(cfg.get("fallback", "native")), per.size()]
+	if build != "":
+		line += "\n%s -> %s (%s)" % [build, ArenaAIDefaults.mode_for(build, cfg),
+				ArenaAIDefaults.policy_spec_for(build, cfg).get_file()]
+	_ai_info.text = line
+
+func _write_ai_config(cfg: Dictionary) -> void:
+	var f := FileAccess.open(_ai_config_path(), FileAccess.WRITE)
+	if f == null:
+		_proc_note = "cannot write " + AI_DEFAULTS
+	else:
+		f.store_string(JSON.stringify(cfg, " "))
+		f.close()
+		_proc_note = "default AI updated — " + AI_DEFAULTS
+	_refresh_ai_default(true)
+	_refresh_ui()
+
+func _set_ai_default(per_build: bool) -> void:
+	var cfg := ArenaAIDefaults.load_config()
+	var mode := str(_ai_mode.get_item_text(_ai_mode.selected)) if _ai_mode.selected >= 0 \
+			else ArenaAIDefaults.DEFAULT_MODE
+	if per_build:
+		var build := _selected_build()
+		if build == "":
+			_proc_note = "pick a trainee first — SET FOR BUILD needs one"
+			_refresh_ui()
+			return
+		var per: Dictionary = cfg.get("per_build", {})
+		per[build] = mode
+		cfg["per_build"] = per
+	else:
+		cfg["mode"] = mode
+	cfg["schema"] = ArenaAIDefaults.SCHEMA
+	_write_ai_config(cfg)
+
+func _clear_ai_default() -> void:
+	var build := _selected_build()
+	var cfg := ArenaAIDefaults.load_config()
+	var per: Dictionary = cfg.get("per_build", {})
+	if build == "" or not per.has(build):
+		_proc_note = "no per-build override for that trainee"
+		_refresh_ui()
+		return
+	per.erase(build)
+	cfg["per_build"] = per
+	_write_ai_config(cfg)
 
 # ---- VERSUS: best-of-N head to head -------------------------------------------------------
 
@@ -651,6 +770,36 @@ func _train() -> void:
 	_attach(_progress_path(key), _file_len(_progress_path(key)))
 	_spawn_league(args, "train", key)
 
+func _train_all() -> void:
+	if _pid > 0: return
+	# Every creature, own registry; --all is the ES sweep, PPO requires a chosen matchup.
+	_spawn_train_run("all-creatures", "", true)
+
+# TRAIN ALL trains one way and assumes it was the right one. TOURNAMENT makes the
+# methods compete: each trains the same creature, each is gated against the same
+# pre-tournament pin, then they fight head to head and the winner takes the pin
+# (ml/training/tournament.py). Ricardo, 2026-09-13: "compete intra-training when
+# train-all, as to optimize for the best methods".
+func _tournament() -> void:
+	if _pid > 0: return
+	var build := _selected_build()
+	var key := _key()
+	var args := "tournament --methods es,ppo --generations %d --pop %d --episodes %d --jobs %d --speed %s --best-of %d --steps %d" % [
+			int(_gens.value), int(_pop.value), int(_eps.value), int(_jobs.value),
+			_speed_spec(), TOURNEY_BEST_OF, TOURNEY_PPO_STEPS]
+	var feed := "all-creatures"
+	if build == "":
+		args += " --all"                    # no trainee picked = the whole roster
+	elif not _valid_key(key):
+		_proc_note = "pick a key ([A-Za-z0-9_-] only)"
+		_refresh_ui()
+		return
+	else:
+		args += " --key %s --build %s" % [_sq(key), _sq(build)]
+		feed = key
+		_attach(_progress_path(key), _file_len(_progress_path(key)))
+	_spawn_league(args, "tournament", feed)
+
 func _gate() -> void:
 	var build := _selected_build()
 	var key := _key()
@@ -874,6 +1023,10 @@ func _refresh_ui() -> void:
 	_refresh_tabs()
 	var running := _pid > 0
 	_train_btn.disabled = running
+	_train_all_btn.disabled = running
+	if _tourney_btn != null:
+		_tourney_btn.disabled = running
+	_refresh_ai_default()
 	_gate_btn.disabled = running
 	_stop_btn.disabled = not running
 	var s: Dictionary = _run.start

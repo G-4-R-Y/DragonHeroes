@@ -54,5 +54,7 @@ builds/linux/
 builds/windows/
 # tools/build_arena.sh — a 96 MB release export
 builds/trainer/
+# the Arena Console app (tools/build_console.sh) — binary + its GDExtension
+builds/console/
 rebirth/native/build/
 rebirth/godot3d/.godot/

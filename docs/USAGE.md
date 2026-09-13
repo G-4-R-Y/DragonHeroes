@@ -309,6 +309,75 @@ gives the best-of reading. The verdict lands in `ml/data/benchmarks/` as schema
 > native returns the same result for every seed, so that pairing is a reference
 > point, not a distribution.
 
+### Let the methods compete (`league tournament`)
+
+A sweep used to assume one trainer was best everywhere. This makes it a contest:
+every method trains the same creature, every candidate is gated against the same
+pin, then the candidates **fight each other** and the winner takes the pin.
+
+```bash
+python3 -m ml.training.tournament --all --dry-run        # the plan and the budget FIRST
+python3 -m ml.training.tournament --key fen_boar_alpha \
+    --build core.arena.fen_boar_alpha --generations 200 --pop 10 --jobs 16
+python3 -m ml.training.tournament --all --methods es      # ES only, no GPU needed
+```
+
+Or from the training console: the **TOURNAMENT** button (no trainee selected =
+every creature). Same thing through the league CLI:
+`python3 -m ml.training.league tournament ...`.
+
+| flag | default | what it does |
+|---|---|---|
+| `--methods` | `es,ppo` | which trainers compete. PPO self-skips if `ml/.venv` is missing |
+| `--extra` | — | extra entrants in `versus --a` syntax (`scripted`, `fen_boar@v6`, a path). Reference points: they can win the bracket but never take the pin |
+| `--best-of` | 5 | bracket rounds per pair |
+| `--bracket-episodes` | 1 | episodes per bracket round |
+| `--gate-episodes` / `--no-gate` | 4 | the gate is a veto on deploying, not a tiebreak |
+| `--opp-build` | next creature in the roster | who PPO trains against |
+| `--method-timeout` | 0 (none) | seconds before a trainer is given up on |
+
+ES knobs (`--generations --pop --episodes --jobs --seed --speed --opponents
+--checkpoint-every`) and PPO knobs (`--steps --envs --arch --selfplay-every`)
+are the same ones those trainers take.
+
+Scoring is 3 points a bracket win, 1 a draw, then rounds won, then episode win
+rate. Two results are reported and they are not the same thing: **champion** won
+the bracket, **winner** won it *and* passed the gate — only the winner moves the
+pin. A champion that fails the gate is still the best net of the round, and the
+fleet stays on its previous pin.
+
+Written per key: `ml/data/benchmarks/<stamp>__tournament__<key>.json` (schema
+`arena.tournament.v1`), one `arena.versus.v1` per pair, `ml/data/logs/<key>__tournament__<method>.log`,
+and the live console feed at `ml/data/progress/<key>.jsonl`.
+
+> `evolve` is **not** a bracket entrant: it registers under derived keys
+> (`<key>_evo_g0c1`), so there is no single candidate to enter. Run it, then add
+> its champion by hand with `--extra <key>_evo_g2c0@candidate`.
+
+### The game's default AI
+
+Which net the *game* gives a creature is now a setting, not a command-line
+argument. `game/arena/data/ai_defaults.json` (schema `arena.ai_defaults.v1`):
+
+```json
+{"mode": "deployed", "per_build": {"core.arena.cinder_drake": "scripted"}, "fallback": "native"}
+```
+
+`deployed` uses the pinned trained net for that creature, `scripted` the utility
+heuristics, `native` the creature's own built-in AI; `per_build` overrides the
+global `mode`, and `fallback` covers a creature with no net pinned yet. Set it in
+the training console — **NETS tab → DEFAULT AI → SET FOR ALL / SET FOR BUILD /
+CLEAR BUILD** — or edit the file. Any arena match can then ask for it:
+
+```bash
+godot --headless --path game res://arena/arena.tscn -- \
+    --a core.arena.fen_boar_alpha --b core.arena.gloam_wisp \
+    --policy-a default --policy-b default --episodes 4
+```
+
+Nets are read from `res://arena/data/nets/<key>.json` when the game is exported,
+and from the deployed pin in `ml/serving/registry.json` in a dev tree.
+
 ### The C++ environment (dh-env)
 
 ```bash
