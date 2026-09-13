@@ -72,6 +72,18 @@ def _load_lib() -> ctypes.CDLL:
     lib.dh_env_tick.restype = ctypes.c_uint64
     lib.dh_env_tick.argtypes = [ctypes.c_void_p]
     lib.dh_env_destroy.argtypes = [ctypes.c_void_p]
+    # batched surface: one crossing per TICK instead of 3-4 per env per tick
+    lib.dh_env_step_many.restype = ctypes.c_int32
+    lib.dh_env_step_many.argtypes = [
+        ctypes.POINTER(ctypes.c_void_p), ctypes.c_int32,
+        ctypes.POINTER(ctypes.c_float), ctypes.POINTER(ctypes.c_int32),
+        ctypes.POINTER(ctypes.c_float), ctypes.POINTER(ctypes.c_int32),
+        ctypes.POINTER(ctypes.c_float), ctypes.POINTER(ctypes.c_int32),
+        ctypes.c_int32]
+    lib.dh_env_reset_many.argtypes = [
+        ctypes.POINTER(ctypes.c_void_p), ctypes.c_int32,
+        ctypes.POINTER(ctypes.c_uint64), ctypes.POINTER(ctypes.c_float)]
+    lib.dh_env_shutdown_pool.argtypes = []
     return lib
 
 
@@ -190,3 +202,82 @@ class DhEnv:
 
     def __del__(self):
         self.close()
+
+
+class VecDhEnv:
+    """Many arenas stepped in ONE ctypes crossing (Ricardo, 2026-09-13:
+    "A batched step across all environments... is roughly sixteen times of
+    headroom sitting there. --> do it!").
+
+    The old rollout crossed into C four times per env per tick (step, two
+    hp_frac, winner) and paid Python loop overhead on top, which pinned PPO at
+    ~32k steps/s against the 527k the sim alone sustains. Here the whole tick
+    is one `dh_env_step_many` call writing into preallocated numpy buffers,
+    optionally drained by a persistent C++ worker pool.
+
+        vec = VecDhEnv([DhEnv(...) for _ in range(32)], threads=8)
+        obs = vec.reset(seeds)
+        obs, done, hp, winner = vec.step(moves, acts)   # moves (N,2), acts (N,)
+        vec.reset_done(done_idx, seeds)                 # caller owns boundaries
+
+    Buffers are REUSED between calls: copy anything you need to keep. Episodes
+    are never auto-reset, so the terminal observation is still yours to read.
+    """
+
+    def __init__(self, envs: list["DhEnv"], threads: int = 1):
+        if not envs:
+            raise ValueError("VecDhEnv needs at least one env")
+        dims = {e.obs_dim for e in envs}
+        if len(dims) != 1:
+            raise ValueError(f"mixed obs_dim in one VecDhEnv: {sorted(dims)}")
+        self.envs = envs
+        self.n = len(envs)
+        self.obs_dim = envs[0].obs_dim
+        self.threads = max(1, int(threads))
+        self._handles = (ctypes.c_void_p * self.n)(*[e._handle for e in envs])
+        self.obs = np.zeros((self.n, self.obs_dim), dtype=np.float32)
+        self.done = np.zeros(self.n, dtype=np.int32)
+        self.hp = np.zeros((self.n, 2), dtype=np.float32)
+        self.winner = np.zeros(self.n, dtype=np.int32)
+        self._moves = np.zeros((self.n, 2), dtype=np.float32)
+        self._acts = np.zeros(self.n, dtype=np.int32)
+        self._seeds = np.zeros(self.n, dtype=np.uint64)
+
+    @staticmethod
+    def _p(a, t):
+        return a.ctypes.data_as(ctypes.POINTER(t))
+
+    def reset(self, seeds) -> np.ndarray:
+        self._seeds[:] = np.asarray(seeds, dtype=np.uint64)
+        lib().dh_env_reset_many(self._handles, self.n,
+                                self._p(self._seeds, ctypes.c_uint64),
+                                self._p(self.obs, ctypes.c_float))
+        return self.obs
+
+    def step(self, moves, acts):
+        """moves (N,2) float, acts (N,) int -> (obs, done, hp, winner) views."""
+        np.copyto(self._moves, np.asarray(moves, dtype=np.float32).reshape(self.n, 2))
+        np.copyto(self._acts, np.asarray(acts, dtype=np.int32).reshape(self.n))
+        lib().dh_env_step_many(
+            self._handles, self.n,
+            self._p(self._moves, ctypes.c_float), self._p(self._acts, ctypes.c_int32),
+            self._p(self.obs, ctypes.c_float), self._p(self.done, ctypes.c_int32),
+            self._p(self.hp, ctypes.c_float), self._p(self.winner, ctypes.c_int32),
+            self.threads)
+        return self.obs, self.done, self.hp, self.winner
+
+    def reset_done(self, idx, seeds) -> None:
+        """Reset just the finished envs; their rows in `obs` are refilled."""
+        idx = np.asarray(idx, dtype=np.int64).ravel()
+        if idx.size == 0:
+            return
+        handles = (ctypes.c_void_p * idx.size)(*[self.envs[i]._handle for i in idx])
+        s = np.ascontiguousarray(np.asarray(seeds, dtype=np.uint64).ravel())
+        buf = np.zeros((idx.size, self.obs_dim), dtype=np.float32)
+        lib().dh_env_reset_many(handles, idx.size,
+                                self._p(s, ctypes.c_uint64),
+                                self._p(buf, ctypes.c_float))
+        self.obs[idx] = buf
+
+    def close(self) -> None:
+        lib().dh_env_shutdown_pool()

@@ -16,6 +16,23 @@
 # first, the deployed pin as fallback — v1 opens a window rather than embedding a
 # SubViewport (design/25 §4). Everything is code-built on the 640x360 grid.
 #
+# THE COCKPIT TABS (2026-09-13, Ricardo: "Is the train_run included in arena
+# console? can we run it there instead? as well as manage active and deployed
+# nets, and even put one against the other for benchmarking (best of N)"):
+#   PROGRESS — this run's fitness chart + match-score strip + gate verdict
+#   RUNS     — every isolated run folder (tools/train_run.sh writes
+#              ml/runs/<date>__<keys>__<config>/), its config and gate verdicts;
+#              OPEN tails that run's own progress feed, PROMOTE copies its
+#              gate-PASSING nets into the deployed registry
+#   NETS     — the registry: every key's versions, which one is the DEPLOYED
+#              pin, DEPLOY/RETIRE, and "set A"/"set B" for the benchmark
+#   VERSUS   — best-of-N head to head between any two nets (or the native /
+#              scripted baselines); the verdict is written to
+#              ml/data/benchmarks/ so comparisons accumulate
+# TRAIN runs through tools/train_run.sh by default (the ISOLATED switch): the
+# run gets its own registry seeded from the deployed one, so experiments never
+# overwrite what the game serves. Untick it to train straight into ml/serving.
+#
 # SPEED (2026-09-11, Ricardo: "it should be able to become faster with more
 # compute"): the loop is CPU-bound — no GPU anywhere (numpy MLP + Godot physics
 # and GDScript workers) — and the old fast mode was WALL-LOCKED at 4x, so --jobs
@@ -31,6 +48,10 @@ const POLL_S := 0.5
 const PROGRESS_DIR := "ml/data/progress"
 const LOG_DIR := "ml/data/logs"
 const REGISTRY := "ml/serving/registry.json"
+const RUNS_DIR := "ml/runs"                     # tools/train_run.sh writes here
+const BENCH_DIR := "ml/data/benchmarks"         # versus verdicts accumulate here
+const TRAIN_RUN := "tools/train_run.sh"
+const BASELINES := ["native", "scripted"]       # selectable as a versus side
 const DEFAULTS := {"generations": 3, "pop": 6, "episodes": 4}   # league.py's; jobs = cores
 # --speed choices: [arena spec, label]. "max" = CPU-bound (league.py adds --fixed-fps
 # 60); numbers are wall-locked multipliers (4 = the original fast mode).
@@ -71,6 +92,31 @@ var _chart: Control
 var _strip: Control
 var _chart_draws := 0
 
+# cockpit tabs
+var _isolated: CheckBox
+var _gpu: CheckBox
+var _runs: ItemList
+var _runs_info: Label
+var _runs_open_btn: Button
+var _runs_promote_btn: Button
+var _nets: ItemList
+var _nets_info: Label
+var _vs_a := {}                  # {label, spec, build} — spec: native|scripted|abs path
+var _vs_b := {}
+var _vs_a_label: Label
+var _vs_b_label: Label
+var _vs_eps: SpinBox
+var _vs_best_of: SpinBox
+var _vs_btn: Button
+var _vs_result: Label
+var _vs_history: ItemList
+var _vs_pending := {}            # {out, a, b, eps, t0}
+var _last_verdict := {}
+# overridable so the selftest never touches the real registry / runs / benchmarks
+var _registry_path := ""
+var _runs_root := ""
+var _bench_root := ""
+
 # the tracked child (train | gate); watch windows are fire-and-forget
 var _pid := -1
 var _pid_kind := ""
@@ -89,9 +135,15 @@ func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	if not _selftest and DisplayServer.get_name() != "headless":
 		_fit_window()
+	_registry_path = _repo.path_join(REGISTRY)
+	_runs_root = _repo.path_join(RUNS_DIR)
+	_bench_root = _repo.path_join(BENCH_DIR)
 	_reset_run()
 	_build_ui()
 	_populate_roster()
+	_refresh_runs()
+	_refresh_nets()
+	_refresh_history()
 	if _trainee.item_count > 0:
 		_trainee.select(0)
 		_on_trainee_selected(0)
@@ -109,6 +161,7 @@ func _process(delta: float) -> void:
 		_pid = -1
 		_pid_kind = ""
 	_poll_progress()
+	_poll_versus()
 	_refresh_ui()
 
 # ---- UI ---------------------------------------------------------------------------------
@@ -222,6 +275,27 @@ func _build_ui() -> void:
 	_hint.custom_minimum_size = Vector2(0, 34)
 	left.add_child(_hint)
 
+	var mode_row := HBoxContainer.new()
+	mode_row.add_theme_constant_override("separation", 6)
+	# TRAIN routes through tools/train_run.sh: the run gets its own registry,
+	# seeded from the deployed one, so an experiment never overwrites what the
+	# game serves. Untick to train straight into ml/serving (the old path).
+	_isolated = CheckBox.new()
+	_isolated.text = "isolated run"
+	_isolated.button_pressed = true
+	_isolated.focus_mode = Control.FOCUS_NONE
+	_isolated.tooltip_text = "tools/train_run.sh — own registry + weights + progress under ml/runs/"
+	_isolated.toggled.connect(func(_on: bool) -> void: _refresh_ui())
+	mode_row.add_child(_isolated)
+	# the GPU tier: PPO over libdh-env, no Godot in the loop (needs ml/.venv)
+	_gpu = CheckBox.new()
+	_gpu.text = "GPU (PPO)"
+	_gpu.focus_mode = Control.FOCUS_NONE
+	_gpu.tooltip_text = "ml/training/ppo.py on CUDA instead of the ES league"
+	_gpu.toggled.connect(func(_on: bool) -> void: _refresh_ui())
+	mode_row.add_child(_gpu)
+	left.add_child(mode_row)
+
 	var btns := HBoxContainer.new()
 	btns.add_theme_constant_override("separation", 4)
 	_train_btn = _button(btns, "TRAIN", _train)
@@ -235,11 +309,19 @@ func _build_ui() -> void:
 	_cmd_label.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	left.add_child(_cmd_label)
 
-	# ---- right: progress
+	# ---- right: the cockpit tabs (PROGRESS / RUNS / NETS / VERSUS)
+	var tabs := TabContainer.new()
+	tabs.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	tabs.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	tabs.add_theme_color_override("font_selected_color", EMBER)
+	tabs.add_theme_color_override("font_unselected_color", DIM)
+	hb.add_child(tabs)
+
 	var right := VBoxContainer.new()
+	right.name = "PROGRESS"
 	right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	right.add_theme_constant_override("separation", 3)
-	hb.add_child(right)
+	tabs.add_child(right)
 
 	_status = _label("", PALE)
 	_status.custom_minimum_size = Vector2(0, 46)
@@ -268,6 +350,121 @@ func _build_ui() -> void:
 	_gate_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_gate_label.custom_minimum_size = Vector2(0, 30)
 	right.add_child(_gate_label)
+
+	_build_runs_tab(tabs)
+	_build_nets_tab(tabs)
+	_build_versus_tab(tabs)
+
+# ---- RUNS: every isolated run tools/train_run.sh has written ------------------------------
+
+func _build_runs_tab(tabs: TabContainer) -> void:
+	var v := VBoxContainer.new()
+	v.name = "RUNS"
+	v.add_theme_constant_override("separation", 3)
+	tabs.add_child(v)
+	v.add_child(_label("ISOLATED RUNS — ml/runs/, newest first", EMBER))
+	v.add_child(_label("each folder is a whole experiment: its own registry, weights, "
+			+ "progress and logs. Promoting copies its gate-PASSING nets into ml/serving.", DIM))
+	_runs = _list(0, false)
+	_runs.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_runs.item_selected.connect(func(_i: int) -> void: _refresh_ui())
+	v.add_child(_runs)
+	_runs_info = _label("", PALE)
+	_runs_info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_runs_info.custom_minimum_size = Vector2(0, 76)
+	v.add_child(_runs_info)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 4)
+	_runs_open_btn = _button(row, "OPEN PROGRESS", _runs_open)
+	_runs_promote_btn = _button(row, "PROMOTE", _runs_promote)
+	_button(row, "REFRESH", _refresh_runs)
+	v.add_child(row)
+
+# ---- NETS: the registry, and which version the fleet actually serves ----------------------
+
+func _build_nets_tab(tabs: TabContainer) -> void:
+	var v := VBoxContainer.new()
+	v.name = "NETS"
+	v.add_theme_constant_override("separation", 3)
+	tabs.add_child(v)
+	v.add_child(_label("REGISTRY — ml/serving/registry.json", EMBER))
+	v.add_child(_label("one DEPLOYED pin per key is what the game and the arena load; "
+			+ "everything else is a candidate. DEPLOY moves the pin, RETIRE clears it.", DIM))
+	_nets = _list(0, false)
+	_nets.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_nets.item_selected.connect(func(_i: int) -> void: _refresh_ui())
+	v.add_child(_nets)
+	_nets_info = _label("", PALE)
+	_nets_info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_nets_info.custom_minimum_size = Vector2(0, 58)
+	v.add_child(_nets_info)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 4)
+	_button(row, "DEPLOY", _net_deploy)
+	_button(row, "RETIRE", _net_retire)
+	_button(row, "SET A", func() -> void: _set_side("a"))
+	_button(row, "SET B", func() -> void: _set_side("b"))
+	_button(row, "REFRESH", _refresh_nets)
+	v.add_child(row)
+
+# ---- VERSUS: best-of-N head to head -------------------------------------------------------
+
+func _build_versus_tab(tabs: TabContainer) -> void:
+	var v := VBoxContainer.new()
+	v.name = "VERSUS"
+	v.add_theme_constant_override("separation", 3)
+	tabs.add_child(v)
+	v.add_child(_label("BEST-OF-N — put one net against another", EMBER))
+	v.add_child(_label("pick both sides in NETS (SET A / SET B), or use the baselines below. "
+			+ "Every round is a real arena match set, so a verdict here means what a gate "
+			+ "verdict means. Results land in ml/data/benchmarks/.", DIM))
+	_vs_a_label = _label("A — (unset)", PALE)
+	_vs_b_label = _label("B — (unset)", PALE)
+	v.add_child(_vs_a_label)
+	v.add_child(_vs_b_label)
+
+	var base := HBoxContainer.new()
+	base.add_theme_constant_override("separation", 4)
+	base.add_child(_label("baselines", DIM))
+	for side in ["a", "b"]:
+		for who in BASELINES:
+			var s2 := str(side)
+			var w := str(who)
+			_button(base, "%s=%s" % [s2.to_upper(), w], func() -> void: _set_baseline(s2, w))
+	v.add_child(base)
+
+	var knobs := HBoxContainer.new()
+	knobs.add_theme_constant_override("separation", 4)
+	knobs.add_child(_label("best of", DIM))
+	_vs_best_of = SpinBox.new()
+	_vs_best_of.min_value = 1
+	_vs_best_of.max_value = 99
+	_vs_best_of.value = 9
+	_vs_best_of.rounded = true
+	knobs.add_child(_vs_best_of)
+	knobs.add_child(_label("episodes/round", DIM))
+	_vs_eps = SpinBox.new()
+	_vs_eps.min_value = 1
+	_vs_eps.max_value = 32
+	_vs_eps.value = 3
+	_vs_eps.rounded = true
+	knobs.add_child(_vs_eps)
+	_vs_btn = _button(knobs, "RUN BEST-OF-N", _versus_run)
+	_button(knobs, "SWAP", func() -> void:
+		var t := _vs_a
+		_vs_a = _vs_b
+		_vs_b = t
+		_refresh_ui())
+	v.add_child(knobs)
+
+	_vs_result = _label("", PALE)
+	_vs_result.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_vs_result.custom_minimum_size = Vector2(0, 66)
+	v.add_child(_vs_result)
+	v.add_child(_label("HISTORY — every verdict, newest first", EMBER))
+	_vs_history = _list(0, false)
+	_vs_history.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	v.add_child(_vs_history)
 
 func _label(text: String, color: Color, size := ProtoTheme.SIZE_BODY) -> Label:
 	var l := Label.new()
@@ -439,6 +636,11 @@ func _train() -> void:
 		_proc_note = "pick a trainee and a key ([A-Za-z0-9_-] only)"
 		_refresh_ui()
 		return
+	if _isolated.button_pressed or _gpu.button_pressed:
+		# tools/train_run.sh: own registry (seeded from the deployed one), own
+		# weights, own progress — ml/serving is left exactly as the game found it
+		_spawn_train_run(key, build)
+		return
 	var args := "train --key %s --build %s --generations %d --pop %d --episodes %d --jobs %d --speed %s" % [
 			_sq(key), _sq(build), int(_gens.value), int(_pop.value), int(_eps.value),
 			int(_jobs.value), _speed_spec()]
@@ -529,7 +731,8 @@ func _watch() -> void:
 func _reset_run() -> void:
 	_run = {"start": {}, "gens": [], "cands": [], "scores": [], "matches": 0, "dur_sum": 0.0,
 			"dur_n": 0, "cur_g": -1, "cur_cand": -1, "last_match": {}, "registered": {},
-			"gate": {}, "error": "", "last_t": 0.0, "unknown": 0}
+			"gate": {}, "error": "", "last_t": 0.0, "unknown": 0,
+			"versus": {}, "versus_done": {}}
 
 func _attach(path: String, offset: int) -> void:
 	_tail_path = path
@@ -606,6 +809,23 @@ func _ingest(line: String) -> void:
 			_run.registered = e
 		"gate":
 			_run.gate = e
+		"versus_start":
+			_reset_run()
+			_run.start = e
+			_run.versus = e
+		"versus_round":   # each round rides the match strip like any other match
+			_run.matches += 1
+			if e.has("duration_s"):
+				_run.dur_sum += float(e.duration_s)
+				_run.dur_n += 1
+			_run.last_match = e
+			var vs_scores: Array = _run.scores
+			vs_scores.append({"opp": "round %d" % (int(e.get("i", 0)) + 1),
+					"score": float(e.get("score_a", 0.0))})
+			if vs_scores.size() > STRIP_MAX:
+				vs_scores.pop_front()
+		"versus_done":
+			_run.versus_done = e
 		"error":
 			_run.error = str(e.get("message", "error"))
 		_:
@@ -651,6 +871,7 @@ static func _fmt_s(sec: float) -> String:
 # ---- status text --------------------------------------------------------------------------
 
 func _refresh_ui() -> void:
+	_refresh_tabs()
 	var running := _pid > 0
 	_train_btn.disabled = running
 	_gate_btn.disabled = running
@@ -739,6 +960,68 @@ func _refresh_ui() -> void:
 # Snap to pixel centers so 1 px lines land on exactly one canvas pixel row.
 static func _px(v: float) -> float:
 	return floorf(v) + 0.5
+
+# The cockpit panels are plain text: everything they show is a fact read off
+# disk (a run's config.json, the registry, a verdict file), never cached state.
+func _refresh_tabs() -> void:
+	if _runs_info != null:
+		var run := _selected_run()
+		if run == "":
+			_runs_info.text = "no run selected — TRAIN with 'isolated run' ticked writes one"
+			_runs_open_btn.disabled = true
+			_runs_promote_btn.disabled = true
+		else:
+			var dir := _runs_root.path_join(run)
+			var cfg := _read_json(dir.path_join("config.json"))
+			var es: Dictionary = cfg.get("es", {})
+			var env: Dictionary = cfg.get("env", {})
+			var summary := FileAccess.get_file_as_string(dir.path_join("summary.txt"))
+			var head := ""
+			for l in summary.split("\n"):
+				if l.contains("PASS") or l.contains("fail") or l.begins_with("wall:"):
+					head += l.strip_edges() + "\n"
+			_runs_info.text = ("%s\nstarted %s · %s · seeded from %s\ngens %s pop %s eps %s jobs %s "
+					+ "· godot %s · HEAD %s\n%s") % [
+					run, str(cfg.get("started", "?")), str(cfg.get("mode", "?")),
+					str(cfg.get("seeded_from", "?")), str(es.get("generations", "?")),
+					str(es.get("pop", "?")), str(es.get("episodes", "?")), str(es.get("jobs", "?")),
+					str(env.get("godot", "?")), str(env.get("git_head", "?")),
+					head if head != "" else "still running — no summary yet"]
+			_runs_open_btn.disabled = false
+			_runs_promote_btn.disabled = (summary == "")
+	if _nets_info != null:
+		var ref := _selected_net()
+		if ref == "":
+			_nets_info.text = "select a net to deploy, retire, or send to VERSUS"
+		else:
+			var e := _net_entry(ref)
+			var ev: Dictionary = e.get("eval", {})
+			var checks: Dictionary = ev.get("checks", {})
+			var parts: PackedStringArray = []
+			for k in checks.keys():
+				var c: Dictionary = checks[k]
+				parts.append("%s=%s" % [str(k), str(c.get("win_rate", c.get("pass", "?")))])
+			_nets_info.text = "%s · created %s · %s\n%s\n%s" % [
+					ref, str(e.get("created", "?")),
+					"DEPLOYED" if bool(e.get("deployed", false)) else "candidate",
+					str(e.get("game_json", "(no exported weights)")),
+					" ".join(parts) if parts.size() > 0 else "never gated"]
+	if _vs_a_label != null:
+		_vs_a_label.text = "A — %s" % (str(_vs_a.get("label", "")) if not _vs_a.is_empty() else "(unset)")
+		_vs_b_label.text = "B — %s" % (str(_vs_b.get("label", "")) if not _vs_b.is_empty() else "(unset)")
+		_vs_btn.disabled = _vs_a.is_empty() or _vs_b.is_empty() or _pid > 0
+	if _vs_result != null and not _last_verdict.is_empty():
+		var v := _last_verdict
+		var a: Dictionary = v.get("a", {})
+		var b: Dictionary = v.get("b", {})
+		var clinch: Variant = v.get("clinched_round", null)
+		_vs_result.text = "%s  %d-%d  %s\nbest of %d · %d episodes/round · %ss\n%s" % [
+				"%s vs %s" % [str(a.get("label", "?")), str(b.get("label", "?"))],
+				int(v.get("rounds_a", 0)), int(v.get("rounds_b", 0)),
+				"WINNER: " + str(v.get("winner", "?")).to_upper(),
+				int(v.get("best_of", 0)), int(v.get("episodes_per_round", 0)),
+				str(v.get("wall_s", "?")),
+				("clinched in round %s" % str(clinch)) if clinch != null else "no clinch — split decision"]
 
 func _on_chart_draw() -> void:
 	_chart_draws += 1
@@ -906,6 +1189,324 @@ static func _fixture_lines() -> PackedStringArray:
 			"npz": "ml/serving/weights/fen_boar_v1.npz"}))
 	return lines
 
+# ---- runs / nets / versus (the cockpit tabs) ----------------------------------------------
+
+# Every run folder tools/train_run.sh has written, newest first. The name IS
+# the record: <date>__<keys>__<knobs>, so sorting by name sorts by time.
+func _refresh_runs() -> void:
+	if _runs == null:
+		return
+	var sel := _selected_run()
+	_runs.clear()
+	var names: Array[String] = []
+	var d := DirAccess.open(_runs_root)
+	if d != null:
+		d.list_dir_begin()
+		var n := d.get_next()
+		while n != "":
+			if d.current_is_dir() and not n.begins_with("."):
+				if FileAccess.file_exists(_runs_root.path_join(n).path_join("config.json")):
+					names.append(n)
+			n = d.get_next()
+		d.list_dir_end()
+	names.sort()
+	names.reverse()
+	for name in names:
+		var cfg := _read_json(_runs_root.path_join(name).path_join("config.json"))
+		var mode := str(cfg.get("mode", "?"))
+		var done := FileAccess.file_exists(_runs_root.path_join(name).path_join("summary.txt"))
+		_runs.add_item("%s  %s%s" % [name, mode, "" if done else "  · running"])
+		_runs.set_item_metadata(_runs.item_count - 1, name)
+		if name == sel:
+			_runs.select(_runs.item_count - 1)
+	_refresh_ui()
+
+func _selected_run() -> String:
+	if _runs == null:
+		return ""
+	var sel := _runs.get_selected_items()
+	return str(_runs.get_item_metadata(sel[0])) if sel.size() > 0 else ""
+
+func _read_json(path: String) -> Dictionary:
+	var raw := FileAccess.get_file_as_string(path)
+	if raw == "":
+		return {}
+	var v: Variant = JSON.parse_string(raw)
+	return v as Dictionary if v is Dictionary else {}
+
+# Tail the SELECTED run's own progress feed instead of the deployed one — an
+# isolated run writes to <run>/progress/<key>.jsonl (ml/serving_paths.py).
+func _runs_open() -> void:
+	var run := _selected_run()
+	if run == "":
+		return
+	var key := _key()
+	if not _valid_key(key):
+		_proc_note = "pick a trainee first — RUNS opens that key's feed inside the run"
+		_refresh_ui()
+		return
+	var path := _runs_root.path_join(run).path_join("progress").path_join(key + ".jsonl")
+	if not FileAccess.file_exists(path):
+		_proc_note = "%s has no progress for '%s' yet" % [run, key]
+		_refresh_ui()
+		return
+	_attach(path, 0)
+	_proc_note = "showing %s · %s" % [run, key]
+	_refresh_ui()
+
+func _runs_promote() -> void:
+	var run := _selected_run()
+	if run == "":
+		return
+	var rel := RUNS_DIR.path_join(run)
+	var log_path := _repo.path_join(_log_rel("promote"))
+	DirAccess.make_dir_recursive_absolute(_repo.path_join(LOG_DIR))
+	var cmd := "cd %s && exec tools/train_run.sh --promote %s >> %s 2>&1" % [
+			_sq(_repo), _sq(rel), _sq(log_path)]
+	var pid := OS.create_process("bash", ["-lc", cmd])
+	_proc_note = ("promoting %s — gate-PASSING nets only; see %s" % [run, _log_rel("promote")]
+			if pid > 0 else "could not spawn tools/train_run.sh")
+	_cmd_label.text = "tools/train_run.sh --promote " + rel
+	_refresh_ui()
+
+# The registry, newest version first per key. The DEPLOYED pin is what the game
+# loads; everything else is a candidate waiting on a gate.
+func _refresh_nets() -> void:
+	if _nets == null:
+		return
+	var sel := _selected_net()
+	_nets.clear()
+	var reg := _read_json(_registry_path)
+	var pols: Array = reg.get("policies", [])
+	var rows: Array = []
+	for p in pols:
+		if p is Dictionary:
+			rows.append(p)
+	rows.sort_custom(func(a: Variant, b: Variant) -> bool:
+		var ka := str((a as Dictionary).get("key", ""))
+		var kb := str((b as Dictionary).get("key", ""))
+		if ka != kb:
+			return ka < kb
+		return int((a as Dictionary).get("version", 0)) > int((b as Dictionary).get("version", 0)))
+	for p in rows:
+		var d: Dictionary = p
+		var key := str(d.get("key", "?"))
+		var ver := int(d.get("version", 0))
+		var dep := bool(d.get("deployed", false))
+		var trainer := "ppo" if str(d.get("game_json", "")).contains("_ppo_") else "es"
+		_nets.add_item("%s  v%-3d %s  %s" % [key.rpad(20), ver,
+				"DEPLOYED" if dep else "candidate", trainer])
+		_nets.set_item_metadata(_nets.item_count - 1, "%s@v%d" % [key, ver])
+		if "%s@v%d" % [key, ver] == sel:
+			_nets.select(_nets.item_count - 1)
+	_refresh_ui()
+
+func _selected_net() -> String:
+	if _nets == null:
+		return ""
+	var sel := _nets.get_selected_items()
+	return str(_nets.get_item_metadata(sel[0])) if sel.size() > 0 else ""
+
+func _net_entry(ref: String) -> Dictionary:
+	var key := ref.get_slice("@", 0)
+	var ver := int(ref.get_slice("@", 1).substr(1))
+	for p in _read_json(_registry_path).get("policies", []):
+		if p is Dictionary and str((p as Dictionary).get("key", "")) == key \
+				and int((p as Dictionary).get("version", 0)) == ver:
+			return p
+	return {}
+
+# Moving the pin rewrites ml/serving/registry.json — one deployed entry per key,
+# exactly the invariant ml/eval/gate.py and tools/train_run.sh --promote keep.
+func _set_deployed(ref: String, on: bool) -> void:
+	var reg := _read_json(_registry_path)
+	if reg.is_empty():
+		_proc_note = "no registry at " + REGISTRY
+		_refresh_ui()
+		return
+	var key := ref.get_slice("@", 0)
+	var ver := int(ref.get_slice("@", 1).substr(1))
+	var hit := false
+	for p in reg.get("policies", []):
+		if not (p is Dictionary):
+			continue
+		var d: Dictionary = p
+		if str(d.get("key", "")) != key:
+			continue
+		if int(d.get("version", 0)) == ver:
+			d["deployed"] = on
+			hit = true
+		elif on:
+			d["deployed"] = false          # one pin per key
+	if not hit:
+		_proc_note = "no such net: " + ref
+		_refresh_ui()
+		return
+	var f := FileAccess.open(_registry_path, FileAccess.WRITE)
+	if f == null:
+		_proc_note = "cannot write " + REGISTRY
+		_refresh_ui()
+		return
+	f.store_string(JSON.stringify(reg, " "))
+	f.close()
+	_proc_note = "%s %s" % [ref, "deployed — the fleet serves it now" if on else "retired"]
+	_refresh_nets()
+
+func _net_deploy() -> void:
+	var ref := _selected_net()
+	if ref != "":
+		_set_deployed(ref, true)
+
+func _net_retire() -> void:
+	var ref := _selected_net()
+	if ref != "":
+		_set_deployed(ref, false)
+
+func _set_side(side: String) -> void:
+	var ref := _selected_net()
+	if ref == "":
+		return
+	var entry := _net_entry(ref)
+	var build := str(entry.get("build", ""))
+	if build == "":
+		build = _selected_build()
+	var side_data := {"label": ref, "spec": ref, "build": build}
+	if side == "a":
+		_vs_a = side_data
+	else:
+		_vs_b = side_data
+	_refresh_ui()
+
+func _set_baseline(side: String, who: String) -> void:
+	var build := _selected_build()
+	var side_data := {"label": who, "spec": who, "build": build}
+	if side == "a":
+		_vs_a = side_data
+	else:
+		_vs_b = side_data
+	_refresh_ui()
+
+func _versus_run() -> void:
+	if _vs_a.is_empty() or _vs_b.is_empty():
+		_proc_note = "set both sides first (NETS: SET A / SET B, or a baseline)"
+		_refresh_ui()
+		return
+	var a_build := str(_vs_a.get("build", ""))
+	if a_build == "":
+		a_build = _selected_build()
+	var b_build := str(_vs_b.get("build", ""))
+	if b_build == "":
+		b_build = a_build
+	if a_build == "":
+		_proc_note = "pick a trainee — a versus needs a build to fight in"
+		_refresh_ui()
+		return
+	DirAccess.make_dir_recursive_absolute(_bench_root)
+	var stamp := Time.get_datetime_string_from_system(false, false).replace(":", "").replace("-", "").replace("T", "_")
+	var out := _bench_root.path_join("console_%s.json" % stamp)
+	var args := ("versus --a %s --b %s --a-build %s --b-build %s --best-of %d "
+			+ "--episodes %d --jobs %d --speed %s --label console --out %s") % [
+			_sq(str(_vs_a.spec)), _sq(str(_vs_b.spec)), _sq(a_build), _sq(b_build),
+			int(_vs_best_of.value), int(_vs_eps.value), int(_jobs.value),
+			_speed_spec(), _sq(out)]
+	_vs_pending = {"out": out, "t0": Time.get_ticks_msec()}
+	_vs_result.text = "running best of %d — %s vs %s…" % [
+			int(_vs_best_of.value), str(_vs_a.label), str(_vs_b.label)]
+	# the versus feed is its own key, so the PROGRESS tab can watch it live
+	_attach(_progress_path("versus"), _file_len(_progress_path("versus")))
+	_spawn_league(args, "versus", "versus")
+
+# The verdict file appears when the run finishes; poll for it rather than
+# blocking the console (matches how the progress tail works).
+func _poll_versus() -> void:
+	if _vs_pending.is_empty():
+		return
+	var out := str(_vs_pending.get("out", ""))
+	if out == "" or not FileAccess.file_exists(out):
+		return
+	var v := _read_json(out)
+	if v.is_empty():
+		return                              # still being written
+	_last_verdict = v
+	_vs_pending = {}
+	_refresh_history()
+	_refresh_ui()
+
+func _refresh_history() -> void:
+	if _vs_history == null:
+		return
+	_vs_history.clear()
+	var names: Array[String] = []
+	var d := DirAccess.open(_bench_root)
+	if d != null:
+		d.list_dir_begin()
+		var n := d.get_next()
+		while n != "":
+			if not d.current_is_dir() and n.ends_with(".json"):
+				names.append(n)
+			n = d.get_next()
+		d.list_dir_end()
+	names.sort()
+	names.reverse()
+	for name in names:
+		var v := _read_json(_bench_root.path_join(name))
+		if v.is_empty():
+			continue
+		var a: Dictionary = v.get("a", {})
+		var b: Dictionary = v.get("b", {})
+		_vs_history.add_item("%s  %d-%d  %s" % [
+				"%s vs %s" % [str(a.get("label", "?")), str(b.get("label", "?"))],
+				int(v.get("rounds_a", 0)), int(v.get("rounds_b", 0)),
+				str(v.get("winner", "?")).to_upper()])
+		_vs_history.set_item_metadata(_vs_history.item_count - 1, name)
+
+# ---- isolated / GPU training (tools/train_run.sh) -----------------------------------------
+
+# The console's own run folder name: DATE FIRST so ml/runs/ sorts by time, and
+# --run-dir hands it to the script so we know where to tail from.
+func _console_run_dir(key: String) -> String:
+	var t := Time.get_datetime_dict_from_system()
+	var stamp := "%04d-%02d-%02d_%02d%02d" % [t.year, t.month, t.day, t.hour, t.minute]
+	var knobs := ("steps%d_envs%d" % [2000000, 512]) if _gpu.button_pressed \
+			else ("g%d_p%d_e%d_j%d" % [int(_gens.value), int(_pop.value),
+					int(_eps.value), int(_jobs.value)])
+	return RUNS_DIR.path_join("%s__%s-console__%s" % [stamp, key, knobs])
+
+func _spawn_train_run(key: String, build: String) -> void:
+	var run_dir := _console_run_dir(key)
+	var log_path := _repo.path_join(_log_rel(key))
+	DirAccess.make_dir_recursive_absolute(_repo.path_join(LOG_DIR))
+	var env := ""
+	var args := ""
+	if _gpu.button_pressed:
+		var opp := _selected_opponents()
+		var opp_build: String = str(opp[0]) if not opp.is_empty() else build
+		env = "ENVS=512 EPISODES=%d SEED=2026 " % int(_eps.value)
+		args = "--ppo --key %s --build %s --opp-build %s --run-dir %s" % [
+				_sq(key), _sq(build), _sq(opp_build), _sq(run_dir)]
+	else:
+		env = "GENERATIONS=%d POP=%d EPISODES=%d JOBS=%d SPEED=%s " % [
+				int(_gens.value), int(_pop.value), int(_eps.value), int(_jobs.value),
+				_speed_spec()]
+		var opps := _opponent_spec()
+		if opps != "":
+			env += "OPPONENTS=%s " % _sq(opps)
+		args = "--key %s --build %s --run-dir %s" % [_sq(key), _sq(build), _sq(run_dir)]
+	var cmd := "cd %s && exec env %stools/train_run.sh %s >> %s 2>&1" % [
+			_sq(_repo), env, args, _sq(log_path)]
+	_pid = OS.create_process("bash", ["-lc", cmd])
+	if _pid <= 0:
+		_pid = -1
+		_proc_note = "could not spawn tools/train_run.sh"
+	else:
+		_pid_kind = "ppo" if _gpu.button_pressed else "train"
+		_proc_note = "%s started · pid %d · %s" % [_pid_kind, _pid, run_dir]
+	# the isolated run writes its progress inside the run folder
+	_attach(_repo.path_join(run_dir).path_join("progress").path_join(key + ".jsonl"), 0)
+	_cmd_label.text = "env %stools/train_run.sh %s" % [env, args]
+	_refresh_runs()
+	_refresh_ui()
+
 func _run_selftest() -> void:
 	var path := ProjectSettings.globalize_path("user://console_fixture.jsonl")
 	DirAccess.make_dir_recursive_absolute(path.get_base_dir())
@@ -965,8 +1566,136 @@ func _run_selftest() -> void:
 		ok = false
 		push_error("CONSOLE SELFTEST: ETA %.1f s of %d matches, want > 0 of 12" % [
 				_eta_s(), _total_matches()])
+	ok = _selftest_cockpit() and ok
 	if ok:
 		print("CONSOLE SELFTEST OK — %d generations, %d/%d matches, ETA %s, chart draws %d, hint '%s'" % [
 				(_run.gens as Array).size(), int(_run.matches), _total_matches(),
 				_fmt_s(_eta_s()), _chart_draws, _hint.text])
 	get_tree().quit(0 if ok else 1)
+
+# The cockpit tabs, against FIXTURES under user:// — the gate must never read or
+# write the real ml/serving/registry.json, ml/runs/ or ml/data/benchmarks/.
+func _selftest_cockpit() -> bool:
+	var ok := true
+	var root := ProjectSettings.globalize_path("user://console_selftest")
+	DirAccess.make_dir_recursive_absolute(root.path_join("runs"))
+	DirAccess.make_dir_recursive_absolute(root.path_join("bench"))
+	_registry_path = root.path_join("registry.json")
+	_runs_root = root.path_join("runs")
+	_bench_root = root.path_join("bench")
+
+	# --- a registry with two keys: one deployed pin, two candidates ----------
+	var reg := {"schema": "arena.registry.v1", "policies": [
+		{"key": "fen_boar", "version": 1, "deployed": true, "created": "2026-09-01T00:00:00",
+			"build": "core.arena.fen_boar_alpha", "game_json": "weights/fen_boar_v1.json"},
+		{"key": "fen_boar", "version": 2, "deployed": false, "created": "2026-09-02T00:00:00",
+			"build": "core.arena.fen_boar_alpha", "game_json": "weights/fen_boar_v2.json",
+			"eval": {"checks": {"suite_native": {"win_rate": 0.62, "pass": true}}}},
+		{"key": "cinder_drake", "version": 1, "deployed": false, "created": "2026-09-03T00:00:00",
+			"build": "core.arena.cinder_drake", "game_json": "weights/cinder_drake_ppo_v1.json"}]}
+	var f := FileAccess.open(_registry_path, FileAccess.WRITE)
+	f.store_string(JSON.stringify(reg, " "))
+	f.close()
+	_refresh_nets()
+	if _nets.item_count != 3:
+		ok = false
+		push_error("CONSOLE SELFTEST: registry shows %d nets, want 3" % _nets.item_count)
+	# newest version first within a key, keys alphabetical
+	if str(_nets.get_item_metadata(0)) != "cinder_drake@v1" \
+			or str(_nets.get_item_metadata(1)) != "fen_boar@v2":
+		ok = false
+		push_error("CONSOLE SELFTEST: net order wrong: %s, %s" % [
+				str(_nets.get_item_metadata(0)), str(_nets.get_item_metadata(1))])
+
+	# --- deploying v2 must move the pin, not add a second one ---------------
+	_nets.select(1)
+	_net_deploy()
+	var after := _read_json(_registry_path)
+	var deployed: Array[String] = []
+	for pol in after.get("policies", []):
+		if bool((pol as Dictionary).get("deployed", false)):
+			deployed.append("%s@v%d" % [str((pol as Dictionary).get("key", "")),
+					int((pol as Dictionary).get("version", 0))])
+	var want_pins: Array[String] = ["fen_boar@v2"]
+	if deployed != want_pins:
+		ok = false
+		push_error("CONSOLE SELFTEST: after DEPLOY the pins are %s, want [fen_boar@v2]" % str(deployed))
+	_net_retire()
+	after = _read_json(_registry_path)
+	for pol in after.get("policies", []):
+		if bool((pol as Dictionary).get("deployed", false)):
+			ok = false
+			push_error("CONSOLE SELFTEST: RETIRE left a deployed pin behind")
+
+	# --- a run folder shows up, and its progress is tailable ----------------
+	var run_name := "2026-09-13_0700__fen_boar-console__g2_p2_e1_j4"
+	var run_dir := _runs_root.path_join(run_name)
+	DirAccess.make_dir_recursive_absolute(run_dir.path_join("progress"))
+	f = FileAccess.open(run_dir.path_join("config.json"), FileAccess.WRITE)
+	f.store_string(JSON.stringify({"started": "2026-09-13T07:00:00", "mode": "es",
+			"keys_label": "fen_boar", "knobs": "g2_p2_e1_j4", "seeded_from": "deployed registry",
+			"es": {"generations": 2, "pop": 2, "episodes": 1, "jobs": 4},
+			"env": {"godot": "4.6", "git_head": "abc1234"}}, " "))
+	f.close()
+	f = FileAccess.open(run_dir.path_join("progress").path_join("fen_boar.jsonl"), FileAccess.WRITE)
+	for line in _fixture_lines():
+		f.store_line(line)
+	f.close()
+	_refresh_runs()
+	if _runs.item_count != 1 or str(_runs.get_item_metadata(0)) != run_name:
+		ok = false
+		push_error("CONSOLE SELFTEST: runs list has %d entries" % _runs.item_count)
+	_runs.select(0)
+	_key_edit.text = "fen_boar"
+	_runs_open()
+	if (_run.gens as Array).size() < 2 or int(_run.matches) != 8:
+		ok = false
+		push_error("CONSOLE SELFTEST: OPEN read %d gens / %d matches from the run folder" % [
+				(_run.gens as Array).size(), int(_run.matches)])
+	_refresh_ui()
+	if _runs_info.text.find("abc1234") < 0:
+		ok = false
+		push_error("CONSOLE SELFTEST: run panel does not show the run's config")
+	if not _runs_promote_btn.disabled:
+		ok = false
+		push_error("CONSOLE SELFTEST: PROMOTE offered for a run with no summary.txt")
+
+	# --- versus: sides, the command, and a verdict read back ----------------
+	_nets.select(1)
+	_set_side("a")
+	_set_baseline("b", "native")
+	if str(_vs_a.get("spec", "")) != "fen_boar@v2" or str(_vs_b.get("spec", "")) != "native":
+		ok = false
+		push_error("CONSOLE SELFTEST: versus sides are %s / %s" % [
+				str(_vs_a.get("spec", "")), str(_vs_b.get("spec", ""))])
+	var verdict := {"schema": "arena.versus.v1", "best_of": 5, "episodes_per_round": 3,
+			"wall_s": 12.5, "rounds_a": 3, "rounds_b": 2, "rounds_drawn": 0,
+			"clinched_round": 5, "winner": "a",
+			"a": {"label": "fen_boar v2 (candidate)"}, "b": {"label": "native"}}
+	f = FileAccess.open(_bench_root.path_join("2026-09-13_070000__a_vs_b.json"), FileAccess.WRITE)
+	f.store_string(JSON.stringify(verdict, " "))
+	f.close()
+	_refresh_history()
+	if _vs_history.item_count != 1 or _vs_history.get_item_text(0).find("3-2") < 0:
+		ok = false
+		push_error("CONSOLE SELFTEST: benchmark history shows %d rows" % _vs_history.item_count)
+	_last_verdict = verdict
+	_refresh_ui()
+	if _vs_result.text.find("WINNER: A") < 0 or _vs_result.text.find("clinched in round 5") < 0:
+		ok = false
+		push_error("CONSOLE SELFTEST: verdict panel reads '%s'" % _vs_result.text)
+
+	# --- the isolated-run command line, without spawning anything -----------
+	_isolated.button_pressed = true
+	_gpu.button_pressed = false
+	var dir_es := _console_run_dir("fen_boar")
+	_gpu.button_pressed = true
+	var dir_ppo := _console_run_dir("fen_boar")
+	_gpu.button_pressed = false
+	if dir_es.find("ml/runs/") != 0 or dir_es.find("__fen_boar-console__g") < 0:
+		ok = false
+		push_error("CONSOLE SELFTEST: ES run dir '%s'" % dir_es)
+	if dir_ppo.find("envs512") < 0:
+		ok = false
+		push_error("CONSOLE SELFTEST: PPO run dir '%s'" % dir_ppo)
+	return ok

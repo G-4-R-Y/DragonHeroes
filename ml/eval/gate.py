@@ -10,6 +10,18 @@ Checks (all proposals, tuned as the league matures):
 
 A failed gate keeps the fleet on the previous pinned version — deliberately
 boring (tech/25 §8).
+
+BANDS (the constants below are the contract; docs/tech/37 carries the why):
+    SCRIPTED_BAND   (0.30, 1.00)  vs the scripted baseline AND the native AI
+    LADDER_BAND     (0.25, 0.90)  vs the currently deployed net of the same key
+    MIN_DAMAGE_FRAC 0.05          mean loser hp deficit per episode
+WHAT A VERDICT WRITES: the candidate's registry entry gains
+`eval.checks = {<check>: {"win_rate": .., "pass": bool}}`, and on a pass its
+`deployed` flag is set while the previous pin for that key is cleared — one
+deployed entry per key is the invariant tools/train_run.sh --promote and the
+training console's DEPLOY/RETIRE both preserve.
+WHO READS IT: game/arena/neural_policy.gd loads the deployed pin; the console's
+NETS tab shows the checks; `league versus` resolves "<key>@deployed".
 """
 from __future__ import annotations
 

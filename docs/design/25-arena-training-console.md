@@ -61,6 +61,16 @@ per line, `t` = unix seconds, `ev` = event:
 {"t":..,"ev":"gate","version":1,"pass":false,"metrics":{...}}     # from `league gate`
 {"t":..,"ev":"error","message":"..."}
 ```
+The head-to-head bench (`league versus`) rides the same feed under the key
+`versus`, so the PROGRESS tab paints a best-of-N exactly like a training run:
+```
+{"t":..,"ev":"versus_start","a":"fen_boar v2 (candidate)","b":"native",
+ "a_build":"core.arena.fen_boar_alpha","b_build":"...","best_of":9,"episodes":3}
+{"t":..,"ev":"versus_round","i":0,"seed":2026,"wins_a":2,"wins_b":1,"draws":0,
+ "hp_a":0.41,"hp_b":0.0,"score_a":0.6667,"duration_s":11.3}
+{"t":..,"ev":"versus_done","winner":"a","rounds_a":5,"rounds_b":4,"draws":0,
+ "out":"ml/data/benchmarks/2026-09-13_0709__fen_boar-v2_vs_native.json"}
+```
 Rules: append-only, one line per event, flush after each write; the console
 tolerates partial trailing lines and unknown events. `match` events come
 from inside `evaluate_candidates` (per arena run — a run IS one match of N
@@ -90,6 +100,40 @@ the verifier and a parallel freed-instance sweep died when the two workflows
 exhausted the session quota. Verification, the jobs/speed/hint/strip controls,
 the `--speed` lever (§5) and these docs were done inline. Standing rule since:
 no background agents unless Ricardo asks (canon §12.39, CLAUDE.md).
+
+## 3b. The cockpit tabs (v2, 2026-09-13)
+
+Ricardo: *"Is the train_run included in arena console? can we run it there
+instead? as well as manage active and deployed nets, and even put one against
+the other for benchmarking (best of N)"* — and *"can we run this gpu training
+in the console, as well?"*. The answer to all of it is yes; the right-hand pane
+became a `TabContainer`.
+
+| Tab | What it does | What it shells out to |
+| --- | --- | --- |
+| PROGRESS | the original fitness chart, match strip, gate verdict — now also paints a best-of-N | — (tails the feed) |
+| RUNS | every folder under `ml/runs/`, newest first, with its `config.json`, gate verdicts and wall time. OPEN PROGRESS tails **that run's** feed; PROMOTE copies its gate-PASSING nets into `ml/serving` | `tools/train_run.sh --promote` |
+| NETS | the registry: every key's versions, which one is the DEPLOYED pin, its gate checks. DEPLOY moves the pin (clearing the old one — one pin per key), RETIRE clears it, SET A / SET B arm the bench | writes `ml/serving/registry.json` directly |
+| VERSUS | best-of-N between any two sides — a registry net, a weights file, or the native/scripted baselines. Verdicts accumulate in `ml/data/benchmarks/` and the history list never clears | `league versus` |
+
+Two switches in the roster panel decide what TRAIN does:
+
+- **isolated run** (on by default) routes TRAIN through `tools/train_run.sh
+  --run-dir ml/runs/<date>__<key>-console__<knobs>`. The run gets its own
+  registry seeded from the deployed one, its own weights and its own progress
+  feed, so an experiment started from the console can never overwrite what the
+  game serves. The console names the folder itself (hence `--run-dir`) so it
+  knows where to tail from instead of guessing a timestamp.
+- **GPU (PPO)** swaps the ES league for `ml/training/ppo.py` on CUDA
+  (`tools/train_run.sh --ppo`), which needs `ml/.venv`. The first selected
+  opponent becomes `--opp-build`.
+
+`--selftest` covers all of it against fixtures under `user://console_selftest/`:
+the gate never reads or writes the real registry, run folders or benchmarks.
+It asserts the registry ordering, that DEPLOY moves the single pin and RETIRE
+clears it, that a run folder's own feed is tailable, that PROMOTE is refused
+while a run has no `summary.txt`, that both versus sides arm and a verdict
+reads back, and that the isolated/GPU run-folder names come out right.
 
 ## 4. Out of scope (v1)
 

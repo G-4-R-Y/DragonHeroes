@@ -5,6 +5,13 @@
 > Commands: [docs/USAGE.md §4](../docs/USAGE.md). Isolated, cumulative runs:
 > `tools/train_run.sh` (writes `ml/runs/<date>__<keys>__<config>/`, leaves the
 > deployed `ml/serving/` alone until you promote a winner).
+>
+> The GUI for all of it is the **training console**
+> (`godot --path game res://arena/console.tscn`): it starts isolated ES *and*
+> GPU/PPO runs through `tools/train_run.sh`, browses `ml/runs/`, manages the
+> registry (which version is the deployed pin), and runs **best-of-N** head to
+> head between any two nets — see [design/25](../docs/design/25-arena-training-console.md).
+> Watch a long run from a terminal with `tools/train_watch.py`.
 
 
 RL is scoped to elite bosses, Champion Ghosts, and Gloomfall fill (canon §9) —

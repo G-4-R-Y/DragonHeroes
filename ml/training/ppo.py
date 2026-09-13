@@ -1,7 +1,8 @@
 """PPO over dh-env (docs/tech/25 §R1): the GPU trainer Ricardo asked for.
 
   learner (torch, CUDA, VRAM-capped via gpu_guard)
-    × N in-process libdh-env arenas (216-256k steps/s/core, no Godot)
+    × N in-process libdh-env arenas, ALL stepped in one call per tick
+      (dh_env_step_many: 352k env-steps/s at 32 envs, 639k at 128)
     × opponents: native | scripted | mlp SELF-PLAY (frozen snapshots of the
       learner — the past-self league inside the env; exploiters join via
       ml/training/league.py's opponent lists)
@@ -13,7 +14,23 @@ PPO optimize the same objective and every PPO checkpoint exports schema
     ml/.venv/bin/python -m ml.training.ppo \
         --key cinder_drake --build core.arena.cinder_drake \
         --opp-build core.arena.fen_boar_alpha \
-        --steps 2000000 --envs 32 --selfplay-every 4
+        --steps 2000000 --envs 512 --selfplay-every 4
+
+Throughput (Ricardo, 2026-09-13: "A batched step across all environments... is
+roughly sixteen times of headroom sitting there. --> do it!"). Two things were
+in the way, and the second only became visible once the first was fixed:
+
+  1. the rollout crossed into C four times PER ENV PER TICK (step, hp_frac x2,
+     winner). dh_env_step_many does the whole tick in one crossing:
+     32 envs 56.6k -> 352.6k env-steps/s (6.2x), 128 envs 55.0k -> 638.8k
+     (11.6x), trajectories bit-identical to the per-env path.
+  2. with the envs cheap, each tick is one SMALL GPU forward, so the rollout
+     became kernel-launch bound. A wider batch fixes it: end-to-end PPO went
+     5,834 -> 56,288 steps/s going from 32 to 512 envs (9.6x), and is flat
+     past 512. Hence the new --envs default.
+
+Both were measured while a 20-job ES sweep had the box at load 20, so an idle
+machine does better. `roll=`/`upd=` in each iteration line shows the split.
 """
 from __future__ import annotations
 
@@ -27,7 +44,7 @@ import numpy as np
 import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-from ml.env.dh_env import DhEnv, OBS_DIM                     # noqa: E402
+from ml.env.dh_env import DhEnv, VecDhEnv, OBS_DIM           # noqa: E402
 from ml.training.gpu_guard import apply as gpu_apply, clamp_batch  # noqa: E402
 from ml.training.torch_policy import TorchPolicyNet, TorchGRUPolicyNet  # noqa: E402
 from ml.serving_paths import registry_path as ml_registry_path  # noqa: E402
@@ -95,7 +112,14 @@ def main() -> None:
     ap.add_argument("--build", required=True)
     ap.add_argument("--opp-build", required=True)
     ap.add_argument("--steps", type=int, default=2_000_000)
-    ap.add_argument("--envs", type=int, default=32)
+    # was 32 until 2026-09-13. With the per-env Python loop gone
+    # (dh_env_step_many), the cost per TICK is one small GPU forward, so the
+    # way to go faster is a WIDER batch per launch, not a longer horizon.
+    # Measured on the dev box while a 20-job ES sweep was running:
+    #   envs=32   5,834 steps/s     envs=256  31,582 steps/s
+    #   envs=64   9,747 steps/s     envs=512  56,288 steps/s  <- the knee
+    #   envs=1024 57,757 steps/s    envs=2048 56,414 steps/s  (flat past 512)
+    ap.add_argument("--envs", type=int, default=512)
     ap.add_argument("--selfplay-every", type=int, default=4,
                     help="refresh the frozen self-play opponent every K iterations")
     ap.add_argument("--warm-start", default="", help="registry JSON/npz to init from")
@@ -107,6 +131,11 @@ def main() -> None:
                     help="2v2: build id of the learner-side buddy body")
     ap.add_argument("--squad-b-buddy", default="",
                     help="2v2: build id of the enemy-side buddy body")
+    ap.add_argument("--env-threads", type=int, default=1,
+                    help="worker threads inside dh_env_step_many. 1 (the "
+                         "default) is fastest on a busy box: a 32-env tick is "
+                         "only tens of microseconds, so sync costs more than "
+                         "it saves. Raise it only with >=128 envs on idle cores.")
     ap.add_argument("--arch", choices=["mlp", "gru"], default="mlp",
                     help="gru = recurrent net (temporal combos/kiting); "
                          "self-play snapshots disabled (C++ opponent is "
@@ -158,7 +187,13 @@ def main() -> None:
                 for i in range(args.envs)]
     mlp_envs = envs if args.exploit else \
         ([] if (args.arch == "gru" or squad) else envs[2::3])
-    obs = np.stack([e.reset(seed=args.seed * 977 + i) for i, e in enumerate(envs)])
+    # ONE ctypes crossing per tick instead of four per env per tick
+    # (Ricardo, 2026-09-13: "do it!"). Measured on the dev box while it was
+    # fully loaded: 32 envs 56.6k -> 352.6k steps/s (6.2x), 128 envs 55.0k ->
+    # 638.8k (11.6x), bit-identical trajectories to the per-env path.
+    vec = VecDhEnv(envs, threads=max(1, args.env_threads))
+    obs = vec.reset(np.array([args.seed * 977 + i for i in range(args.envs)],
+                             dtype=np.uint64)).copy()
     prev_self = np.ones(args.envs, dtype=np.float32)
     prev_foe = np.ones(args.envs, dtype=np.float32)
 
@@ -205,6 +240,7 @@ def main() -> None:
                 and iteration % args.selfplay_every == 0:
             refresh_selfplay()   # past-self becomes the opponent
         # ---- rollout --------------------------------------------------------
+        t_roll = time.time()
         T, N = t_horizon, args.envs
         b_obs = torch.zeros(T, N, obs_dim)
         b_move = torch.zeros(T, N, 2)
@@ -236,36 +272,45 @@ def main() -> None:
                 b_logp[t] = logp.cpu()
                 b_val[t] = value.cpu()
                 m_np = m.cpu().numpy()
-                for i, e in enumerate(envs):
-                    done, nobs = e.step((float(m_np[i, 0]), float(m_np[i, 1])),
-                                        int(acts[i]))
-                    r = R_HP_DELTA * ((prev_foe[i] - e.hp_frac(1))
-                                      - (prev_self[i] - e.hp_frac(0))) - R_TIME
-                    tick_count[i] += 1
-                    if 3 <= int(acts[i]) <= 6:   # a kit was cast
-                        r += R_KIT
-                        if last_kit[i] >= 0 and last_kit[i] != int(acts[i]) \
-                                and tick_count[i] - last_kit_tick[i] <= CHAIN_WINDOW:
-                            r += R_CHAIN   # chained a DIFFERENT kit in the window
-                        last_kit[i] = int(acts[i])
-                        last_kit_tick[i] = tick_count[i]
-                    if done:
-                        w = e.winner
-                        r += R_WIN if w == 0 else (R_LOSE if w == 1 else 0.0)
-                        results.append(w)
-                        nobs = e.reset(seed=int(rng.integers(2**31)))
-                        prev_self[i] = prev_foe[i] = 1.0
-                        last_kit[i] = -1
-                        tick_count[i] = 0
-                        if h is not None:
-                            h[i] = 0.0   # episode boundary wipes temporal state
-                    else:
-                        prev_self[i] = e.hp_frac(0)
-                        prev_foe[i] = e.hp_frac(1)
-                    b_rew[t, i] = r
-                    b_done[t, i] = float(done)
-                    obs[i] = nobs
+                # the whole tick in one call; hp, done and winner come back
+                # with the observations, so nothing else crosses into C here
+                nobs, done_n, hp, win = vec.step(m_np, acts)
+                self_hp, foe_hp = hp[:, 0], hp[:, 1]
+                r = (R_HP_DELTA * ((prev_foe - foe_hp) - (prev_self - self_hp))
+                     - R_TIME).astype(np.float32)
+                tick_count += 1
+                kit = (acts >= 3) & (acts <= 6)          # a kit was cast
+                if kit.any():
+                    r[kit] += R_KIT
+                    # chained a DIFFERENT kit inside the combo window
+                    chain = kit & (last_kit >= 0) & (last_kit != acts) \
+                        & ((tick_count - last_kit_tick) <= CHAIN_WINDOW)
+                    r[chain] += R_CHAIN
+                    last_kit[kit] = acts[kit]
+                    last_kit_tick[kit] = tick_count[kit]
+                live = done_n == 0
+                prev_self[live] = self_hp[live]
+                prev_foe[live] = foe_hp[live]
+                fin = np.flatnonzero(done_n)
+                if fin.size:
+                    w = win[fin]
+                    r[fin] += np.where(w == 0, R_WIN,
+                                       np.where(w == 1, R_LOSE, 0.0)).astype(np.float32)
+                    results.extend(int(x) for x in w)
+                    vec.reset_done(fin, rng.integers(1, 2**31, size=fin.size)
+                                   .astype(np.uint64))
+                    prev_self[fin] = 1.0
+                    prev_foe[fin] = 1.0
+                    last_kit[fin] = -1
+                    tick_count[fin] = 0
+                    if h is not None:
+                        h[fin] = 0.0   # episode boundary wipes temporal state
+                b_rew[t] = r
+                b_done[t] = done_n.astype(np.float32)
+                obs = nobs
         done_steps += T * N
+        roll_s = time.time() - t_roll
+        t_upd = time.time()
         # ---- GAE ------------------------------------------------------------
         with torch.no_grad():
             if h is not None:
@@ -344,12 +389,21 @@ def main() -> None:
                     loss.backward()
                     torch.nn.utils.clip_grad_norm_(net.parameters(), 0.5)
                     opt.step()
-        if iteration % 5 == 0:
-            recent = results[-200:]
-            wr = sum(1 for w in recent if w == 0) / max(1, len(recent))
-            sps = done_steps / (time.time() - t0)
-            print(f"[ppo:{args.key}] it={iteration} steps={done_steps:,} "
-                  f"sps={sps:,.0f} win_rate(last {len(recent)})={wr:.2f}")
+        # every iteration, not every fifth: a rollout is ~30 s and a silent
+        # trainer is an unreadable trainer (Ricardo, 2026-09-13: "make sure to
+        # make logs constant and pretty in those files")
+        upd_s = time.time() - t_upd
+        recent = results[-200:]
+        wr = sum(1 for w in recent if w == 0) / max(1, len(recent))
+        sps = done_steps / (time.time() - t0)
+        shown = min(done_steps, args.steps)
+        eta = max(0.0, (args.steps - done_steps)) / max(sps, 1.0)
+        # roll/upd split: after the batched dh_env_step_many landed, the
+        # rollout is no longer the expensive half — the PPO update is.
+        print(f"[ppo:{args.key}] it={iteration} steps={shown:,}/{args.steps:,} "
+              f"sps={sps:,.0f} roll={roll_s:.1f}s({T * N / max(roll_s, 1e-6):,.0f}/s) "
+              f"upd={upd_s:.1f}s win_rate(last {len(recent)})={wr:.2f} "
+              f"eta={int(eta) // 60:d}m{int(eta) % 60:02d}s", flush=True)
     # ---- export: the same JSON the Godot arena gates ------------------------
     WEIGHTS_DIR.mkdir(parents=True, exist_ok=True)
     reg = json.load(open(REGISTRY)) if REGISTRY.exists() else \

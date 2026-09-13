@@ -63,6 +63,40 @@ DH_API void dh_env_reset(DhEnv* env, uint64_t seed, float* out_obs31);
 DH_API int dh_env_step(DhEnv* env, float move_x, float move_y, int32_t act,
                        float* out_obs31);
 /* -2 fighting, -1 draw, 0 learner (A) won, 1 opponent (B) won. */
+/* ---- batched stepping (docs/tech/25 §R1) ---------------------------------
+ * Ricardo, 2026-09-13: "A batched step across all environments, or a few
+ * worker processes, is roughly sixteen times of headroom sitting there. -->
+ * do it!"  The PPO rollout used to cross the ctypes boundary 3-4 times PER ENV
+ * PER TICK (step + two hp_frac + winner), which is why end-to-end throughput
+ * was 32k steps/s against the 527k the sim itself can do. These two calls move
+ * the whole per-tick fan-out into C++: one call steps every env, returns their
+ * observations, done flags, hp fractions and winners in caller-owned arrays,
+ * and can spread the envs over a persistent worker pool (the envs share
+ * nothing, so this is embarrassingly parallel).
+ *
+ * envs      : n environment handles; all must have the same obs_dim
+ * move_xy   : 2n floats, (x, y) per env      acts: n ints
+ * out_obs   : n * obs_dim floats, post-step  (NULL to skip)
+ * out_done  : n int32, 1 when the episode ended on this tick (NULL to skip)
+ * out_hp    : 2n floats, [learner, opponent] per env (NULL to skip)
+ * out_winner: n int32, dh_env_winner after the step (NULL to skip)
+ * n_threads : <= 1 steps serially on the calling thread; otherwise the envs
+ *             are drained by that many persistent workers. The pool is created
+ *             on first use and reused; ask for the same number every call.
+ * Returns how many envs reported done this tick.
+ * Episodes are NOT auto-reset: the caller still owns the boundary (it needs
+ * the terminal observation first). Reset the finished ones with
+ * dh_env_reset_many, which takes the subset and writes their obs compactly. */
+DH_API int32_t dh_env_step_many(DhEnv* const* envs, int32_t n,
+                                const float* move_xy, const int32_t* acts,
+                                float* out_obs, int32_t* out_done,
+                                float* out_hp, int32_t* out_winner,
+                                int32_t n_threads);
+DH_API void dh_env_reset_many(DhEnv* const* envs, int32_t n,
+                              const uint64_t* seeds, float* out_obs);
+/* Tears the worker pool down (tests, and before fork()). Safe to call always. */
+DH_API void dh_env_shutdown_pool(void);
+
 DH_API int dh_env_winner(const DhEnv* env);
 DH_API float dh_env_hp_frac(const DhEnv* env, int32_t who);
 DH_API uint64_t dh_env_tick(const DhEnv* env);

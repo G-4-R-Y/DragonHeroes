@@ -25,24 +25,28 @@
 #   GENERATIONS=200 POP=10 EPISODES=6 tools/train_run.sh --all # the real budget
 #   tools/train_run.sh --ppo --key cinder_drake --build core.arena.cinder_drake \
 #       --opp-build core.arena.fen_boar_alpha                  # GPU PPO instead of ES
+#   tools/train_run.sh --run-dir ml/runs/<name> --key ... --build ...   # caller names it
 #   tools/train_run.sh --list                                  # every past run, oldest first
 #   tools/train_run.sh --promote ml/runs/<run>                 # copy PASSING nets into ml/serving
 #
 # Env knobs (ES): GENERATIONS (20) POP (8) EPISODES (4) JOBS (nproc) SEED (2026)
 #                 SPEED (max) OPPONENTS ("")
-# Env knobs (PPO): STEPS (2000000) ENVS (32) ARCH (mlp) SELFPLAY_EVERY (4)
+# Env knobs (PPO): STEPS (2000000) ENVS (512) ARCH (mlp) SELFPLAY_EVERY (4)
 set -euo pipefail
 cd "$(dirname "$0")/.."
 REPO="$PWD"
+# shellcheck source=tools/dh_term.sh
+source "$REPO/tools/dh_term.sh"      # palette, dragon banner, rules, bars
 
 GENERATIONS="${GENERATIONS:-20}"; POP="${POP:-8}"; EPISODES="${EPISODES:-4}"
 JOBS="${JOBS:-$(nproc)}"; SEED="${SEED:-2026}"; SPEED="${SPEED:-max}"
 OPPONENTS="${OPPONENTS:-}"
-STEPS="${STEPS:-2000000}"; ENVS="${ENVS:-32}"; ARCH="${ARCH:-mlp}"
+STEPS="${STEPS:-2000000}"; ENVS="${ENVS:-512}"; ARCH="${ARCH:-mlp}"  # ENVS was 32 pre-batching
 SELFPLAY_EVERY="${SELFPLAY_EVERY:-4}"
 PYVENV="$REPO/ml/.venv/bin/python"
 
 MODE="es"; ALL=0; KEY=""; BUILD=""; OPP_BUILD=""; LABEL=""; FRESH=0; NOTE=""
+RUN_DIR=""            # --run-dir: the caller names the folder (the console does)
 while [ $# -gt 0 ]; do
   case "$1" in
     --all) ALL=1; shift;;
@@ -52,6 +56,7 @@ while [ $# -gt 0 ]; do
     --label) LABEL="$2"; shift 2;;
     --note) NOTE="$2"; shift 2;;
     --fresh) FRESH=1; shift;;
+    --run-dir) RUN_DIR="$2"; shift 2;;
     --ppo) MODE="ppo"; shift;;
     --list) MODE="list"; shift;;
     --promote) MODE="promote"; RUN_IN="${2:-}"; shift 2 || shift;;
@@ -147,8 +152,12 @@ else
   KNOBS="g${GENERATIONS}_p${POP}_e${EPISODES}_j${JOBS}_s${SEED}"
 fi
 STAMP="$(date +%Y-%m-%d_%H%M)"                     # DATE FIRST: the folder sorts by time
-RUN="$REPO/ml/runs/${STAMP}__${KEYS_LABEL}__${KNOBS}"
-[ ! -e "$RUN" ] || RUN="${RUN}_$(date +%S)"
+if [ -n "$RUN_DIR" ]; then
+  case "$RUN_DIR" in /*) RUN="$RUN_DIR";; *) RUN="$REPO/$RUN_DIR";; esac
+else
+  RUN="$REPO/ml/runs/${STAMP}__${KEYS_LABEL}__${KNOBS}"
+  [ ! -e "$RUN" ] || RUN="${RUN}_$(date +%S)"
+fi
 mkdir -p "$RUN/weights" "$RUN/progress" "$RUN/logs"
 
 ACTIVE="$(pgrep -fa 'ml\.training\.(league|ppo|evolve)' | grep -v train_run | head -3 || true)"
@@ -188,20 +197,31 @@ json.dump({
 }, open(run / "config.json", "w"), indent=2)
 PY
 
-echo "[train-run] $RUN"
-echo "[train-run] isolated: DH_SERVING_DIR — ml/serving is untouched. Seeded from: $SEEDED"
-[ -z "$ACTIVE" ] || echo "[train-run] NOTE: another trainer is running:"$'\n'"$ACTIVE"
+dh_banner "DRAGON HEROES" "TRAINING FORGE · isolated, cumulative runs"
+dh_kv run "${RUN#"$REPO"/}"
+dh_kv mode "$MODE · $KEYS_LABEL · $KNOBS"
+dh_kv seeded "$SEEDED"
+dh_kv isolated "DH_SERVING_DIR=$RUN — ml/serving is untouched"
+dh_kv watch "tools/train_watch.py ${RUN#"$REPO"/}"
+[ -z "$NOTE" ] || dh_kv note "$NOTE"
+[ -z "$ACTIVE" ] || { dh_warn "another trainer is already running:"; echo "$ACTIVE" | sed 's/^/      /'; }
+echo
 export DH_SERVING_DIR="$RUN"
 godot --headless --path game --import >/dev/null 2>&1 || true
 T0=$(date +%s)
 
 if [ "$MODE" = "ppo" ]; then
-  echo "=== ppo $KEY ($BUILD vs $OPP_BUILD, $ARCH, $STEPS steps, $ENVS envs) ==="
+  dh_rule "ppo $KEY"
+  dh_kv build "$BUILD  vs  $OPP_BUILD"
+  dh_kv budget "$STEPS steps · $ENVS envs · $ARCH · self-play every $SELFPLAY_EVERY"
   "$PYVENV" -u -m ml.training.ppo --key "$KEY" --build "$BUILD" \
       --opp-build "$OPP_BUILD" --steps "$STEPS" --envs "$ENVS" --arch "$ARCH" \
-      --selfplay-every "$SELFPLAY_EVERY" --seed "$SEED" 2>&1 | tee "$RUN/logs/$KEY.log" | tail -3
+      --selfplay-every "$SELFPLAY_EVERY" --seed "$SEED" 2>&1 \
+      | tee "$RUN/logs/$KEY.log" \
+      | python3 -u "$REPO/tools/dh_trainfmt.py" --key "$KEY" || dh_err "ppo $KEY failed — see logs/$KEY.log"
   "$PYVENV" -u -m ml.training.league gate --key "$KEY" --build "$BUILD" \
-      --episodes "$EPISODES" 2>&1 | tee -a "$RUN/logs/$KEY.log" | tail -3 || true
+      --episodes "$EPISODES" 2>&1 | tee -a "$RUN/logs/$KEY.log" \
+      | python3 -u "$REPO/tools/dh_trainfmt.py" --key "$KEY" || true
 else
   if [ $ALL -eq 1 ]; then
     KEYS=$(python3 - <<'PY'
@@ -215,15 +235,26 @@ PY
     KEYS="$KEY $BUILD"
   fi
   OPP_ARG=(); [ -z "$OPPONENTS" ] || OPP_ARG=(--opponents "$OPPONENTS")
+  N_KEYS=$(echo "$KEYS" | grep -c . || true); I_KEY=0
   echo "$KEYS" | while read -r key build; do
     [ -n "$key" ] || continue
-    echo "=== $key ($build) ==="
-    python3 -m ml.training.league train --key "$key" --build "$build" \
+    I_KEY=$((I_KEY + 1))
+    dh_rule "$I_KEY/$N_KEYS  $key"
+    dh_kv build "$build"
+    dh_kv budget "$GENERATIONS gens · pop $POP · $EPISODES episodes · $JOBS jobs · speed $SPEED"
+    # -u: without it Python block-buffers into the pipe and a 200-generation
+    # run prints nothing for ten minutes. dh_trainfmt paints it live; the
+    # untouched trainer text still lands in logs/<key>.log through tee.
+    python3 -u -m ml.training.league train --key "$key" --build "$build" \
         --generations "$GENERATIONS" --pop "$POP" --episodes "$EPISODES" \
-        --jobs "$JOBS" --seed "$SEED" --speed "$SPEED" "${OPP_ARG[@]}" \
-        2>&1 | tee "$RUN/logs/$key.log" | tail -2
-    python3 -m ml.training.league gate --key "$key" --build "$build" \
-        --episodes "$EPISODES" 2>&1 | tee -a "$RUN/logs/$key.log" | tail -3 || true
+        --jobs "$JOBS" --seed "$SEED" --speed "$SPEED" "${OPP_ARG[@]}" 2>&1 \
+        | tee "$RUN/logs/$key.log" \
+        | python3 -u "$REPO/tools/dh_trainfmt.py" --key "$key" \
+            --generations "$GENERATIONS" --pop "$POP" \
+        || dh_err "$key training failed — see logs/$key.log"
+    python3 -u -m ml.training.league gate --key "$key" --build "$build" \
+        --episodes "$EPISODES" 2>&1 | tee -a "$RUN/logs/$key.log" \
+        | python3 -u "$REPO/tools/dh_trainfmt.py" --key "$key" || true
   done
 fi
 
@@ -250,5 +281,17 @@ if not mine:
 lines += ["", "promote the passing nets into ml/serving with:",
           f"    tools/train_run.sh --promote ml/runs/{run.name}"]
 (run / "summary.txt").write_text("\n".join(lines) + "\n")
-print("\n".join(lines))
 PY
+
+dh_rule "summary"
+while IFS= read -r line; do
+  case "$line" in
+    *" PASS "*|*" PASS") printf '%s  ✓%s %s\n' "$C_GREEN" "$C_0" "$line";;
+    *" fail "*|*" fail") printf '%s  ✗%s %s\n' "$C_RED" "$C_0" "$line";;
+    "") echo;;
+    *) printf '  %s%s%s\n' "$C_PALE" "$line" "$C_0";;
+  esac
+done < "$RUN/summary.txt"
+echo
+dh_say "watch any run live:   ${C_CYAN}tools/train_watch.py ${RUN#"$REPO"/}${C_0}"
+dh_say "every run, oldest first:   ${C_CYAN}tools/train_run.sh --list${C_0}"

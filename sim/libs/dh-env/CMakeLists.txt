@@ -6,4 +6,6 @@ add_library(dh-env SHARED
     src/dh_env.cpp
 )
 target_include_directories(dh-env PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
-target_link_libraries(dh-env PRIVATE dh-sim)
+# dh_env_step_many drains the per-tick env fan-out across a worker pool
+find_package(Threads REQUIRED)
+target_link_libraries(dh-env PRIVATE dh-sim Threads::Threads)

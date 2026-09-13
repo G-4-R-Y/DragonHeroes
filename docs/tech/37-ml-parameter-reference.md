@@ -297,6 +297,41 @@ Every check runs `--episodes` matches in the real Godot arena (unbalanced, on
 purpose — deployment reality). Pass sets `deployed: true`; fail leaves the fleet
 on the previous pin and says so.
 
+### Head to head: `league versus` (best-of-N)
+
+The gate says *is this net good enough to ship*. `versus` says *which of these
+two is better* (Ricardo, 2026-09-13: "even put one against the other for
+benchmarking (best of N)").
+
+```bash
+python3 -m ml.training.league versus --best-of 9 --episodes 3 --jobs 9 \
+    --a fen_boar@v6 --b fen_boar@deployed --a-build core.arena.fen_boar_alpha
+```
+
+| Flag | Default | Meaning |
+|---|---|---|
+| `--a` / `--b` | required | `native`, `scripted`, a path to an `arena.policy.v1` JSON, or a registry reference: `<key>`, `<key>@v3`, `<key>@deployed`, `<key>@candidate` |
+| `--a-build` / `--b-build` | required / = `--a-build` | the builds the two sides play |
+| `--best-of` | 9 | rounds. All of them are played even after the outcome is decided |
+| `--episodes` | 1 | episodes per round; a round goes to whoever wins more |
+| `--jobs` | 1 | rounds run concurrently |
+| `--seed` | 2026 | round *i* uses `seed + i*7919`, so a verdict replays |
+| `--out` | `ml/data/benchmarks/<date>__<a>_vs_<b>.json` | where the verdict lands |
+
+Verdict schema `arena.versus.v1`: both sides' spec/label/build, `best_of`,
+`episodes_per_round`, seed, speed, every round (`wins_a`, `wins_b`, `draws`,
+`hp_a`, `hp_b`, `score_a`, `duration_s`), then `rounds_a`/`rounds_b`/
+`rounds_drawn`, `winner`, `clinched_round` and `episode_win_rate_a`. It streams
+`versus_start` / `versus_round` / `versus_done` on the progress feed under the
+key `versus`, which is how the console's VERSUS tab paints it live.
+
+> **Determinism caveat (measured 2026-09-13).** A *neural* side makes rounds
+> differ: aim noise and the observation delay consume the per-episode seed, so
+> one net vs native gave 0-2, 0-0 and 0-1 on seeds 3 / 777 / 424242. Two
+> *baseline* sides do not: scripted vs native returned an identical 1-0 for
+> every seed tried. A best-of-N between native and scripted is therefore N
+> copies of one match — a reference point, not a distribution.
+
 Other measurements:
 
 ```bash
@@ -305,10 +340,45 @@ python3 -m ml.training.league round-robin --episodes 2           # deployed poli
 python3 -m pytest ml/tests/ -q                                   # league, policy-net and progress-feed tests
 ```
 
-*Measured 2026-09-13:* bench 527,665 steps/s; one 4-episode Godot match 0.72 s;
-16 concurrent 1.4 s; 20 concurrent 1.7 s; a gate (3 sequential match sets) 3.1 s;
-PPO end to end 32,343 steps/s at `--envs 32`, win rate against the native third
-visibly moving inside the first two million steps.
+*Measured 2026-09-13 (idle box):* bench 527,665 steps/s; one 4-episode Godot
+match 0.72 s; 16 concurrent 1.4 s; 20 concurrent 1.7 s; a gate (3 sequential
+match sets) 3.1 s; PPO end to end 32,343 steps/s at `--envs 32`.
+
+### The batched environment (`dh_env_step_many`)
+
+The PPO rollout used to cross into C four times **per env per tick** (step, two
+`hp_frac`, `winner`) and pay a Python loop on top. `dh_env_step_many` does the
+whole tick in one crossing, writing observations, done flags, HP fractions and
+winners into caller-owned buffers; `VecDhEnv` (`ml/env/dh_env.py`) is the Python
+side. Envs share nothing, so an optional C++ worker pool can drain them —
+`--env-threads`, default 1, because a 32-env tick is only tens of microseconds
+and synchronising costs more than it saves below ~128 envs.
+
+*Measured while a 20-job ES sweep held the box at load 20:*
+
+| Envs | Per-env loop | `step_many` | Gain |
+|---|---|---|---|
+| 32 | 56,564 steps/s | 352,559 | 6.2× |
+| 64 | 62,380 | 399,433 | 6.4× |
+| 128 | 54,974 | 638,807 | 11.6× |
+
+Trajectories are bit-identical to the per-env path (asserted over 200 ticks ×
+32 envs with a fixed action stream), and episode counts match.
+
+With the envs cheap, the rollout became bound by one **small GPU forward per
+tick**, so the throughput knob is now batch width, not horizon:
+
+| `--envs` | End-to-end PPO |
+|---|---|
+| 32 | 5,834 steps/s |
+| 64 | 9,747 |
+| 256 | 31,582 |
+| 512 | **56,288** ← the knee, and the new default |
+| 1024 | 57,757 |
+| 2048 | 56,414 |
+
+Each iteration prints `roll=`/`upd=` so the split is visible: after the change
+the PPO update is a second or two while the rollout is still the larger half.
 
 ---
 
@@ -320,8 +390,11 @@ visibly moving inside the first two million steps.
 - **GRU and squad nets cannot deploy**: the Godot runtime is a stateless
   31-observation MLP. They gate via dh-env until it grows a recurrent path and
   observation v2.
-- **PPO leaves ~16× on the table**: the environment alone runs 527k steps/s but
-  the trainer reaches 32k, because Python steps each env individually through
-  ctypes every tick. A batched `dh_env_step_many` over all envs (or several
-  worker processes) is the obvious next optimisation.
+- ~~**PPO leaves ~16× on the table**~~ — **done 2026-09-13** (Ricardo: "do
+  it!"). `dh_env_step_many` removed the per-env ctypes loop (6.2× at 32 envs,
+  11.6× at 128) and raising `--envs` to 512 amortised the per-tick GPU launch
+  (9.6× end to end). What is left: the rollout is still the larger half of an
+  iteration, so the next lever is either a CUDA graph / larger net per launch or
+  several worker processes. The C++ worker pool exists (`--env-threads`) but
+  loses on a contended box below ~128 envs.
 - **ONNX / INT8 serving** is still future work; the runtime reads JSON today.

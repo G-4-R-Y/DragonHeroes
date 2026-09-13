@@ -26,6 +26,48 @@ Usage:
   python3 -m ml.training.league train-global --builds core.arena.fen_boar_alpha,core.arena.dusk_revenant
   python3 -m ml.training.league gate --key fen_boar
   python3 -m ml.training.league round-robin --episodes 2
+  python3 -m ml.training.league versus --best-of 9 \
+      --a fen_boar --a-build core.arena.fen_boar_alpha \
+      --b native   --b-build core.arena.fen_boar_alpha
+
+`versus` is the head-to-head bench (Ricardo, 2026-09-13: "even put one against
+the other for benchmarking (best of N)"): any two sides — a registry net, a
+weights file, or the native/scripted baselines — play a best-of-N and the
+verdict is written to ml/data/benchmarks/ as schema arena.versus.v1, so
+comparisons accumulate instead of scrolling past. It streams the same progress
+feed under the key "versus" while it runs.
+
+KNOBS (train) — every one of these is a CLI flag; the numbers are the defaults
+this module ships, not the ones tools/train_run.sh passes:
+    --generations 3   ES iterations. Each costs pop x opponents matches.
+    --pop 6           perturbations per generation. Fill your cores: matches
+                      per generation = pop x len(opponents).
+    --episodes 4      episodes per match. A neural side makes episodes differ
+                      (aim noise + observation delay consume the seed), so this
+                      is the variance knob; two BASELINE sides are deterministic.
+    --sigma 0.02      ES noise scale       --lr 0.02   ES step size
+    --seed 2026       every match seed is derived from it, so a run replays
+    --jobs 1          concurrent headless Godot workers (docs/tech/32)
+    --speed max       "max" = CPU-bound with --fixed-fps 60, bit-identical to
+                      a wall-locked run; a number is a wall multiplier
+    --opponents ""    "policy@build,..."; empty = native + scripted
+ARTIFACTS — what a run leaves behind and who eats it:
+    ml/serving/weights/<key>_v<N>.json   arena.policy.v1, loaded by the Godot
+                                         arena (game/arena/neural_policy.gd)
+    ml/serving/weights/<key>_v<N>.npz    the raw net, warm-start for the next run
+    ml/serving/registry.json             arena.registry.v1: every version, one
+                                         `deployed` pin per key = what ships
+    ml/data/progress/<key>.jsonl         this feed (below)
+    ml/data/episodes/*.json              per-match results; obs+action JSONL
+                                         when --record-dir is set (the R0 dataset)
+    ml/data/benchmarks/*.json            arena.versus.v1 verdicts
+  $DH_SERVING_DIR redirects the first three into an isolated run folder
+  (ml/serving_paths.py, tools/train_run.sh) so experiments never overwrite what
+  the game serves. Full reference: docs/tech/37-ml-parameter-reference.md.
+GATE BANDS (ml/eval/gate.py, the only thing that lets a net deploy):
+    suite vs scripted/native  win rate in [0.30, 1.00]
+    ladder vs deployed self   win rate in [0.25, 0.90]
+    sanity                    mean loser hp deficit >= 0.05 per episode
 
 train / train-global / gate also append a JSONL progress feed to
 ml/data/progress/<key>.jsonl (or --progress-file) — the seam the arena training
@@ -407,6 +449,149 @@ def parse_opponents(spec: str) -> list[tuple[str, str | None]]:
     return out
 
 
+# ---- versus: head-to-head best-of-N -----------------------------------------------
+
+
+BENCH_DIR = ROOT / "ml" / "data" / "benchmarks"
+
+
+def resolve_policy(spec: str, reg: dict | None = None) -> tuple[str, str]:
+    """A versus side -> (policy argument for the arena, human label).
+
+    Accepted: "native", "scripted", a path to an arena.policy.v1 JSON, or a
+    registry reference "<key>" (its deployed pin, else its newest candidate) or
+    "<key>@v3" / "<key>@candidate" / "<key>@deployed" to pin one exactly.
+    """
+    spec = (spec or "").strip()
+    if spec in ("native", "scripted"):
+        return spec, spec
+    path = Path(spec)
+    if path.exists() and path.suffix == ".json" and path.is_file():
+        return str(path), path.stem
+    key, _, want = spec.partition("@")
+    reg = reg if reg is not None else load_registry()
+    mine = [p for p in reg.get("policies", []) if p.get("key") == key]
+    if not mine:
+        raise SystemExit(f"versus: cannot resolve '{spec}' — not a file, not a "
+                         f"registry key, not native/scripted")
+    pick = None
+    if want.startswith("v") and want[1:].isdigit():
+        pick = next((p for p in mine if int(p.get("version", 0)) == int(want[1:])), None)
+    elif want == "deployed":
+        pick = max((p for p in mine if p.get("deployed")),
+                   key=lambda p: p.get("version", 0), default=None)
+    elif want == "candidate":
+        pick = max((p for p in mine if not p.get("deployed")),
+                   key=lambda p: p.get("version", 0), default=None)
+    else:                                    # default: the deployed pin, else newest
+        pick = max((p for p in mine if p.get("deployed")),
+                   key=lambda p: p.get("version", 0), default=None) \
+            or max(mine, key=lambda p: p.get("version", 0))
+    if pick is None:
+        raise SystemExit(f"versus: '{spec}' matches no policy in the registry")
+    game_json = pick.get("game_json") or ""
+    if not game_json:
+        raise SystemExit(f"versus: {key} v{pick.get('version')} has no game_json "
+                         f"(train exports it; GRU/squad nets cannot be deployed yet)")
+    gp = Path(game_json)
+    if not gp.is_absolute():
+        gp = ROOT / gp
+    if not gp.exists():
+        raise SystemExit(f"versus: weights missing for {key} v{pick.get('version')}: {gp}")
+    tag = "deployed" if pick.get("deployed") else "candidate"
+    return str(gp), f"{key} v{pick.get('version')} ({tag})"
+
+
+def versus(a_spec: str, b_spec: str, a_build: str, b_build: str, best_of: int,
+           episodes: int, seed: int, jobs: int, speed: str | float,
+           out_path: Path | None = None, label: str = "",
+           progress: Progress | None = None) -> dict:
+    """Best-of-N between two sides. Every round is a real arena match set, so a
+    verdict here means the same thing a gate verdict means.
+
+    All N rounds are played even once the outcome is decided: a 5-4 and a 5-0
+    are different facts, and the extra rounds cost seconds. `clinched_round` is
+    still reported for anyone who wants the best-of reading.
+
+    CAVEAT (measured 2026-09-13): a NEURAL side makes rounds differ — aim noise
+    and the observation delay consume the per-episode seed, so seeds 3/777/424242
+    of one net vs native gave 0-2, 0-0 and 0-1. Two BASELINE sides do not:
+    scripted vs native returned a bit-identical 1-0 for every seed tried. So a
+    best-of-N between native and scripted is N copies of one match — informative
+    as a reference point, not as a distribution.
+    """
+    if progress is None:
+        progress = Progress(None)
+    a_policy, a_label = resolve_policy(a_spec)
+    b_policy, b_label = resolve_policy(b_spec)
+    started = time.strftime("%Y-%m-%dT%H:%M:%S")
+    t_start = time.monotonic()
+    progress.emit("versus_start", a=a_label, b=b_label, a_build=a_build,
+                  b_build=b_build, best_of=best_of, episodes=episodes)
+
+    def one(i: int) -> dict:
+        t0 = time.monotonic()
+        r = run_match(a_build, b_build, a_policy, b_policy, episodes,
+                      seed + i * 7919, speed=speed)
+        n = max(len(r["episodes"]), 1)
+        row = {"i": i, "seed": seed + i * 7919,
+               "wins_a": int(r["wins_a"]), "wins_b": int(r["wins_b"]),
+               "draws": int(r.get("draws", 0)),
+               "hp_a": float(np.mean([e["hp_a"] for e in r["episodes"]]) if r["episodes"] else 0.0),
+               "hp_b": float(np.mean([e["hp_b"] for e in r["episodes"]]) if r["episodes"] else 0.0),
+               "score_a": round(r["wins_a"] / n, 4),
+               "duration_s": round(time.monotonic() - t0, 2)}
+        progress.emit("versus_round", **row)
+        return row
+
+    rounds: list[dict] = []
+    if jobs <= 1:
+        rounds = [one(i) for i in range(best_of)]
+    else:
+        with ThreadPoolExecutor(max_workers=jobs) as ex:
+            rounds = list(ex.map(one, range(best_of)))
+    rounds.sort(key=lambda r: r["i"])
+
+    wins_a = sum(1 for r in rounds if r["wins_a"] > r["wins_b"])
+    wins_b = sum(1 for r in rounds if r["wins_b"] > r["wins_a"])
+    draws = len(rounds) - wins_a - wins_b
+    need = best_of // 2 + 1
+    clinch, ca, cb = None, 0, 0
+    for r in rounds:                       # the best-of reading, in round order
+        if r["wins_a"] > r["wins_b"]:
+            ca += 1
+        elif r["wins_b"] > r["wins_a"]:
+            cb += 1
+        if clinch is None and (ca >= need or cb >= need):
+            clinch = r["i"] + 1
+    winner = "a" if wins_a > wins_b else ("b" if wins_b > wins_a else "draw")
+    verdict = {
+        "schema": "arena.versus.v1", "started": started,
+        "finished": time.strftime("%Y-%m-%dT%H:%M:%S"),
+        "wall_s": round(time.monotonic() - t_start, 2), "label": label,
+        "a": {"spec": a_spec, "policy": a_policy, "label": a_label, "build": a_build},
+        "b": {"spec": b_spec, "policy": b_policy, "label": b_label, "build": b_build},
+        "best_of": best_of, "episodes_per_round": episodes, "seed": seed,
+        "speed": str(speed), "jobs": jobs, "rounds": rounds,
+        "rounds_a": wins_a, "rounds_b": wins_b, "rounds_drawn": draws,
+        "clinched_round": clinch, "winner": winner,
+        "episode_win_rate_a": round(sum(r["wins_a"] for r in rounds)
+                                    / max(sum(r["wins_a"] + r["wins_b"] + r["draws"]
+                                              for r in rounds), 1), 4),
+    }
+    if out_path is None:
+        BENCH_DIR.mkdir(parents=True, exist_ok=True)
+        stamp = time.strftime("%Y-%m-%d_%H%M%S")     # DATE FIRST, like ml/runs/
+        safe = f"{a_label}_vs_{b_label}".replace(" ", "-").replace("/", "-")
+        out_path = BENCH_DIR / f"{stamp}__{safe}.json"
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(json.dumps(verdict, indent=1))
+    verdict["out"] = str(out_path)
+    progress.emit("versus_done", winner=winner, rounds_a=wins_a, rounds_b=wins_b,
+                  draws=draws, out=str(out_path))
+    return verdict
+
+
 # ---- CLI -------------------------------------------------------------------------
 
 
@@ -451,6 +636,21 @@ def main() -> int:
                             "default) or a wall-clock multiplier such as 4 (the old 4x)")
     p_rr = sub.add_parser("round-robin")
     p_rr.add_argument("--episodes", type=int, default=2)
+    p_vs = sub.add_parser("versus", help="best-of-N head to head between two nets")
+    p_vs.add_argument("--a", required=True,
+                      help="native | scripted | path/to/policy.json | <key>[@v3|@deployed|@candidate]")
+    p_vs.add_argument("--b", required=True, help="same syntax as --a")
+    p_vs.add_argument("--a-build", required=True, help="the build side A plays")
+    p_vs.add_argument("--b-build", default="", help="side B's build (default: --a-build)")
+    p_vs.add_argument("--best-of", type=int, default=9)
+    p_vs.add_argument("--episodes", type=int, default=1,
+                      help="episodes per ROUND; a round goes to whoever wins more")
+    p_vs.add_argument("--seed", type=int, default=2026)
+    p_vs.add_argument("--jobs", type=int, default=1)
+    p_vs.add_argument("--speed", default=DEFAULT_SPEED)
+    p_vs.add_argument("--label", default="")
+    p_vs.add_argument("--out", default="", help="where the verdict JSON lands")
+    p_vs.add_argument("--progress-file", default=None)
     args = ap.parse_args()
 
     if args.cmd == "roster":
@@ -508,6 +708,25 @@ def main() -> int:
         progress.emit("gate", **{"version": cand["version"], "pass": bool(ok),
                                  "metrics": cand["eval"].get("checks", {})})
         return 0 if ok else 1
+
+    if args.cmd == "versus":
+        progress = Progress(args.progress_file or progress_path("versus"))
+        with progress.guard():
+            v = versus(args.a, args.b, args.a_build, args.b_build or args.a_build,
+                       args.best_of, args.episodes, args.seed, args.jobs,
+                       args.speed, Path(args.out) if args.out else None,
+                       args.label, progress)
+        print(f"[versus] {v['a']['label']} vs {v['b']['label']} "
+              f"({v['a']['build']} vs {v['b']['build']})")
+        for r in v["rounds"]:
+            print(f"[versus]   round {r['i'] + 1}: {r['wins_a']}-{r['wins_b']}"
+                  f" hp {r['hp_a']:.2f}/{r['hp_b']:.2f}  {r['duration_s']}s")
+        print(f"[versus] RESULT {v['rounds_a']}-{v['rounds_b']}"
+              f"{' (' + str(v['rounds_drawn']) + ' drawn)' if v['rounds_drawn'] else ''}"
+              f" — winner: {v['winner']}"
+              + (f", clinched in round {v['clinched_round']}" if v["clinched_round"] else ""))
+        print(f"[versus] {v['out']}")
+        return 0
 
     if args.cmd == "round-robin":
         reg = load_registry()
