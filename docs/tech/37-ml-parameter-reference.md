@@ -416,6 +416,98 @@ trains there, and the ES league still pays the Godot price because its fitness
 is deliberately the *deployment* environment. The gate must stay in Godot; the
 search does not have to.
 
+#### Where the tick actually goes (measured 2026-09-13, later)
+
+Ricardo followed up: *"1) can't we load the engine just once and run all
+episodes? 2) can't we accelerate the 60 physics tick/s to just process all the
+ticks capped by our processing power? 3) how can we optimize the godot arena? i
+noticed my gpu is VERY subutilised"*. The table above answers (1) — the engine
+already loads once per MATCH, not per episode. The rest needed a profile.
+
+Method: run the same matchup at two different `--time-limit` values and take
+the slope. Startup cancels out, so the number is honest even on a loaded box.
+**A first attempt at this was wrong** and is worth recording: it passed the
+weights as a path relative to the repo, but the arena runs with `--path game`,
+so `FileAccess` resolved it against `res://`, the load failed, and the fighter
+silently fell back to its native AI. The "neural" rows measured native. Always
+pass an absolute policy path, and check stderr for `NeuralPolicy:` errors.
+
+| Matchup | µs per tick |
+|---|---|
+| native vs native | ~250–380 |
+| scripted vs scripted | ~340–630 |
+| neural vs native | ~2,540 |
+| neural vs neural | ~4,740–4,950 |
+
+**One neural side costs ~2,200 µs per tick — 93% of the whole arena tick.**
+Physics, projectiles, fields and every other node together are the remaining
+7%. The forward pass is 47→64→64→10, just 7,744 multiply-adds, and GDScript was
+spending ~400 ns on each one because `_forward` held the weights as an `Array`
+of `Array` and did `float(row[j]) * float(out[j])` — every element through a
+Variant. Flattening to a `PackedFloat64Array` indexed `o * n_in + j` made it
+**1.74× faster with bit-identical fights** (the exported weights are
+float32-exact and the accumulator was always a GDScript float, so no number
+moves). Even flattened it is ~3,100 µs/tick, still ~1000× off what C does:
+moving the forward pass into `dh-godot` is the single biggest remaining win,
+and it is blocked on that GDExtension not existing yet.
+
+Answering (2): the tick rate is **already uncapped**. `--speed max` sets
+`--fixed-fps 60`, `Engine.max_fps = 0` and
+`low_processor_usage_mode_sleep_usec = 0`, so the engine advances one 1/60 s
+tick per frame as fast as one core allows and never sleeps. 60 Hz is the
+simulation *resolution*, not a wall-clock rate. Note that canon specifies a
+**30 Hz** sim; the arena runs at 60, so matching canon would halve the work —
+but it changes dodge windows and projectile stepping, so every trained net and
+gate band would need revisiting. That is a product decision, not a tuning knob.
+
+Answering (3): **the GPU cannot help this path at all.** A `--headless` Godot
+draws nothing, so the arena never touches the GPU — an idle card during
+training means there is no rendering to do, not that throughput is being left
+unused. The GPU tier is PPO over `libdh-env`. Nor does running more keys in
+parallel help: measured during the live sweep, `JOBS=20` already puts 20 Godot
+processes (24 threads each) on **10 physical cores** at load 23–24. The box is
+oversubscribed as it stands, so more concurrency would only add contention.
+
+#### The arena was not reproducible (fixed 2026-09-13)
+
+Godot **randomises the global random stream at startup** — three consecutive
+headless runs printed `randf()` = 0.394, 0.927, 0.505. `arena.gd` seeded its
+own `_rng` but never that one, and gameplay draws from it: `creature.gd`'s
+wander target, `hag.gd`'s retreat destination, `projectile.gd`'s volley desync.
+So the same `--seed` produced a different fight every run:
+
+| dusk_revenant vs gloam_wisp, seed 77 | `dmg_taken_b` per episode |
+|---|---|
+| run 1 | [0, 0, 0] |
+| run 2 | [0, 88.6, 0] |
+| run 3 | [0, 112.0, 0] |
+
+Winners were stable, which is why every win-rate check missed it — but fitness
+is `win_rate + 0.1 × (own_hp − foe_hp)`, so the hp term was partly luck.
+Measured fitness over 4 identical runs of the live sweep's own matchup:
+**sd 0.0037 before, 0.0000 after**, against a within-generation candidate sd of
+0.0350. So roughly **11% of what ES was ranking on was noise** — real, now
+gone, and not the order-of-magnitude effect a first glance suggests.
+
+The fix is one line in `_start_episode`: seed the global stream from the match
+seed, the rotation index and the episode index, so episodes still differ from
+each other while reproducing exactly across runs.
+
+#### The release trainer export
+
+Training runs matches through the Godot **editor** binary, which is a debug
+build (`OS.is_debug_build()` is true). `tools/build_arena.sh` exports a release
+build instead. A release template refuses a scene path on the command line
+(`disable_path_overrides`), so the export carries the custom feature `trainer`
+and `game/project.godot` sets `run/main_scene.trainer="res://arena/arena.tscn"`
+— the binary boots the arena itself. Point training at it with `DH_ARENA_BIN`.
+
+Verified **bit-identical** to the editor binary on scripted, native and neural
+matchups. Honest payoff: startup **4.01 s → 2.53 s**, and near nothing per tick
+while the GDScript MLP dominates — but 1.5 s × 20 matches × 1000 generations is
+about 8 hours per key, so it pays for itself. It becomes a large win once the
+forward pass moves to C++.
+
 ### The batched environment (`dh_env_step_many`)
 
 The PPO rollout used to cross into C four times **per env per tick** (step, two

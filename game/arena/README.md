@@ -199,6 +199,41 @@ python3 -m pytest ml/tests/ -q                                          # 18 pas
 python3 tools/validate_content.py                                       # content OK
 ```
 
+## 6b. Cost and determinism (measured 2026-09-13)
+
+Two facts anyone touching this code needs, so nobody has to go to
+`docs/tech/37-ml-parameter-reference.md` to learn them the hard way.
+
+**The neural forward pass is ~93% of the arena tick.** Measured by two-point
+slope (same matchup at two `--time-limit` values, so startup cancels):
+
+| Matchup | µs per tick |
+|---|---|
+| native vs native | ~250–380 |
+| scripted vs scripted | ~340–630 |
+| neural vs native | ~2,540 |
+| neural vs neural | ~4,740–4,950 |
+
+One neural side costs ~2,200 µs/tick for 7,744 multiply-adds. `_forward` in
+`neural_policy.gd` is therefore written flat — weights in one
+`PackedFloat64Array` indexed `o * n_in + j`, not an `Array` of `Array`. The
+nested version cost 1.74× more because every element went through a Variant.
+**Do not "tidy" it back into nested arrays.** Physics, projectiles and fields
+together are the other 7%; optimising them buys almost nothing.
+
+**The global random stream must stay seeded.** Godot randomises it at startup,
+and gameplay draws from it (`creature.gd` wander, `hag.gd` retreat,
+`projectile.gd` volley desync). `_start_episode()` seeds it from the match seed,
+rotation index and episode index. Without that line the same `--seed` produces
+different damage and durations every run — winners stay stable, so win-rate
+checks do not catch it, but ES fitness includes an hp term and was carrying
+~11% noise. **If you add randomness to arena gameplay, draw it from a seeded
+source or it will silently poison training.**
+
+For faster matches, `tools/build_arena.sh` exports a release build that boots
+straight into the arena (startup 4.01 s → 2.53 s, bit-identical results); point
+training at it with `DH_ARENA_BIN`.
+
 ## 7. Troubleshooting
 
 | Symptom | Cause / fix |
@@ -207,5 +242,6 @@ python3 tools/validate_content.py                                       # conten
 | `NeuralPolicy: obs_dim mismatch` | weights JSON from an old schema — re-export from `ml/training/policy_net.py` |
 | Matches take forever | you forgot `--fast` (headless runs real-time without it); or `--speed max` without the engine flag `--fixed-fps 60` — the arena warns and runs the wall-locked 4× |
 | `--jobs` does not speed training up | a generation is pop × opponents matches — that is the most workers ever busy (the console's hint line states it); raise `--pop`, and make sure `--speed max` is in effect (league.py default) |
+| A trained net behaves like the built-in AI | the weights path did not load — the arena resolves relative paths against `res://`, so pass an ABSOLUTE path, and check stderr for `NeuralPolicy:` |
 | `godot: command not found` | install Godot 4.6+ or add it to PATH |
 | New global class not found after editing arena scripts | run `godot --headless --path game --import` once |

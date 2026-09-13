@@ -47,5 +47,7 @@ ml/.venv/
 # raw export dirs (100 MB GitHub limit) — the zips are the distributable
 builds/linux/
 builds/windows/
+# tools/build_arena.sh — a 96 MB release export
+builds/trainer/
 rebirth/native/build/
 rebirth/godot3d/.godot/

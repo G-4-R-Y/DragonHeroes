@@ -224,6 +224,22 @@ its own `registry.json` (seeded from the deployed one, so runs are cumulative;
 `ml/serving/` — what the game and console read — is untouched until you promote.
 Under the hood it is `DH_SERVING_DIR`, honoured by league, ppo and evolve.
 
+**Faster matches: the release trainer build.** Training runs matches through the
+Godot *editor* binary, which is a debug build. `tools/build_arena.sh` exports a
+release build that boots straight into the arena, verified bit-identical:
+
+```bash
+tools/build_arena.sh                                   # -> builds/trainer/dh-arena.x86_64
+export DH_ARENA_BIN=$PWD/builds/trainer/dh-arena.x86_64
+tools/train_run.sh --all                               # every match now uses it
+```
+
+It buys engine startup (4.01 s → 2.53 s per match, and a generation is 20
+matches); per tick it changes almost nothing while the GDScript forward pass
+dominates. Unset `DH_ARENA_BIN` to fall back to the editor binary. Rebuild it
+after editing anything under `game/` — the export is a snapshot, so a stale
+binary will train against stale rules.
+
 **A long run is interruptible.** The ES trainer registers its net only when the
 whole generation loop finishes, so it checkpoints the search (theta plus the RNG
 stream) every `CHECKPOINT_EVERY` generations — 25 by default. Kill the run and

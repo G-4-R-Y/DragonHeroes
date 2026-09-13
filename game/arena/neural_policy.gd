@@ -10,7 +10,14 @@ extends ArenaPolicy
 var path := ""
 var explore := 0.05             # epsilon on the action logits (eval: ~0)
 var _emb := {}
-var _layers: Array = []         # [{w: [[out x in]], b: [out], act: "tanh"|"logits"}]
+# Layers are FLAT, not nested. Measured 2026-09-13: with `w` as an Array of
+# Arrays and `float(row[j]) * float(out[j])` in the inner loop, this forward pass
+# was ~2.2 ms per fighter per tick — 93% of the whole arena tick, dwarfing
+# physics, projectiles and the rest of the engine combined. Every element access
+# went through a Variant. A flat PackedFloat64Array indexed by o * n_in + j
+# keeps the identical numbers (the exported weights are float32-exact, and the
+# accumulator was always a GDScript float) with none of the boxing.
+var _layers: Array = []         # [{w: PackedFloat64Array flat [out*in], b: ..., n_in, n_out, tanh}]
 
 func policy_id() -> String:
 	return "neural:" + path.get_file()
@@ -31,27 +38,46 @@ static func from_file(p: String) -> ArenaNeuralPolicy:
 		return pol
 	pol._emb = data.get("embeddings", {})
 	for l in data.get("layers", []):
-		pol._layers.append({"w": l.get("w", []), "b": l.get("b", []),
-				"act": str(l.get("act", "tanh"))})
+		var rows: Array = l.get("w", [])
+		var n_out := rows.size()
+		var n_in: int = (rows[0] as Array).size() if n_out > 0 else 0
+		var flat := PackedFloat64Array()
+		flat.resize(n_out * n_in)
+		for o in n_out:
+			var row: Array = rows[o]
+			var base := o * n_in
+			for j in mini(n_in, row.size()):
+				flat[base + j] = float(row[j])
+		var bias := PackedFloat64Array()
+		bias.resize(n_out)
+		var b_src: Array = l.get("b", [])
+		for o in mini(n_out, b_src.size()):
+			bias[o] = float(b_src[o])
+		pol._layers.append({"w": flat, "b": bias, "n_in": n_in, "n_out": n_out,
+				"tanh": str(l.get("act", "tanh")) == "tanh"})
 	pol.explore = float(data.get("explore", 0.05))
 	return pol
 
-func _forward(x: PackedFloat32Array) -> Array:
-	var out: Array = []
+func _forward(x: PackedFloat32Array) -> PackedFloat64Array:
+	var out := PackedFloat64Array()
 	out.resize(x.size())
 	for i in x.size():
 		out[i] = x[i]
 	for l in _layers:
-		var w: Array = l.w
-		var b: Array = l.b
-		var nxt: Array = []
-		nxt.resize(w.size())
-		for o in w.size():
-			var row: Array = w[o]
-			var s := float(b[o])
-			for j in mini(row.size(), out.size()):
-				s += float(row[j]) * float(out[j])
-			nxt[o] = tanh(s) if str(l.act) == "tanh" else s
+		var w: PackedFloat64Array = l.w
+		var b: PackedFloat64Array = l.b
+		var n_in: int = l.n_in
+		var n_out: int = l.n_out
+		var use_tanh: bool = l.tanh
+		var lim: int = mini(n_in, out.size())
+		var nxt := PackedFloat64Array()
+		nxt.resize(n_out)
+		for o in n_out:
+			var base: int = o * n_in
+			var s: float = b[o]
+			for j in lim:
+				s += w[base + j] * out[j]
+			nxt[o] = tanh(s) if use_tanh else s
 		out = nxt
 	return out
 
@@ -70,7 +96,7 @@ func _act(_delta: float) -> void:
 		x[i] = obs[i]
 	for i in mini(EMB_DIM, row.size()):
 		x[OBS_DIM + i] = float(row[i])
-	var y := _forward(x)
+	var y: PackedFloat64Array = _forward(x)
 	if y.size() < 2 + ACTION_LOGITS + 1:
 		return
 	fighter.cmd_move(Vector2(float(y[0]), float(y[1])))

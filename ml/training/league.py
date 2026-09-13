@@ -85,6 +85,7 @@ from __future__ import annotations
 import argparse
 import itertools
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -147,18 +148,27 @@ def run_match(a: str, b: str, policy_a: str, policy_b: str, episodes: int,
               timeout: float | None = None, speed: str | float = DEFAULT_SPEED) -> dict:
     """One headless match set. Policies: native | scripted | <weights.json path>.
     speed: "max" (CPU-bound, --fixed-fps 60) or a wall multiplier (see DEFAULT_SPEED)."""
-    godot = shutil.which("godot")
-    if godot is None:
-        raise RuntimeError("godot not on PATH")
     speed = parse_speed(speed)
     out = EPISODES_DIR / f"result_{int(time.time() * 1000)}_{next(_NONCE)}.json"
     engine_opts = ["--headless"]
     if speed == "max":
         engine_opts += ["--fixed-fps", "60"]   # engine flag: must precede `--`
-    cmd = [godot, *engine_opts, "--path", str(ROOT / "game"), ARENA_SCENE, "--",
-           "--a", a, "--b", b, "--policy-a", policy_a, "--policy-b", policy_b,
-           "--episodes", str(episodes), "--time-limit", str(time_limit),
-           "--seed", str(seed), "--fast", "--speed", speed, "--out", str(out)]
+    # $DH_ARENA_BIN = the release trainer export (tools/build_arena.sh). Verified
+    # bit-identical to the editor binary; it boots the arena ITSELF because a
+    # release template refuses a scene path on the command line, which is why the
+    # export carries a feature-tagged run/main_scene.trainer. Worth it for the
+    # startup alone: 4.01 s -> 2.53 s per match, and a generation is 20 matches.
+    arena_bin = os.environ.get("DH_ARENA_BIN", "").strip()
+    if arena_bin and Path(arena_bin).is_file():
+        cmd = [arena_bin, *engine_opts, "--"]
+    else:
+        godot = shutil.which("godot")
+        if godot is None:
+            raise RuntimeError("godot not on PATH")
+        cmd = [godot, *engine_opts, "--path", str(ROOT / "game"), ARENA_SCENE, "--"]
+    cmd += ["--a", a, "--b", b, "--policy-a", policy_a, "--policy-b", policy_b,
+            "--episodes", str(episodes), "--time-limit", str(time_limit),
+            "--seed", str(seed), "--fast", "--speed", speed, "--out", str(out)]
     if record:
         cmd += ["--record-dir", str(EPISODES_DIR)]
     if timeout is None:

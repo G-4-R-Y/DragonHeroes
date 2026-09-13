@@ -188,6 +188,18 @@ func _current_match() -> Array:
 	return _rotation[_rotation_idx % _rotation.size()]
 
 func _start_episode() -> void:
+	# DETERMINISM — training fitness must be a signal, not a lottery.
+	# Godot randomizes the GLOBAL random stream at startup, and gameplay draws
+	# from it: creature.gd's wander target, hag.gd's retreat destination,
+	# projectile.gd's volley desync. The arena seeded its OWN _rng and never
+	# that one, so the same --seed produced different damage and durations on
+	# every run — measured 2026-09-13: dusk_revenant vs gloam_wisp on seed 77
+	# gave dmg_b [0,0,0], [0,88.6,0] and [0,112,0] across three identical runs.
+	# Winners were stable, so it hid from the win-rate checks, but fitness is
+	# win_rate + 0.1*(own_hp - foe_hp): the hp term was partly luck, and ES was
+	# ranking candidates on it. Seeded per EPISODE (not per match) so episodes
+	# still differ from one another while reproducing exactly across runs.
+	seed(int(_cfg.get("seed", 2026)) * 1000003 + _rotation_idx * 9176 + _episode * 7919)
 	for f in _fighters:
 		if is_instance_valid(f):
 			f.free_body()
