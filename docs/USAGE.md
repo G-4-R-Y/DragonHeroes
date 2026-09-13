@@ -1,234 +1,354 @@
-# Dragon Heroes — Usage Manual (play, co-op, arena, training, dev)
+# Dragon Heroes — Usage Manual (every command, verified)
 
-> Everything you can run today, in one place. Deeper references:
-> [game/arena/README.md](../game/arena/README.md) (arena),
-> [tech/33](tech/33-p2p-coop.md) (co-op), [tech/32](tech/32-scaling-rl-training.md)
-> (training at scale), [00-canon](00-canon.md) (decisions).
+> **Every command below was re-run on 2026-09-13** against this tree, except
+> the ones marked *(not run here)* — long training runs, packaging that needs
+> the ~1 GB export templates, Nakama's containers, and the Vulkan path that is
+> Ricardo-only. Pass lines quoted in the gate table are the real output from
+> that pass. Deeper references: [game/arena/README.md](../game/arena/README.md)
+> (arena), [tech/33](tech/33-p2p-coop.md) (co-op),
+> [tech/32](tech/32-scaling-rl-training.md) (training at scale),
+> [00-canon](00-canon.md) (decisions).
 
-## Requirements
-
-- **Godot 4.6+** on PATH (`godot --version` → 4.6.stable).
-- **Python 3** with numpy + pytest (ML/content tooling).
-- The sim server binary for world generation: `cmake -S sim -B sim/build && cmake --build sim/build -j` → `sim/build/libs/dh-server/dh-server`.
-- Default renderer: gl_compatibility (safe everywhere). Vulkan HDR bloom is an
-  opt-in: `tools/run_vulkan.sh` — **only on Ricardo's hardware** (a Vulkan
-  window once crashed the dev's X; never auto-flip).
-
-## Playing the game
+## 0. Requirements and first-time setup
 
 ```bash
-godot --path game                # boots the main menu (640×360 pixel-perfect)
+godot --version                      # 4.6.stable.official.89cea1439 here — 4.6+ required, on PATH
+cmake -S sim -B sim/build -DCMAKE_BUILD_TYPE=Release && cmake --build sim/build -j
+                                     # builds dh-server (worldgen), dh-effect-lab, libdh-env.so, the test binaries
+godot --headless --path game --import   # run ONCE after adding/renaming a class_name script
 ```
 
-Menu → name your hunter → pick a class (Reaver / Emberkin / Frostbinder /
-Gloam Mage / Veilblade) → **ENTER THE HUNT**. Saved hunters load automatically
-(saves in `user://saves/`). **CO-OP (P2P)** opens the multiplayer lobby (below).
-EN/PT-BR toggle in the menu and the Haven.
+- **Python 3** with numpy + pytest for content/ML tooling (system `python3` is enough).
+- **PyTorch tier** (GPU PPO only) lives in its own venv: `ml/.venv/bin/python`
+  (torch 2.6.0+cu124, CUDA available on the RTX 4050). The system `python3` has
+  no torch — `python3 -m ml.training.ppo` fails with `ModuleNotFoundError`, by design.
+- Default renderer is **gl_compatibility** (safe everywhere). Vulkan HDR bloom is
+  opt-in via `tools/run_vulkan.sh` — **only on Ricardo's hardware**; a Vulkan
+  window once crashed the dev X server, so nothing auto-flips to it.
+- Kill a stuck run with `pkill -x godot` — never `pkill -f` (it kills the other
+  session's training workers too).
 
-### Controls (keyboard + mouse)
+## 1. Play the game
+
+```bash
+godot --path game                                   # main menu (640x360 pixel-perfect)
+godot --path game res://prototype/main.tscn         # skip the menu, straight into a hunt
+godot --path game res://prototype/ui/haven.tscn     # straight into the Haven
+tools/run_vulkan.sh                                 # Ricardo only: same game, Vulkan + real HDR bloom (not run here)
+```
+
+Menu → name your hunter → pick a class (Reaver / Emberkin / Frostbinder / Gloam
+Mage / Veilblade) → **ENTER THE HUNT**. Saved hunters load automatically (saves
+in `user://saves/`, i.e. `~/.local/share/Dragon Heroes Codex/`). The menu also
+offers **PLAY NEW CONTENT: LAIRS & LEGENDS** (§6), **CO-OP (P2P)** (§2),
+**ARENA** (opens the training console, §4), a **LANGUAGE** toggle (EN / PT-BR)
+and **OPTIONS** — a modal with MUSIC and SFX switches plus two volume sliders,
+and the display MODE (windowed / fullscreen) and FIT (integer pixels /
+fractional fill) controls. Everything persists in `user://settings.json` and is
+applied at every boot, including direct scene boots.
+
+### Controls
 
 | Input | Action |
 |---|---|
 | `WASD` / arrows | move |
 | `LMB` / `Space` | attack (hold to keep swinging) |
-| `Shift` / `RMB` | dodge dash (3 charges; brief i-frames + displacement) |
+| `Shift` / `RMB` | dodge dash (3 charges, brief i-frames + displacement) |
 | `E` | class special (Whirlwind / Frost Nova / Fan of Knives) |
 | `Q` | Shadow Rend (bestial slot — needs a skill stone) |
-| `1–4` | class-tree skills (assign in CHARACTER → Skills) |
-| `F` | Soul Snare — capture a creature below ~35% HP (fails enrage it) |
+| `1`–`4` | class-tree skills (assign in CHARACTER → Skills) |
+| `F` | Soul Snare — capture a creature below ~35% HP (a failed snare enrages it) |
 | `Z` | mount / dismount (combat dismounts you) |
 | `C` / `Tab` | character panel (attributes, skills, pets, bag) |
 | `K` | keybind card |
+| `Esc` | back to the Haven |
 
-Attacks and skills **buffer** for 150 ms — presses just before a cooldown ends
-still fire. Leveling heals to full. Death costs 25% of carried gold.
-
-### Settings (title screen, bottom corners)
-
-Bottom-left: **Language** (EN / PT-BR). Bottom-right, stacked: **MUSIC: ON/OFF**,
-**SFX: ON/OFF**, **FIT** (integer pixels / fractional fill), **MODE** (windowed /
-fullscreen). Everything persists in `user://settings.json` and applies at every
-boot, including direct scene boots. Audio runs on two buses, `Music` and `SFX`
-(created in code — there is no music track yet; the slice's sound is
-synthesized effects, so MUSIC controls the bus future music will play on).
-Volumes are also persisted (`audio.music_vol` / `audio.sfx_vol`, 0..1) for
-anyone who wants quieter rather than silent.
+Attacks and skills **buffer** for 150 ms. Leveling heals to full and refills
+flasks. Death costs 25% of carried gold.
 
 ### The hunt
 
-Infinite seeded world (new map every hunt): 14 packs, three boss hunts —
+Infinite seeded world (new map every hunt): 14 packs, three boss hunts — the
 Fenwitch Hag (pack 8), the Pyre Sovereign + Terravore Colossus legendary DUO
-(pack 11 — fire + earth fields fuse into LAVA), and the Emberwing Matriarch
-(pack 13). One hunt legendary per map (magenta minimap diamond). Loot: gear
-with affixes, runes (skill modifiers), skill stones (unlock Q), Spirit
-Essences (enchants), pets (snare them). The Haven between hunts: vendor,
-forge, enchanter, chest, stables.
+(pack 11, where fire and earth fields fuse into LAVA) and the Emberwing
+Matriarch (pack 13). One hunt legendary per map (magenta minimap diamond).
 
-## Co-op (P2P, friends & LAN)
-
-Menu → **CO-OP (P2P)** → one friend **HOST**s (share the LAN IP shown), up to
-3 friends **JOIN** with that IP (port 7377 UDP) → **READY** → host **START
-HUNT**. Everyone gets the same world; the host simulates; clients play as full
-hunters. Internet: port-forward UDP 7377 or use Tailscale-style overlay.
-Details + v1 simplifications: [tech/33](tech/33-p2p-coop.md).
-
-## The arena (watch & train creature AI)
+## 2. Co-op (P2P, friends and LAN)
 
 ```bash
-godot --path game res://arena/arena.tscn           # spectator (N/R/1-3/Q)
-godot --headless --path game res://arena/arena.tscn -- --selftest   # CI gate
-godot --path game res://arena/console.tscn         # training console (below)
+godot --path game                                   # menu -> CO-OP (P2P)
+godot --path game res://mp/lobby.tscn               # straight to the lobby
+bash tools/mp_test.sh                               # the gate: host + client on loopback
 ```
 
-**In-game:** the title menu's **ARENA** button opens the training console
-directly (BACK returns to the menu) — no command line needed. Training runs
-need the local Python stack (`ml/.venv` or system python3 + numpy); if it is
-missing the console says so instead of failing silently.
-
-Creatures, bosses and geared bounty-hunter builds fight 1v1; scripted baselines
-or trained neural policies drive them. Full manual (all flags, roster,
-cosmetics, training): **[game/arena/README.md](../game/arena/README.md)**.
-
-### Training console
-
-A windowed front-end for the ES trainer ([design/25](design/25-arena-training-console.md)).
-It drives `python3 -m ml.training.league` for you and tails the trainer's
-progress file `ml/data/progress/<key>.jsonl` (one JSON event per line).
-
-| Control | What it does |
-|---|---|
-| **Roster** | pick the trainee (species key + build), tick opponents, set generations / pop / episodes / **jobs** (default = your core count) / **speed** (default `max`); a hint line states the parallelism ceiling (pop × opponents matches per generation), idle workers, and the pop that fills your cores |
-| **Train / Stop** | spawns `league train …` as a child process; Stop kills it; the UI never blocks |
-| **Progress** | current generation / candidate / match, matches done of total, ETA from observed match durations, a fitness chart (best + mean per generation, per-candidate dots), a per-match **score strip** coloured by opponent (`native@fen_boar_alpha 0.00` in its legend = no learning signal yet), the last gate result |
-| **Gate** | runs `league gate` for the trainee → PASS / FAIL + the numbers |
-| **Watch** | opens a windowed arena for ONE episode with the trainee's latest net (candidate version, else deployed) against a chosen opponent |
-
-ES has no loss curve: **fitness** (candidate match score vs opponents, 0..1,
-higher is better) is the metric, plus the gate's win-rates. Progress arrives
-per match, so the chart moves long before a generation completes.
-
-## Training policies (ML)
+One friend **HOST**s and shares the LAN IP shown, up to 3 friends **JOIN** with
+that IP (UDP 7377) → **READY** → host **START HUNT**. Everyone gets the same
+world; the host simulates, clients play as full hunters. Over the internet:
+port-forward UDP 7377 or use a Tailscale-style overlay. Details and v1
+simplifications: [tech/33](tech/33-p2p-coop.md).
 
 ```bash
-python3 -m ml.training.league roster                # list builds
+tools/nakama.sh up | status | logs | down | wipe    # self-hosted Nakama (docker; not run here)
+```
+
+## 3. The arena — watch fights
+
+```bash
+godot --path game res://arena/arena.tscn            # spectator (N next matchup, R rerun, 1-3 speed, Q quit)
+```
+
+A headless match set, exactly what training runs:
+
+```bash
+godot --headless --path game res://arena/arena.tscn -- \
+    --a core.arena.dusk_revenant --b core.arena.fen_boar_alpha \
+    --policy-a scripted --policy-b native \
+    --episodes 4 --seed 7 --fast \
+    --record-dir "$PWD/ml/data/episodes" --out /tmp/result.json
+```
+
+The fastest, deterministic form (results bit-identical to wall-locked speeds):
+
+```bash
+godot --headless --fixed-fps 60 --path game res://arena/arena.tscn -- \
+    --a core.arena.fen_boar_alpha --b core.arena.cinder_drake \
+    --policy-a scripted --policy-b native --episodes 4 --fast --speed max --out /tmp/r.json
+```
+
+Flags: `--a` / `--b` (build IDs), `--policy-a` / `--policy-b`
+(`native` | `scripted` | absolute path to a weights JSON), `--episodes` (4),
+`--seed` (2026), `--fast`, `--speed max|N`, `--spectate`, `--record-dir`,
+`--out`, `--selftest`. Watch a trained net by copying its JSON into
+`game/arena/data/` and passing `--policy-a res://arena/data/<file>.json`.
+
+```bash
+python3 -m ml.training.league roster                # the 17 build IDs (5 player, 7 creature, 4 boss, 1 duo)
+godot --headless --path game -s res://arena/tools/dump_specs.gd -- --out "$PWD/ml/env/specs.json"
+                                                    # re-export real combat stats to the C++ arena
+```
+
+## 4. Train creature AI
+
+### The training console (the GUI for all of it)
+
+```bash
+godot --path game res://arena/console.tscn          # or the menu's ARENA button
+```
+
+Roster (trainee, opponents, generations, pop, episodes, jobs, speed with a
+parallelism hint) · Train / Stop (spawns `league train` as a child process) ·
+live progress from `ml/data/progress/<key>.jsonl` with a fitness chart and a
+per-match score strip · Gate · Watch (one windowed episode with the latest net).
+
+> **Every knob, artifact and benchmark is documented in
+> [tech/37](tech/37-ml-parameter-reference.md).** To experiment without
+> touching the deployed registry, run through `tools/train_run.sh` (§4.4).
+
+### ES league (CPU, numpy — the default trainer)
+
+```bash
+python3 -m ml.training.league roster
+python3 -m ml.training.league init --key fen_boar
 python3 -m ml.training.league train --key fen_boar --build core.arena.fen_boar_alpha \
-    --generations 20 --pop 16 --episodes 4 --jobs "$(nproc)"   # parallel workers
-python3 -m ml.training.league gate --key fen_boar --build core.arena.fen_boar_alpha
+    --generations 20 --pop 16 --episodes 4 --jobs "$(nproc)"
+python3 -m ml.training.league gate --key fen_boar --build core.arena.fen_boar_alpha --episodes 4
+python3 -m ml.training.league train-global \
+    --builds core.arena.fen_boar_alpha,core.arena.dusk_revenant,core.arena.cinder_drake \
+    --generations 3 --pop 6 --episodes 2
+python3 -m ml.training.league round-robin --episodes 2
+tools/train_all.sh                                  # every roster build, then gate each (not run here)
+GENERATIONS=2 POP=4 EPISODES=2 tools/train_all.sh   # quick smoke of the same
 ```
 
-**What to expect.** Every match runs at `--speed max` (default since
-2026-09-11: CPU-bound, one core per worker, results bit-identical to the old
-wall-locked 4× mode), so a 4-episode match set takes ~1–3 s instead of 45 s.
-With the defaults (3 generations × 6 candidates × 2 opponents × 4 episodes,
-`--jobs 1`) the CLI prints `[train:KEY] fresh net`, then within ~30 s per
-generation the `[train:KEY] g0 candN fitness=..` lines and `g0 best=.. mean=..`,
-ending `registered vN (candidate — run the gate)`. **Scaling rules:** a
-generation is pop × opponents independent matches (12 by default) — that is the
-most workers ever busy, so `--jobs` past it idles; raise `--pop` to use more
-cores (a better ES gradient too) and set `--jobs` ≈ cores. Measured on the
-20-core dev box: 1 worker ≈ 110× real time, 16 workers ≈ 870× aggregate
-(≈ 70k episodes/hour; flat past 16). The GPU is not used anywhere in this loop
-(numpy MLP + Godot physics/GDScript workers — tech/32); GPUs arrive with the
-C++ `dh-env` tier. For live per-match progress use the console (above) — it
-reads the same `ml/data/progress/<key>.jsonl` the trainer appends to.
+Extra flags: `--sigma` (0.02), `--lr` (0.02), `--seed` (2026),
+`--opponents "native@core.arena.gloamfen_stalker,scripted@core.arena.dusk_revenant"`,
+`--progress-file`, `--speed max|N` (default `max`).
 
-Thousands of parallel episodes, the dh-env endgame, fleet runs:
-**[tech/32](tech/32-scaling-rl-training.md)**.
+**Scaling.** A generation is `pop × opponents` independent matches — that is the
+most workers that can ever be busy, so `--jobs` past it idles. Raise `--pop` to
+use more cores. Measured on the 20-core box: 1 worker ≈ 110× real time, 16
+workers ≈ 870× aggregate (≈ 70k episodes/hour, flat past 16). No GPU is involved
+in this tier.
 
-## Distributing to friends (no Godot needed on their end)
-
-**On the Codex review branch**, use `python3 tools/package_codex.py all`
-(or `linux` / `windows`). Outputs are `builds/codex/dragon-heroes-codex-<platform>.zip`,
-with a new dragon icon, rebuilt world-generation helper and offline content
-review. This branch's project/export defaults are marked Codex and isolate
-review saves. [Full runbook](tech/34-living-content-pipeline.md#codex-review-packages-and-application-icon).
-The existing mainline packaging command is:
+### PPO tier (GPU, PyTorch — needs `ml/.venv`)
 
 ```bash
-tools/package_game.sh linux      # or: windows | all
-# DH_FETCH_TEMPLATES=1 tools/package_game.sh all   # first time: fetch ~1 GB templates
+ml/.venv/bin/python -m ml.training.ppo --key fen_boar \
+    --build core.arena.fen_boar_alpha --opp-build core.arena.cinder_drake \
+    --steps 2000000 --envs 32 --selfplay-every 4 --arch mlp --seed 0
+ml/.venv/bin/python -m ml.training.ppo --key fen_boar --build core.arena.fen_boar_alpha \
+    --opp-build core.arena.cinder_drake --arch gru --steps 500000
+ml/.venv/bin/python -m ml.training.ppo --key duo --build core.arena.fen_boar_alpha \
+    --opp-build core.arena.cinder_drake \
+    --squad-a-buddy core.arena.gloam_wisp --squad-b-buddy core.arena.bog_golem
+ml/.venv/bin/python -m ml.training.evolve --key fen_boar --build core.arena.fen_boar_alpha \
+    --opp-build core.arena.cinder_drake --pop 4 --generations 3 --steps 500000
 ```
 
-Produces `builds/dragon-heroes-<platform>.zip`: the standalone game binary +
-`dh-server` (worldgen — must sit next to the executable or worlds/co-op parity
-break) + a LEIA-ME quickstart. Friends unzip and run. Windows packaging needs a
-Windows `dh-server.exe` (mingw cross-build or CI). The game is open source
-(code MIT / art CC BY-NC, business/32) — sharing builds is explicitly fine.
+`--warm-start <registry JSON/npz>` initialises from an existing net,
+`--exploit <build>` targets a specific opponent. VRAM is capped before the first
+CUDA allocation by `ml/training/gpu_guard.py` (half the 6 GB card by default;
+override with `DH_VRAM_FRACTION`). Training stays **local** on the 4050 — no
+cloud GPU (canon §12.38).
 
-## The 3D view (experiment)
+### Isolated, cumulative runs (recommended for experiments)
 
 ```bash
-godot --path game res://prototype3d/hunt3d.tscn
+tools/train_run.sh --all                                   # every creature build, isolated
+tools/train_run.sh --key fen_boar --build core.arena.fen_boar_alpha --label sweep
+GENERATIONS=200 POP=10 EPISODES=6 tools/train_run.sh --all  # the real budget
+tools/train_run.sh --ppo --key cinder_drake --build core.arena.cinder_drake \
+    --opp-build core.arena.fen_boar_alpha                   # GPU PPO in the same shape
+tools/train_run.sh --list                                   # every run, oldest first
+tools/train_run.sh --promote ml/runs/<run>                  # copy PASSING nets into ml/serving
 ```
 
-Same world/art/data in perspective 3D ([design/22](design/22-3d-alternative-view.md));
-the 2D view remains canon.
+Each run gets `ml/runs/<date>__<keys>__<config>/` holding `config.json`,
+its own `registry.json` (seeded from the deployed one, so runs are cumulative;
+`--fresh` starts empty), `weights/`, `progress/`, `logs/` and `summary.txt`.
+`ml/serving/` — what the game and console read — is untouched until you promote.
+Under the hood it is `DH_SERVING_DIR`, honoured by league, ppo and evolve.
 
-## Content & data workflows
-
-**Play the new candidates:** run the Codex binary and click **PLAY NEW CONTENT:
-LAIRS & LEGENDS**. Explore Shrine Entrances starts beside the bell doorway;
-press G to enter. Defeat Orun to unlock Boss Rush and earn saved artifacts.
-Practice provides all four presets; L opens lore, Q→E tests Wet/Storm chains
-and R tests companion synergies. No online account is needed. Build with `python3 tools/package_codex.py all`.
-[Full controls, scope and verification](tech/35-playable-living-trial.md).
-
-Modern pixel-art/weekly-chapter review (isolated experimental branch):
+### The C++ environment (dh-env)
 
 ```bash
-python3 tools/review_living.py
+python3 -c "import ml.env.dh_env as e; print(e.DhEnv, e.make_spec)"   # ctypes over sim/build/libs/dh-env/libdh-env.so
+ml/.venv/bin/python -m ml.env.bench --seconds 5 --opp scripted        # throughput bench
 ```
 
-Open the printed `index.html` locally to inspect the animation, emission,
-artifact rarities, linked lore and VFX anatomy. This builds the candidate and
-runs the C++ effect probe; it does not install the content into a Hunt.
-Authoring/generation commands and remaining integration gates:
-[tech/34](tech/34-living-content-pipeline.md). Direction and skill proposal:
-[design/26](design/26-living-pixel-world.md).
+## 5. The world server (dh-server) directly
 
 ```bash
-python3 tools/validate_content.py      # the CI gauntlet for content packs
-python3 -m genforge.pipeline.bestiary_gen --seed 2026   # regenerate bestiary data
+sim/build/libs/dh-server/dh-server --seed 42 --entities 500 --ticks 3000
+sim/build/libs/dh-server/dh-server --seed 42 --dump-chunks 3 --out /tmp/chunks.json
+sim/build/libs/dh-server/dh-server --seed 42 --dump-window "x,y,w,h" --out /tmp/window.json
+sim/build/libs/dh-server/dh-server --lair-profile <profile>
+sim/build/libs/dh-server/dh-server --living-preview --client-port <port> --token <n> \
+    --profile <p> --mode <m> --lair <id> --seed 42 --entrance-chunk <chunk>
+sim/build/libs/dh-server/dh-effect-lab <program.dhe>      # offline effect-program probe
+```
+
+The game shells out to this binary for worldgen; it must sit next to the
+exported executable or worlds and co-op parity break.
+
+## 6. New content — Lairs & Legends trial
+
+```bash
+godot --path game                                   # menu -> PLAY NEW CONTENT: LAIRS & LEGENDS
+python3 tools/check_lair_journey.py                 # real world -> lair -> saved loot -> boss rush
+python3 tools/check_lair_journey.py --capture       # same, with GL captures
+python3 tools/check_living_preview.py               # the playable trial with isolated saves
+python3 tools/check_living_preview.py --capture
+python3 tools/review_living.py                      # build the weekly candidate + C++ effect probe, print an index.html
+python3 tools/stage_living_preview.py               # compile authoring data -> C++ tables + Godot display pack
+```
+
+In the trial: Shrine Entrances start beside the bell doorway, `G` enters,
+defeating Orun unlocks Boss Rush and earns saved artifacts, `L` opens lore,
+`Q`→`E` tests Wet/Storm chains, `R` tests companion synergies. Scope and
+verification: [tech/35](tech/35-playable-living-trial.md), pipeline:
+[tech/34](tech/34-living-content-pipeline.md).
+
+## 7. Content, art and data workflows
+
+```bash
+python3 tools/validate_content.py                       # CI gate for every content pack
+python3 -m genforge.pipeline.bestiary_gen --seed 2026    # regenerate bestiary data
 python3 genforge/vfx_lab/auras/render.py                # re-render VFX previews
-python3 -m pytest genforge/tests/ ml/tests/ -q          # python test suites
+python3 -m genforge.pipeline.mesh_gen --actor fen_boar --image <concept.png> --provider triposr
+python3 -m pytest ml/tests/ genforge/tests/ -q          # python suites
 ```
 
-Rules: gameplay content is data (`content/`), validated in CI; IDs are
-`pack.type.name` and never deleted, only deprecated. Arena roster:
-`content/core/arena/builds.json` → sync to `game/arena/data/builds.json`.
+Gameplay content is data (`content/`), validated in CI; IDs are
+`pack.type.name` and are never deleted, only deprecated. The arena roster lives
+in `content/core/arena/builds.json` and syncs to `game/arena/data/builds.json`.
 
-## Dev gates (run before shipping anything)
+## 8. Package and distribute (no Godot on their end)
 
-| Gate | Command | Pass line |
+```bash
+tools/package_game.sh linux                     # or: windows | all   (not run here)
+DH_FETCH_TEMPLATES=1 tools/package_game.sh all  # first time: fetch ~1 GB export templates
+python3 tools/package_codex.py all              # Codex review packages (linux | windows | all)
+python3 tools/package_codex.py all --require-clean
+python3 tools/verify_package.py <package.zip>   # verifies contents incl. embedded Windows icons
+python3 tools/smoke_codex.py <package.zip>      # exercise the exported PCK + native helper
+python3 tools/build_app_icon.py                 # regenerate PNG + Windows ICO sizes
+python3 tools/install_linux_launcher.py         # desktop launcher + icon association
+```
+
+Output: `builds/dragon-heroes-<platform>.zip` (mainline) or
+`builds/codex/dragon-heroes-codex-<platform>.zip` — the game binary, `dh-server`
+and a LEIA-ME quickstart. Code is MIT, art CC BY-NC (business/32): sharing
+builds is explicitly fine.
+
+## 9. The 3D experiments
+
+```bash
+godot --path game res://prototype3d/hunt3d.tscn              # 2D world/art/data in perspective 3D (design/22)
+
+# rebirth/ — separate engine spikes, own git repo (rebirth/docs/02-status.md)
+REBIRTH_SELFTEST=1 godot --headless --fixed-fps 60 --path rebirth/godot3d        # REBIRTH3D OK
+godot --path rebirth/godot3d                                                     # play the 3D slice
+cmake -S rebirth/native -B rebirth/native/build -DCMAKE_BUILD_TYPE=Release && cmake --build rebirth/native/build -j
+rebirth/native/build/rebirth-native --sim-only --verify                           # REBIRTH-NATIVE OK
+ctest --test-dir rebirth/native/build
+python3 rebirth/assets/tools/gen_assets.py --all-placeholders --stage godot3d native unreal
+```
+
+The 2D view remains canon; Unreal is code-complete but uncompiled (no engine on
+this box — `rebirth/unreal/INSTALL.md`).
+
+## 10. Dev gates — run ALL before shipping anything
+
+Every row below was run on 2026-09-13 and printed exactly this.
+
+| Gate | Command | Verified pass line |
 |---|---|---|
-| Menu boot | `godot --headless --path game res://prototype/tests/menu_probe.tscn` | MENU OK (asserts the main scene BUILT: MODE/FIT/ENTER/CO-OP/LANGUAGE buttons present) |
-| Hunt boot ×3 | `godot --headless --path game res://prototype/main.tscn --quit-after 150` | no errors |
-| World spawn | `godot --headless --path game res://prototype/tests/spawn_probe.tscn` | SPAWNTEST OK |
-| Stream interruption recovery | `godot --headless --path game res://prototype/tests/stream_recovery.tscn` | STREAM RECOVERY OK |
-| UI / character / action renewal | `godot --headless --path game res://prototype/tests/renewal_probe.tscn` | RENEWAL OK |
-| World stream | `godot --headless --path game res://prototype/tests/stream_test.tscn` | STREAMTEST OK |
-| Click test | `godot --headless --path game res://prototype/tests/click_test.tscn` | CLICKTEST OK ×16 |
-| FX budget | `godot --headless --path game res://prototype/tests/fx_stress.tscn --quit-after 260` | FXSTRESS OK |
-| Arena | `godot --headless --path game res://arena/arena.tscn -- --selftest` | ARENA SELFTEST OK |
-| Console | `godot --headless --path game res://arena/console.tscn -- --selftest` | CONSOLE SELFTEST OK |
-| Cosmetics | `godot --headless --path game res://arena/tests/cosmetics_test.tscn --quit-after 140` | COSMETICS OK |
-| Hunt level-up | `godot --headless --path game res://prototype/tests/level_up_probe.tscn` | LEVEL UP OK |
-| Co-op | `bash tools/mp_test.sh` | MP TEST OK |
-| Content | `python3 tools/validate_content.py` | 0 problems |
-| Python | `python3 -m pytest ml/tests/ genforge/tests/ -q` | all pass |
-| Sim | `ctest --test-dir sim/build --output-on-failure` | all pass |
+| Menu boot | `godot --headless --path game res://prototype/tests/menu_probe.tscn` | `MENU OK — 12 buttons + OPTIONS screen (2 volume sliders, MUSIC/SFX/MODE/FIT/BACK), 2 fields, SFX bus mutes + restores, settings survive a language save, script compiled` |
+| Hunt boot ×3 | `godot --headless --path game res://prototype/main.tscn --quit-after 150` | boots and quits 0. **Known flake:** roughly one run in four ends with 5 `RID allocations … were leaked at exit` lines (a MultiMesh + Mesh + Material + Shader, plus `1 resources still in use`). Exit-time only, no gameplay effect; logged in the roadmap polish backlog. No other scene shows it |
+| World spawn | `godot --headless --path game res://prototype/tests/spawn_probe.tscn` | `SPAWNTEST OK — creatures=82 nearest=191 px streaming=true` |
+| Distant encounters | `godot --headless --path game res://prototype/tests/residency_probe.tscn` | `RESIDENCY OK` (worst_step_ms=0.514) |
+| Stream recovery | `godot --headless --path game res://prototype/tests/stream_recovery.tscn` | `STREAM RECOVERY OK peak_chunks=49 worst_apply_ms=0.858` |
+| UI / character renewal | `godot --headless --path game res://prototype/tests/renewal_probe.tscn` | `RENEWAL OK — action release, movement, VFX recycling, portrait/nickname save, fresh hunter isolation, visibility and actual Haven return` |
+| World stream | `godot --headless --path game res://prototype/tests/stream_test.tscn` | `STREAMTEST OK worst_apply=0.92ms (budget 2ms / hard 4ms) window=30 chunks` |
+| Click test | `godot --headless --path game res://prototype/tests/click_test.tscn` | `CLICKTEST DONE — ALL PASS` |
+| Hunt level-up | `godot --headless --path game res://prototype/tests/level_up_probe.tscn` | `LEVEL UP OK — real kills refresh stats/HP/HUD/dodges/flasks; party parity; no gear heal, duplicate refill, build reroll or revival` |
+| FX budget | `godot --headless --path game res://prototype/tests/fx_stress.tscn --quit-after 260` | `FXSTRESS OK ribbons_peak<=40(40) lights_peak<=32(32) telegraphs_peak<=24(20) labels_peak<=48(48) nodes_created_after_warmup=0 draws<120(0) frame_ms<16.6(2.19)` |
+| Escape to Haven | `godot --headless --path game res://prototype/tests/esc_probe.tscn` | `ESC OK — returned to haven.tscn (static mem 99 -> 46 MB)` |
+| Flasks | `godot --headless --path game res://prototype/tests/flask_probe.tscn` | `FLASK OK — drink heals 40% over 2s, charge spent, 6 kills rekindle, empty refuses, haven refills` |
+| Repopulation | `godot --headless --path game res://prototype/tests/repop_probe.tscn` | `REPOP OK — field restocked 0 -> 10 creatures across 3 species` |
+| Arena | `godot --headless --path game res://arena/arena.tscn -- --selftest` | `ARENA SELFTEST OK — 4 matchups, damage flowed, no orphan proxies, HUD 4134 frames` |
+| Training console | `godot --headless --path game res://arena/console.tscn -- --selftest` | `CONSOLE SELFTEST OK — 2 generations, 8/12 matches, ETA 1:20, chart draws 2, hint '12 matches/gen (pop 6 × 2 opp) · jobs 20 · 20 cores — 8 workers idle: pop 10 fills them'` |
+| Cosmetics | `godot --headless --path game res://arena/tests/cosmetics_test.tscn --quit-after 140` | `COSMETICS OK` |
+| Lair journey | `python3 tools/check_lair_journey.py` | `LAIR JOURNEY OK: earned_artifacts=2, entrances=1, fps=60.0, lair_unlocks=1, rush_round=2.0, world_return_preserved=True` |
+| Co-op | `bash tools/mp_test.sh` | `MP HOST OK` + `MP CLIENT OK — 10 snapshots received` + `MP TEST OK` |
+| Content | `python3 tools/validate_content.py` | `content OK: 46 definitions across 11 types, 5 registries, 0 problems` |
+| Python | `python3 -m pytest ml/tests/ genforge/tests/ -q` | `116 passed in 5.44s` |
+| Sim (C++) | `ctest --test-dir sim/build --output-on-failure` | `100% tests passed, 0 tests failed out of 4` (sim, living, lair, lair-profile) |
 
-Notes: kill the game with `pkill -x godot` (never `pkill -f`); after adding a
-`class_name` script run `godot --headless --path game --import` once;
-`grep -c` exits 1 on zero matches — never chain gates with `&&`.
+Longer soaks and capture scenes, run when the area changes:
 
-## Troubleshooting
+```bash
+godot --headless --path game res://prototype/tests/mem_soak.tscn --quit-after 3000   # MEMSOAK lines: mem must plateau
+godot --path game res://prototype/tests/vfx_showcase.tscn        # windowed VFX catalog
+godot --path game res://prototype/tests/vfx_iso.tscn             # one effect in isolation
+godot --path game res://prototype/tests/ui_capture.tscn          # UI reference frames
+godot --path game res://prototype/tests/residency_capture.tscn   # distant-encounter captures
+godot --path game res://prototype/tests/renewal_capture.tscn     # renewal captures
+```
+
+Notes: `grep -c` exits 1 on zero matches — never chain gates with `&&`, use `;`.
+Headless for gates, windowed only for captures.
+
+## 11. Troubleshooting
 
 | Symptom | Fix |
 |---|---|
-| Black/empty hunt window | build `sim/build` (dh-server) — worldgen shells out to it |
-| Co-op can't connect | same LAN? UDP 7377 free? host firewall? use overlay for internet |
-| `Script class X not found` | run `godot --headless --path game --import` once |
-| Arena match crawls | add `--fast` to headless runs |
-| ML: `godot not on PATH` | install/link Godot 4.6+ |
-| X crash on Vulkan | expected on the dev box — stay on gl_compatibility (default) |
+| Black or empty hunt window | build `sim/build` — worldgen shells out to `dh-server` |
+| `Script class X not found` | `godot --headless --path game --import` once |
+| `ModuleNotFoundError: torch` | use `ml/.venv/bin/python` for the PPO tier; the ES league needs only system numpy |
+| Co-op cannot connect | same LAN? UDP 7377 free? host firewall? use an overlay for internet play |
+| Arena match crawls | add `--fast` (and `--speed max`) to headless runs |
+| `godot: command not found` | install Godot 4.6+ or put it on PATH |
+| X crash on Vulkan | expected on this box — stay on gl_compatibility; `tools/run_vulkan.sh` is Ricardo-only |
+| Something hangs | `pkill -x godot` only, never `pkill -f` (it would kill training workers) |

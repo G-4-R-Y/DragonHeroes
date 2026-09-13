@@ -24,6 +24,8 @@ import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(REPO))
+from ml.serving_paths import weights_dir as ml_weights_dir  # noqa: E402
 PY = str(REPO / "ml" / ".venv" / "bin" / "python")
 LOG_DIR = REPO / "ml" / "data" / "logs"
 
@@ -67,7 +69,7 @@ def run_candidate(key: str, build: str, opp_build: str, cfg: dict, steps: int,
     with open(log, "w") as lf:
         subprocess.run(cmd, cwd=REPO, stdout=lf, stderr=subprocess.STDOUT,
                        timeout=7200)
-    weights = REPO / "ml" / "serving" / "weights" / f"{tag}_ppo_v1.json"
+    weights = ml_weights_dir() / f"{tag}_ppo_v1.json"   # honours $DH_SERVING_DIR
     if cfg["arch"] == "gru" or not weights.exists():
         # GRU has no Godot export: dh-env proxy fitness (win rate from the log)
         rates = [float(m) for m in

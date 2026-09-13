@@ -48,8 +48,14 @@ from pathlib import Path
 import numpy as np
 
 ROOT = Path(__file__).resolve().parent.parent.parent
-REGISTRY = ROOT / "ml" / "serving" / "registry.json"
-WEIGHTS_DIR = ROOT / "ml" / "serving" / "weights"
+sys.path.insert(0, str(ROOT))
+from ml.serving_paths import (progress_dir, registry_path,  # noqa: E402
+                              weights_dir)
+
+# $DH_SERVING_DIR redirects every artifact to an isolated run folder
+# (tools/train_run.sh); unset = the deployed ml/serving (ml/serving_paths.py).
+REGISTRY = registry_path()
+WEIGHTS_DIR = weights_dir()
 EPISODES_DIR = ROOT / "ml" / "data" / "episodes"
 BUILDS_JSON = ROOT / "game" / "arena" / "data" / "builds.json"
 ARENA_SCENE = "res://arena/arena.tscn"
@@ -172,7 +178,7 @@ def save_net(net: PolicyNet, entry: dict) -> None:
 # ---- progress feed (docs/design/25 §2) ----------------------------------------------
 
 
-PROGRESS_DIR = ROOT / "ml" / "data" / "progress"
+PROGRESS_DIR = progress_dir()
 
 
 class Progress:

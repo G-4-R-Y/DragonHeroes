@@ -1,5 +1,12 @@
 # ml/ — creature AI training (docs/tech/25, docs/design/23)
 
+> **Every parameter, hyperparameter, artifact and benchmark is documented in
+> [docs/tech/37-ml-parameter-reference.md](../docs/tech/37-ml-parameter-reference.md).**
+> Commands: [docs/USAGE.md §4](../docs/USAGE.md). Isolated, cumulative runs:
+> `tools/train_run.sh` (writes `ml/runs/<date>__<keys>__<config>/`, leaves the
+> deployed `ml/serving/` alone until you promote a winner).
+
+
 RL is scoped to elite bosses, Champion Ghosts, and Gloomfall fill (canon §9) —
 normal creatures use data-driven BT/utility profiles in `content/*/ai-profiles/`.
 
@@ -23,3 +30,22 @@ gate, obs schema and datasets port unchanged to PufferLib once dh-env lands.
 Phase R0 (replay logging) runs TODAY in the arena recorder (`--record-dir`) and
 moves server-side into `dh-server` at the first playtest — it is this
 directory's most important dependency.
+
+## Layout today
+
+| Path | What it holds |
+|---|---|
+| `training/policy_net.py` | numpy MLP + embedding table — the twin of the Godot runtime |
+| `training/league.py` | ES trainer, match runner, registry, progress feed |
+| `training/ppo.py` | GPU PPO over dh-env (self-play, exploiters, squads, GRU) |
+| `training/torch_policy.py` | torch twins of the policy net (MLP + GRU) |
+| `training/gpu_guard.py` | VRAM cap and rollout clamp (`DH_VRAM_FRACTION`) |
+| `training/evolve.py` | ES over PPO *configs* (arch, lr, entropy, self-play cadence) |
+| `env/dh_env.py`, `env/bench.py` | ctypes binding for `libdh-env.so`, throughput bench |
+| `env/specs.json` | generated fighter stats (from the real Godot bodies) |
+| `eval/gate.py` | the deploy gate: scripted + native suites, ladder, sanity |
+| `serving_paths.py` | resolves artifact paths through `DH_SERVING_DIR` |
+| `serving/` | deployed registry + weights (weights gitignored) |
+| `runs/` | isolated run folders from `tools/train_run.sh` (gitignored) |
+| `data/` | episodes, progress feeds, logs (gitignored) |
+| `tests/` | league, policy-net and progress-feed suites |

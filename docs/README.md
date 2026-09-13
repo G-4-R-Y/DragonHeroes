@@ -55,6 +55,7 @@
 | [32-scaling-rl-training](tech/32-scaling-rl-training.md) | Thousands of parallel episodes: parallel Godot workers (landed), dh-env, fleets |
 | [33-p2p-coop](tech/33-p2p-coop.md) | P2P co-op (friends & LAN): lobby, host authority, snapshot replication |
 | [36-official-content-and-trust](tech/36-official-content-and-trust.md) | Official/modded provenance, promotion/anti-cheat gates, bot rating and 100v100 capacity proof |
+| [37-ml-parameter-reference](tech/37-ml-parameter-reference.md) | Every ML parameter and hyperparameter, every artifact produced, who consumes it, and how nets are benchmarked |
 | **business/** | |
 | [30-legal-payments-compliance](business/30-legal-payments-compliance.md) | Brazilian gambling/minors law, PSPs, tax, AML, LGPD — **read before launch decisions** |
 | [31-roadmap](business/31-roadmap.md) | M0→M6 milestones, exit gates, parallel tracks, risk register |
@@ -102,3 +103,4 @@ most work (see also canon §12):
 | [20-roadmap](harness/20-roadmap.md) | The one consolidated roadmap: NOW / PICK / SCHEDULED / BUDGET / polish |
 
 - [35 — Playable living-content trial](tech/35-playable-living-trial.md): controls, artifact comparisons, C++ host and export gates.
+- [37 — ML parameter reference](tech/37-ml-parameter-reference.md): league/PPO/evolve knobs, registry and weights schemas, the deploy gate, measured throughput.

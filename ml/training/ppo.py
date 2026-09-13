@@ -30,10 +30,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from ml.env.dh_env import DhEnv, OBS_DIM                     # noqa: E402
 from ml.training.gpu_guard import apply as gpu_apply, clamp_batch  # noqa: E402
 from ml.training.torch_policy import TorchPolicyNet, TorchGRUPolicyNet  # noqa: E402
+from ml.serving_paths import registry_path as ml_registry_path  # noqa: E402
+from ml.serving_paths import weights_dir as ml_weights_dir  # noqa: E402
 
 REPO = Path(__file__).resolve().parents[2]
-WEIGHTS_DIR = REPO / "ml" / "serving" / "weights"
-REGISTRY = REPO / "ml" / "serving" / "registry.json"
+# $DH_SERVING_DIR redirects every artifact to an isolated run folder
+# (tools/train_run.sh); unset = the deployed ml/serving (ml/serving_paths.py).
+WEIGHTS_DIR = ml_weights_dir()
+REGISTRY = ml_registry_path()
 
 # reward shaping == league fitness terms (win rate + hp margin)
 R_WIN, R_LOSE, R_HP_DELTA, R_TIME = 1.0, -1.0, 1.0, 0.002
