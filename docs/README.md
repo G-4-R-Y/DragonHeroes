@@ -39,6 +39,8 @@
 | [26-living-pixel-world](design/26-living-pixel-world.md) | Modern pixel art direction, storied artifact rarity, skill-system audit and proposal, weekly chapter design |
 | [34-living-content-pipeline](tech/34-living-content-pipeline.md) | Reproducible candidate generation/ingest, review UI, schemas, C++ effect probe and runbook |
 | [27-continuity-and-community](design/27-continuity-and-community.md) | Permanent heroes, weekly behavioral enchantments, cosmetic XP, mod promotion, PvP/guild/AI roadmap |
+| [28-living-world-and-weekly-lore](design/28-living-world-and-weekly-lore.md) | Connected release stories, exploration surprises, player/guild agency and persistence |
+| [Source-file notes](reference/files/README.md) | File-specific responsibilities, state ownership, callers, gates and continuation limits |
 | **tech/** | |
 | [20-architecture-overview](tech/20-architecture-overview.md) | System map, one-sim-three-consumers, data flows, decision table |
 | [21-simulation-core](tech/21-simulation-core.md) | C++ sim workspace, entity store, tick pipeline, fields, determinism |
@@ -56,6 +58,7 @@
 | [33-p2p-coop](tech/33-p2p-coop.md) | P2P co-op (friends & LAN): lobby, host authority, snapshot replication |
 | [36-official-content-and-trust](tech/36-official-content-and-trust.md) | Official/modded provenance, promotion/anti-cheat gates, bot rating and 100v100 capacity proof |
 | [37-ml-parameter-reference](tech/37-ml-parameter-reference.md) | Every ML parameter and hyperparameter, every artifact produced, who consumes it, and how nets are benchmarked |
+| [38-reward-model-history](tech/38-reward-model-history.md) | Every version of the reward model, what each one scored, why it was replaced, and the measurement that proved it |
 | **business/** | |
 | [30-legal-payments-compliance](business/30-legal-payments-compliance.md) | Brazilian gambling/minors law, PSPs, tax, AML, LGPD — **read before launch decisions** |
 | [31-roadmap](business/31-roadmap.md) | M0→M6 milestones, exit gates, parallel tracks, risk register |
@@ -104,3 +107,4 @@ most work (see also canon §12):
 
 - [35 — Playable living-content trial](tech/35-playable-living-trial.md): controls, artifact comparisons, C++ host and export gates.
 - [37 — ML parameter reference](tech/37-ml-parameter-reference.md): league/PPO/evolve knobs, registry and weights schemas, the deploy gate, measured throughput.
+- [38 — Reward model history](tech/38-reward-model-history.md): the changelog for the scoring model — v0's two disagreeing functions, v1 kept for reproducibility, v2's weights and enforced invariants, and the four bugs that each produced a plausible number instead of an error.
