@@ -249,7 +249,15 @@ Measured 2026-09-14, `core.arena.cinder_drake` mirror, 12 episodes each:
 | trained net v5.0 | 0.557 / 0.402 | 0.33 / 0.421 |
 | statue | 0.559 / 0.401 | 0.00 / 0.238 |
 
-Against scripted the trained net is **indistinguishable from the statue**. That single row reframed the whole investigation: the gate was honest and the reward model ranked all three correctly (its first independent confirmation), so the learner was the problem. Run these controls before tuning anything.
+And `fen_boar` v6.0 — the **deployed** pin, the net driving creatures players actually fight:
+
+| policy | vs scripted (foe hp / reward) | vs native (foe hp / reward) |
+| --- | --- | --- |
+| heuristic | 0.000 / 0.839 (win 1.00) | 0.000 / 0.869 (win 1.00) |
+| **deployed net v6.0** | 0.579 / 0.113 | 0.348 / 0.176 |
+| statue | **0.463** / **0.140** | **0.156** / **0.218** |
+
+The statue takes *more* health off the opponent than the deployed net does, in both matchups, and outscores it. Against scripted the drake net is likewise indistinguishable from the statue. That single row reframed the whole investigation: the gate was honest and the reward model ranked all three correctly (its first independent confirmation), so the learner was the problem. Run these controls before tuning anything.
 
 **The reward model is not the arena's vocabulary.** `episode_terms()` reads `winner_is_self`/`seconds`; an arena row says `winner_side`/`duration_s`. Passed a raw arena row, the two heaviest terms both defaulted to 0.5 and a loss scored 0.528 instead of 0.238 — above real wins, and above the 0.45 ceiling `assert_sane_weights` guarantees. It is refused now; always convert with `from_arena_row(row, side)`.
 

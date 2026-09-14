@@ -715,6 +715,21 @@ Rebuild after the packaging commit for clean provenance; archives remain in
   the right order, which is the first independent confirmation that 15a works.
   It is the LEARNER.
 
+  **AND IT IS NOT ONE KEY. The DEPLOYED net is worse than a statue.** Same
+  controls against `fen_boar` v6.0 — the pin that actually ships, the one
+  driving creatures players fight:
+      vs scripted   heuristic  win 1.00  foe hp 0.000   reward 0.839
+                    net v6.0   win 0.00  foe hp 0.579   reward 0.113
+                    STATUE     win 0.00  foe hp 0.463   reward 0.140
+      vs native     heuristic  win 1.00  foe hp 0.000   reward 0.869
+                    net v6.0   win 0.00  foe hp 0.348   reward 0.176
+                    STATUE     win 0.00  foe hp 0.156   reward 0.218
+  The statue takes MORE health off the opponent than the trained net does, in
+  both matchups, and outscores it on the reward model in both. The deployed
+  creature AI is measurably worse than doing nothing. That is a SHIPPING
+  finding, not only a training one. Registry untouched — this is a measurement,
+  and pulling a pin is Ricardo's call.
+
   WHY, measured in the weights rather than guessed. Softmax over real
   observations, drake v5.0:
       logit means  +0.24  +11.40  +11.40  -2.96  -2.51  -4.13  -4.01
