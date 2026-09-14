@@ -647,6 +647,8 @@ func _build_versus_tab(tabs: TabContainer) -> void:
 	_vs_eps.rounded = true
 	knobs.add_child(_vs_eps)
 	_vs_btn = _button(knobs, "RUN BEST-OF-N", _versus_run)
+	_button(knobs, "WATCH", _versus_watch).tooltip_text = \
+			"Spectate this exact pairing — both nets attached, the whole set."
 	_button(knobs, "SWAP", func() -> void:
 		var t := _vs_a
 		_vs_a = _vs_b
@@ -681,6 +683,8 @@ func _build_versus_tab(tabs: TabContainer) -> void:
 	filt.add_child(_vs_kind)
 	_vs_count = _label("", DIM)
 	filt.add_child(_vs_count)
+	_button(filt, "WATCH THIS", _verdict_watch).tooltip_text = \
+			"Replay the selected verdict in a spectated arena window."
 	v.add_child(filt)
 	_vs_history = _list(0, false)
 	_vs_history.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -1132,15 +1136,99 @@ func _watch() -> void:
 				"deployed" if bool(net.deployed) else "candidate", int(net.version)]
 	var opps := _selected_opponents()
 	var opp: String = opps[0] if not opps.is_empty() else build
+	_arena_window(build, opp, spec, "", 1, _proc_note)
+
+# Every watch route goes through here. It was inlined in _watch(), which is why
+# only ONE shape was ever watchable: the selected key's latest net against an
+# opponent BUILD, for a single episode, with no --policy-b. Ricardo,
+# 2026-09-14: "in the console arena I can't watch the best of N showdowns when
+# testing nets!" — a showdown needs BOTH sides' policies and the whole set.
+func _arena_window(a_build: String, b_build: String, pol_a: String, pol_b: String,
+		episodes: int, note: String) -> void:
+	if a_build == "":
+		_proc_note = "no build to fight in"
+		_refresh_ui()
+		return
 	# the running binary: same Godot as this console, no PATH dependency
 	var exe := OS.get_executable_path()
 	if exe == "":
 		exe = "godot"
-	var pid := OS.create_process(exe, ["--path", _repo.path_join("game"), "res://arena/arena.tscn",
-			"--", "--a", build, "--b", opp, "--policy-a", spec, "--episodes", "1", "--spectate"])
-	if pid <= 0:
-		_proc_note = "could not spawn the arena window"
+	var argv := ["--path", _repo.path_join("game"), "res://arena/arena.tscn", "--",
+			"--a", a_build, "--b", b_build if b_build != "" else a_build,
+			"--episodes", str(maxi(episodes, 1)), "--spectate"]
+	if pol_a != "":
+		argv.append_array(["--policy-a", pol_a])
+	if pol_b != "":
+		argv.append_array(["--policy-b", pol_b])
+	var pid := OS.create_process(exe, argv)
+	_proc_note = note if pid > 0 else "could not spawn the arena window"
 	_refresh_ui()
+
+# WATCH from the VERSUS tab: the exact pairing RUN BEST-OF-N would play, for the
+# whole set (best_of rounds x episodes per round), both policies attached.
+func _versus_watch() -> void:
+	if _vs_a.is_empty() or _vs_b.is_empty():
+		_proc_note = "set both sides first (NETS: SET A / SET B, or a baseline)"
+		_refresh_ui()
+		return
+	var a_build := str(_vs_a.get("build", ""))
+	if a_build == "":
+		a_build = _selected_build()
+	var b_build := str(_vs_b.get("build", ""))
+	if b_build == "":
+		b_build = a_build
+	var eps := int(_vs_best_of.value) * int(_vs_eps.value)
+	_arena_window(a_build, b_build, str(_vs_a.get("spec", "")), str(_vs_b.get("spec", "")),
+			eps, "watching %s vs %s — best of %d x %d episodes — [Q] closes the arena window" % [
+			str(_vs_a.get("label", "A")), str(_vs_b.get("label", "B")),
+			int(_vs_best_of.value), int(_vs_eps.value)])
+
+# WATCH a verdict that ALREADY RAN, from the history list. Every schema stores
+# enough to replay it: a versus verdict carries both sides' spec+build, and a
+# bracket row carries `out` — the path of the versus verdict that decided it.
+func _verdict_watch() -> void:
+	if _last_verdict.is_empty():
+		_proc_note = "pick a verdict in HISTORY first"
+		_refresh_ui()
+		return
+	var v := _replayable(_last_verdict, 0)
+	if v.is_empty():
+		_proc_note = "%s verdicts do not record a single pairing to replay" % \
+				_verdict_kind(_last_verdict)
+		_refresh_ui()
+		return
+	var a: Dictionary = v.get("a", {})
+	var b: Dictionary = v.get("b", {})
+	var a_build := str(a.get("build", ""))
+	var eps := int(v.get("best_of", 1)) * int(v.get("episodes_per_round", 1))
+	_arena_window(a_build, str(b.get("build", a_build)), str(a.get("spec", "")),
+			str(b.get("spec", "")), eps,
+			"replaying %s vs %s — best of %d — [Q] closes the arena window" % [
+			str(a.get("label", "A")), str(b.get("label", "B")), int(v.get("best_of", 1))])
+
+# A versus verdict replays itself; a bracket points at the versus verdict that
+# decided it. `depth` stops a malformed `out` chain from recursing forever.
+func _replayable(v: Dictionary, depth: int) -> Dictionary:
+	if depth > 3:
+		return {}
+	match _verdict_kind(v):
+		"versus":
+			return v
+		"tournament":
+			var br: Array = v.get("bracket", [])
+			if br.is_empty():
+				return {}
+			var out := str((br[br.size() - 1] as Dictionary).get("out", ""))
+			if out == "" or not FileAccess.file_exists(out):
+				return {}
+			var f := FileAccess.open(out, FileAccess.READ)
+			if f == null:
+				return {}
+			var parsed: Variant = JSON.parse_string(f.get_as_text())
+			f.close()
+			if parsed is Dictionary:
+				return _replayable(parsed as Dictionary, depth + 1)
+	return {}
 
 # ---- progress tail (design/25 §2) ---------------------------------------------------------
 
@@ -2430,11 +2518,60 @@ func _run_selftest() -> void:
 		push_error("CONSOLE SELFTEST: ETA %.1f s of %d matches, want > 0 of 12" % [
 				_eta_s(), _total_matches()])
 	ok = _selftest_cockpit() and ok
+	ok = _selftest_watch() and ok
 	if ok:
 		print("CONSOLE SELFTEST OK — %d generations, %d/%d matches, ETA %s, chart draws %d, hint '%s'" % [
 				(_run.gens as Array).size(), int(_run.matches), _total_matches(),
 				_fmt_s(_eta_s()), _chart_draws, _hint.text])
 	get_tree().quit(0 if ok else 1)
+
+# Watching a best-of-N showdown (Ricardo, 2026-09-14). This gate checks the
+# PAIRING RESOLUTION only and never spawns anything: launching an arena window
+# from a headless gate is exactly the thing that must not happen. What it
+# proves is that a bracket verdict resolves to the versus verdict that decided
+# it, and that both sides' policies survive the hop — the old _watch() attached
+# --policy-a only, so a net-vs-net showdown was unwatchable.
+func _selftest_watch() -> bool:
+	var ok := true
+	var root := ProjectSettings.globalize_path("user://selftest_watch")
+	_rm_rf(root)
+	DirAccess.make_dir_recursive_absolute(root)
+	var vs_path := root.path_join("versus.json")
+	var vs := {"schema": "arena.versus.v1", "best_of": 5, "episodes_per_round": 3,
+			"a": {"spec": "/nets/es_v2.json", "label": "es v2", "build": "core.arena.bog_golem"},
+			"b": {"spec": "/nets/ppo_v3.json", "label": "ppo v3", "build": "core.arena.bog_golem"}}
+	var f := FileAccess.open(vs_path, FileAccess.WRITE)
+	f.store_string(JSON.stringify(vs))
+	f.close()
+	# a versus verdict replays itself
+	var direct := _replayable(vs, 0)
+	if str((direct.get("a", {}) as Dictionary).get("spec", "")) != "/nets/es_v2.json":
+		ok = false
+		push_error("CONSOLE SELFTEST: a versus verdict did not resolve to itself")
+	# a bracket resolves through `out` to the versus verdict that decided it
+	var tour := {"schema": "arena.tournament.v1", "key": "bog_golem", "best_of": 5,
+			"bracket": [{"a": "es", "b": "ppo", "out": vs_path}]}
+	var hop := _replayable(tour, 0)
+	if str((hop.get("b", {}) as Dictionary).get("spec", "")) != "/nets/ppo_v3.json" \
+			or int(hop.get("best_of", 0)) != 5:
+		ok = false
+		push_error("CONSOLE SELFTEST: a bracket did not resolve to its deciding showdown")
+	# BOTH sides carry a policy — the bug Ricardo hit was a one-sided watch
+	if str((hop.get("a", {}) as Dictionary).get("spec", "")) == "" \
+			or str((hop.get("b", {}) as Dictionary).get("spec", "")) == "":
+		ok = false
+		push_error("CONSOLE SELFTEST: a showdown resolved with only one side's policy")
+	# a broken `out` must refuse, not crash or replay the wrong thing
+	var broken := {"schema": "arena.tournament.v1", "bracket": [{"out": root.path_join("gone.json")}]}
+	if not _replayable(broken, 0).is_empty():
+		ok = false
+		push_error("CONSOLE SELFTEST: a bracket with a missing verdict did not refuse")
+	# a ladder has no single pairing, and must say so rather than guess
+	if not _replayable({"schema": "arena.ladder.v1"}, 0).is_empty():
+		ok = false
+		push_error("CONSOLE SELFTEST: a ladder verdict claimed a replayable pairing")
+	_rm_rf(root)
+	return ok
 
 # The cockpit tabs, against FIXTURES under user:// — the gate must never read or
 # write the real ml/serving/registry.json, ml/runs/ or ml/data/benchmarks/.

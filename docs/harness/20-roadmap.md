@@ -808,10 +808,31 @@ Rebuild after the packaging commit for clean provenance; archives remain in
       18` with truncation, in the header and the rows, and the same guard is in
       the new watcher (`PACK_W`).
 
-  STATUS: logged 2026-09-14. 13e fixed (one measurement outstanding), 13g done.
-  Remaining order: 13d (blocks him testing nets) -> 13a (an answer he asked for)
-  -> 13c's provider-independent half -> the rest of the ledger. 13b waits on his
-  repo, by his own instruction.
+  **13d DONE 2026-09-14.** The arena already accepted `--policy-b` and
+  `--episodes`; the console never sent them. `_watch()` had the spawn inlined
+  with one hardcoded shape — the selected key's newest net vs an opponent
+  BUILD, ONE episode, `--policy-a` only — so a net-vs-net best-of-N was
+  literally unwatchable. Extracted `_arena_window(a_build, b_build, pol_a,
+  pol_b, episodes, note)` as the single spawner and gave it three callers:
+  the old WATCH (unchanged behaviour), a new `WATCH` in VERSUS that spectates
+  the exact pairing RUN BEST-OF-N would play for the whole set
+  (`best_of x episodes/round`, both policies attached), and `WATCH THIS` under
+  HISTORY that replays a verdict that already ran. Brackets replay too:
+  `arena.tournament.v1` stores `out` per bracket row — the path of the versus
+  verdict that decided it — so `_replayable()` hops through it to the real
+  match set. GATED by a new `_selftest_watch()` that checks PAIRING RESOLUTION
+  only and never spawns a window (a headless gate must never open an arena):
+  a versus verdict resolves to itself, a bracket resolves through `out`, BOTH
+  sides keep a policy, a missing `out` refuses instead of replaying the wrong
+  fight, and a ladder says it has no single pairing rather than guessing.
+  A/B'd to prove it bites — reverted to the one-sided behaviour it fails with
+  `a showdown resolved with only one side's policy` and `a bracket did not
+  resolve to its deciding showdown`; restored, `CONSOLE SELFTEST OK`.
+
+  STATUS: logged 2026-09-14. 13e fixed (one measurement outstanding), 13g done,
+  13d done. Remaining order: 13a (an answer he asked for) -> 13c's
+  provider-independent half -> the rest of the ledger. 13b waits on his repo, by
+  his own instruction.
 
 - **Regenerate EVERY asset through the new pipeline — Ricardo, 2026-09-14
   (latest+12):** *"you use our new, improved, pipeline to regenerate all our
