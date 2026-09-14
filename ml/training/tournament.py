@@ -73,7 +73,7 @@ from ml.training import league                                      # noqa: E402
 BENCH_DIR = league.BENCH_DIR
 VENV_PY = ROOT / "ml" / ".venv" / "bin" / "python"
 LOG_DIR = ROOT / "ml" / "data" / "logs"
-METHODS = ("es", "ppo")
+METHODS = ("es", "ppo", "distill")
 
 # Bracket points. Chess/football scoring rather than "count the wins": a draw is
 # a fact about two nets being equal, and rounds_a == rounds_b happens often
@@ -161,6 +161,19 @@ def method_command(method: str, key: str, build: str, opp_build: str,
         if knobs.get("opponents"):
             cmd += ["--opponents", knobs["opponents"]]
         return cmd
+    if method == "distill":
+        # A student is only as good as its teacher, so this method exists only
+        # when one was named: --teacher. The teacher itself must still beat both
+        # baselines before distill.py will collect a single observation.
+        if not knobs.get("teacher"):
+            return None
+        return [sys.executable, "-u", "-m", "ml.training.distill",
+                "--key", key, "--build", build, "--teacher", str(knobs["teacher"]),
+                "--opp-build", opp_build, "--seed", str(knobs["seed"]),
+                "--jobs", str(knobs["jobs"]), "--speed", str(knobs["speed"]),
+                "--samples", str(knobs["samples"]),
+                "--dagger-rounds", str(knobs["dagger_rounds"]),
+                "--envs", str(knobs["envs"]), "--no-gate"]
     if method == "ppo":
         if not VENV_PY.exists():
             return None
@@ -184,7 +197,10 @@ def run_method(method: str, key: str, build: str, opp_build: str, knobs: dict,
     if cmd is None:
         row["status"] = "skipped"
         row["reason"] = (f"ml/.venv missing — PPO needs torch ({VENV_PY})"
-                         if method == "ppo" else f"unknown method '{method}'")
+                         if method == "ppo" else
+                         "no --teacher given — distillation needs a wide net to "
+                         "learn from (train one with ppo --hidden 256,256)"
+                         if method == "distill" else f"unknown method '{method}'")
         progress.emit("method_done", method=method, status=row["status"],
                       reason=row["reason"])
         return row
@@ -412,6 +428,10 @@ def plan(keys: list[tuple[str, str]], methods: list[str], knobs: dict,
         print(f"    ppo     {knobs['steps']:,} steps x {knobs['envs']} envs, "
               f"arch {knobs['arch']}  (GPU, ml/.venv"
               f"{'' if VENV_PY.exists() else ' — MISSING, would be skipped'})")
+    if "distill" in methods:
+        print(f"    distill {knobs['dagger_rounds']} DAgger round(s) x "
+              f"{knobs['samples']:,} samples"
+              f"{'' if knobs.get('teacher') else '  (NO --teacher: would be skipped)'}")
     if gate_episodes:
         print(f"    gate    {len(methods)} x 2 suites x {gate_episodes} episodes")
     print(f"    bracket {pairs} pair(s) x best-of-{best_of} x {bracket_episodes} "
@@ -463,6 +483,12 @@ def build_parser(ap: argparse.ArgumentParser) -> argparse.ArgumentParser:
     ap.add_argument("--envs", type=int, default=512)
     ap.add_argument("--arch", default="mlp", choices=["mlp", "gru"])
     ap.add_argument("--selfplay-every", type=int, default=4)
+    # distill knobs
+    ap.add_argument("--teacher", default="",
+                    help="a wide net for the `distill` method, in `versus --a` syntax. "
+                         "Without it, distill is skipped with that reason recorded.")
+    ap.add_argument("--samples", type=int, default=200_000, help="distill: per DAgger round")
+    ap.add_argument("--dagger-rounds", type=int, default=3)
     return ap
 
 
@@ -487,7 +513,9 @@ def run(args: argparse.Namespace) -> int:
              "speed": args.speed, "opponents": args.opponents,
              "checkpoint_every": args.checkpoint_every,
              "steps": args.steps, "envs": args.envs, "arch": args.arch,
-             "selfplay_every": args.selfplay_every}
+             "selfplay_every": args.selfplay_every,
+             "teacher": args.teacher, "samples": args.samples,
+             "dagger_rounds": args.dagger_rounds}
 
     if args.dry_run:
         plan(keys, methods, knobs, args.best_of, args.bracket_episodes,

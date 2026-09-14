@@ -354,6 +354,55 @@ and the live console feed at `ml/data/progress/<key>.jsonl`.
 > (`<key>_evo_g0c1`), so there is no single candidate to enter. Run it, then add
 > its champion by hand with `--extra <key>_evo_g2c0@candidate`.
 
+### Teachers and students (`distill`)
+
+A wide net cannot ship — the shipping net is 7,744 MACs and ~105 µs/tick in C++,
+a 256×256 net is 80,128 MACs and ~1.09 ms, and fifteen of those eat a whole
+60 FPS frame. So train big, then teach small:
+
+```bash
+# 1. a teacher. PPO on the GPU is the trainer that can actually use the width.
+ml/.venv/bin/python -m ml.training.ppo --key fen_boar_alpha \
+    --build core.arena.fen_boar_alpha --opp-build core.arena.gloamfen_stalker \
+    --hidden 256,256 --steps 2000000
+
+# 2. distill it into the 64x64 net the game loads
+python3 -m ml.training.distill --key fen_boar_alpha \
+    --build core.arena.fen_boar_alpha --teacher fen_boar_alpha@candidate
+```
+
+`--hidden` also works on `league train` (ES), though ES scales poorly with
+parameter count — gradients are what use width.
+
+**A teacher must earn the job.** Before a single observation is collected it
+plays `versus` against **both** `native` and `scripted` in the real Godot arena
+and must win both by `--qualify-margin` (0.55 episode win rate by default). A
+teacher that cannot beat the built-in AI has nothing to teach, and distilling
+from it would make the student worse than the scripted fallback it replaces. It
+fails, nothing is distilled, exit 1. (`--skip-qualify` exists for experiments.)
+
+The student learns by **DAgger**, not plain cloning: round 0 rolls out with the
+teacher acting, every later round rolls out with the *student* acting and the
+teacher labelling — so the student sees the states its own mistakes lead to.
+Rollouts run in `libdh-env`, batched, at ~150–270k samples/s. The loss is
+standard KD matched to what the runtime reads: MSE on move, softened
+cross-entropy on the action logits (the runtime argmaxes them, so ranking is what
+matters), BCE on dodge. A measured run reaches ~94% action agreement with the
+teacher. The student registers as a normal candidate and gates like any other net.
+
+| flag | default | what it does |
+|---|---|---|
+| `--teacher` | required | the wide net, in `versus --a` syntax |
+| `--hidden` | `64,64` | the STUDENT's width |
+| `--samples` / `--dagger-rounds` | 200000 / 3 | per round, and how many rounds |
+| `--epochs --batch --lr --temperature` | 4 / 512 / 1e-3 / 2.0 | the fit |
+| `--qualify-margin` | 0.55 | the bar the teacher must clear vs both baselines |
+| `--envs --threads --opp` | 64 / 1 / native | the rollout |
+
+Verdicts land in `ml/data/benchmarks/` as `arena.distill.v1`. Distillation is also
+a tournament method — `tournament --methods es,ppo,distill --teacher <spec>` —
+so the student competes head to head with everything else for the pin.
+
 ### The game's default AI
 
 Which net the *game* gives a creature is now a setting, not a command-line
@@ -436,6 +485,19 @@ tools/genforge.py list                # every pack, its bundles, its approval st
 tools/genforge.py check               # audit EVERYTHING; exit 1 if anything fails
 tools/genforge.py check fen_bells     # one pack
 ```
+
+Or as a cockpit — **main menu → GENFORGE**, or standalone:
+
+```bash
+godot --path game res://genforge/console.tscn
+```
+
+PACKS on the left with their approval state; on the right the pack's verdict, one
+ART row per asset (provenance verified? clips complete?) and every finding,
+coloured. CHECK / BUILD / REVIEW (opens the bundle's `index.html`) / APPROVE /
+REJECT / CREATE. The console never re-implements the rules — it runs
+`tools/genforge.py --json` and renders the answer, so it cannot say an asset is
+fine when the CI gate says it is not.
 
 `check` is the machine half of the gate and it is deliberately blunt. Run it
 first; it is the fastest way to see what is actually wrong.
@@ -569,8 +631,10 @@ Every row below was run on 2026-09-13 and printed exactly this.
 
 | Gate | Command | Verified pass line |
 |---|---|---|
-| Menu boot | `godot --headless --path game res://prototype/tests/menu_probe.tscn` | `MENU OK — 12 buttons + OPTIONS screen (2 volume sliders, MUSIC/SFX/MODE/FIT/BACK), 2 fields, SFX bus mutes + restores, settings survive a language save, script compiled` |
-| Hunt boot ×3 | `godot --headless --path game res://prototype/main.tscn --quit-after 150` | boots and quits 0. **Known flake:** roughly one run in four ends with 5 `RID allocations … were leaked at exit` lines (a MultiMesh + Mesh + Material + Shader, plus `1 resources still in use`). Exit-time only, no gameplay effect; logged in the roadmap polish backlog. No other scene shows it |
+| Genforge console | `godot --headless --path game res://genforge/console.tscn -- --selftest` | `GENFORGE CONSOLE SELFTEST OK — 1 pack(s), fen_bells: 14 finding(s) rendered (2 failing), 1 art row(s), review page present` |
+| Menu boot | `godot --headless --path game res://prototype/tests/menu_probe.tscn` | `MENU OK — 13 buttons + OPTIONS screen (2 volume sliders, MUSIC/SFX/MODE/FIT/BACK), 2 fields, SFX bus mutes + restores, settings survive a language save, script compiled` |
+| Hunt boot ×3 | `godot --headless --path game res://prototype/main.tscn --quit-after 150` | boots and quits 0. Off-tree staged-water leak fixed; 12 verbose quits pass `python3 tools/check_hunt_exit.py`. Full receipts: `genforge/candidates/hunt-exit/` |
+| Ground state / teardown | `godot --headless --path game res://prototype/tests/ground_state_probe.tscn` | `GROUND STATE OK` — original loot after travel, full bag/cap, collection once, offscreen shot/impact/expiry and forced pending-water cleanup |
 | World spawn | `godot --headless --path game res://prototype/tests/spawn_probe.tscn` | `SPAWNTEST OK — creatures=82 nearest=191 px streaming=true` |
 | Distant encounters | `godot --headless --path game res://prototype/tests/residency_probe.tscn` | `RESIDENCY OK` (worst_step_ms=0.514) |
 | Stream recovery | `godot --headless --path game res://prototype/tests/stream_recovery.tscn` | `STREAM RECOVERY OK peak_chunks=49 worst_apply_ms=0.858` |

@@ -113,7 +113,8 @@ BUILDS_JSON = ROOT / "game" / "arena" / "data" / "builds.json"
 ARENA_SCENE = "res://arena/arena.tscn"
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from policy_net import PolicyNet  # noqa: E402
+from policy_net import (HIDDEN as DEFAULT_HIDDEN, PolicyNet, macs,  # noqa: E402
+                        parse_hidden)
 
 DEFAULT_OPPONENTS = [
     ("native", None),      # the built-in creature/boss AI — the baseline
@@ -619,21 +620,32 @@ def train_es(key: str, build: str, generations: int, pop: int, episodes: int,
              sigma: float, lr: float, seed: int, opponents: list[tuple[str, str | None]],
              jobs: int = 1, progress: Progress | None = None,
              speed: str | float = DEFAULT_SPEED, checkpoint_every: int = CHECKPOINT_EVERY,
-             resume: bool = False) -> dict:
+             resume: bool = False, hidden: str | None = None) -> dict:
     if progress is None:
         progress = Progress(None)
     speed = parse_speed(speed)
     reg = load_registry()
     dep = deployed(reg, key)
     warm_start = None
+    want = parse_hidden(hidden)
     if dep and Path(dep["npz"]).exists():
         base = PolicyNet.load_npz(dep["npz"])
         warm_start = dep["version"]
         print(f"[train:{key}] warm-start from v{dep['version']}")
+        if base.hidden != want:
+            # A width change cannot warm-start: theta would be a different length
+            # and every weight would mean something else. Say so and start fresh
+            # rather than silently training the OLD shape.
+            print(f"[train:{key}] --hidden {want} != deployed {base.hidden} — "
+                  f"starting fresh at the requested width")
+            base, warm_start = PolicyNet(seed=seed, hidden=want), None
     else:
-        base = PolicyNet(seed=seed)
+        base = PolicyNet(seed=seed, hidden=want)
         base.ensure_embedding("*", seed)
         print(f"[train:{key}] fresh net")
+    if base.hidden != DEFAULT_HIDDEN:
+        print(f"[train:{key}] WIDE net {base.hidden}: {macs(base.hidden):,} MACs/tick vs "
+              f"{macs():,} — a teacher, not something to ship (see ml/training/distill.py)")
     base.ensure_embedding("*", seed)
     progress.emit("start", key=key, build=build, generations=generations, pop=pop,
                   episodes=episodes, jobs=jobs, speed=speed,
@@ -654,7 +666,8 @@ def train_es(key: str, build: str, generations: int, pop: int, episodes: int,
             progress.emit("resumed", g=start_g, generations=generations,
                           saved=str(state.get("saved", "")))
     ckpt_meta = {"build": build, "seed": seed, "pop": pop, "sigma": sigma, "lr": lr,
-                 "episodes": episodes, "generations": generations}
+                 "episodes": episodes, "generations": generations,
+                 "hidden": list(base.hidden)}
     for g in range(start_g, generations):
         noises = [rng.normal(0.0, 1.0, theta.size) for _ in range(pop)]
         cands = []
@@ -919,6 +932,10 @@ def main() -> int:
     p_tr.add_argument("--checkpoint-every", type=int, default=CHECKPOINT_EVERY,
                       help="save the search state (theta + the RNG stream) every N "
                            "generations so a killed run is not lost; 0 disables")
+    p_tr.add_argument("--hidden", default="",
+                      help="hidden layer widths, e.g. '256,256' (default 64,64). A wide "
+                           "net is a TEACHER — it costs ~10x the per-tick budget and "
+                           "cannot ship; distill it with ml/training/distill.py")
     p_tr.add_argument("--resume", action="store_true",
                       help="continue from this key's checkpoint instead of starting "
                            "the search over")
@@ -989,7 +1006,7 @@ def main() -> int:
             train_es(args.key, args.build, args.generations, args.pop, args.episodes,
                      args.sigma, args.lr, args.seed, opponents, args.jobs, progress,
                      speed=args.speed, checkpoint_every=args.checkpoint_every,
-                     resume=args.resume)
+                     resume=args.resume, hidden=args.hidden)
         return 0
 
     if args.cmd == "train-global":

@@ -71,8 +71,15 @@ class Arena {
     // Frozen opponent net (OppPolicy::kMlp): flat row-major weights + biases,
     // layer row sizes [in0,out0,in1,out1,...], and the 16-float embedding row
     // appended to the obs (policy_net.py layout: obs31 ++ emb16, tanh hidden).
+    // Frozen-opponent MLP. Widest layer this accepts: kMlpMaxUnits. A net wider
+    // than that is REJECTED (the opponent falls back to scripted) rather than
+    // written past the forward pass's activation buffers — teacher-sized nets
+    // (256x256, ml/training/distill.py) reach here through PPO self-play, and
+    // a silent stack overwrite is the worst possible way to find that out.
+    static constexpr int kMlpMaxUnits = 512;
     void set_opp_mlp(const float* params, const int* layer_in, const int* layer_out,
                      int n_layers, const float* emb16);
+    bool has_opp_mlp() const { return mlp_params_ != nullptr && mlp_layers_ > 0; }
 
     void reset(std::uint64_t seed);
     bool step(const Action& act);        // true once the episode is done

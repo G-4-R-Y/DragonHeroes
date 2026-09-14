@@ -47,6 +47,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from ml.env.dh_env import DhEnv, VecDhEnv, OBS_DIM           # noqa: E402
 from ml.training.gpu_guard import apply as gpu_apply, clamp_batch  # noqa: E402
 from ml.training.torch_policy import TorchPolicyNet, TorchGRUPolicyNet  # noqa: E402
+
+
+def policy_hidden_default() -> tuple[int, ...]:
+    from ml.training.policy_net import HIDDEN
+    return HIDDEN
 from ml.serving_paths import registry_path as ml_registry_path  # noqa: E402
 from ml.serving_paths import weights_dir as ml_weights_dir  # noqa: E402
 
@@ -136,6 +141,10 @@ def main() -> None:
                          "default) is fastest on a busy box: a 32-env tick is "
                          "only tens of microseconds, so sync costs more than "
                          "it saves. Raise it only with >=128 envs on idle cores.")
+    ap.add_argument("--hidden", default="",
+                    help="hidden widths, e.g. '256,256' (default 64,64). A wide net is "
+                         "a TEACHER: ~10x the per-tick budget, it cannot ship — distill "
+                         "it with ml/training/distill.py. mlp only.")
     ap.add_argument("--arch", choices=["mlp", "gru"], default="mlp",
                     help="gru = recurrent net (temporal combos/kiting); "
                          "self-play snapshots disabled (C++ opponent is "
@@ -150,8 +159,22 @@ def main() -> None:
     squad = (args.squad_a_buddy, args.squad_b_buddy) \
         if args.squad_a_buddy and args.squad_b_buddy else None
     obs_dim = 36 if squad else OBS_DIM
+    from ml.training.policy_net import macs, parse_hidden
+    hidden = parse_hidden(args.hidden)
+    if args.arch == "gru" and hidden != policy_hidden_default():
+        raise SystemExit("--hidden is mlp only (the GRU stack has its own shape)")
     net = (TorchGRUPolicyNet(["*"], obs_dim=obs_dim) if args.arch == "gru"
-           else TorchPolicyNet(["*"], obs_dim=obs_dim)).to(device)
+           else TorchPolicyNet(["*"], obs_dim=obs_dim, hidden=hidden)).to(device)
+    if hidden != policy_hidden_default():
+        # The C++ frozen-opponent MLP (dh-sim Arena::set_opp_mlp) refuses layers
+        # wider than kMlpMaxUnits and falls back to scripted, so say up front
+        # whether self-play will actually see this net.
+        cap = 512
+        fits = all(n <= cap for n in hidden)
+        print(f"[ppo:{args.key}] WIDE net {hidden}: {macs(hidden):,} MACs/tick vs "
+              f"{macs():,} — a teacher, not something to ship. self-play opponent: "
+              f"{'on' if fits else f'OFF (layers > {cap} are refused by dh-sim)'}",
+              flush=True)
     if args.warm_start:
         from ml.training import policy_net
         es = policy_net.PolicyNet()

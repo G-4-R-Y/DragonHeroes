@@ -84,8 +84,16 @@ void Arena::hurt(const BodyRef& ref, float dmg) {
 
 void Arena::set_opp_mlp(const float* params, const int* layer_in,
                         const int* layer_out, int n_layers, const float* emb16) {
+    const int layers = n_layers > 8 ? 8 : n_layers;
+    for (int i = 0; i < layers; ++i) {
+        if (layer_in[i] > kMlpMaxUnits || layer_out[i] > kMlpMaxUnits) {
+            mlp_params_ = nullptr;      // too wide: refuse, do not truncate
+            mlp_layers_ = 0;            // mlp_act() then falls back to scripted
+            return;
+        }
+    }
     mlp_params_ = params;
-    mlp_layers_ = n_layers > 8 ? 8 : n_layers;
+    mlp_layers_ = layers;
     for (int i = 0; i < mlp_layers_; ++i) {
         mlp_in_[i] = layer_in[i];
         mlp_out_[i] = layer_out[i];
@@ -299,7 +307,9 @@ Action Arena::mlp_act(int who) {
     Action act{};
     if (mlp_params_ == nullptr || mlp_layers_ <= 0 || squad_)
         return scripted_act(who, kArenaDt);   // squad: MLP opp unsupported (obs v2)
-    float buf_a[96], buf_b[96];
+    // Sized by kMlpMaxUnits, not by the shipping net: set_opp_mlp refuses
+    // anything wider, so the loop below can never run past these.
+    float buf_a[kMlpMaxUnits], buf_b[kMlpMaxUnits];
     build_obs(f_[who], f_[1 - who], buf_a);
     std::memcpy(buf_a + kObsDim, mlp_emb_, sizeof(mlp_emb_));
     // forward: tanh hidden layers, linear head [move2, logits7, dodge1].

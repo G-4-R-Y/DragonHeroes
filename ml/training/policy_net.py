@@ -8,8 +8,16 @@ ONE architecture serves both nets Ricardo asked for (docs/design/23):
 
 Layout (must match the GDScript runtime exactly):
   input  = obs[OBS_DIM] ++ embedding[EMB_DIM]
-  hidden = [64, 64] tanh
+  hidden = HIDDEN tanh, [64, 64] by default
   head   = HEAD_DIM linear: [move_x, move_y, logit x ACTION_LOGITS, dodge_logit]
+
+WIDTH IS A PARAMETER (Ricardo, 2026-09-13: "train bigger models and use them to
+distill smaller ones"). The Godot runtime reads whatever layer shapes the JSON
+carries, so a wide net LOADS and RUNS — it is just slower: 7,744 MACs costs
+105 us/tick in C++, a 256x256 net is 80,128 MACs and ~1.09 ms, and fifteen of
+those eat a whole 60 FPS frame. So a wide net is a TEACHER, never a shipped
+policy; ml/training/distill.py turns one into a 64x64 student that can ship.
+Only the DEFAULT is (64, 64) — pass `hidden=` to build something else.
 
 Weights are stored as .npz for training and exported as JSON (schema
 "arena.policy.v1") for the Godot runtime.
@@ -31,16 +39,35 @@ POLICY_SCHEMA = "arena.policy.v1"
 INIT_SCALE = 0.1
 
 
-def layer_sizes() -> list[int]:
-    return [OBS_DIM + EMB_DIM, *HIDDEN, HEAD_DIM]
+def parse_hidden(spec: str | None) -> tuple[int, ...]:
+    """"256,256" -> (256, 256). Empty/None -> the default HIDDEN."""
+    if not spec:
+        return HIDDEN
+    sizes = tuple(int(x) for x in str(spec).replace(" ", "").split(",") if x)
+    if not sizes or any(n < 1 for n in sizes):
+        raise ValueError(f"bad hidden spec {spec!r} — want e.g. '256,256'")
+    return sizes
+
+
+def layer_sizes(hidden: tuple[int, ...] | None = None) -> list[int]:
+    return [OBS_DIM + EMB_DIM, *(hidden or HIDDEN), HEAD_DIM]
+
+
+def macs(hidden: tuple[int, ...] | None = None) -> int:
+    """Multiply-accumulates per forward pass — the number that decides whether a
+    net can run in the game at all (see the module docstring)."""
+    sizes = layer_sizes(hidden)
+    return sum(sizes[i] * sizes[i + 1] for i in range(len(sizes) - 1))
 
 
 class PolicyNet:
     """A small MLP + content-id embedding table."""
 
-    def __init__(self, seed: int = 0):
+    def __init__(self, seed: int = 0, hidden: tuple[int, ...] | str | None = None):
         rng = np.random.default_rng(seed)
-        sizes = layer_sizes()
+        self.hidden = parse_hidden(hidden) if isinstance(hidden, str) else \
+            tuple(hidden) if hidden else HIDDEN
+        sizes = layer_sizes(self.hidden)
         self.weights = [
             rng.normal(0.0, INIT_SCALE, size=(sizes[i + 1], sizes[i])).astype(np.float32)
             for i in range(len(sizes) - 1)
@@ -101,7 +128,7 @@ class PolicyNet:
             i += e.size
 
     def clone(self) -> "PolicyNet":
-        other = PolicyNet()
+        other = PolicyNet(hidden=self.hidden)
         other.weights = [w.copy() for w in self.weights]
         other.biases = [b.copy() for b in self.biases]
         other.embeddings = {k: v.copy() for k, v in self.embeddings.items()}
@@ -114,6 +141,7 @@ class PolicyNet:
         payload.update({f"b{i}": b for i, b in enumerate(self.biases)})
         keys = list(self.embeddings.keys())
         payload["emb_keys"] = np.array(keys)
+        payload["hidden"] = np.array(self.hidden, dtype=np.int64)
         for k in keys:
             payload[f"emb:{k}"] = self.embeddings[k]
         np.savez(path, **payload)
@@ -121,9 +149,16 @@ class PolicyNet:
     @staticmethod
     def load_npz(path: str | Path) -> "PolicyNet":
         data = np.load(path, allow_pickle=False)
-        net = PolicyNet()
-        net.weights = [data[f"w{i}"] for i in range(len(layer_sizes()) - 1)]
-        net.biases = [data[f"b{i}"] for i in range(len(layer_sizes()) - 1)]
+        # Depth comes from the file, not from the module default: a teacher
+        # saved at 256x256 has to load as 256x256 even while HIDDEN says 64x64.
+        # `hidden` was added with variable width, so nets saved before it fall
+        # back to counting w{i} keys — which gives the old shape exactly.
+        n_layers = sum(1 for k in data.files if k.startswith("w") and k[1:].isdigit())
+        hidden = (tuple(int(x) for x in data["hidden"]) if "hidden" in data.files
+                  else tuple(data[f"w{i}"].shape[0] for i in range(n_layers - 1)))
+        net = PolicyNet(hidden=hidden)
+        net.weights = [data[f"w{i}"] for i in range(n_layers)]
+        net.biases = [data[f"b{i}"] for i in range(n_layers)]
         net.embeddings = {str(k): data[f"emb:{k}"] for k in data["emb_keys"]}
         return net
 
@@ -135,6 +170,10 @@ class PolicyNet:
             "obs_dim": OBS_DIM,
             "emb_dim": EMB_DIM,
             "explore": explore,
+            # Metadata: the runtime reads the layer shapes themselves and ignores
+            # these, but a net on disk should be able to say how big it is.
+            "hidden": list(self.hidden),
+            "macs": macs(self.hidden),
             "embeddings": {k: [float(x) for x in v] for k, v in self.embeddings.items()},
             "layers": [
                 {"w": [[float(x) for x in row] for row in w], "b": [float(x) for x in b], "act": a}

@@ -71,23 +71,25 @@ class TorchGRUPolicyNet(nn.Module):
 
 
 class TorchPolicyNet(nn.Module):
-    def __init__(self, keys: list[str] | None = None, obs_dim: int = OBS_DIM):
+    def __init__(self, keys: list[str] | None = None, obs_dim: int = OBS_DIM,
+                 hidden: tuple[int, ...] | None = None):
         super().__init__()
         self.keys = list(keys or ["*"])
         self.key_to_idx = {k: i for i, k in enumerate(self.keys)}
+        self.hidden = tuple(hidden) if hidden else HIDDEN
         self.embeddings = nn.Embedding(len(self.keys), EMB_DIM)
         nn.init.normal_(self.embeddings.weight, 0.0, 0.1)
-        sizes = [obs_dim + EMB_DIM, *HIDDEN]
+        sizes = [obs_dim + EMB_DIM, *self.hidden]
         self.layers = nn.ModuleList()
         for i in range(len(sizes) - 1):
             lin = nn.Linear(sizes[i], sizes[i + 1])
             nn.init.normal_(lin.weight, 0.0, 0.1)
             nn.init.zeros_(lin.bias)
             self.layers.append(lin)
-        self.head_move = nn.Linear(HIDDEN[-1], 2)
-        self.head_act = nn.Linear(HIDDEN[-1], ACTION_LOGITS)
-        self.head_dodge = nn.Linear(HIDDEN[-1], 1)
-        self.head_value = nn.Linear(HIDDEN[-1], 1)
+        self.head_move = nn.Linear(self.hidden[-1], 2)
+        self.head_act = nn.Linear(self.hidden[-1], ACTION_LOGITS)
+        self.head_dodge = nn.Linear(self.hidden[-1], 1)
+        self.head_value = nn.Linear(self.hidden[-1], 1)
         for h in (self.head_move, self.head_act, self.head_dodge):
             nn.init.normal_(h.weight, 0.0, 0.01)
             nn.init.zeros_(h.bias)

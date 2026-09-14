@@ -196,6 +196,49 @@ def check_release(path: Path, findings: list[tuple[str, str, str]]) -> dict:
     return data
 
 
+def audit_data(pack: str | None) -> dict:
+    """The audit as DATA. The console reads this; `audit` prints it. One place
+    decides what a finding is — the GUI must never re-implement the rules."""
+    rels, buns = releases(), bundles()
+    targets = [p for p in rels if pack in (None, p)] or ([pack] if pack in buns else [])
+    out = {"schema": "genforge.audit.v1", "packs": [],
+           "known": sorted(set(rels) | set(buns))}
+    for name in targets:
+        findings: list[tuple[str, str, str]] = []
+        bundle = buns.get(name, [None])[0]
+        data = check_release(rels[name], findings) if name in rels else {}
+        arts = []
+        for art in data.get("art", []):
+            before = len(findings)
+            check_art(art, findings)
+            check_clips(art, bundle, findings)
+            mine = findings[before:]
+            arts.append({"id": art["id"], "source": art.get("source", ""),
+                         "required_clips": list(art.get("required_clips", [])),
+                         "worst": (BAD if any(f[0] == BAD for f in mine)
+                                   else WARN if any(f[0] == WARN for f in mine) else OK),
+                         "findings": [{"level": l, "who": w, "message": m}
+                                      for l, w, m in mine]})
+        manifest = check_bundle(bundle, findings) if bundle is not None else {}
+        if bundle is None:
+            findings.append((WARN, name, "never built — `tools/genforge.py build "
+                                         f"{name}` produces the reviewable bundle"))
+        bad = sum(1 for f in findings if f[0] == BAD)
+        warn = sum(1 for f in findings if f[0] == WARN)
+        out["packs"].append({
+            "pack": name,
+            "release": str(rels[name].relative_to(ROOT)) if name in rels else "",
+            "bundle": str(bundle.relative_to(ROOT)) if bundle else "",
+            "review_page": str(bundle / "index.html") if bundle else "",
+            "content_hash": str(manifest.get("content_hash", "")),
+            "blockers": list(manifest.get("blockers", [])),
+            "approval": approval_for(str(manifest.get("content_hash", ""))),
+            "art": arts, "failures": bad, "open_items": warn,
+            "ready": bad == 0 and warn == 0,
+            "findings": [{"level": l, "who": w, "message": m} for l, w, m in findings]})
+    return out
+
+
 def audit(pack: str | None) -> int:
     rels, buns = releases(), bundles()
     targets = [p for p in rels if pack in (None, p)] or ([pack] if pack in buns else [])
@@ -230,6 +273,27 @@ def audit(pack: str | None) -> int:
 
 
 # ---- create / build / approve --------------------------------------------------------
+
+
+def list_data() -> dict:
+    rels, buns = releases(), bundles()
+    rows = []
+    for name in sorted(set(rels) | set(buns)):
+        mine = buns.get(name, [])
+        ch, ap = "", None
+        if mine:
+            ch = json.loads((mine[0] / "manifest.json").read_text()).get("content_hash", "")
+            ap = approval_for(ch)
+        rows.append({"pack": name,
+                     "release": str(rels[name].relative_to(ROOT)) if name in rels else "",
+                     "bundles": len(mine),
+                     "bundle": str(mine[0].relative_to(ROOT)) if mine else "",
+                     "content_hash": ch,
+                     "state": ("no bundle" if not mine else
+                               "approved" if ap and ap.get("decision") == "approved" else
+                               "REJECTED" if ap else "candidate (unapproved)")})
+    return {"schema": "genforge.list.v1", "packs": rows,
+            "templates": sorted(rels)}
 
 
 def cmd_list() -> int:
@@ -337,9 +401,12 @@ def main() -> int:
     ap = argparse.ArgumentParser(prog="tools/genforge.py", description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
-    sub.add_parser("list", help="every pack, its bundles and its approval state")
+    p_list = sub.add_parser("list", help="every pack, its bundles and its approval state")
     p_check = sub.add_parser("check", help="audit a pack (or everything) and exit 1 on a failure")
     p_check.add_argument("pack", nargs="?", default=None)
+    for p in (p_list, p_check):
+        p.add_argument("--json", action="store_true",
+                       help="machine-readable; what game/genforge/console.gd reads")
     p_create = sub.add_parser("create", help="draft a new release from an existing one")
     p_create.add_argument("--from", dest="template", required=True,
                           help="an existing pack name, or a path under genforge/releases")
@@ -362,8 +429,15 @@ def main() -> int:
     args = ap.parse_args()
 
     if args.cmd == "list":
+        if args.json:
+            print(json.dumps(list_data(), indent=1))
+            return 0
         return cmd_list()
     if args.cmd == "check":
+        if args.json:
+            data = audit_data(args.pack)
+            print(json.dumps(data, indent=1))
+            return 1 if any(p["failures"] for p in data["packs"]) else 0
         return audit(args.pack)
     if args.cmd == "create":
         return cmd_create(args)

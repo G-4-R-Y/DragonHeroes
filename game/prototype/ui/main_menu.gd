@@ -218,6 +218,16 @@ func _build() -> void:
 		get_tree().change_scene_to_file("res://arena/console.tscn"))
 	modes_row.add_child(arena_btn)
 
+	# GENFORGE — the content pipeline cockpit, the same way: create a chapter,
+	# audit its provenance and clips, open the offline review page, approve it.
+	var forge_btn := Button.new()
+	forge_btn.text = "GENFORGE"
+	forge_btn.custom_minimum_size = Vector2(190, 0)
+	forge_btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	forge_btn.pressed.connect(func() -> void:
+		get_tree().change_scene_to_file("res://genforge/console.tscn"))
+	modes_row.add_child(forge_btn)
+
 	# saved hunters (user://saves) — entering a listed name continues that character
 	var saves: Array = Session.list_saves()
 	if not saves.is_empty():
