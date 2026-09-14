@@ -70,6 +70,15 @@ R_WIN, R_LOSE, R_HP_DELTA, R_TIME = 1.0, -1.0, 1.0, 0.002
 # for firing a DIFFERENT kit within the combo window (1.5 s = 90 ticks)
 R_KIT, R_CHAIN, CHAIN_WINDOW = 0.02, 0.05, 90
 GAMMA, LAM, CLIP, ENTROPY, LR, EPOCHS, MINIBATCHES = 0.99, 0.95, 0.2, 0.01, 3e-4, 4, 8
+# Std of the Gaussian the move head is sampled from. It was already the 0.3 of
+# the old `0.3 * randn_like(move)` exploration noise — what was missing is that
+# a policy-gradient method only trains the heads whose log-probability is in the
+# ratio. move was not, so head_move never received a gradient and every PPO net
+# ever exported moved with its INITIAL weights (measured on the 2026-09-14
+# cinder_drake export: |move| mean 0.027 on a +-1 scale — a creature that
+# stands still). That is why PPO gated at win_rate 0.00 against scripted at
+# every budget while ES, which perturbs the whole parameter vector, passed.
+MOVE_STD = 0.3
 SNAPSHOTS = REPO / "ml" / "data" / "ppo_snapshots"
 
 
@@ -119,6 +128,11 @@ def pack_from_policy_json(path: str) -> tuple[np.ndarray, np.ndarray, np.ndarray
             np.array(layer_in, dtype=np.int32),
             np.array(layer_out, dtype=np.int32), emb,
             np.array(acts, dtype=np.int32))
+
+
+# Fewer updates than this is not a short run, it is a broken one: the trainer
+# refuses rather than registering a net the gate will reject at win_rate 0.00.
+MIN_UPDATES = 10
 
 
 def main() -> None:
@@ -214,12 +228,33 @@ def main() -> None:
         print(f"[ppo:{args.key}] warm-started from {args.warm_start}")
     opt = torch.optim.Adam(net.parameters(), lr=LR)
 
-    steps_per_rollout = clamp_batch(2048 * args.envs, budget)
-    t_horizon = max(256, steps_per_rollout // args.envs)
+    # Steps per policy update — a FIXED step budget, deliberately NOT `2048 *
+    # envs`. Tying the rollout to --envs is what broke Ricardo's 2026-09-14
+    # cinder_drake run: when --envs went 32 -> 512 with the batched rollout
+    # (ab14e32), `2048 * envs` took a rollout from 65,536 steps to 1,048,576, so
+    # the unchanged 2,000,000-step budget bought 2 policy updates instead of 30.
+    # PPO learns nothing in 2 updates — that run printed win_rate 0.81 (against
+    # its own frozen self-play snapshot, which is equally untrained) and then
+    # gated at 0.00 against scripted. --envs is a THROUGHPUT knob: 512 is the
+    # measured knee, and it must not change how often the policy is updated.
+    ROLLOUT_STEPS = 65_536
+    steps_per_rollout = clamp_batch(ROLLOUT_STEPS, budget)
+    t_horizon = max(64, steps_per_rollout // args.envs)
     if args.arch == "gru":
         t_horizon = min(t_horizon, 256)   # sequential BPTT: keep T tractable
+    rollout = t_horizon * args.envs
+    updates = max(1, args.steps // rollout)
     print(f"[ppo:{args.key}] device={device} envs={args.envs} "
-          f"horizon={t_horizon} (VRAM-capped at {steps_per_rollout})")
+          f"horizon={t_horizon} rollout={rollout:,} steps -> {updates} policy "
+          f"updates (VRAM cap {steps_per_rollout:,})")
+    if updates < MIN_UPDATES:
+        raise SystemExit(
+            f"[ppo:{args.key}] REFUSING to start: {args.steps:,} steps over a "
+            f"{rollout:,}-step rollout is {updates} policy update(s), and PPO "
+            f"cannot learn in fewer than {MIN_UPDATES}. This is the failure mode "
+            f"that produced a net with win_rate 0.00 against scripted while its "
+            f"self-play number read 0.81. Raise the budget to at least "
+            f"--steps {MIN_UPDATES * rollout:,}, or lower --envs.")
 
     if args.exploit or args.arch == "gru":
         # fixed target / no snapshots: gru runs fight native+scripted halves
@@ -305,14 +340,19 @@ def main() -> None:
                     move, logits, dodge, value = net(t_obs)
                 act_dist = torch.distributions.Categorical(logits=logits)
                 dodge_dist = torch.distributions.Bernoulli(logits=dodge)
+                move_dist = torch.distributions.Normal(move, MOVE_STD)
                 a = act_dist.sample()
                 d = dodge_dist.sample()
-                noise = 0.3 * torch.randn_like(move)
-                m = (move + noise).clamp(-1.0, 1.0)
-                logp = act_dist.log_prob(a) + dodge_dist.log_prob(d)
+                # the RAW sample is what the log-probability refers to; the env
+                # gets the clamped one. Storing the clamped sample instead would
+                # make the ratio disagree with the action that was actually taken.
+                m_raw = move_dist.sample()
+                m = m_raw.clamp(-1.0, 1.0)
+                logp = (move_dist.log_prob(m_raw).sum(-1)
+                        + act_dist.log_prob(a) + dodge_dist.log_prob(d))
                 acts = torch.where(d > 0.5, torch.full_like(a, 7), a).cpu().numpy()
                 b_obs[t] = t_obs.cpu()
-                b_move[t] = m.cpu()
+                b_move[t] = m_raw.cpu()
                 b_act[t] = torch.where(d > 0.5, torch.full_like(a, 7), a)
                 b_logp[t] = logp.cpu()
                 b_val[t] = value.cpu()
@@ -384,14 +424,16 @@ def main() -> None:
                     h_up = b_h0[mb].to(device)
                     logps, vals, ents = [], [], []
                     for t in range(T):
-                        _, logits, dodge, value, h_up = net(
+                        move, logits, dodge, value, h_up = net(
                             b_obs[t, mb].to(device), "*", h_up)
                         is_dodge = b_act[t, mb].to(device) == 7
                         a = torch.where(is_dodge,
                                         torch.zeros_like(b_act[t, mb]).to(device),
                                         b_act[t, mb].to(device))
                         cat = torch.distributions.Categorical(logits=logits)
-                        logps.append(cat.log_prob(a)
+                        logps.append(torch.distributions.Normal(move, MOVE_STD)
+                                     .log_prob(b_move[t, mb].to(device)).sum(-1)
+                                     + cat.log_prob(a)
                                      + torch.distributions.Bernoulli(
                                          logits=dodge).log_prob(is_dodge.float()))
                         vals.append(value)
@@ -411,16 +453,19 @@ def main() -> None:
             f_obs = b_obs.reshape(T * N, -1).to(device)
             f_act = b_act.reshape(T * N).to(device)
             f_logp = b_logp.reshape(T * N).to(device)
+            f_move = b_move.reshape(T * N, 2).to(device)
             f_adv = adv.reshape(T * N).to(device)
             f_ret = ret.reshape(T * N).to(device)
             f_adv = (f_adv - f_adv.mean()) / (f_adv.std() + 1e-8)
             for _ in range(EPOCHS):
                 idx = torch.randperm(T * N, device=device)
                 for mb in idx.split((T * N) // MINIBATCHES):
-                    _, logits, dodge, value = net(f_obs[mb])
+                    move, logits, dodge, value = net(f_obs[mb])
                     is_dodge = f_act[mb] == 7
                     a = torch.where(is_dodge, torch.zeros_like(f_act[mb]), f_act[mb])
-                    logp = (torch.distributions.Categorical(logits=logits).log_prob(a)
+                    logp = (torch.distributions.Normal(move, MOVE_STD)
+                            .log_prob(f_move[mb]).sum(-1)
+                            + torch.distributions.Categorical(logits=logits).log_prob(a)
                             + torch.distributions.Bernoulli(logits=dodge).log_prob(
                                 is_dodge.float()))
                     ratio = (logp - f_logp[mb]).exp()

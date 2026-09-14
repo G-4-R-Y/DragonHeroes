@@ -671,6 +671,148 @@ Rebuild after the packaging commit for clean provenance; archives remain in
      With the tick cheap and the engine resident, that is where a generation's
      time actually goes.
 
+- **Six demands in one message — Ricardo, 2026-09-14 (latest+13).** Logged
+  verbatim the moment they arrived, before any work, per the roadmap rule.
+
+  **13a. Terrain textures and particles — rework them, and what ARE they?**
+  *"Can't we rework terrain textures and overall particles, though? They are
+  animations... hat are they made of? shaders? GLSL? What is the sota for
+  particles?"* — a direct challenge to the finding below that tiles/particles are
+  not regenerable assets. He is right to push: "not a sprite regeneration" is not
+  the same as "cannot be reworked". Owed: what the terrain and the particles are
+  actually made of in this engine today (shader? GLSL? MultiMesh? CPU?), and an
+  honest read of the state of the art for 2D particles, before any plan.
+
+  **13b. The local image-gen repo is coming.** *"We have a repo for local image
+  generation, I can bring the latest version here so we consume from it"* and, at
+  the end: *"image gen repo will be added in reference_repos soon. Finish up all
+  the other tasks in the roadmap and I'll provide you the repository (it's been
+  worked on as to be finished and tested out for you)"*. This ANSWERS blocker (3)
+  below — the local backend is not something we have to build from nothing, it is
+  something we adapt to behind the existing `ImageBackend` seam. SEQUENCING IS HIS
+  AND IS EXPLICIT: the rest of the roadmap first, the repo after.
+  AMBIGUOUS, DO NOT GUESS: *"does it have anyway of recovering any past logs from
+  alternatio"* — the sentence is cut off. Two readings (does the image-gen repo
+  recover past logs / does OUR pipeline recover past generation logs). Ask before
+  acting; what we CAN answer is what our side already keeps per candidate.
+
+  **13c. The asset order is APPROVED.** *"---> do it!"* and *"---> follow through
+  with it :))))))"*, both quoting the recommended order back: local backend behind
+  the `ImageBackend` seam -> bellwether from one clip to all six -> the other 9
+  baked actors -> player and bosses -> tiles and particles last. This is now a
+  DECISION, not a proposal. Step (a) is gated on 13b's repo by his own
+  instruction, so the work that can start now is everything that does not need a
+  provider: the six-clip recipe, the prompt family, the gates.
+
+  **13d. Best-of-N showdowns are not watchable.** *"also, in the console arena I
+  can't watch the best of N showdowns when testing nets!"* — the console HAS a
+  WATCH button; it does not reach the bracket/versus matches. Testing nets
+  head-to-head without being able to SEE a single match is the same complaint as
+  the sweep having no total: the number is there, the thing itself is not.
+
+  **13e. A PPO run failed.** Screenshot of the training console, cinder_drake:
+  `IDLE · core.arena.cinder_drake · gen 0/600 · cand 0/13 · match 0/15600`,
+  `ppo finished — log ml/data/logs/cinder_drake.console.log`, and in red:
+  `GATE v6: FAIL — previous pin stays · suite_scripted FAIL wr 0.00 ·
+  suite_scripted_sanity ok · suite_native FAIL wr 0.29 · suite_native_sanity ok`.
+  Note what this actually says: PPO *finished*, the GATE failed it, and the
+  previous pin correctly stayed. `wr 0.00` against scripted is not a near-miss,
+  it is a net that never wins — diagnose from the log before touching anything.
+
+  **13f. Finish the rest of the roadmap.** *"Finish up all the other tasks in the
+  roadmap"* — the standing instruction that orders all of the above.
+
+  **13g. The terminal watcher's three gaps — APPROVED mid-turn.** Asked whether
+  we had a terminal watcher for the console; told yes (`tools/train_watch.py`,
+  verified live against his finished sweep) plus three gaps, he answered *"fix
+  and add all of those"*:
+    * it ignores every tournament event (`tournament_start`, `method_start`,
+      `method_done`, `bracket_start`, `tournament_done`) and, because each method
+      runs `league train` as a subprocess writing to the SAME per-key feed with
+      no `--progress-file`, a bracket key reads `100/100 PASS` when only ES is
+      done and then restarts at generation 0 for PPO — sweep ETA off by the
+      method count;
+    * genforge has NO live feed at all, so the assets console has no terminal
+      twin — `tools/genforge.py` only does one-shot snapshots;
+    * the KEY column is 16 wide and `gloamfen_stalker` is exactly 16 characters,
+      so the name runs into the bar with no gap.
+
+  **13e DIAGNOSED AND FIXED 2026-09-14 — and it was not what the screen said.**
+  The console said the PPO run failed. It did not: PPO *finished*, the GATE
+  rejected it, and the previous pin correctly stayed. Underneath were TWO
+  separate defects, one of them the reason PPO has never once passed a gate.
+    1. **The step budget bought 2 policy updates.** `steps_per_rollout` was
+       `2048 * envs`. When `--envs` went 32 -> 512 for throughput (ab14e32, the
+       batched rollout), a rollout went from 65,536 steps to 1,048,576, so the
+       unchanged 2,000,000-step default bought **2 updates instead of 30** — the
+       log shows it: `it=1`, `it=2`, done in 59 s. FIXED: the rollout is now a
+       fixed 65,536-step budget, so `--envs` is purely a throughput knob and the
+       update count no longer moves when it changes. Same 2M budget, same wall
+       time, now **31 iterations**. Added `MIN_UPDATES = 10`: the trainer now
+       REFUSES a config that cannot learn, printing the arithmetic and the
+       `--steps` that would fix it. That guard immediately caught the console's
+       own `TOURNEY_PPO_STEPS = 500000` (7 updates) — so every PPO entrant in a
+       TRAIN ALL bracket was structurally incapable of winning.
+    2. **THE REAL ONE: PPO never trained the move head at all.** The rollout did
+       `logp = act_dist.log_prob(a) + dodge_dist.log_prob(d)` — move was NOT in
+       the log-probability, so the PPO ratio never covered it and no gradient
+       ever reached `head_move`. The buffer proves it: `b_move` was allocated,
+       written every tick, and **never read** by either update path (both did
+       `_, logits, dodge, value = net(...)`). Every PPO net ever exported moved
+       with its INITIALISATION. Measured on the failing export: move-head
+       `|w| mean 0.0089`, output `|move| mean 0.027, p95 0.066` on a +-1 scale —
+       a creature that stands still. That is why the gate read `win_rate 0.00`
+       against scripted at every budget, while ES — which perturbs the whole
+       flat parameter vector — passes. FIXED: move is now sampled from
+       `Normal(move, MOVE_STD=0.3)` (0.3 was already the old exploration noise),
+       its `log_prob` is in the ratio in the rollout and in BOTH update paths
+       (MLP and GRU), and the raw sample is stored while the env still gets the
+       clamped one so the ratio matches the action actually taken.
+       VERIFIED: same seed, same 2M budget, the move head now learns —
+       `|w| 0.0089 -> 0.0151`, output `0.027 -> 0.082`.
+    ALSO FOUND, not yet acted on: the exporter folds all three heads into one
+    `"act": "linear"` layer while training squashes move through `tanh`; the
+    runtime CLIPS instead (`policy_net.act`). Harmless today because the outputs
+    are far inside +-1 (measured tanh-vs-clip difference: 0.0000), but it is a
+    real train/runtime divergence that will bite once move outputs grow.
+    STILL OPEN: 31 updates is not enough to clear the gate from scratch — the
+    2M-step default is a 40-second run. A 40M-step (610-update) verification run
+    is in flight; its self-play win rate has already moved from 0.20-0.36 (broken
+    move head) to 0.40-0.47. The DEFAULT budget in `tools/train_run.sh` has NOT
+    been raised yet: that is a decision to make on the measurement, not ahead of
+    it.
+
+  **13g DONE 2026-09-14 — all three, verified on real and synthetic data.**
+    * `tools/train_watch.py` now understands the bracket: `tournament_start`,
+      `method_start`, `method_done`, `bracket_start` and `tournament_done` all
+      feed a new `KeyState.frac`, and the whole sweep is summed as per-key
+      FRACTIONS instead of raw generations (which both double-counted and
+      finished early, because every method restarts the generation count in the
+      same feed). A method with no feed of its own counts as half — the same
+      rule `console.gd::_sweep_frac` uses, so the two surfaces cannot disagree.
+      PROVEN with a synthetic bracket feed: a key whose ES half is done and
+      gated PASS with PPO still running now reads `1/2 · ppo 2/2` at 75% of its
+      own bar; before this it read `100/100 PASS`. The 7-key ES sweep renders
+      byte-identically to before, so the ES path did not regress.
+    * `tools/genforge_watch.py` (NEW) — the asset forge window, the twin the
+      assets console never had. It is honest about the difference: training
+      tails a JSONL feed, genforge has none, so this WATCHES STATE ON DISK
+      (releases, bundles, blockers, provenance findings, approvals) and
+      repaints. It imports genforge.py's own `list_data`/`audit_data`, so the
+      rules live in one place and it can never call an asset fine when
+      `tools/genforge.py check` fails it — cross-checked: watcher says 1
+      failure, `check` exits 1. Its per-pack view states this roadmap's own
+      finding out loud: `fen_bells.art.bellwether 1/6 clips — missing: move,
+      anticipation, attack, hit, death`.
+    * the KEY column was exactly `len("gloamfen_stalker")`; it is now `KEY_W =
+      18` with truncation, in the header and the rows, and the same guard is in
+      the new watcher (`PACK_W`).
+
+  STATUS: logged 2026-09-14. 13e fixed (one measurement outstanding), 13g done.
+  Remaining order: 13d (blocks him testing nets) -> 13a (an answer he asked for)
+  -> 13c's provider-independent half -> the rest of the ledger. 13b waits on his
+  repo, by his own instruction.
+
 - **Regenerate EVERY asset through the new pipeline — Ricardo, 2026-09-14
   (latest+12):** *"you use our new, improved, pipeline to regenerate all our
   assets under the new design overhaul philosophy? From tiles and particles to
