@@ -193,6 +193,15 @@ int dh_env_step(DhEnv* env, float move_x, float move_y, int32_t act,
 int32_t dh_env_step_many(DhEnv* const* envs, int32_t n, const float* move_xy,
                          const int32_t* acts, float* out_obs, int32_t* out_done,
                          float* out_hp, int32_t* out_winner, int32_t n_threads) {
+    return dh_env_step_many_commit(envs, n, move_xy, acts, out_obs, out_done,
+                                   out_hp, out_winner, nullptr, n_threads);
+}
+
+int32_t dh_env_step_many_commit(DhEnv* const* envs, int32_t n, const float* move_xy,
+                                const int32_t* acts, float* out_obs,
+                                int32_t* out_done, float* out_hp,
+                                int32_t* out_winner, int32_t* out_commit,
+                                int32_t n_threads) {
     if (envs == nullptr || n <= 0) return 0;
     const int stride = envs[0]->arena.obs_dim();
     std::atomic<int32_t> n_done{0};
@@ -209,6 +218,8 @@ int32_t dh_env_step_many(DhEnv* const* envs, int32_t n, const float* move_xy,
             out_hp[2 * i + 1] = e->arena.hp_frac(1);
         }
         if (out_winner != nullptr) out_winner[i] = e->arena.winner();
+        // the LEARNER is fighter 0; -1 when its action was refused
+        if (out_commit != nullptr) out_commit[i] = e->arena.last_commit(0);
         if (done) n_done.fetch_add(1, std::memory_order_relaxed);
     };
 

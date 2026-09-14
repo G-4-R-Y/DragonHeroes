@@ -171,6 +171,57 @@ def test_arena_rows_convert_with_damage_in_health_bars():
     assert epsb[0]["dmg_dealt"] == pytest.approx(0.6)
 
 
+def _mirror_row(winner_side=None, hp_a=0.0, hp_b=0.62):
+    """A MIRROR matchup — what every self-play suite is — where side A lost."""
+    e = {"a": "core.arena.cinder_drake", "b": "core.arena.cinder_drake",
+         "winner": "core.arena.cinder_drake", "hp_a": hp_a, "hp_b": hp_b,
+         "duration_s": 18.0, "dmg_taken_a": 300.0, "dmg_taken_b": 114.0,
+         "max_hp_a": 300.0, "max_hp_b": 300.0}
+    if winner_side is not None:
+        e["winner_side"] = winner_side
+    return {"wins_a": 0, "wins_b": 4, "draws": 0, "episodes": [dict(e) for _ in range(4)]}
+
+
+def test_mirror_matchup_does_not_score_both_sides_as_the_winner():
+    """The bug Ricardo's gate screenshot exposed: `winner` names a BUILD, and in
+    a mirror both fighters carry the same one, so `winner == row["a"]` was true
+    for every episode no matter who won. A net that lost 4/4 scored 0.672 —
+    above the 0.45 ceiling this model guarantees for a loss."""
+    eps = reward.from_arena_row(_mirror_row(), "a")
+    assert [e["winner_is_self"] for e in eps] == [False] * 4
+    score = reward.score_episodes(eps, W)
+    assert score <= 1.0 - W["win"] + 1e-9,         "a losing side scored above the ceiling a pure loss can reach"
+    # ...and the other seat of the same row is the winner, not a second loser
+    assert all(e["winner_is_self"] for e in reward.from_arena_row(_mirror_row(), "b"))
+
+
+def test_winner_side_is_authoritative_when_present():
+    for ws, expect_a in (("a", True), ("b", False), ("draw", None)):
+        eps = reward.from_arena_row(_mirror_row(winner_side=ws), "a")
+        assert all(e["winner_is_self"] is expect_a for e in eps), ws
+
+
+def test_mirror_without_winner_side_falls_back_to_who_died():
+    """Recordings made before winner_side existed still have to resolve. The
+    arena ends an episode when a fighter dies, so the side at zero lost."""
+    assert reward.from_arena_row(_mirror_row(hp_a=0.0, hp_b=0.5), "a")[0][
+        "winner_is_self"] is False
+    assert reward.from_arena_row(_mirror_row(hp_a=0.5, hp_b=0.0), "a")[0][
+        "winner_is_self"] is True
+    # both alive: unresolvable from this row, and a draw is the honest answer —
+    # guessing is exactly what produced the bug above
+    assert reward.from_arena_row(_mirror_row(hp_a=0.4, hp_b=0.5), "a")[0][
+        "winner_is_self"] is None
+
+
+def test_non_mirror_rows_still_resolve_by_build_id():
+    row = {"episodes": [{"a": "core.arena.fen_boar_alpha", "b": "core.arena.gloam_wisp",
+                         "winner": "core.arena.gloam_wisp", "hp_a": 0.0, "hp_b": 0.3,
+                         "duration_s": 12.0}]}
+    assert reward.from_arena_row(row, "a")[0]["winner_is_self"] is False
+    assert reward.from_arena_row(row, "b")[0]["winner_is_self"] is True
+
+
 def test_empty_match_set_scores_zero_rather_than_raising():
     assert reward.score_episodes([], W) == 0.0
 

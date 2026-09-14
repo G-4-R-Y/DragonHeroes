@@ -696,6 +696,81 @@ Rebuild after the packaging commit for clean provenance; archives remain in
   currently subtracts `R_TIME` every tick REGARDLESS of outcome, so a losing
   agent is paid to die sooner. See the answer below for what is scored today.
 
+  **15c DONE 2026-09-14 — "stills errors (perhaps no new build?)", and his
+  hunch was half right: the build was fine, but TWO real bugs were hiding
+  behind that gate, and one of them was mine.**
+  ANSWERING THE QUESTION FIRST, with timestamps rather than reassurance: his
+  run started 07:57:31 and DID carry the dodge fix and the reward model (its
+  own log line 89 prints `reward model v2`). The 15b native fix landed at
+  07:59:29 — about two minutes LATER — so `suite_native` in that screenshot was
+  genuinely stale. `dh-godot`'s .so (21:41) is NOT stale: it exposes only the
+  policy forward pass and never touches `sim::Arena`, so no arena change can
+  age it. But a stale suite does not explain `suite_scripted FAIL wr 0.00`, and
+  chasing that turned up the two bugs below.
+
+  **BUG 1, MINE, and Ricardo's screenshot is what caught it — the mirror
+  matchup.** His console showed `fitness 0.607` sitting next to `win_rate
+  0.00`. Both cannot be true: the reward model's own enforced invariant is that
+  no loss can outrank a win, which caps a 0-win policy at 0.45. So either the
+  invariant was broken or the parse was. It was the parse. In self-play BOTH
+  fighters carry the SAME `build_id`, so `winner == e["a"]` is true no matter
+  who actually won — every mirror episode read as a WIN for whichever side was
+  being scored. A net that lost 4 of 4 scored 0.672.
+  FIX at the source, not in the reader: `game/arena/arena.gd` now writes
+  `winner_side` ("a"/"b"/"draw") into the episode row, because a side letter
+  cannot be ambiguous the way a build id can. `reward._winner_is_self()`
+  resolves in a declared order — `winner_side`, then an explicit draw, then
+  build ids ONLY when they differ, then hp (the side at zero lost), then draw —
+  so old rows without the field still parse and mirrors no longer lie.
+  VERIFIED on the same data: the losing side now scores 0.102, not 0.672.
+  4 new tests in `ml/tests/test_reward.py` (21 total), one per resolution step.
+
+  **BUG 2 — a textbook reward hack, and it was worth 72x winning the fight.**
+  With the parse honest, the retrained net's action histogram was absurd:
+  **kit slot 1 + dodge on 100.000% of ticks**, `|move| mean 0.059` on a +-1
+  scale. A creature standing still, casting one thing forever.
+  THE ARITHMETIC: `R_KIT = 0.02` paid for SELECTING a kit — the intent — and
+  `field_cast` has an 8 s cooldown, i.e. 480 ticks during which selecting it
+  does NOTHING. 3600 ticks x 0.02 = **72 per episode**, against a terminal
+  worth `R_TERMINAL * (score - 0.5)`, at most 1. The optimal policy under that
+  reward is exactly the degenerate one we were looking at. It was not a
+  learning failure; the learner was right and the reward was wrong.
+  FIX, paying for EFFECT instead of intent, and it needed a new signal from the
+  sim because nothing downstream knew what actually fired: `Arena::last_commit`
+  records the action that was ACCEPTED (-1 when refused), `dh_env_step_many_commit`
+  carries it out through the C ABI as a NEW symbol (the old entry point now
+  forwards with `nullptr`, so a stale .so announces itself instead of reading an
+  unset register), `VecDhEnv.commit` surfaces it, and ppo.py masks the dodge bit
+  off before testing the kit range:
+      pick = vec.commit & (ACT_DODGE - 1)
+      kit  = (vec.commit >= 0) & (pick >= 3) & (pick <= 6)
+  MEASURED, directly: 600 kit selections produce **1** actual cast. The signal
+  that was paying 600 now pays 1.
+  Golden `state_hash` matrix re-verified IDENTICAL — commit tracking is
+  observation only and changes no simulation outcome.
+  GATE: `sim-tests::test_arena_reports_what_actually_committed` pins all of it —
+  600 requests yield at most 3 commits at an 8 s cooldown, a cooldown-blocked
+  request reports -1, an empty kit slot reports -1, and a noop is never a
+  commitment.
+
+  **HONEST RESULT, because the fix did NOT finish the job.** After retraining
+  (`smoke_kit`, 11 updates) the collapse is REDUCED, not cured: kit spam fell
+  from 100.000% to 91.2% vs scripted and is still 100% vs native, `|move| mean`
+  is still ~0.05, and the net still dies in both matchups. Self-play win rate
+  did hold near 0.69 instead of decaying to 0.21 as the pre-fix run did, which
+  is a real signal but a weak one. 11 updates is far below `MIN_UPDATES`-scale
+  training, so this smoke run is not evidence either way about the remaining
+  collapse. Removing the 72x exploit was necessary and is not sufficient.
+  NEXT, in order: (1) a real-budget retrain now that the reward is honest,
+  before drawing any conclusion about entropy; (2) if it survives that, the
+  suspects are `ENTROPY = 0.01` (too weak to keep the move head alive) and the
+  near-zero `|move|` itself, which is the same "creature standing still"
+  symptom seen before; (3) only then the last parity divergence, `dps_taken`
+  (opponents deal damage 1.70-2.28x faster in dh-env than in the arena).
+  The registry was NOT touched: `smoke_kit`'s entry, weights and progress
+  artifacts were removed after measuring, as `smoke_reward`'s were.
+  SUITES: 121 ml tests + 4 native suites pass.
+
   **15b DONE 2026-09-14 — and it was an AGGRO RANGE, which is a game number,
   not a training one.** The arena's `native` is not a port of anything: it means
   NO policy driver (`ai_defaults.gd`: *"inert: the body's own AI runs"*), so the

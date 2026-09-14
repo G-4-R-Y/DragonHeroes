@@ -96,6 +96,17 @@ def _load_lib() -> ctypes.CDLL:
         ctypes.POINTER(ctypes.c_float), ctypes.POINTER(ctypes.c_int32),
         ctypes.POINTER(ctypes.c_float), ctypes.POINTER(ctypes.c_int32),
         ctypes.c_int32]
+    # Same call plus the COMMITTED action per env. Optional symbol, same
+    # discipline as the rest: a library without it would leave the commit array
+    # untouched and every kit would read as refused.
+    if hasattr(lib, "dh_env_step_many_commit"):
+        lib.dh_env_step_many_commit.restype = ctypes.c_int32
+        lib.dh_env_step_many_commit.argtypes = [
+            ctypes.c_void_p, ctypes.c_int32, ctypes.POINTER(ctypes.c_float),
+            ctypes.POINTER(ctypes.c_int32), ctypes.POINTER(ctypes.c_float),
+            ctypes.POINTER(ctypes.c_int32), ctypes.POINTER(ctypes.c_float),
+            ctypes.POINTER(ctypes.c_int32), ctypes.POINTER(ctypes.c_int32),
+            ctypes.c_int32]
     lib.dh_env_reset_many.argtypes = [
         ctypes.POINTER(ctypes.c_void_p), ctypes.c_int32,
         ctypes.POINTER(ctypes.c_uint64), ctypes.POINTER(ctypes.c_float)]
@@ -354,6 +365,11 @@ class VecDhEnv:
         self.done = np.zeros(self.n, dtype=np.int32)
         self.hp = np.zeros((self.n, 2), dtype=np.float32)
         self.winner = np.zeros(self.n, dtype=np.int32)
+        # The action that actually COMMITTED this tick, per env, or -1 if the
+        # chosen one was refused. Rewarding intent instead of effect is how a
+        # policy learns to spam a kit it never casts (2026-09-14).
+        self.commit = np.full(self.n, -1, dtype=np.int32)
+        self._has_commit = hasattr(lib(), "dh_env_step_many_commit")
         self._moves = np.zeros((self.n, 2), dtype=np.float32)
         self._acts = np.zeros(self.n, dtype=np.int32)
         self._seeds = np.zeros(self.n, dtype=np.uint64)
@@ -370,15 +386,27 @@ class VecDhEnv:
         return self.obs
 
     def step(self, moves, acts):
-        """moves (N,2) float, acts (N,) int -> (obs, done, hp, winner) views."""
+        """moves (N,2) float, acts (N,) int -> (obs, done, hp, winner) views.
+
+        `self.commit` is filled alongside them: the action that actually took
+        effect this tick, or -1 if it was refused. Read it rather than `acts`
+        for anything that pays a bonus — `acts` is what the policy WANTED.
+        """
         np.copyto(self._moves, np.asarray(moves, dtype=np.float32).reshape(self.n, 2))
         np.copyto(self._acts, np.asarray(acts, dtype=np.int32).reshape(self.n))
-        lib().dh_env_step_many(
-            self._handles, self.n,
-            self._p(self._moves, ctypes.c_float), self._p(self._acts, ctypes.c_int32),
-            self._p(self.obs, ctypes.c_float), self._p(self.done, ctypes.c_int32),
-            self._p(self.hp, ctypes.c_float), self._p(self.winner, ctypes.c_int32),
-            self.threads)
+        args = [self._handles, self.n,
+                self._p(self._moves, ctypes.c_float),
+                self._p(self._acts, ctypes.c_int32),
+                self._p(self.obs, ctypes.c_float),
+                self._p(self.done, ctypes.c_int32),
+                self._p(self.hp, ctypes.c_float),
+                self._p(self.winner, ctypes.c_int32)]
+        if self._has_commit:
+            lib().dh_env_step_many_commit(
+                *args, self._p(self.commit, ctypes.c_int32), self.threads)
+        else:
+            self.commit.fill(-1)
+            lib().dh_env_step_many(*args, self.threads)
         return self.obs, self.done, self.hp, self.winner
 
     def reset_done(self, idx, seeds) -> None:

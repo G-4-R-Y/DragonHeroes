@@ -269,6 +269,12 @@ func _end_episode(winner: ArenaFighter) -> void:
 	var result := {"episode": _episode,
 			"a": _fighters[0].build_id, "b": _fighters[1].build_id,
 			"winner": "draw" if draw else winner.build_id,
+			# WHICH SIDE won, not which build. In a mirror matchup — and every
+			# self-play suite is one — `winner` alone is ambiguous because both
+			# fighters carry the same build_id, so anything reading it scores
+			# both sides as the winner (found 2026-09-14 via a net that lost
+			# every episode and still scored 0.607).
+			"winner_side": "draw" if draw else ("a" if winner == _fighters[0] else "b"),
 			"duration_s": snappedf(duration, 0.01),
 			"hp_a": snappedf(_fighters[0].hp_frac(), 0.001),
 			"hp_b": snappedf(_fighters[1].hp_frac(), 0.001),

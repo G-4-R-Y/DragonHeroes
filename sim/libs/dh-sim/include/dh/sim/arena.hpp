@@ -120,6 +120,17 @@ class Arena {
     // term the two runtimes disagree on instead of only that they disagree:
     // hp_frac alone cannot separate "hits rarely land" from "hits land soft".
     float damage_taken(int who) const { return damage_taken_[who & 1]; }
+    // The action id that actually COMMITTED on the last step for this fighter,
+    // or -1 if the chosen action was refused (on cooldown, no such kit slot,
+    // act 0). The twin of game/arena/fighter.gd's `ok`.
+    //
+    // Exists because a trainer that pays for INTENT pays for nothing: PPO's kit
+    // bonus fired on "the agent selected a kit", and a kit on an 8 s cooldown is
+    // selectable for 480 ticks per cast, so spamming one kit earned 3600 x 0.02
+    // = 72 per episode against a terminal worth 1. The policy duly collapsed to
+    // that single action on 100.000% of ticks (measured 2026-09-14,
+    // cinder_drake v6.0). Pay for effect, never for intent.
+    int last_commit(int who) const { return last_commit_[who & 1]; }
     std::uint64_t tick() const { return tick_; }
     std::uint64_t state_hash() const;    // determinism fingerprint (tests)
 
@@ -193,6 +204,7 @@ class Arena {
     std::uint64_t tick_ = 0;
     int winner_ = -2;                    // -2 fighting, -1 draw, 0/1
     float damage_taken_[2] = {0.0f, 0.0f};   // per-episode, reset() clears it
+    int last_commit_[2] = {-1, -1};          // per-TICK, apply_action sets it
     math::Pcg32 combat_rng_;
     math::Pcg32 policy_rng_;
     // scripted-policy state (per fighter, only index 1 used today)

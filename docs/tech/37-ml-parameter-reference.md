@@ -99,8 +99,8 @@ opponent slot is a stateless MLP.
 | ~~`R_WIN` / `R_LOSE`~~ | ~~+1.0 / −1.0~~ | Superseded by `R_TERMINAL` × the weighted score |
 | ~~`R_HP_DELTA`~~ | ~~1.0~~ | Superseded by `R_DEAL` / `R_ABSORB` |
 | `R_TIME` | **0.0** (was 0.002) | Removed, wrong twice over. It applied every tick REGARDLESS of outcome, so a losing agent was paid to die sooner (Ricardo: *"If loser, the longest the better"*); and at `0.002 × 3600` ticks it totalled **7.2 against a win bonus of 1.0**, so the clock outweighed the result 7×. `GAMMA` already discounts later reward — that IS "sooner is better" — and duration now lives in the terminal score where its sign can depend on the outcome |
-| `R_KIT` | 0.02 | Per kit cast — beats LMB spam (canon: "no dull simple attacks") |
-| `R_CHAIN` | 0.05 | Casting a **different** kit inside the window |
+| `R_KIT` | 0.02 | Per kit cast — beats LMB spam (canon: "no dull simple attacks"). Reads `vec.commit`, the action the sim **accepted**, never the action requested: paid on selection it was worth `3600 × 0.02 = 72` per episode against a terminal worth 1, because an 8 s cooldown leaves the kit selectable for 480 dead ticks. See tech/25 §5.1.1 |
+| `R_CHAIN` | 0.05 | Casting a **different** kit inside the window — same `commit` source as `R_KIT` |
 | `CHAIN_WINDOW` | 90 ticks (1.5 s) | The combo window that bonus applies in |
 | rollout | `clamp_batch(2048 × envs)` | VRAM-capped (§2.5); horizon = `max(256, batch ÷ envs)`, and ≤ 256 for GRU (sequential BPTT) |
 | grad clip | 0.5 | Global norm |

@@ -182,6 +182,23 @@ The encoding that keeps the contract: bit 3 of the action integer (`DH_ENV_ACT_D
 
 **The same encoding is what makes PPO's likelihood correct.** Overwriting the pick with 7 destroyed it, so the update recomputed `Categorical.log_prob(0)` for every dodging tick. Measured at an unchanged policy, where the PPO ratio must be exactly 1: **43.1% of actions reconstructed wrong, ratio spread 0.87–1.17**. With the flag: ratio `1.000000` everywhere, 0% wrong. Gate: `sim-tests::test_arena_dodge_is_a_fallback`.
 
+### 5.1.1 Pay for the effect, never for the intent
+
+An agent chooses an action every tick; the sim decides whether it *happens*. Cooldowns, empty kit slots, being mid-recovery — all of these refuse an action silently. A shaping term that reads the agent's own choice therefore pays for asking, and asking is free.
+
+This was not hypothetical. `R_KIT = 0.02` paid per kit *selection*, and `field_cast` has an 8 s cooldown, so 480 of every 481 ticks that selected it did nothing at all. Over a 3600-tick episode that is **72 reward**, against a terminal worth at most 1 — the exploit outscored winning the fight by 72×, and the learner found it exactly as it should have: kit slot 1 on **100.000%** of ticks, `|move| mean 0.059`. The policy was optimal for the reward it was given.
+
+The fix is a signal, not a smaller constant: `dh::sim::Arena::last_commit(who)` records the action the sim **accepted** this tick, or `-1` if it refused, and `dh_env_step_many_commit()` carries it through the C ABI (a *new* symbol — the old entry point forwards with `nullptr`, so a stale `.so` raises `AttributeError` instead of reading an unset register). PPO masks the dodge bit off before testing the range, because bit 3 is not part of the pick:
+
+```python
+pick = vec.commit & (ACT_DODGE - 1)
+kit  = (vec.commit >= 0) & (pick >= 3) & (pick <= 6)
+```
+
+Measured on the collapsed net: 600 kit selections, **1** actual cast. Gate: `sim-tests::test_arena_reports_what_actually_committed`. Commit tracking is observation only — the golden `state_hash` matrix is unchanged.
+
+**The general rule, since this class of bug is silent by construction:** any per-tick shaping term must read sim state (what changed), not agent output (what was requested). A reward hack does not look like a bug in a training log; it looks like a policy that learned something.
+
 ### 5.2 The scoring model: one weighted, scale-normalized definition of "good fight"
 
 Ricardo, 2026-09-14: *"perhaps we should better model our reward model. What is currently considered? […] weight out which is the most importante performance metric, and attribute weights to each variable, sclaing values to what is most impactful. Numbers magnitudes must be scaled tho, as to not compare 40 seconds with 0.087 dmg_dealt. If winner, the shorter the better. If loser, the longest the better."*

@@ -181,6 +181,44 @@ static void test_arena_conduct_combo() {
     CHECK(burst_seen);
 }
 
+static void test_arena_reports_what_actually_committed() {
+    // last_commit() is the difference between paying for INTENT and paying for
+    // EFFECT. PPO's kit bonus fired whenever the agent SELECTED a kit, and a kit
+    // on an 8 s cooldown stays selectable for 480 ticks per cast, so spamming
+    // one earned 3600 x 0.02 = 72 reward per episode against a terminal worth 1.
+    // The policy collapsed onto that one action on 100.000% of ticks.
+    dh::sim::FighterSpec caster;
+    caster.max_hp = 400.0f; caster.damage = 20.0f; caster.move_speed = 70.0f;
+    caster.attack_reach = 30.0f; caster.attack_cd = 1.0f; caster.body_radius = 8.0f;
+    caster.kits[0] = {dh::sim::KitId::kFieldCast, 8.0f, 999.0f, dh::sim::FieldKind::kFire};
+    caster.kit_count = 1;
+    dh::sim::FighterSpec dummy = caster;
+    dummy.damage = 0.0f; dummy.move_speed = 0.0f; dummy.kit_count = 0;
+
+    dh::sim::Arena a(caster, dummy, dh::sim::OppPolicy::kScripted, 3);
+    int selected = 0, committed = 0;
+    for (int t = 0; t < 600; ++t) {
+        if (a.step({0.0f, 0.0f, 3})) break;    // pick kit slot 0 EVERY tick
+        ++selected;
+        if (a.last_commit(0) == 3) ++committed;
+    }
+    CHECK(selected > 400);                     // it really did ask 600 times
+    CHECK(committed >= 1);                     // ...the kit really did fire
+    // 8 s at 60 Hz is 480 ticks: at most two casts in 600, never 600.
+    CHECK(committed <= 3);
+
+    // A refused action reports -1 rather than the action id.
+    dh::sim::Arena b(caster, dummy, dh::sim::OppPolicy::kScripted, 3);
+    b.step({0.0f, 0.0f, 3});                   // fires, cooldown starts
+    CHECK(b.last_commit(0) == 3);
+    b.step({0.0f, 0.0f, 3});                   // on cooldown now
+    CHECK(b.last_commit(0) == -1);
+    b.step({0.0f, 0.0f, 5});                   // slot 2: this build has none
+    CHECK(b.last_commit(0) == -1);
+    b.step({0.0f, 0.0f, 0});                   // noop is never a commitment
+    CHECK(b.last_commit(0) == -1);
+}
+
 static void test_arena_dodge_is_a_fallback() {
     // The contract the shipping arena defines (game/arena/neural_policy.gd):
     //     match pick: 1 -> cmd_attack() ... ;  if dodge_logit > 0 and NOT ok:
@@ -351,6 +389,7 @@ int main() {
     test_arena_terminates();
     test_arena_obs_schema();
     test_arena_conduct_combo();
+    test_arena_reports_what_actually_committed();
     test_arena_dodge_is_a_fallback();
     test_arena_damage_accounting();
     test_arena_squad_mode();

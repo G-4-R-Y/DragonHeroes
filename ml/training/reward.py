@@ -233,6 +233,44 @@ def breakdown(eps: list[dict], weights: dict | None = None,
             "episodes": len(eps)}
 
 
+def _winner_is_self(e: dict, side: str, foe: str):
+    """Did `side` win this episode? True / False / None for a draw.
+
+    Resolution order, most authoritative first, because the obvious reading is
+    WRONG in the most common case. `winner` names a BUILD, and a self-play suite
+    is a mirror matchup where both fighters carry the same build id — so
+    `winner == e["a"]` is true for every episode no matter who actually won, and
+    a net that lost every fight scored as if it had won every fight (measured
+    2026-09-14: win_rate 0.00 alongside fitness 0.607, which this model's own
+    invariant says is impossible for a loss).
+    """
+    winner = e.get("winner", "draw")
+    # 1. the side, stated outright (arena.gd, 2026-09-14 onward)
+    if "winner_side" in e:
+        ws = e["winner_side"]
+        return None if ws == "draw" else (ws == side)
+    if winner == "draw":
+        return None
+    # 2. build ids, but ONLY when they can tell the sides apart
+    a_id, b_id = e.get(side), e.get(foe)
+    if a_id is not None and b_id is not None and a_id != b_id:
+        return winner == a_id
+    # 3. mirror, or a row with no build ids: infer from health. The arena ends
+    #    an episode when a fighter dies, so the side at zero is the side that
+    #    lost. Only for recordings made before winner_side existed.
+    hp_self = float(e.get(f"hp_{side}", e.get("hp_self", 0.0)))
+    hp_foe = float(e.get(f"hp_{foe}", e.get("hp_foe", 0.0)))
+    if hp_self <= 0.0 and hp_foe > 0.0:
+        return False
+    if hp_foe <= 0.0 and hp_self > 0.0:
+        return True
+    # 4. both alive or both dead and nothing else to go on: a draw is the only
+    #    honest answer. Guessing here is what caused the bug above.
+    if a_id is not None:
+        return None
+    return None if winner == "draw" else (winner == side)
+
+
 def from_arena_row(row: dict, side: str = "a") -> list[dict]:
     """An arena result row (ml/training/league.py::run_match) -> episodes in this
     module's vocabulary. Damage is converted to health bars here, using the
@@ -243,15 +281,7 @@ def from_arena_row(row: dict, side: str = "a") -> list[dict]:
     out = []
     for e in row.get("episodes", []):
         winner = e.get("winner", "draw")
-        # The arena names the winner by BUILD ID and carries "a"/"b" -> build on
-        # the same row. Fall back to comparing against the side letter when
-        # those keys are absent, because the alternative is that every episode
-        # silently reads as a LOSS — a whole match set scoring as if the policy
-        # never won once, which looks like a bad policy rather than a bad parse.
-        if side in e:
-            winner_is_self = None if winner == "draw" else (winner == e[side])
-        else:
-            winner_is_self = None if winner == "draw" else (winner == side)
+        winner_is_self = _winner_is_self(e, side, foe)
         bar_self = float(e.get(f"max_hp_{side}", 0.0)) or None
         bar_foe = float(e.get(f"max_hp_{foe}", 0.0)) or None
         dmg_self = e.get(f"dmg_taken_{side}")

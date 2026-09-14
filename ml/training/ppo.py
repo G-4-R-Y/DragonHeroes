@@ -97,6 +97,8 @@ R_TIME = 0.0
 # combo incentives (Ricardo: "no dull simple attacks — mobs rely on skill
 # combos"): small per-cast bonus so kits beat LMB spam, plus a chaining bonus
 # for firing a DIFFERENT kit within the combo window (1.5 s = 90 ticks)
+# Paid on the tick a kit actually FIRES (vec.commit), never on selecting one.
+# CHAIN_WINDOW is in TICKS and the sim runs at 60 Hz, so 90 ticks = 1.5 s.
 R_KIT, R_CHAIN, CHAIN_WINDOW = 0.02, 0.05, 90
 GAMMA, LAM, CLIP, ENTROPY, LR, EPOCHS, MINIBATCHES = 0.99, 0.95, 0.2, 0.01, 3e-4, 4, 8
 # Std of the Gaussian the move head is sampled from. It was already the 0.3 of
@@ -429,11 +431,16 @@ def main() -> None:
                 ep_dealt += d_dealt
                 ep_absorbed += d_absorbed
                 tick_count += 1
-                # `acts` carries the dodge flag in bit 3, so the kit test has to
-                # look at the PICK. Comparing the encoded value would silently
-                # stop paying the combo bonus on every tick the agent dodged.
-                pick = acts & (ACT_DODGE - 1)
-                kit = (pick >= 3) & (pick <= 6)          # a kit was cast
+                # PAY FOR EFFECT, NOT INTENT. This used to read `acts` — what
+                # the policy WANTED — so selecting a kit paid R_KIT whether or
+                # not the kit fired. A kit on an 8 s cooldown stays selectable
+                # for 480 ticks per cast, so spamming one earned 3600 x 0.02 =
+                # 72 per episode against a terminal worth 1, and the policy
+                # duly collapsed onto that single action on 100.000% of ticks
+                # (cinder_drake v6.0, measured 2026-09-14). vec.commit is the
+                # action the sim actually EXECUTED, or -1 when it was refused.
+                pick = vec.commit & (ACT_DODGE - 1)
+                kit = (vec.commit >= 0) & (pick >= 3) & (pick <= 6)
                 if kit.any():
                     r[kit] += R_KIT
                     # chained a DIFFERENT kit inside the combo window

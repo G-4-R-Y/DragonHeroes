@@ -129,6 +129,7 @@ void Arena::reset(std::uint64_t seed) {
     tick_ = 0;
     winner_ = -2;
     damage_taken_[0] = damage_taken_[1] = 0.0f;
+    last_commit_[0] = last_commit_[1] = -1;
     // symmetric spawns: ONE base angle, fighters opposite, 12.5 tiles out
     const float base_ang = policy_rng_.next_float() * 2.0f * kPi;
     for (int i = 0; i < 2; ++i) {
@@ -526,6 +527,7 @@ void Arena::apply_action(int who, const Action& act) {
     // accepted, or was it refused (on cooldown, no such slot, act 0)? The
     // arena's neural policy dodges only when it was refused, and so do we.
     bool committed = false;
+    last_commit_[who & 1] = -1;
     switch (act.act) {
         case 1:
             if (me.attack_cd <= 0.0f && me.windup_t <= 0.0f) {
@@ -561,7 +563,13 @@ void Arena::apply_action(int who, const Action& act) {
         default:
             break;
     }
-    if (act.dodge && !committed) do_dodge();
+    if (act.dodge && !committed) {
+        const int before = me.dodge_charges;
+        do_dodge();
+        if (me.dodge_charges < before) { committed = true; last_commit_[who & 1] = 7; }
+    } else if (committed) {
+        last_commit_[who & 1] = act.act;
+    }
 }
 
 bool Arena::step(const Action& learner_act) {

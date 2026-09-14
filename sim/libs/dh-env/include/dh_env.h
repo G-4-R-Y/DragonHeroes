@@ -116,6 +116,25 @@ DH_API int32_t dh_env_step_many(DhEnv* const* envs, int32_t n,
                                 float* out_obs, int32_t* out_done,
                                 float* out_hp, int32_t* out_winner,
                                 int32_t n_threads);
+/* Same as dh_env_step_many plus `out_commit`: n int32, the action id that
+ * actually COMMITTED for the learner on this tick, or -1 if the chosen action
+ * was refused (cooldown, no such kit slot, act 0). NULL to skip.
+ *
+ * A separate symbol rather than a tenth argument on dh_env_step_many, for the
+ * reason the acts entry point above spells out: a stale library would read a
+ * register that was never set. Existing callers of dh_env_step_many are
+ * unchanged — it now simply forwards here with out_commit = NULL.
+ *
+ * WHY IT EXISTS: a trainer that pays for INTENT pays for nothing. PPO's kit
+ * bonus fired whenever the agent SELECTED a kit, and a kit on an 8 s cooldown
+ * stays selectable for 480 ticks per cast, so spamming one kit earned
+ * 3600 x 0.02 = 72 reward per episode against a terminal worth 1. The policy
+ * collapsed onto that one action on 100.000% of ticks. Pay for effect. */
+DH_API int32_t dh_env_step_many_commit(DhEnv* const* envs, int32_t n,
+                                       const float* move_xy, const int32_t* acts,
+                                       float* out_obs, int32_t* out_done,
+                                       float* out_hp, int32_t* out_winner,
+                                       int32_t* out_commit, int32_t n_threads);
 DH_API void dh_env_reset_many(DhEnv* const* envs, int32_t n,
                               const uint64_t* seeds, float* out_obs);
 /* Tears the worker pool down (tests, and before fork()). Safe to call always. */
