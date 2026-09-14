@@ -133,6 +133,11 @@ DH_API float dh_env_damage_taken(const DhEnv* env, int32_t who);
  * is how a caller tells that the dodge bit would be silently dropped. */
 DH_API int32_t dh_env_action_dodge_bit(void);
 DH_API uint64_t dh_env_tick(const DhEnv* env);
+/* Sim ticks per second (dh::sim::kArenaDt). Exported so callers convert ticks
+ * to seconds from the SIM's own number instead of a hardcoded copy that can
+ * drift: ml/eval/env_parity.py carried a 30 against the sim's 60 and reported
+ * every dh-env duration at twice its real length (found 2026-09-14). */
+DH_API float dh_env_tick_hz(void);
 DH_API void dh_env_destroy(DhEnv* env);
 
 #ifdef __cplusplus

@@ -182,7 +182,42 @@ The encoding that keeps the contract: bit 3 of the action integer (`DH_ENV_ACT_D
 
 **The same encoding is what makes PPO's likelihood correct.** Overwriting the pick with 7 destroyed it, so the update recomputed `Categorical.log_prob(0)` for every dodging tick. Measured at an unchanged policy, where the PPO ratio must be exactly 1: **43.1% of actions reconstructed wrong, ratio spread 0.87–1.17**. With the flag: ratio `1.000000` everywhere, 0% wrong. Gate: `sim-tests::test_arena_dodge_is_a_fallback`.
 
-### 5.2 Environment parity: the twin of the policy-parity gate
+### 5.2 The scoring model: one weighted, scale-normalized definition of "good fight"
+
+Ricardo, 2026-09-14: *"perhaps we should better model our reward model. What is currently considered? […] weight out which is the most importante performance metric, and attribute weights to each variable, sclaing values to what is most impactful. Numbers magnitudes must be scaled tho, as to not compare 40 seconds with 0.087 dmg_dealt. If winner, the shorter the better. If loser, the longest the better."*
+
+**What was scored before.** Two different functions, neither of which saw most of what a fight produces:
+
+| | formula | sees |
+|---|---|---|
+| `league.fitness()` (ES ranking, the gate) | `wins + 0.1 × (hp_self − hp_foe)` | outcome, end-of-fight health |
+| `ppo.py` per tick | `1.0 × (foe_hp_lost − self_hp_lost) − 0.002` `+ 0.02/kit + 0.05/chain`, `±1.0` terminal | outcome, health delta, kit usage |
+
+Neither scored **damage** or **duration**, and `hp_frac` clamps at zero, so overkill is invisible and a kill is indistinguishable from a long grind that ended at the same health. Worse, the per-tick clock was wrong twice over: `− R_TIME` applied regardless of outcome, so **a losing agent was paid to die sooner**, and `0.002 × 3600` ticks totals **7.2 against a win bonus of 1.0** — the clock outweighed the result 7×. And the symmetric health delta meant **avoiding a hit paid exactly as well as landing one**, which is the avoidance local optimum written down as code; PPO seed 7 found it (`mean_loser_hp 0.967`).
+
+**`ml/training/reward.py` replaces both.** Four rules:
+
+1. **Normalize first.** Every term becomes a goodness in `[0, 1]` *before* any weight touches it, each against its own reference scale (one full health bar; the 60 s episode cap). Seconds and damage-bars are never compared as raw magnitudes.
+2. **Directions are declared, not implied** by a sign buried in an expression — `TERMS` in the module is the single source of truth. Anything "lower is better" is normalized as `1 − x`.
+3. **Duration is conditional on the outcome:** shorter when winning, longer when losing, **neutral on a draw** — deliberately, because giving a draw the loser's rule pays an agent to stall to the time limit.
+4. **The outcome outweighs everything else combined.** `assert_sane_weights` enforces `w_win > Σ(others)` at load, so no amount of damage, health or clock can make a lost episode outrank a won one.
+
+| term | better | weight | why that weight |
+|---|---|---|---|
+| `win` | higher | 0.55 | the product is winning; dominates by construction |
+| `dmg_dealt` | higher | 0.15 | offence has been the hardest thing to teach — the move head sat untrained for PPO's whole history |
+| `dmg_taken` | lower | 0.11 | **deliberately below offence**; symmetric was the avoidance optimum |
+| `hp_foe` | lower | 0.08 | clamped, end-of-episode confirmation of `dmg_dealt`, not a second vote |
+| `hp_self` | higher | 0.06 | likewise for `dmg_taken` |
+| `duration` | split | 0.05 | a tiebreaker: win faster, lose slower |
+
+Weights live in `ml/training/reward_weights.json` — data, so tuning needs no engine work (canon directive 4) — and `"model": "v1"` restores `league.fitness_v1`, which is kept rather than deleted because every ES ranking in the repo's history was made with it. Both consumers read the one file: ES ranks candidates with it and PPO pays `R_TERMINAL × (score − 0.5)` at the episode boundary, so the two optimisers can no longer pull in different directions. Gates: `ml/tests/test_reward.py` pins one test per clause of the specification above.
+
+```bash
+python3 -m ml.training.reward --explain     # terms, weights, worked examples
+```
+
+### 5.3 Environment parity: the twin of the policy-parity gate
 
 `game/arena/tests/policy_parity_test.tscn` proves the **network** matches across runtimes — same weights, same numbers, bit-for-bit. Nothing proved the **environment** those numbers are spent in, and a net can compute identical outputs in two worlds where identical outputs mean different things. `ml/eval/env_parity.py` closes that: one fixed policy, one fixed baseline, the same seeds, both runtimes, and it reports the gap without taking a position on which side is right.
 

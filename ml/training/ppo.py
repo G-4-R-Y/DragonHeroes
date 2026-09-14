@@ -45,8 +45,9 @@ import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from ml.env.dh_env import (ACT_DODGE, DhEnv, VecDhEnv, OBS_DIM,   # noqa: E402
-                          set_opp_weights, supports_dodge_flag)
+                          set_opp_weights, supports_dodge_flag, tick_hz)
 from ml.training import arch as arch_mod                     # noqa: E402
+from ml.training import reward as reward_model               # noqa: E402
 from ml.training.arch import ACT_CODE, normalize_act         # noqa: E402
 from ml.training.gpu_guard import apply as gpu_apply, clamp_batch  # noqa: E402
 from ml.training.torch_policy import TorchPolicyNet, TorchGRUPolicyNet  # noqa: E402
@@ -64,8 +65,35 @@ REPO = Path(__file__).resolve().parents[2]
 WEIGHTS_DIR = ml_weights_dir()
 REGISTRY = ml_registry_path()
 
-# reward shaping == league fitness terms (win rate + hp margin)
-R_WIN, R_LOSE, R_HP_DELTA, R_TIME = 1.0, -1.0, 1.0, 0.002
+# ---- reward shaping ---------------------------------------------------------
+# The TERMINAL reward is now ml/training/reward.py — the same weighted,
+# scale-normalized model league.fitness() ranks ES candidates with, so the two
+# optimisers stop pulling in different directions. What stays here is the DENSE
+# per-tick signal, which exists only for credit assignment: it tells the agent
+# which tick the outcome came from, it does not define the outcome.
+#
+# R_TERMINAL scales the [0,1] episode score into reward units. 2.0 reproduces
+# the old +1/-1 spread between a perfect win and a total loss.
+R_TERMINAL = 2.0
+# Dense damage shaping, and it is ASYMMETRIC on purpose. It used to be one term,
+# R_HP_DELTA * ((foe lost) - (self lost)), weight 1.0 each way — so avoiding a
+# hit paid exactly as well as landing one, and standing still is much easier
+# than fighting. That is the avoidance local optimum, and PPO seed 7 found it
+# (mean_loser_hp 0.967, a timeout "win" the sanity gate correctly refused).
+# Dealing damage is now worth more per health point than taking it is worth
+# avoiding, in the same ratio as the terminal model's two weights.
+R_DEAL, R_ABSORB = 1.0, 0.73
+# PREVIOUS SETTINGS, kept per Ricardo's standing rule (comment out, never
+# delete) — the shaping every PPO run before 2026-09-14 used:
+#     R_WIN, R_LOSE, R_HP_DELTA, R_TIME = 1.0, -1.0, 1.0, 0.002
+# R_TIME was wrong twice over. It applied every tick REGARDLESS of outcome, so a
+# losing agent was paid to die sooner (Ricardo: "If loser, the longest the
+# better"), and at 0.002 x 3600 ticks it totalled 7.2 against a win bonus of
+# 1.0, so the clock outweighed the result by 7x. There is no per-tick clock term
+# now: GAMMA already discounts later reward, which IS "sooner is better", and
+# the outcome-conditioned duration term lives in the terminal score where it can
+# carry the right sign.
+R_TIME = 0.0
 # combo incentives (Ricardo: "no dull simple attacks — mobs rely on skill
 # combos"): small per-cast bonus so kits beat LMB spam, plus a chaining bonus
 # for firing a DIFFERENT kit within the combo window (1.5 s = 90 ticks)
@@ -256,6 +284,14 @@ def main() -> None:
             f"that produced a net with win_rate 0.00 against scripted while its "
             f"self-play number read 0.81. Raise the budget to at least "
             f"--steps {MIN_UPDATES * rollout:,}, or lower --envs.")
+    # Loaded once: the weights are validated on load (they must sum to 1.0 and
+    # `win` must outweigh every other term combined), so a bad edit to
+    # reward_weights.json stops the run here rather than quietly retraining
+    # against a different objective.
+    reward_weights = reward_model.load_weights()
+    TICK_HZ = tick_hz()
+    print(f"[ppo:{args.key}] reward model {reward_model.active_model()} "
+          f"weights={reward_weights} terminal x{R_TERMINAL}")
     if not supports_dodge_flag():
         raise SystemExit(
             f"[ppo:{args.key}] REFUSING to start: libdh-env.so predates the "
@@ -322,6 +358,13 @@ def main() -> None:
     last_kit = np.full(args.envs, -1, dtype=np.int64)
     last_kit_tick = np.full(args.envs, -1000, dtype=np.int64)
     tick_count = np.zeros(args.envs, dtype=np.int64)
+    # Per-episode damage in HEALTH BARS, for the terminal score. Accumulated
+    # from the hp deltas already computed each tick rather than read back from
+    # Arena::damage_taken: same unit, one fewer crossing into C. The difference
+    # is that overkill does not count here (hp clamps at zero) — which for a
+    # reward is the behaviour you want anyway, since a corpse is a corpse.
+    ep_dealt = np.zeros(args.envs, dtype=np.float64)
+    ep_absorbed = np.zeros(args.envs, dtype=np.float64)
     while done_steps < args.steps:
         iteration += 1
         if not args.exploit and args.arch != "gru" and not squad \
@@ -378,17 +421,26 @@ def main() -> None:
                 # with the observations, so nothing else crosses into C here
                 nobs, done_n, hp, win = vec.step(m_np, acts)
                 self_hp, foe_hp = hp[:, 0], hp[:, 1]
-                r = (R_HP_DELTA * ((prev_foe - foe_hp) - (prev_self - self_hp))
-                     - R_TIME).astype(np.float32)
+                # asymmetric: landing a hit is worth more than dodging one
+                d_dealt = np.maximum(prev_foe - foe_hp, 0.0)
+                d_absorbed = np.maximum(prev_self - self_hp, 0.0)
+                r = (R_DEAL * (prev_foe - foe_hp)
+                     - R_ABSORB * (prev_self - self_hp)).astype(np.float32)
+                ep_dealt += d_dealt
+                ep_absorbed += d_absorbed
                 tick_count += 1
-                kit = (acts >= 3) & (acts <= 6)          # a kit was cast
+                # `acts` carries the dodge flag in bit 3, so the kit test has to
+                # look at the PICK. Comparing the encoded value would silently
+                # stop paying the combo bonus on every tick the agent dodged.
+                pick = acts & (ACT_DODGE - 1)
+                kit = (pick >= 3) & (pick <= 6)          # a kit was cast
                 if kit.any():
                     r[kit] += R_KIT
                     # chained a DIFFERENT kit inside the combo window
-                    chain = kit & (last_kit >= 0) & (last_kit != acts) \
+                    chain = kit & (last_kit >= 0) & (last_kit != pick) \
                         & ((tick_count - last_kit_tick) <= CHAIN_WINDOW)
                     r[chain] += R_CHAIN
-                    last_kit[kit] = acts[kit]
+                    last_kit[kit] = pick[kit]
                     last_kit_tick[kit] = tick_count[kit]
                 live = done_n == 0
                 prev_self[live] = self_hp[live]
@@ -396,8 +448,22 @@ def main() -> None:
                 fin = np.flatnonzero(done_n)
                 if fin.size:
                     w = win[fin]
-                    r[fin] += np.where(w == 0, R_WIN,
-                                       np.where(w == 1, R_LOSE, 0.0)).astype(np.float32)
+                    # The terminal is the full weighted episode score, so every
+                    # term Ricardo specified — outcome, damage both ways, both
+                    # healths, and the outcome-CONDITIONED duration — is paid
+                    # exactly once, on one [0,1] scale, at the only moment the
+                    # outcome is known. Centred on 0.5 so a mediocre episode is
+                    # neutral rather than a bonus.
+                    for j, e in enumerate(fin):
+                        ep_score = reward_model.episode_score({
+                            "winner_is_self": None if w[j] < 0 else (w[j] == 0),
+                            "hp_self": float(self_hp[e]),
+                            "hp_foe": float(foe_hp[e]),
+                            "dmg_dealt": float(ep_dealt[e]),
+                            "dmg_taken": float(ep_absorbed[e]),
+                            "seconds": float(tick_count[e]) / TICK_HZ,
+                        }, reward_weights)
+                        r[e] += R_TERMINAL * (ep_score - 0.5)
                     results.extend(int(x) for x in w)
                     vec.reset_done(fin, rng.integers(1, 2**31, size=fin.size)
                                    .astype(np.uint64))
@@ -405,6 +471,8 @@ def main() -> None:
                     prev_foe[fin] = 1.0
                     last_kit[fin] = -1
                     tick_count[fin] = 0
+                    ep_dealt[fin] = 0.0
+                    ep_absorbed[fin] = 0.0
                     if h is not None:
                         h[fin] = 0.0   # episode boundary wipes temporal state
                 b_rew[t] = r

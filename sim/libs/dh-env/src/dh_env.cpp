@@ -252,4 +252,6 @@ float dh_env_damage_taken(const DhEnv* env, int32_t who) {
 
 uint64_t dh_env_tick(const DhEnv* env) { return env->arena.tick(); }
 
+float dh_env_tick_hz(void) { return 1.0f / dh::sim::kArenaDt; }
+
 void dh_env_destroy(DhEnv* env) { delete env; }

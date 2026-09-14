@@ -116,6 +116,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from policy_net import (HIDDEN as DEFAULT_HIDDEN, PolicyNet, macs,  # noqa: E402
                         parse_hidden)
 from ml.training import arch as arch_mod                      # noqa: E402
+from ml.training import reward as reward_model                # noqa: E402
 
 DEFAULT_OPPONENTS = [
     ("native", None),      # the built-in creature/boss AI — the baseline
@@ -364,14 +365,36 @@ def run_match(a: str, b: str, policy_a: str, policy_b: str, episodes: int,
     return _read()
 
 
-def fitness(result: dict, side: str = "a") -> float:
-    """Win rate + hp margin shaping (annealed away as leagues mature, tech/25 §4.2)."""
+def fitness_v1(result: dict, side: str = "a") -> float:
+    """THE ORIGINAL two-term fitness, kept and selectable — not deleted.
+
+    Win rate + hp margin shaping (annealed away as leagues mature, tech/25 §4.2).
+    Superseded by the weighted model in ml/training/reward.py on 2026-09-14
+    because it scores neither damage nor duration, and hp fraction clamps at
+    zero, so a kill and a long grind that ended at the same health are the same
+    number to it. Set "model": "v1" in ml/training/reward_weights.json to run
+    this instead; every ES ranking in the repo's history used it.
+    """
     n = max(len(result["episodes"]), 1)
     wins = result["wins_a" if side == "a" else "wins_b"] / n
     hp = np.mean([e[f"hp_{side}"] for e in result["episodes"]]) if result["episodes"] else 0.0
     foe = "b" if side == "a" else "a"
     foe_hp = np.mean([e[f"hp_{foe}"] for e in result["episodes"]]) if result["episodes"] else 0.0
     return float(wins + 0.1 * (hp - foe_hp))
+
+
+def fitness(result: dict, side: str = "a") -> float:
+    """Candidate score for ES selection — now the one weighted, scale-normalized
+    model that PPO also pays (ml/training/reward.py).
+
+    The two used to be different functions, so ES optimised win rate + hp margin
+    while PPO optimised an hp delta with a mis-signed clock, and the gate graded
+    with a third rule. One definition means a candidate that ranks well here
+    ranks well there.
+    """
+    if reward_model.active_model() == "v1":
+        return fitness_v1(result, side)
+    return reward_model.score_episodes(reward_model.from_arena_row(result, side))
 
 
 # ---- registry -------------------------------------------------------------------

@@ -82,6 +82,9 @@ def _load_lib() -> ctypes.CDLL:
     if hasattr(lib, "dh_env_action_dodge_bit"):
         lib.dh_env_action_dodge_bit.restype = ctypes.c_int32
         lib.dh_env_action_dodge_bit.argtypes = []
+    if hasattr(lib, "dh_env_tick_hz"):
+        lib.dh_env_tick_hz.restype = ctypes.c_float
+        lib.dh_env_tick_hz.argtypes = []
     lib.dh_env_tick.restype = ctypes.c_uint64
     lib.dh_env_tick.argtypes = [ctypes.c_void_p]
     lib.dh_env_destroy.argtypes = [ctypes.c_void_p]
@@ -143,6 +146,22 @@ def encode_act(pick, dodge):
     """(pick, dodge) -> the action int dh-env takes. Works on scalars and on
     numpy arrays, so the batched rollout does not need a second code path."""
     return pick + ACT_DODGE * np.asarray(dodge).astype(np.int32)
+
+
+def tick_hz() -> float:
+    """Sim ticks per second, from the sim itself — never a copy.
+
+    env_parity.py held its own 30 against the sim's 60 and reported every dh-env
+    episode at twice its length, which made a 2x duration divergence read as a
+    perfect match. A constant that has to agree with C is a constant that will
+    eventually disagree with C.
+    """
+    fn = getattr(lib(), "dh_env_tick_hz", None)
+    if fn is None:
+        raise RuntimeError(
+            "libdh-env.so predates dh_env_tick_hz — rebuild it: "
+            "cmake --build sim/build --target dh-env")
+    return float(fn())
 
 
 def supports_dodge_flag() -> bool:
@@ -279,6 +298,12 @@ class DhEnv:
     @property
     def tick(self) -> int:
         return lib().dh_env_tick(self._handle)
+
+    @property
+    def seconds(self) -> float:
+        """Episode length in SIM seconds — the same quantity the Godot arena
+        reports as `duration_s`, so the two are directly comparable."""
+        return self.tick / tick_hz()
 
     def close(self) -> None:
         if self._handle:

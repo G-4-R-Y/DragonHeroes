@@ -13,16 +13,50 @@ import gate  # noqa: E402
 from gate import run_gate  # noqa: E402
 
 
-def _result(wins_a=3, wins_b=1, draws=0, hp_a=0.6, hp_b=0.2, episodes=4):
-    eps = [{"hp_a": hp_a, "hp_b": hp_b, "winner": "a"} for _ in range(episodes)]
+def _result(wins_a=3, wins_b=1, draws=0, hp_a=0.6, hp_b=0.2, episodes=4,
+            winner="a", duration_s=20.0):
+    eps = [{"hp_a": hp_a, "hp_b": hp_b, "winner": winner,
+            "duration_s": duration_s} for _ in range(episodes)]
     return {"wins_a": wins_a, "wins_b": wins_b, "draws": draws, "episodes": eps}
 
 
 def test_fitness_rewards_winning_and_margin():
+    """Ranking is the contract both models share; the SCALE is not.
+
+    fitness_v1 was `wins + 0.1 * margin`, which is unbounded above 1.0. The
+    weighted model (ml/training/reward.py, 2026-09-14) is normalized to [0, 1]
+    on purpose — that normalization is the whole point of it, so asserting
+    "> 1.0" would now be asserting the bug it was built to remove.
+    """
     strong = league.fitness(_result(wins_a=4, hp_a=0.8, hp_b=0.1))
-    weak = league.fitness(_result(wins_a=1, wins_b=3, hp_a=0.2, hp_b=0.7))
+    weak = league.fitness(_result(wins_a=1, wins_b=3, hp_a=0.2, hp_b=0.7,
+                                  winner="b"))
     assert strong > weak
-    assert strong > 1.0  # win rate 1.0 + positive margin shaping
+    assert 0.0 <= weak < strong <= 1.0
+
+
+def test_fitness_v1_is_kept_and_still_behaves_as_it_did():
+    """The original is selectable, not deleted: every ES ranking in this repo's
+    history was made with it, and reproducing those means being able to run it."""
+    strong = league.fitness_v1(_result(wins_a=4, hp_a=0.8, hp_b=0.1))
+    weak = league.fitness_v1(_result(wins_a=1, wins_b=3, hp_a=0.2, hp_b=0.7))
+    assert strong > weak
+    assert strong > 1.0        # unbounded above 1.0, as it always was
+
+
+def test_fitness_scores_duration_conditionally_on_the_outcome():
+    """Ricardo: "If winner, the shorter the better. If loser, the longest the
+    better." The old fitness could not express this — it never saw the clock."""
+    fast_win = league.fitness(_result(wins_a=4, winner="a", duration_s=8.0))
+    slow_win = league.fitness(_result(wins_a=4, winner="a", duration_s=55.0))
+    assert fast_win > slow_win
+
+    quick_loss = league.fitness(_result(wins_a=0, wins_b=4, winner="b",
+                                        hp_a=0.0, hp_b=0.9, duration_s=8.0))
+    long_loss = league.fitness(_result(wins_a=0, wins_b=4, winner="b",
+                                       hp_a=0.0, hp_b=0.9, duration_s=55.0))
+    assert long_loss > quick_loss
+    assert quick_loss < fast_win and long_loss < slow_win
 
 
 def test_registry_lifecycle(tmp_path, monkeypatch):

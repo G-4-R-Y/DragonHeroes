@@ -671,6 +671,142 @@ Rebuild after the packaging commit for clean provenance; archives remain in
      With the tick cheap and the engine resident, that is where a generation's
      time actually goes.
 
+- **"perhaps we should better model our reward model" — Ricardo, 2026-09-14
+  (latest+15). TWO DEMANDS IN ONE MESSAGE, logged verbatim before any work.**
+
+  **15a. Re-model the reward.** *"perhaps we should better model our reward
+  model. What is currently considered? we can get each one of the columns
+  values, weight out which is the most importante performance metric, and
+  attribute weights to each variable, sclaing values to what is most impactful.
+  Numbers magnitudes must be scaled tho, as to not compare 40 seconds with 0.087
+  dmg_dealt. If winner, the shorter the better. If loser, the longest the
+  better. "dmg_taken" is always "lower is better", "dmg_dealt" is always "higher
+  the better", hp_foe lower the better, hp_self higher the better, win_rate the
+  higher the better."*
+  HIS SPECIFICATION, and it is a complete one — these are requirements, not
+  suggestions:
+    * every parity column becomes a scored TERM, each with a weight;
+    * magnitudes are NORMALISED first (his example: 40 seconds must not be
+      compared against 0.087 bars of damage);
+    * directions, stated by him: `win_rate` higher better, `hp_self` higher
+      better, `hp_foe` LOWER better, `dmg_dealt` higher better, `dmg_taken`
+      LOWER better, and duration is CONDITIONAL — **shorter is better when you
+      win, longer is better when you lose.**
+  He is right that duration is conditional, and it exposes a live defect: PPO
+  currently subtracts `R_TIME` every tick REGARDLESS of outcome, so a losing
+  agent is paid to die sooner. See the answer below for what is scored today.
+
+  **15a DONE 2026-09-14 — `ml/training/reward.py`, and answering his question
+  first because the answer is most of the justification.**
+  WHAT WAS SCORED BEFORE: two different functions, neither seeing most of what
+  a fight produces.
+    * `league.fitness()` (ES ranking + the gate): `wins + 0.1 * (hp_self -
+      hp_foe)`. Two terms. Duration NOT scored. Damage NOT scored.
+    * `ppo.py` per tick: `1.0 * (foe_hp_lost - self_hp_lost) - 0.002`, plus
+      `+0.02` per kit and `+0.05` per chained kit, plus `+-1.0` terminal.
+  THREE DEFECTS, one of them Ricardo's own catch in the asking:
+    1. **TIME WAS SIGNED WRONG FOR A LOSER.** `- R_TIME` applied EVERY tick
+       regardless of outcome, so a losing agent was paid to die sooner. His
+       rule ("If loser, the longest the better") is a CORRECTION, not a
+       refinement.
+    2. **IT WAS ALSO MIS-SCALED 7x.** `0.002 * 3600 ticks = 7.2` over a full
+       episode against a win bonus of `1.0`. The clock outweighed the result.
+       This is exactly the magnitude problem he named ("not compare 40 seconds
+       with 0.087 dmg_dealt") sitting inside our own trainer.
+    3. **DEALING AND AVOIDING DAMAGE SCORED IDENTICALLY** — one symmetric hp
+       delta, weight 1.0 each way. That IS the avoidance local optimum, in
+       code, and PPO seed 7 found it (`mean_loser_hp 0.967`).
+  BUILT, to his specification: every parity column is a term, normalised to
+  [0,1] against its OWN reference scale before any weight applies (one health
+  bar; the 60 s cap), directions declared in one table rather than implied by a
+  buried sign, duration CONDITIONAL on outcome (shorter winning, longer losing,
+  NEUTRAL on a draw — the loser's rule on a draw would pay an agent to stall).
+  WEIGHTS (data, `ml/training/reward_weights.json`, canon directive 4):
+      win 0.55 | dmg_dealt 0.15 | dmg_taken 0.11 | hp_foe 0.08 | hp_self 0.06
+      | duration 0.05
+  Two invariants ENFORCED ON LOAD, not merely intended: they must sum to 1.0
+  (so a score is always on one scale) and `win` must EXCEED the sum of all the
+  others (so no pretty loss outranks an ugly win — "lose beautifully" is not a
+  hypothetical failure mode here). `dmg_dealt > dmg_taken` deliberately, so
+  avoidance is no longer a tie.
+  WORKED ORDERING, from `--explain`: fast clean kill 0.965 > slow bloody win
+  0.801 > timeout stall 0.472 > long brave loss 0.246 > instant death 0.003.
+  The stall sits ABOVE the losses because a draw genuinely is half an outcome;
+  what STOPS stalling is the gate's hard sanity check, not a weight, and the
+  tool says so rather than pretending otherwise.
+  ONE MODEL, BOTH CONSUMERS: `league.fitness()` ranks ES candidates with it and
+  ppo.py pays `R_TERMINAL * (score - 0.5)` at the episode boundary, so ES and
+  PPO can no longer optimise different things. `fitness_v1` is KEPT and
+  selectable (`"model": "v1"`) per the standing rule — every ES ranking in this
+  repo's history was made with it, and reproducing those means being able to
+  run it, not just describe it.
+  PPO per-tick shaping now: `R_DEAL 1.0` / `R_ABSORB 0.73` (asymmetric),
+  `R_TIME 0.0` with the old constants commented above it, not deleted.
+  GATES: `ml/tests/test_reward.py`, 17 tests, ONE PER CLAUSE of his
+  specification — each direction, the winner/loser duration split, the draw
+  neutrality, the [0,1] normalisation under absurd inputs, "a 100x longer
+  episode moves the score by at most its weight", "any win outranks any loss",
+  and the refusal of weight sets that break either invariant.
+  FULL SUITE 240 passed, 1 skipped. PPO smoke ran end to end on the new
+  reward (11 updates, self-play win rate 0.00 -> 0.76) and its registry entry
+  was removed afterwards so nothing polluted the shipped registry.
+  TWO BUGS FOUND BY THE TESTS, both real, neither in the new model's maths:
+    * `from_arena_row` read every episode as a LOSS when the row carried no
+      `a`/`b` build keys, because it compared the winner id against a missing
+      field. A whole match set would have scored as a policy that never won —
+      which looks like a bad policy, not a bad parse. It now falls back to the
+      side letter. This was ALSO what broke `test_progress`.
+    * my own regression from the dodge-bit commit earlier today: `ppo.py`'s
+      combo bonus tested `acts >= 3 & acts <= 6` against the ENCODED action, so
+      once bit 3 carried the dodge flag (kit 3 + dodge = 11) the kit and chain
+      bonuses silently stopped paying on every tick the agent dodged. Now masks
+      the pick out first.
+  **CORRECTION TO THIS MORNING'S CLAIM, and it changes the diagnosis.** I wrote
+  that after the dodge fix "episode length now matches EXACTLY (40.0 vs 40.0)".
+  It did not. `ml/eval/env_parity.py` divided ticks by a hardcoded 30 while
+  `dh::sim::kArenaDt` is 1/60 — MEASURED, not assumed: an idle episode runs
+  3600 ticks to the 60 s cap. Every dh-env duration was reported at TWICE its
+  real length, so "40.0 vs 40.0" was really 20.0 vs 40.0, a 2x gap I read as a
+  perfect match. FIXED at the source: `dh_env_tick_hz()` is now exported from C
+  and the Python asks the sim instead of holding a copy — a constant that has
+  to agree with C is a constant that will eventually disagree with C.
+  WITH THAT FIXED, the remaining divergence is ONE term and it is much sharper
+  than "2.02x dmg_dealt":
+      term         dh-env   arena     gap   verdict
+      win_rate      0.000   0.000  0.0000   ok
+      hp_self       0.000   0.054  0.0542   ok
+      hp_foe        0.597   0.184  0.4126   DIVERGES
+      dmg_dealt     0.403   0.816  0.4126   DIVERGES
+      dmg_taken     1.074   0.943  0.1313   ok
+      seconds      19.986  39.967   2.00x   DIVERGES
+      dps_dealt     0.020   0.020   1.01x   ok
+      dps_taken     0.054   0.024   2.28x   DIVERGES
+  **The learner's own damage RATE now agrees to 1%.** The whole `dmg_dealt`
+  gap is that dh-env episodes end in half the time, and they end in half the
+  time because the OPPONENT deals damage 2.28x faster there. Incoming DPS is
+  the one remaining divergence against scripted, and it feeds straight into 15b.
+  The probe learned the general lesson too: rates are now compared SEPARATELY
+  from totals, because a total and a rate can disagree in opposite directions
+  when episodes differ in length — `dmg_taken` totals agreed (1.074 vs 0.943,
+  inside tolerance) while the rate was off 2.28x, and the old report would have
+  called that term fine. Report is now term-major with a ratio tolerance
+  (1.25x) alongside the absolute one.
+  NOTE, not staged: `ml/serving/registry.json` is shared-dirty and the PPO
+  smoke run round-tripped it, so its key ORDER changed. Verified semantically
+  against HEAD — nothing lost: all 17 HEAD entries present, the other session's
+  `bog_golem` v2/v3 and its `fen_boar` v6 `deployed` pin intact. Left dirty and
+  unstaged for that session.
+
+  **15b. Chase the native divergence — APPROVED.** *"go through with it!"*,
+  quoting back my own stated next step: *"Next I'll chase the native
+  divergence, since it affects what players actually fight."* This is now a
+  DECISION. `Arena::native_act` (C++) and the Godot arena's native policy were
+  written independently for the same name, and the parity probe measured the
+  arena's native as a near-total standoff (0.083 bars dealt / 0.077 taken in
+  44.7 s, both fighters near full health at timeout) where dh-env has a real
+  fight (0.662 / 1.071). It is a GAME finding, not only a training one: native
+  is the in-game creature AI.
+
 - **"crashed entering the dungeon while mounted" — Ricardo, 2026-09-14
   (latest+14). ROOT CAUSE FOUND, AND IT WAS THIS SESSION'S DOING. Not the
   mount.** The mount was a coincidence; the crash would have happened at the

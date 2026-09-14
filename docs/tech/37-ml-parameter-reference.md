@@ -58,7 +58,8 @@ net from any of them can be gated and deployed by the same path.
 |---|---|---|
 | `DEFAULT_OPPONENTS` | `native`, `scripted` | The two baselines every candidate must beat |
 | `DEFAULT_SPEED` | `max` | See `--speed` |
-| `fitness()` | `win_rate + 0.1 × (own_hp − foe_hp)` | HP-margin shaping gives gradient before wins appear; anneal it away as leagues mature (tech/25 §4.2) |
+| `fitness()` | the weighted model, `ml/training/reward.py` | One scale-normalized definition of "good fight", shared with PPO's terminal reward so ES and PPO stop optimising different things (tech/25 §4.3). Weights are data: `ml/training/reward_weights.json` |
+| `fitness_v1()` | `win_rate + 0.1 × (own_hp − foe_hp)` | The original, KEPT and selectable (`"model": "v1"`). Scores neither damage nor duration, and hp clamps at zero, so a kill and a long grind ending at the same health are one number to it. Every ES ranking before 2026-09-14 used it |
 | `time_limit` (per episode) | 45 s sim time | Draw if neither side dies |
 | timeout guard | `episodes × 45 s × wall + 120 s` | Hang guard, not an estimate |
 
@@ -93,9 +94,11 @@ opponent slot is a stateless MLP.
 | `LR` | 3e-4 | Adam learning rate |
 | `EPOCHS` | 4 | Passes per rollout |
 | `MINIBATCHES` | 8 | Minibatches per epoch |
-| `R_WIN` / `R_LOSE` | +1.0 / −1.0 | Terminal reward |
-| `R_HP_DELTA` | 1.0 | Per-tick shaping on (damage dealt − damage taken), mirrors league fitness |
-| `R_TIME` | 0.002 | Per-tick penalty: stalling costs |
+| `R_TERMINAL` | 2.0 | Scales the `[0,1]` weighted episode score (`ml/training/reward.py`) into reward units, centred on 0.5. Reproduces the old ±1 spread between a perfect win and a total loss, but now every term — outcome, damage both ways, both healths, outcome-conditioned duration — is paid once on one scale |
+| `R_DEAL` / `R_ABSORB` | 1.0 / 0.73 | Dense per-tick damage shaping, **asymmetric on purpose**. It was one symmetric term (`R_HP_DELTA` 1.0 each way), so avoiding a hit paid exactly as well as landing one — the avoidance local optimum, which PPO seed 7 duly found (`mean_loser_hp 0.967`, a timeout "win" the sanity gate refused) |
+| ~~`R_WIN` / `R_LOSE`~~ | ~~+1.0 / −1.0~~ | Superseded by `R_TERMINAL` × the weighted score |
+| ~~`R_HP_DELTA`~~ | ~~1.0~~ | Superseded by `R_DEAL` / `R_ABSORB` |
+| `R_TIME` | **0.0** (was 0.002) | Removed, wrong twice over. It applied every tick REGARDLESS of outcome, so a losing agent was paid to die sooner (Ricardo: *"If loser, the longest the better"*); and at `0.002 × 3600` ticks it totalled **7.2 against a win bonus of 1.0**, so the clock outweighed the result 7×. `GAMMA` already discounts later reward — that IS "sooner is better" — and duration now lives in the terminal score where its sign can depend on the outcome |
 | `R_KIT` | 0.02 | Per kit cast — beats LMB spam (canon: "no dull simple attacks") |
 | `R_CHAIN` | 0.05 | Casting a **different** kit inside the window |
 | `CHAIN_WINDOW` | 90 ticks (1.5 s) | The combo window that bonus applies in |

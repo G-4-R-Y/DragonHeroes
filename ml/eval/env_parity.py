@@ -44,7 +44,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
 from ml.env.dh_env import (ACT_DODGE, DhEnv, balance_specs,   # noqa: E402
-                          make_spec, supports_dodge_flag)
+                          make_spec, supports_dodge_flag, tick_hz)
 from ml.training import league                       # noqa: E402
 from ml.training.distill import TeacherNet           # noqa: E402
 from ml.training.policy_net import ACTION_LOGITS     # noqa: E402
@@ -120,17 +120,22 @@ def run_dh_env(build: str, policy: str, opp: str, episodes: int,
     finally:
         env.close()
     n = max(episodes, 1)
-    secs = (ticks / n) / 30.0
+    # ticks -> seconds using the SIM's own rate, not a copy of it. This line
+    # held a hardcoded 30 against the sim's 60 (dh::sim::kArenaDt = 1/60) and so
+    # reported every dh-env episode at TWICE its real length, which made a 2x
+    # duration divergence read as a perfect match.
+    secs = (ticks / n) / tick_hz()
     return {"runtime": "dh-env", "episodes": episodes, "win_rate": wins / n,
             "hp_self": hp_self / n, "hp_foe": hp_foe / n,
-            # the arena reports wall seconds per episode; the sim is a fixed
-            # 30 Hz, so ticks/30 is the same quantity and the columns compare
+            # the arena reports duration_s per episode; this is the same
+            # quantity, so the columns compare directly
             "seconds": secs,
             # damage in HEALTH BARS, not hit points: dh-env's stats come from
             # ml/env/specs.json and the arena's from the live content, so raw
             # hit points are two different units. Bars are one unit.
             "dmg_dealt": dmg_foe / n, "dmg_taken": dmg_self / n,
-            "dps_dealt": (dmg_foe / n) / max(secs, 1e-6)}
+            "dps_dealt": (dmg_foe / n) / max(secs, 1e-6),
+            "dps_taken": (dmg_self / n) / max(secs, 1e-6)}
 
 
 def run_arena(build: str, policy: str, opp: str, episodes: int, seed: int,
@@ -151,95 +156,140 @@ def run_arena(build: str, policy: str, opp: str, episodes: int, seed: int,
                               for e in eps]))
     secs = mean("duration_s")
     dmg_dealt = bars("dmg_taken_b", "max_hp_b")
+    dmg_taken = bars("dmg_taken_a", "max_hp_a")
     return {"runtime": "arena", "episodes": len(eps),
             "win_rate": float(row.get("wins_a", 0)) / n,
             "hp_self": mean("hp_a"), "hp_foe": mean("hp_b"),
             "seconds": secs,
-            "dmg_dealt": dmg_dealt, "dmg_taken": bars("dmg_taken_a", "max_hp_a"),
-            "dps_dealt": dmg_dealt / max(secs, 1e-6), "raw": row}
+            "dmg_dealt": dmg_dealt, "dmg_taken": dmg_taken,
+            "dps_dealt": dmg_dealt / max(secs, 1e-6),
+            "dps_taken": dmg_taken / max(secs, 1e-6), "raw": row}
+
+
+# Terms compared as an absolute difference (all are fractions in [0, 1]) and
+# terms compared as a RATIO (seconds and per-second rates, where "twice as fast"
+# is the meaningful statement and a raw subtraction is not).
+ABS_TERMS = ("win_rate", "hp_self", "hp_foe", "dmg_dealt", "dmg_taken")
+RATIO_TERMS = ("seconds", "dps_dealt", "dps_taken")
+# A rate is called divergent outside [1/RATE_TOL, RATE_TOL]. 1.25 is a quarter
+# either way — loose enough for 12-episode noise, tight enough that the 2.24x
+# incoming-damage gap this found does not hide inside it.
+RATE_TOL = 1.25
+
+
+def ratio_of(a: float, b: float) -> float:
+    """b/a, oriented so it always reads >= 1 ("N times"), sign-free."""
+    if a <= 1e-9 or b <= 1e-9:
+        return 1.0 if abs(a - b) <= 1e-9 else float("inf")
+    return max(a, b) / min(a, b)
 
 
 def compare(a: dict, b: dict, tolerance: float) -> dict:
-    gaps = {}
-    for field in ("win_rate", "hp_self", "hp_foe", "dmg_dealt", "dmg_taken"):
-        gaps[field] = round(abs(a[field] - b[field]), 4)
+    """Absolute gaps on the fraction terms, ratios on time and the rates.
+
+    Rates are compared SEPARATELY from totals on purpose: a total and a rate can
+    disagree in opposite directions when the episodes are different lengths, and
+    the rate is the one that describes the combat. Exactly that happened here —
+    dmg_taken totals agreed (1.074 vs 0.943, inside tolerance) while the rate
+    was off 2.24x, because the dh-env episode ended in half the time.
+    """
+    gaps = {f: round(abs(a[f] - b[f]), 4) for f in ABS_TERMS}
+    ratios = {f: round(ratio_of(a.get(f, 0.0), b.get(f, 0.0)), 3)
+              for f in RATIO_TERMS}
     worst = max(gaps.values()) if gaps else 0.0
-    return {"gaps": gaps, "worst": worst, "agree": worst <= tolerance}
+    worst_ratio = max(ratios.values()) if ratios else 1.0
+    return {"gaps": gaps, "ratios": ratios, "worst": worst,
+            "worst_ratio": worst_ratio,
+            "agree": worst <= tolerance and worst_ratio <= RATE_TOL}
 
 
 def diagnose(dh: dict, ar: dict, tolerance: float) -> list[str]:
     """Turn "the two runtimes disagree" into "THIS term disagrees".
 
-    hp_frac alone cannot separate the two ways a fight can go differently, and
-    they call for opposite fixes: hits that land RARELY (reach, cooldown,
-    tracking, hit detection) versus hits that land SOFTLY (damage numbers,
-    scaling, mitigation). Damage per second separates them, because it is
-    damage per episode with episode length divided out.
+    The two ways a fight can go differently call for opposite fixes: hits that
+    land RARELY (reach, cooldown, tracking, hit detection) versus hits that land
+    SOFTLY (damage numbers, scaling, mitigation). Damage per second separates
+    them from a damage total, because it divides episode length out.
 
-    Every line below is stated as a measured ratio. Nothing here decides which
-    runtime is correct — that is a content question, not this probe's.
+    Nothing here decides which runtime is correct — that is a content question.
     """
     out: list[str] = []
-    ratio = lambda x, y: x / y if y > 1e-6 else float("inf") if x > 1e-6 else 1.0
-    for side, dealt, secs in (("DEALT by the policy", "dmg_dealt", "seconds"),
-                              ("TAKEN by the policy", "dmg_taken", "seconds")):
-        d_tot, a_tot = dh.get(dealt, 0.0), ar.get(dealt, 0.0)
-        if abs(d_tot - a_tot) <= tolerance:
+    for label, total, rate in (("DEALT by the policy", "dmg_dealt", "dps_dealt"),
+                               ("TAKEN by the policy", "dmg_taken", "dps_taken")):
+        d_tot, a_tot = dh.get(total, 0.0), ar.get(total, 0.0)
+        d_rate, a_rate = dh.get(rate, 0.0), ar.get(rate, 0.0)
+        tot_off = abs(d_tot - a_tot) > tolerance
+        rate_off = ratio_of(d_rate, a_rate) > RATE_TOL
+        if not tot_off and not rate_off:
             continue
-        d_sec, a_sec = dh.get(secs, 0.0), ar.get(secs, 0.0)
-        d_rate, a_rate = ratio(d_tot, d_sec), ratio(a_tot, a_sec)
-        out.append("{}: {:.3f} bars in dh-env vs {:.3f} in the arena "
-                   "({:.2f}x).".format(side, d_tot, a_tot, ratio(a_tot, d_tot)))
-        rate_gap = ratio(a_rate, d_rate)
-        if 0.8 <= rate_gap <= 1.25:
-            out.append("  ...but PER SECOND they agree ({:.3f} vs {:.3f} "
-                       "bars/s). The episodes are different LENGTHS; the "
-                       "combat itself is not the disagreement.".format(
-                           d_rate, a_rate))
+        out.append("{}: {:.3f} bars in dh-env vs {:.3f} in the arena; "
+                   "{:.3f} vs {:.3f} bars/s.".format(label, d_tot, a_tot,
+                                                     d_rate, a_rate))
+        if tot_off and not rate_off:
+            out.append("  The totals differ but the RATES agree — the episodes "
+                       "are different lengths,")
+            out.append("  and the combat itself is not the disagreement. Look "
+                       "at what ends the episode.")
+        elif rate_off and not tot_off:
+            out.append("  The totals agree but the RATES differ {:.2f}x — the "
+                       "episodes are different".format(ratio_of(d_rate, a_rate)))
+            out.append("  lengths and that is hiding it. This IS the combat.")
         else:
-            out.append("  ...and PER SECOND too: {:.3f} vs {:.3f} bars/s "
-                       "({:.2f}x). This is the combat, not the clock — look at "
-                       "reach, cooldown and damage for this build in both "
-                       "runtimes.".format(d_rate, a_rate, rate_gap))
+            out.append("  Totals and rates both differ ({:.2f}x per second) — "
+                       "look at reach, cooldown".format(ratio_of(d_rate, a_rate)))
+            out.append("  and damage for this build in both runtimes.")
+    sec_ratio = ratio_of(dh.get("seconds", 0.0), ar.get("seconds", 0.0))
+    if sec_ratio > RATE_TOL:
+        out.append("EPISODE LENGTH: {:.1f}s in dh-env vs {:.1f}s in the arena "
+                   "({:.2f}x).".format(dh.get("seconds", 0.0),
+                                       ar.get("seconds", 0.0), sec_ratio))
     if not out:
         return out
     out.append("Neither runtime is assumed correct here. The arena is what the "
-               "game ships,")
-    out.append("so it is the reference for CONTENT; dh-env is what PPO trains "
-               "in, so it is")
-    out.append("the one that has to be made to match, unless the arena is the "
-               "one that is wrong.")
+               "game ships, so it")
+    out.append("is the reference for CONTENT; dh-env is what PPO trains in, so "
+               "it is the one to")
+    out.append("move, unless the arena is the one that is wrong.")
     return out
 
 
 def print_report(dh: dict, ar: dict, verdict: dict, tolerance: float) -> None:
+    """One row per TERM, not per runtime: the question is always "does this
+    term agree", and a term-major table puts the two numbers side by side."""
     print()
     print("  ENVIRONMENT PARITY — one fixed policy, two runtimes")
-    print("  " + "-" * 78)
-    head = "  {:<8}{:>10}{:>9}{:>9}{:>9}{:>10}{:>10}{:>9}".format(
-        "runtime", "win_rate", "hp_self", "hp_foe", "seconds",
-        "dmg_dealt", "dmg_taken", "dps")
-    print(head)
-    for row in (dh, ar):
-        print("  {:<8}{:>10.3f}{:>9.3f}{:>9.3f}{:>9.1f}{:>10.3f}{:>10.3f}{:>9.3f}".format(
-            row["runtime"], row["win_rate"], row["hp_self"], row["hp_foe"],
-            row["seconds"], row["dmg_dealt"], row["dmg_taken"], row["dps_dealt"]))
-    print("  (dmg columns are HEALTH BARS dealt/taken per episode, dps is bars/s)")
-    print("  " + "-" * 66)
-    for field, gap in verdict["gaps"].items():
-        flag = "ok" if gap <= tolerance else "DIVERGES"
-        print("  {:<10} gap {:.4f}   {}".format(field, gap, flag))
+    print("  episodes: {} dh-env / {} arena".format(dh["episodes"], ar["episodes"]))
+    print("  " + "-" * 62)
+    print("  {:<12}{:>10}{:>10}{:>12}  {}".format(
+        "term", "dh-env", "arena", "gap", "verdict"))
+    print("  " + "-" * 62)
+    rows = [(f, "{:.3f}".format(dh[f]), "{:.3f}".format(ar[f]),
+             "{:.4f}".format(verdict["gaps"][f]),
+             verdict["gaps"][f] <= tolerance) for f in ABS_TERMS]
+    rows += [(f, "{:.3f}".format(dh.get(f, 0.0)), "{:.3f}".format(ar.get(f, 0.0)),
+              "{:.2f}x".format(verdict["ratios"][f]),
+              verdict["ratios"][f] <= RATE_TOL) for f in RATIO_TERMS]
+    for name, a, b, gap, ok in rows:
+        print("  {:<12}{:>10}{:>10}{:>12}  {}".format(
+            name, a, b, gap, "ok" if ok else "DIVERGES"))
+    print("  " + "-" * 62)
+    print("  dmg/dps are HEALTH BARS (dealt to the foe / taken by the policy);")
+    print("  seconds and the rates are compared as RATIOS, tolerance {:.2f}x."
+          .format(RATE_TOL))
     diag = diagnose(dh, ar, tolerance)
     if diag:
         print()
         for line in diag:
             print("  " + line)
     if verdict["agree"]:
-        print("\n  PARITY OK — the two runtimes agree inside {:.3f}.".format(tolerance))
+        print("\n  PARITY OK — the two runtimes agree inside {:.3f} "
+              "and {:.2f}x.".format(tolerance, RATE_TOL))
     else:
-        print("\n  PARITY FAILED — worst gap {:.4f} > {:.3f}. A net trained in one "
-              "of these\n  and graded in the other is being scored on dynamics it "
-              "never saw.".format(verdict["worst"], tolerance))
+        print("\n  PARITY FAILED — worst gap {:.4f} (tol {:.3f}), worst ratio "
+              "{:.2f}x (tol {:.2f}x).\n  A net trained in one of these and "
+              "graded in the other is being scored on\n  dynamics it never "
+              "saw.".format(verdict["worst"], tolerance,
+                            verdict["worst_ratio"], RATE_TOL))
 
 
 def build_parser(ap: argparse.ArgumentParser) -> argparse.ArgumentParser:

@@ -1,0 +1,39 @@
+{
+  "schema": "arena.reward.v1",
+  "model": "v2",
+  "_": [
+    "The scoring model's weights (ml/training/reward.py). Data, not code, so",
+    "tuning needs no engine work (canon directive 4). Both consumers read this:",
+    "league.fitness() ranks ES candidates with it and ppo.py pays it as the",
+    "terminal reward, so the two can no longer optimise different things.",
+    "",
+    "RULES ENFORCED ON LOAD (assert_sane_weights), not merely intended:",
+    "  * the weights must sum to 1.0, so a score is always on a [0,1] scale",
+    "    and a threshold means the same thing twice;",
+    "  * 'win' must EXCEED the sum of all the others, so no amount of damage,",
+    "    health or clock can make a lost episode outrank a won one.",
+    "",
+    "DIRECTIONS are declared in reward.py::TERMS and are Ricardo's wording:",
+    "  win / dmg_dealt / hp_self  -> higher is better",
+    "  dmg_taken / hp_foe         -> lower is better",
+    "  duration                   -> shorter winning, longer losing, draw neutral",
+    "",
+    "WHY dmg_dealt OUTWEIGHS dmg_taken, deliberately and asymmetrically: they",
+    "used to be one symmetric term (ppo.py's hp delta, weight 1.0 each way), and",
+    "a symmetric trade means not-being-hit pays exactly as well as hitting. That",
+    "is the avoidance local optimum, and it is not hypothetical here \u2014 PPO seed 7",
+    "produced precisely that policy (mean_loser_hp 0.967, a timeout win).",
+    "",
+    "model: 'v2' = the weighted model above; 'v1' = the original",
+    "league.fitness_v1 (wins + 0.1 * hp margin), kept so historical ES",
+    "rankings can be reproduced rather than only described."
+  ],
+  "weights": {
+    "win": 0.55,
+    "dmg_dealt": 0.15,
+    "dmg_taken": 0.11,
+    "hp_foe": 0.08,
+    "hp_self": 0.06,
+    "duration": 0.05
+  }
+}
