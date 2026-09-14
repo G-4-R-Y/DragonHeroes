@@ -507,6 +507,551 @@ Rebuild after the packaging commit for clean provenance; archives remain in
   A real Gen-AI mesh through `rebirth/assets/tools/gen_assets.py` rides the same
   concept-render unblock as the image-to-3D spike below.
 
+- **DONE 2026-09-13 — command ledger, arena → game** (Ricardo: "document all
+  commands: from arena starting to game starting - all give them to me").
+  `docs/USAGE.md` rewritten as the single verified reference: every command
+  re-run against this tree that day, with the real pass lines in the gate
+  table; only long training runs, packaging (needs the ~1 GB templates),
+  Nakama's containers and the Ricardo-only Vulkan path are marked *not run*.
+  New since the old doc: the OPTIONS modal, the PPO/GPU tier in `ml/.venv`,
+  dh-env + bench, dh-server's living-preview/lair-profile/dump modes, the
+  Lairs & Legends trial tools, the Codex packaging set, `dump_specs`, and the
+  rebirth slices.
+
+- **Isolated, cumulative training runs (Ricardo, 2026-09-13: "can't we have a
+  test backup so i can test freely and cumulatively without overwriting stuff?
+  perhaps if theres an active one we put the new registry inside a folder with
+  the configs used and date as name (with date first as to order it proper
+  chronologically in the folder)").** Every trainer writes the SHARED
+  `ml/serving/registry.json` + weights, so two sessions (or two experiments)
+  overwrite each other. Wanted: per-run folders named date-first with the
+  config in the name, seeded from the current registry so runs accumulate,
+  promoted back to `ml/serving/` only on purpose.
+
+- **Deep ML documentation (Ricardo, 2026-09-13: "deeply detail our
+  documentations. Specially for our ML files, I want details on every parameter
+  and hyperparameter, as well as artifacts produced and how they are later
+  consumed and benchmarked").** One reference covering every knob of
+  league.py / ppo.py / evolve.py / gpu_guard / torch_policy / policy_net /
+  dh-env: what each parameter means, its default, what it costs, what it
+  changes; every artifact (weights JSON/npz/.pt, registry entries, progress
+  JSONL, episode records, logs) with its schema, producer and consumer; and the
+  benchmark/gate path each artifact travels.
+
+- **DONE 2026-09-13 — Training console = the ML cockpit (Ricardo: "Is the train_run
+  included in arena console? can we run it there instead? as well as manage
+  active and deployed nets, and even put one against the other for benchmarking
+  (best of N)").** The console still shells out to `league train` against the
+  deployed registry. Wanted, in the console: (a) start runs through
+  `tools/train_run.sh` so every experiment is isolated + cumulative; (b) a runs
+  browser (date-first folders, config, gate verdicts) with promote; (c) manage
+  the registry — see candidates vs deployed pins, deploy/retire; (d) head-to-head
+  **best-of-N** benchmarking between any two nets (or native/scripted), with the
+  result written somewhere durable. Plus: document all of it.
+  **Landed:** the right pane is a TabContainer — PROGRESS / RUNS / NETS /
+  VERSUS; an "isolated run" switch routes TRAIN through `tools/train_run.sh
+  --run-dir` (new flag, so the console names the folder and knows where to
+  tail); a "GPU (PPO)" switch runs the CUDA tier the same way; `league versus`
+  is the new best-of-N seam (schema `arena.versus.v1` into
+  `ml/data/benchmarks/`, streamed on the progress feed under key `versus`).
+  `CONSOLE SELFTEST OK` now also covers the cockpit against `user://` fixtures,
+  so the gate never touches the real registry, runs or benchmarks. Documented
+  in design/25 §3b, USAGE §4, tech/37 §5 and ml/README.
+
+- **DONE 2026-09-13 — The terminal is part of the game (Ricardo: "make sure to make
+  logs constant and pretty in those files. I'll run `GENERATIONS=200 POP=10
+  EPISODES=6 tools/train_run.sh --all` now and i want to keep track of it and
+  have it beautifully exhibited and themed in the terminal. Are you able to
+  create some art? GPT Astra created our current repo banner, show who is the
+  best creating our terminal artistically now").** `tools/train_run.sh` pipes
+  each trainer through `tail -2`, and the ES trainer is spawned without
+  `python3 -u`, so a 200-generation run prints NOTHING for ten minutes per key.
+  Wanted: (a) constant per-generation output, unbuffered; (b) a Dragon Heroes
+  terminal theme — original ASCII/ANSI art, ember palette, shared by every ML
+  script; (c) a live run dashboard to watch a long run.
+  **Landed:** `tools/dh_term.sh` (palette + banner + rules + bars, colour
+  dropped for non-TTY so logs stay greppable), `tools/art/make_dragon.py` (the
+  sigil is rasterised from Bezier outlines into half-block glyphs, not
+  hand-pasted, so it is re-tunable) writing `tools/art/dragon.txt`,
+  `tools/dh_trainfmt.py` (live bar + fitness sparkline + s/gen + ETA per
+  generation, PPO iterations too; candidate lines animate on a TTY and vanish
+  in a pipe), `python3 -u` in `train_run.sh` (the actual cause of the silence),
+  and `tools/train_watch.py` — a read-only dashboard over any run folder, with
+  a sweep-wide ETA that counts the keys still queued.
+
+- **DONE 2026-09-13 — Kill the PPO Python bottleneck + GPU training in the console (Ricardo,
+  2026-09-13: "do it! ALso, can we run this gpu training in the console, as
+  well?").** Measured: raw `libdh-env.so` does 527,665 steps/s, PPO end-to-end
+  does 32,343 — the gap is the Python loop stepping each env one at a time
+  through ctypes. Wanted: a batched `dh_env_step_many` across all envs (~16x
+  headroom), and the PPO/GPU tier startable from the training console like the
+  ES tier.
+
+- **DONE 2026-09-13 — Interruptible ES runs — checkpoint + resume (Ricardo: "do
+  it!", after a 10.4-hour run turned out to have nothing on disk).** `train_es`
+  registers its net only AFTER the whole generation loop, so killing a
+  1000-generation run discards every hour of it. Wanted: a checkpoint written
+  every N generations (theta, the generation index, the RNG state) and a
+  `--resume` that restarts a killed run from the last one instead of from
+  scratch, without breaking the per-generation seed derivation that makes a run
+  replayable.
+  **Landed:** `--checkpoint-every` (default 25, so even a run started without
+  the flag is protected) writes ONE `_ckpt_<key>.npz` into the run's own
+  weights dir — theta, the next generation, and the RNG bit-generator state —
+  temp-then-rename so a kill cannot leave half a file. (The first cut used two
+  files; each rename was atomic but the pair was not, so a kill between them
+  could pair theta from generation N with metadata claiming N-k. Folded into a
+  single file so one rename commits the whole checkpoint.) `--resume` restores all
+  three, so the resumed run is BIT-FOR-BIT the run that would have happened
+  (`ml/tests/test_league.py::test_resume_reproduces_the_uninterrupted_run`
+  asserts it against a simulated mid-generation kill). A completed run clears
+  its checkpoint; a stale one of the wrong parameter count or already past the
+  requested generation is refused rather than half-applied.
+  `tools/train_run.sh --resume ml/runs/<run>` needs no other flags: config.json
+  now records the key/build pairs and the knobs, so the folder describes itself.
+  **Verified end to end 2026-09-13 17:31** on a real 6-generation run: killed the
+  process group after the g4 checkpoint, then `--resume` ran g4 and g5 ONLY,
+  emitted `resumed g=4`, registered `fen_boar_alpha@v2`, and cleared its
+  checkpoint. The resume was launched with deliberately wrong environment knobs
+  (`GENERATIONS=999 POP=99 EPISODES=99`) and ignored all three — it reads them
+  back from config.json, because knobs that disagree with the killed run would
+  make the checkpoint inapplicable. `ml/serving/` stayed untouched throughout.
+  **Note:** the sweep running since 2026-09-13 06:40 predates this and has NO
+  checkpoint — killing it still loses its hours.
+
+- **Method tournament, the console, JOBS, and the C++ forward pass — Ricardo,
+  2026-09-13 (latest+1).** Four demands in one message:
+  1. *"add that to fight over in the other training methods, as to compete
+     intra-training when train-all, as to optimize for the best methods"* — when
+     `--all` runs, the methods (ES-in-Godot, PPO-on-dh-env, and whatever comes
+     next) should COMPETE per key, head to head, so the sweep picks the winner
+     per creature instead of assuming one method is best everywhere. The
+     `versus` command and `arena.versus.v1` already exist as the comparison
+     primitive; what is missing is running it as part of `--all` and recording a
+     per-key verdict. STATUS: designing.
+  2. *"is this shown in the arena interface as an options? never ran that and
+     would very much like to try"* — Ricardo has never launched the training
+     console. It is `game/arena/console.tscn`. STATUS: answer + a launcher.
+     NOTE: the other session is actively editing `console.gd`, so any console
+     work here must not collide — read, do not edit.
+  3. *"perhaps we should cap at 16? ... can't we run another creature key on the
+     1-4 remaining cores? ... we are compute bound, not parallel worker bound"* —
+     Ricardo is right, and the measurement agrees: jobs 16 and 20 are both
+     6.4 s/gen, so **capping at 16 costs nothing and frees 4 threads** for the
+     desktop. That is strictly better than `TRAIN_PROFILE=desktop` halving it.
+     And his reasoning about parallel keys is exactly right: total work is
+     unchanged because the box is compute bound, so running keys concurrently
+     does not add throughput — but it does let every key progress at once
+     instead of key 7 waiting days for key 1, which matters for comparing keys
+     and for surviving an interruption. STATUS: cap landing; concurrent keys
+     to design.
+     **COLLISION, unresolved by design:** the jobs default lives in TWO files
+     that the other Claude session owns right now — `tools/train_run.sh`
+     (`TRAIN_PROFILE=desktop` -> `min(nproc/2, 4)`, so **4 jobs on a 20-thread
+     box**, measured at 9.6 s/gen against 6.4 at 16) and `game/arena/console.gd`
+     (`clampi(OS.get_processor_count() / 2, 1, 4)`, the same cap in the UI
+     spinbox). Both are dirty in the working tree from that session. Flagged,
+     not edited. The one-line change when they land: desktop default becomes
+     `min(nproc - 4, 16)` instead of `min(nproc/2, 4)`.
+  4. *"the biggest remaining win is C++ ... well, let's execute that right
+     now"* — build `dh-godot` and move the neural forward pass into it.
+     **DONE 2026-09-13, commit `6a46279`.** godot-cpp has no 4.6 branch;
+     `godot-4.5-stable` is the newest tag and GDExtension is forward
+     compatible, so the extension targets 4.5 headers and declares
+     `compatibility_minimum = "4.5"`. `DhPolicyNet` holds flat
+     `std::vector<double>` layers and runs GDScript's exact accumulation order
+     (double accumulator, libm `tanh`, `-ffp-contract=off`) so fights stay
+     bit-identical and no trained weight is invalidated. **566 -> 105 us/tick,
+     5.39x** — but end-to-end only ~1.06x per generation, inside the noise.
+     `neural_policy.gd` falls back to GDScript when `ClassDB` has no
+     `DhPolicyNet`, so an unbuilt tree trains slower, not broken. Build with
+     `tools/build_dh_godot.sh`.
+     **NEXT PROFILING TARGET (this is now the bottleneck):** per-episode scene
+     teardown/rebuild in `arena.gd::_start_episode` plus per-match overhead.
+     With the tick cheap and the engine resident, that is where a generation's
+     time actually goes.
+
+- **Configurable net hyperparameters — Ricardo, 2026-09-13 (latest+8):** *"net
+  hyperparams should be configurable, as to test new architectures."*
+  `--hidden` landed with distillation; everything else about the architecture is
+  still hard-coded: tanh on every hidden layer, `INIT_SCALE = 0.1`, and the
+  optimiser knobs are a scatter of per-trainer flags. Wanted: an architecture
+  that is one NAMED thing you can point every trainer at, and new ones that can
+  actually be gated and shipped — which means the two runtimes must support them
+  too. FOUR SURFACES, and a net is only real if all of them agree:
+    1. `ml/training/policy_net.py` (numpy, ES + distill student)
+    2. `ml/training/torch_policy.py` (PPO learner)
+    3. `game/arena/neural_policy.gd` + `sim/libs/dh-godot` `DhPolicyNet` — these
+       two must stay BIT-IDENTICAL or every trained weight is invalidated
+    4. `sim/libs/dh-sim` `Arena::mlp_act` — PPO's frozen self-play opponent,
+       which hard-codes tanh for hidden layers today
+  STATUS: in progress.
+
+- **An asset generation console — Ricardo, 2026-09-13 (latest+7):** *"And how
+  about the asset generation console?"* — asked right after `tools/genforge.py`
+  landed as a CLI. He wants the content pipeline to have the cockpit the arena
+  has: a scene you open, not commands you remember. Shape it mirrors:
+  `game/arena/console.tscn` (PACKS list, per-art provenance/clip status, CHECK /
+  CREATE / BUILD / APPROVE / REJECT, and a button that opens the bundle's
+  `index.html` review page). The seam is the same one the training console uses:
+  the GUI shells out to the python tool and reads STRUCTURED output, so the logic
+  lives in one place — hence `tools/genforge.py --json` first, then the scene.
+  **DONE 2026-09-13, commit `f3c866f`.** `game/genforge/console.tscn`, reachable
+  from the title menu's GENFORGE button (MENU OK — 13 buttons) or standalone.
+  Packs with approval state on the left; on the right the pack verdict, one ART
+  row per asset (provenance verified? clips complete?), every finding coloured,
+  and CHECK / BUILD / REVIEW (opens the bundle's index.html) / APPROVE / REJECT /
+  CREATE. It shells out to `tools/genforge.py --json` (new `audit_data` /
+  `list_data` seam) and renders the answer — the GUI never re-implements the
+  rules, so it cannot call an asset fine when the CI gate fails it. Gate:
+  `GENFORGE CONSOLE SELFTEST OK — 1 pack(s), fen_bells: 14 finding(s) rendered
+  (2 failing), 1 art row(s), review page present`; the selftest asserts the live
+  catalog STILL fails on bellwether.
+
+- **Teacher/student distillation — Ricardo, 2026-09-13 (latest+6):** *"Let's
+  train bigger models and use them to distill smaller ones, as to use the smaller
+  nets in the actual games and the big ones to act as their teachers once they
+  surpass the default script/engine behaviour!"*
+  Three parts, and the third is the condition he attached:
+  1. **Bigger nets.** `HIDDEN = (64, 64)` is hard-coded in
+     `ml/training/policy_net.py`. Teachers need width as a parameter, recorded in
+     the exported `arena.policy.v1` so a net says how big it is.
+  2. **Distillation.** A small student (the shipping 64x64) learns to reproduce a
+     wide teacher's head on observations from real play, then gates in Godot the
+     normal way. The student is what deploys — teachers never ship.
+  3. **THE TEACHING GATE (his condition): a teacher may only teach once it
+     SURPASSES the default script/engine behaviour.** That is executable with
+     the pieces already here: `versus` against `native` and `scripted` in the
+     real arena. A teacher that cannot beat the built-in AI has nothing to
+     teach, and distilling from it would actively make the student worse.
+  WHY IT IS WORTH IT (the numbers from the glitchiness answer): the runtime cost
+  is ~105 us/tick in C++ at 7,744 MACs; a 256x256 teacher is 80,128 MACs,
+  ~1.09 ms/tick, and fifteen of those eat a whole 60 FPS frame. So a wide net can
+  never ship — but it can train, and it can teach.
+  **DONE 2026-09-13, commit `f3c866f`.**
+  1. **Width is a parameter.** `PolicyNet(hidden=)`, npz reads its depth from the
+     FILE (older nets fall back to counting w-keys — the same shape), the export
+     declares `hidden` + `macs`, and `league train --hidden` / `ppo --hidden`
+     take it. A width change refuses to warm-start from a different shape rather
+     than silently training the old one.
+  2. **`ml/training/distill.py`** — qualify -> DAgger collect -> KD fit -> gate.
+     Round 0 drives with the teacher, later rounds drive with the STUDENT and the
+     teacher only labels. Loss matched to what the runtime reads: MSE on move,
+     softened CE on the action logits (argmaxed at runtime, so ranking is what
+     matters), BCE on dodge. numpy + Adam, no venv needed. libdh-env rollouts at
+     150-270k samples/s. **Measured 94.6% action agreement**, and the DAgger
+     round is what took it from 92.7 to 94.6.
+  3. **The teaching gate is enforced**: `versus` vs BOTH baselines in the real
+     arena, `--qualify-margin` 0.55, fail -> nothing distilled, exit 1.
+  Also `distill` is a tournament method (`--methods es,ppo,distill --teacher`).
+  **A C++ BUG FOUND ON THE WAY:** dh-sim's frozen-opponent MLP forwarded through
+  `float buf[96]` with no width check — PPO self-play with a 256-wide teacher
+  would have smashed the stack. `Arena::set_opp_mlp` now refuses layers wider
+  than `kMlpMaxUnits` (512) and the buffers are sized by that constant. ctest 4/4.
+  **STILL OPEN:** PPO's GRU stack keeps the fixed shape (`--hidden` is mlp only);
+  no wide teacher has actually been TRAINED yet — that is a GPU run for Ricardo
+  to launch, and it is the real test of whether a big teacher outclasses ES.
+
+- **A content approval/creation interface + a usable pipeline doc — Ricardo,
+  2026-09-13 (latest+5):** *"create an interface to approve/check/create new
+  content! Also further document the pipeline so it's usable by me!"* (said while
+  confirming the asset-pipeline findings: *"I'll send your critiques directly to
+  the other agent, you got some REAL mistakes, well done!"*).
+  The genforge pipeline now has provenance and a cleanup/rejection stage, but no
+  human-facing surface: approving a candidate, checking one against its
+  provenance, and kicking off a new one are all ad-hoc python. Wanted:
+  1. **An interface — DONE 2026-09-13, commit `f2e34de`.** `tools/genforge.py`:
+     `list | check | create | build | show | approve | reject`. `check` is
+     written backwards from the bellwether failure — a missing
+     `provenance-v1.json`, a recorded `sha256` that does not match the file, a
+     `prompt_sha256` that does not match the prompt, and a bake short of its
+     `required_clips` are all FAILURES, not warnings. Run live it reproduces
+     exactly the two bellwether gaps. Approval is pinned to the bundle's
+     `content_hash` AND its manifest digest, stored in
+     `genforge/approvals/<hash>.json` (never inside the immutable bundle), with
+     every still-open blocker copied into the record. READY needs both halves
+     clean. Nothing writes to `content/drops/` — promotion stays deliberate.
+     14 tests.
+  2. **Documentation — DONE, same commit.** `docs/USAGE.md` §7 is now the
+     pipeline in order: release -> art source (and exactly what a source folder
+     must contain) -> bake -> browser review page -> approve/reject.
+
+- **Land the JOBS cap, a default-AI control in the console, and "can a PPO net
+  make the game glitchy?" — Ricardo, 2026-09-13 (latest+4):** *"let's fix that,
+  please!"* / *"make sure to add an option to the arena console/training
+  interface to set new game default ais!"* / *"how can the PPO net get too heavy
+  as to get the game to be glitchy?"*
+  1. **JOBS cap — DONE 2026-09-13, `aa35f2b`.** Ricardo overrode the collision
+     flag. `min(nproc -
+     4, 16)` replaces `min(nproc/2, 4)` in `tools/train_run.sh` and the console's
+     jobs spinbox. Both files are dirty with the other session's work, so the
+     edit lands in the working tree and only MY hunks are staged (the
+     split-the-diff-and-`git apply --cached` method already used for
+     `docs/USAGE.md`). STATUS: doing.
+  2. **Console: set the game's default AI — DONE 2026-09-13, `aa35f2b`.** The
+     NETS tab already moved the deployed pin; what was missing was anything that
+     read that pin as "the default" — every match had to be told `--policy-a`
+     explicitly. Now `--policy-a default` resolves through
+     `game/arena/data/ai_defaults.json` (`mode` + `per_build` overrides +
+     `fallback`), `game/arena/ai_defaults.gd` resolves it, `fighter.gd` honours
+     it, and the console writes it from NETS -> DEFAULT AI (SET FOR ALL / SET
+     FOR BUILD / CLEAR BUILD). Nets come from `res://arena/data/nets/<key>.json`
+     in an exported game, or the registry pin in a dev tree.
+  3. **"How can the PPO net get too heavy as to get the game to be glitchy?" —
+     ANSWERED 2026-09-13.** Not by training. The runtime contract
+     (`arena.policy.v1`) fixes the shape at 47 -> 64 -> 64 -> 10 = **7,744 MACs**,
+     so 2M steps and 200M steps export the identical net. Measured cost of one
+     forward pass, run once per agent per physics tick: **566 us GDScript, 105 us
+     C++** (`DhPolicyNet`). The 60 FPS frame is 16,670 us. Four real risks:
+     (a) **agent count** — 29 neural agents saturate a frame in GDScript, 158 in
+     C++, and that is before rendering and physics, so realistically ~8-14 vs
+     ~40-60; at the canon 30 Hz sim rate both double;
+     (b) **a widened net** — `HIDDEN = (64, 64)` in `ml/training/policy_net.py`;
+     (256,256) is 80,128 MACs, 10.3x, ~1.09 ms per agent per tick in C++, and
+     fifteen agents eat the whole frame;
+     (c) **`--arch gru` / squad nets** export no `game_json` at all — the Godot
+     runtime is a stateless 31-obs MLP — so they cannot be pinned (the tournament
+     reports them as "no-candidate"); and
+     (d) **a net that fails to load** (obs_dim mismatch after an OBS_DIM change)
+     leaves `_layers` empty, `_act` returns immediately, and the creature stands
+     still — a behaviour glitch, not a frame glitch, and the one to watch for.
+     Also per agent per tick: `_obs_log` appends a 31-float observation into a
+     24-entry ring, so allocation churn scales with agent count too.
+
+  CURRENT STRATEGY AT THIS INTERRUPTION: the method tournament is designed and
+  half-read (see the entry above); it lands as a NEW module
+  `ml/training/tournament.py` plus a thin `tournament` subcommand in
+  `league.py`, because `tools/train_run.sh` belongs to the other session. Order
+  of work now: (1) JOBS cap, (2) console default-AI control, (3) the PPO answer,
+  (4) finish the tournament, (5) the codex/launcher icon parity audit.
+
+- **Build the method tournament + a desktop launcher parity audit — Ricardo,
+  2026-09-13 (latest+3):** *"methods competing head-to-head per key during TRAIN
+  ALL ... work on that!"* and *"create an execution icon binary as the rest. What
+  is the difference in codex build code and yours? Don't alter, but investigate
+  as to get yours up-to-date (we even have custom icons)"*.
+  1. **Method tournament — DONE 2026-09-13, commit `aa35f2b`.**
+     `ml/training/tournament.py` (+ a `tournament` subcommand on league, + the
+     console's TOURNAMENT button). Every method trains the key, every candidate
+     is gated against the SAME pre-tournament pin (the pin is snapshotted and
+     restored around each gate call — otherwise gating ES first makes ES the
+     yardstick for PPO), the candidates fight best-of-N in the real arena, and
+     the winner takes the pin. CHAMPION (won the bracket) and WINNER (won it AND
+     passed the gate) are reported separately; only a winner moves the pin.
+     Verdicts are `arena.tournament.v1` in `ml/data/benchmarks/`. `evolve` is
+     not an entrant — it registers under derived keys, so its champion goes in
+     through `--extra`, which also takes `scripted`/paths/registry refs as
+     reference points that can win the bracket but never the pin. 16 tests.
+  2. **Launcher/icon parity — DONE 2026-09-13, `aa35f2b`.** Neither file was
+     altered; both were read. THE DIFFERENCE: `tools/package_codex.py` is a full
+     distribution pipeline — it renders the icon (`build_app_icon.py`),
+     validates content, builds and ctests `sim/`, cross-compiles the Windows
+     helper, imports, exports BOTH platforms, verifies the export against
+     `game/branding/dragon-heroes.ico` (`verify_package.py`), smoke-runs the
+     Linux build, stages the offline content review, writes a `BUILD-INFO.json`
+     manifest with a sha256 per file, zips it and CRC-checks the zip, and ships
+     `install-launcher.py` so the first launch registers a `.desktop` entry.
+     `tools/build_arena.sh` did one thing: export the trainer and probe it.
+     Linux exports carry no embedded icon (only preset.0/Windows sets
+     `application/icon`) — on Linux the icon IS the `.desktop` entry, which the
+     codex build had and the cockpit did not. NOW IT DOES: preset.3 "Arena
+     Console (Linux)" + `run/main_scene.console` export the cockpit as its own
+     binary, `tools/build_console.sh` verifies it reaches CONSOLE SELFTEST OK
+     without opening a window, and `tools/install_console_launcher.py` registers
+     "Dragon Heroes — Arena Console" with the Dragon Heroes icon. VERIFIED: 92M
+     binary built, selftest OK from the binary, entry + icon installed under
+     ~/.local/share. STILL MISSING vs codex (deliberate, it is a dev tool): no
+     zip, no BUILD-INFO manifest, no Windows export, no content staging.
+  - **EXTENDED 2026-09-13 (Ricardo ran `game/genforge/console.tscn` from bash:
+    "Permissão negada / yooo wtf").** A `.tscn` is data, not a program — so the
+    GenForge console got the same treatment: preset.4 "Genforge Console (Linux)"
+    + `custom_features="genforge"` + `run/main_scene.genforge`, and the launcher
+    became `tools/install_console_launcher.py arena|genforge|all` over a TARGETS
+    table. `tools/build_console.sh [arena|genforge|all]` loops both with their
+    own selftest sentinels.
+  - **BUG THE APP BUILD EXPOSED — repo discovery.** Both cockpits shell out to
+    the repo's python, and both resolved the repo as
+    `globalize_path("res://..")`. In the editor `res://` IS `game/`, so that is
+    right; in an exported binary `res://` is the PCK next to the executable, so
+    `res://..` is `builds/` — the first GenForge app booted the right scene and
+    reported "genforge.py list returned no packs". Fixed with
+    `game/tools/repo_root.gd` (`DhRepoRoot`): `$DH_REPO`, else `res://..`, else
+    climb from the executable, each candidate checked against sentinels
+    (`docs/00-canon.md` + `tools/genforge.py`) rather than a guessed path shape.
+    The arena console had the SAME latent bug — its selftest runs on `user://`
+    fixtures, so it passed while a real TRAIN from the installed app would have
+    written into `builds/`. Both now guard on `_repo == ""` and say what to do.
+    VERIFIED: both 92M binaries reach their sentinels, and the GenForge app
+    audits the real pack when launched from `/tmp`.
+
+- **Asset pipeline: did it get stepped up, and was the dungeon boss made with
+  it? — Ricardo, 2026-09-13 (latest+2):** *"did our asset generation pipeline
+  got stepped up in the other sessions? We have an asset who's our new-role
+  model as the dungeon boss, but perhaps it wasn't made using our asset
+  generator pipeline."*
+  **ANSWERED. Yes, it was stepped up — and no, the boss is not fully covered.**
+  - **Stepped up:** `hunter-renewal` (other session, 2026-09-13) introduced
+    versioned **`provenance-v1.json`** plus a **cleanup/rejection stage**
+    (`cleanup-prompt.txt`, `cleanup-rejection.json`) — a generated image can now
+    be rejected and re-cleaned with the rejection reason recorded.
+  - **Covered:** `app_icon` and `haven-renewal` both carry `provenance.json`
+    with `sha256` + `prompt_sha256`.
+  - **NOT covered — the dungeon boss.** `bellwether` (the Gloamfen Bellwether /
+    "Orun", `fen_bells.art.bellwether`) has **NO provenance file and no sha256
+    anywhere**. It DID go through the generator — there is a `prompt.txt`, a
+    `source.png`, and a release record in `genforge/releases/bell_beneath_fen.json`
+    naming both, with `provider: "built-in image_gen; model identity not
+    exposed"` — but the image cannot be verified against its prompt, so it is
+    unreproducible and unauditable by the current rules.
+  - **Second gap:** bellwether has only **`idle` of 6 `required_clips`**
+    (`idle, move, anticipation, attack, hit, death`). As the role model for
+    dungeon bosses it is 1/6 animated.
+  - **STATUS: awaiting Ricardo's call** — backfill a `provenance-v1.json` for
+    bellwether (hash what exists, mark it retro-fitted and unverifiable), or
+    regenerate it through the stepped-up pipeline so the boss the others copy
+    is the one that passes the gate. The 5 missing clips are the same decision.
+
+- **GPU physics, the persistent worker, and 60 Hz — Ricardo, 2026-09-13
+  (latest): "but can't we use the gpu to calculate the physics math in the
+  engine? some cuda stuff or smth" / "[persistent worker] ---> do it!" / "keep
+  at 60hz as to be fully capable".**
+  **60 Hz: DECIDED, keep it.** Ricardo: "as to be fully capable". The arena
+  stays at 60 Hz even though canon's sim target is 30 — the extra resolution is
+  deliberate, and no trained net or gate band needs revisiting. Closed; do not
+  reopen this as an optimisation.
+  **GPU physics: no, and the premise is worth correcting.** Godot's 2D physics
+  is CPU-only; there is no CUDA backend to switch on, and writing one is an
+  engine project, not a setting. More to the point, physics is not the cost:
+  the profile puts the GDScript forward pass at ~93% of the tick and EVERYTHING
+  else — physics, projectiles, fields, node processing — at ~7%. Taking physics
+  to zero buys 7%. And the shape is wrong for a GPU regardless: a GPU wins on
+  throughput (thousands of independent items in one launch), not latency. One
+  match has two fighters and a handful of projectiles; a kernel launch costs
+  ~5-10 us against a ~250-380 us step of branchy, data-dependent scalar logic,
+  so the transfers would cost more than the math. The GPU-shaped version of
+  this problem is "simulate ten thousand fights at once", which is exactly
+  `libdh-env` + PPO — already built, already on the GPU at 56k steps/s. The
+  right next step for the GODOT arena is C++ (`dh-godot`), not CUDA.
+  **LANDED — the persistent arena worker.** `--serve` keeps one engine alive
+  and takes matchups as JSON on stdin, answering `ARENA SERVE DONE <path>`;
+  `league.py` holds a pool of them, one per job, booted once per RUN instead of
+  once per match. Measured steady state (idle box, pop 10, 13 episodes, 2
+  opponents, jobs 10, all including the flat-MLP fix):
+
+  | configuration | s/generation | speedup |
+  |---|---|---|
+  | editor binary, one engine per match (the old way) | 13.0 | 1.00x |
+  | editor binary + resident workers | 9.3 | 1.39x |
+  | release export, one engine per match | 9.5 | 1.36x |
+  | release export + resident workers | 7.1 | **1.83x** |
+
+  All four produce identical scores. For a 1000-generation key that is 3.6 h ->
+  2.0 h. Correctness gates: a served match must equal a fresh process, checked
+  with the same matchup sent FIRST and LAST in a batch so state leaking across
+  matches would show as order dependence. `DH_ARENA_POOL=0` disables it.
+  **Two bugs worth remembering**, both found by running the thing rather than
+  reasoning about it: (a) `OS.read_string_from_stdin()` is line-oriented and
+  strips the newline, so waiting for a `"\n"` hangs on the first request;
+  (b) Godot flushes stdout per print in DEBUG builds but NOT in release, so a
+  release trainer's `ARENA SERVE READY` sat in the C buffer and every worker
+  timed out — fixed with `run/flush_stdout_on_print=true`. The build script's
+  first serve check missed (b) because it read stdout from a FILE after exit;
+  it now probes through the real pool class over a live pipe.
+
+- **Arena throughput — Ricardo, 2026-09-13 (later): "1) can't we load the
+  engine just once and run all episodes? 2) can't we accelerate the 60 physics
+  tick/s to just process all the ticks capped by our processing power? 3) how
+  can we optimize the godot arena? i noticed my gpu is VERY subutilised, so we
+  could run stuff much faster, even running all keys in parallel if needed".**
+  Answered with measurements rather than guesses; two fixes landed, the rest is
+  a ranked backlog below.
+  **(1) Already true per match** — `run_match` passes `--episodes N` to ONE
+  Godot process, so the engine loads once per match, not once per episode.
+  Measured fixed startup: 4.01 s (editor binary) / 2.53 s (release export).
+  What is NOT amortised is startup ACROSS matches: 20 matches per generation
+  means ~80 s of pure engine boot per generation. A persistent arena worker
+  (Godot boots once, reads matchups on stdin) would reclaim it — see backlog.
+  **(2) Already CPU-bound** — `--speed max` sets `--fixed-fps 60`,
+  `Engine.max_fps = 0` and `low_processor_usage_mode_sleep_usec = 0`, so the
+  engine advances one 1/60 s tick per frame as fast as one core allows and
+  never sleeps. 60 Hz is the sim RESOLUTION, not a wall-clock rate. The lever
+  that remains is making each tick cheaper, and lowering the resolution —
+  canon §: "Simulation: fixed-tick 30 Hz", but the ARENA runs at 60. Matching
+  canon would halve the work. NOT done unilaterally: it changes dodge windows
+  and projectile stepping, so every trained net and gate band would need
+  revisiting. **Ricardo's call.**
+  **(3) The GPU cannot help and the box is already saturated.** A `--headless`
+  Godot draws nothing, so the arena never touches the GPU — the 4050 is idle in
+  training because there is no rendering to do, not because we are leaving
+  throughput on the table. The GPU tier is PPO over `libdh-env` (56k steps/s),
+  which is a different path entirely. On "run all keys in parallel": the answer
+  is still no, but the FIRST reasoning was wrong and is corrected here. I read
+  load average 23-24 on 10 physical cores as oversubscription; measured on an
+  idle box afterwards, `--jobs` does not plateau until 16 and `jobs=20` is
+  exactly as fast as `jobs=16` (6.4 s/gen, vs 7.1 at jobs=10 and 9.6 at
+  jobs=4). Hyperthreading earns its keep here. The real reason parallel keys buy
+  nothing is throughput, not contention: a generation IS 20 matches, and one key
+  at `jobs=20` already saturates the box at ~3.1 matches/s. Two keys at
+  `jobs=10` each run the same 40 matches through the same pipe in the same
+  total time. Parallel keys redistribute throughput; they do not add any.
+  **LANDED — the arena was not reproducible at all.** Godot randomises the
+  GLOBAL random stream at startup (proved: three runs, three different first
+  `randf()` draws). `arena.gd` seeded its own `_rng` but never that one, and
+  gameplay draws from it — `creature.gd` wander, `hag.gd` retreat,
+  `projectile.gd` volley desync. So the same `--seed` produced different fights
+  every run: dusk_revenant vs gloam_wisp on seed 77 gave dmg_b [0,0,0],
+  [0,88.6,0] and [0,112,0] across three identical runs. Winners were stable, so
+  it hid from every win-rate check, but fitness is `win_rate + 0.1*(own_hp -
+  foe_hp)` — the hp term was partly luck. Measured fitness sd over 4 identical
+  runs: **0.0037 before, 0.0000 after**, against a within-generation candidate
+  sd of 0.0350 — so ~11% of what ES was ranking on was noise. Fixed by seeding
+  the global stream per EPISODE in `_start_episode`.
+  **LANDED — the GDScript MLP was 93% of the arena tick.** Measured by
+  two-point slope (startup cancels): native vs native ~250-380 us/tick, neural
+  vs neural ~4,740-4,950 us/tick; one neural side costs ~2,200 us/tick for a
+  47-64-64-10 forward pass (7,744 MACs). `_forward` held weights as an Array of
+  Arrays and did `float(row[j]) * float(out[j])` — every element through a
+  Variant. Flattened to `PackedFloat64Array` indexed `o * n_in + j`: **1.74x
+  faster, fights bit-identical** (the exported weights are float32-exact and
+  the accumulator was always a GDScript float, so the numbers do not move).
+  **BACKLOG, ranked by measured payoff:**
+  1. **Move the forward pass to C++.** Even flattened it is ~3,100 us/tick —
+     about 400 ns per multiply-add, ~1000x off what C does. This is the single
+     biggest remaining win (~10x on the whole tick). Blocked on `dh-godot`,
+     which is currently only a README: the GDExtension is not built or wired
+     into `game/`. That is the real project behind this number.
+  2. **Persistent arena worker** — boot Godot once per job, feed matchups over
+     stdin. Reclaims ~80 s per generation of engine boot (~5-20% depending on
+     episode length).
+  3. **Release trainer export** — `game/export_presets.cfg` "Arena Trainer
+     (Linux)" plus a feature-tagged `run/main_scene.trainer`, because a RELEASE
+     template refuses a scene path on the command line. Verified bit-identical
+     to the editor binary. Honest payoff: startup 4.01 s -> 2.53 s, and near
+     nothing per tick while the GDScript MLP dominates — but 1.5 s x 20 matches
+     x 1000 generations is ~8 h per key, so it pays for itself. Becomes a much
+     bigger win once (1) lands.
+  4. ~~Tune `JOBS` to physical cores~~ — **MEASURED and rejected.** On an idle
+     box: jobs 4 -> 9.6 s/gen, 8 -> 7.4, 10 -> 7.1, 12 -> 7.0, 16 -> 6.4,
+     20 -> 6.4. `JOBS=$(nproc)` was right all along. Note the other session is
+     adding `TRAIN_PROFILE=desktop` to cap jobs at half the CPUs — that is a
+     deliberate trade of ~11-16% training throughput for desktop
+     responsiveness, not a fix for oversubscription.
+
+- **Why a Godot episode is slow — measured, 2026-09-13 (Ricardo: "what is it
+  about episodes that take them so long? won't they be only calculated
+  computationally? we don't need to render images").** It is not rendering:
+  `--headless` draws nothing. An episode simulates ~28.5 in-game seconds at 60
+  physics ticks/s, so ~1,700 frames of GDScript `_physics_process` across every
+  arena node, in a freshly booted engine process. Measured one-at-a-time on a
+  loaded box: 1 episode 4.07 s, 4 episodes 7.74 s, 13 episodes 16.58 s — a
+  straight line of ~3.0 s fixed engine startup per match plus ~1.04 s per
+  episode. The live sweep sees ~86 s per 13-episode match because `--jobs 20`
+  runs 20 engines on 20 cores. Same box, same moment: the Godot arena runs
+  27.5x real time, `libdh-env` runs 6,076x — **~220x apart**. Written up in
+  tech/37 §5. The standing consequence: the GATE must stay in Godot (it is the
+  deployment environment), but the SEARCH does not have to — that is the case
+  for moving ES onto dh-env the way PPO already is.
+
 ## PICK — the order-of-magnitude levers (design/24 §2; Ricardo's call)
 
 L1 data-driven AI profiles for the 1000-species bestiary (arena `bot_drive`

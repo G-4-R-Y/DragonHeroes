@@ -143,7 +143,7 @@ var _run := {}
 
 func _ready() -> void:
 	_selftest = OS.get_cmdline_user_args().has("--selftest")
-	_repo = ProjectSettings.globalize_path("res://..").simplify_path()
+	_repo = DhRepoRoot.find()  # not res://.. — an exported app would answer builds/
 	theme = ProtoTheme.get_theme()
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	if not _selftest and DisplayServer.get_name() != "headless":
@@ -732,6 +732,9 @@ static func _sq(s: String) -> String:
 	return "'" + s.replace("'", "'\\''") + "'"
 
 func _spawn_league(args: String, kind: String, key: String) -> void:
+	if _repo == "":
+		_proc_note = DhRepoRoot.missing_note()
+		return
 	DirAccess.make_dir_recursive_absolute(_repo.path_join(LOG_DIR))
 	DirAccess.make_dir_recursive_absolute(_repo.path_join(PROGRESS_DIR))
 	# exec: the pid we track IS python's — through `&&` alone python would be a

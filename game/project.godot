@@ -27,6 +27,10 @@ run/main_scene.trainer="res://arena/arena.tscn"
 ; desktop menu, so the arena is something you click, not something you
 ; remember a godot command line for.
 run/main_scene.console="res://arena/console.tscn"
+; ...and the content pipeline is the same idea: an application, not a
+; scene path you have to remember (Ricardo tried to run the .tscn from
+; bash and got 'Permissão negada' — a .tscn is data, not a program).
+run/main_scene.genforge="res://genforge/console.tscn"
 ; Godot flushes stdout per print in DEBUG builds but not in release ones,
 ; so a release trainer's "ARENA SERVE READY" sat in the C buffer and the
 ; worker pool timed out waiting for a line the engine had already written.

@@ -1,42 +1,48 @@
 #!/usr/bin/env bash
-# Build the Arena Console as its OWN application — an icon in the menu, not a
-# godot command line (Ricardo, 2026-09-13: "create an execution icon binary as
-# the rest ... we even have custom icons").
+# Build the Dragon Heroes consoles as their OWN applications — icons in the menu,
+# not godot command lines (Ricardo, 2026-09-13: "create an execution icon binary
+# as the rest ... we even have custom icons", and then, after trying to run a
+# scene file from bash: "Permissão negada / yooo wtf" — a .tscn is data, not a
+# program, and that is exactly the problem this removes).
 #
-# The codex flavour already had this treatment: tools/package_codex.py exports a
-# binary, stages the PNG and points at tools/install_linux_launcher.py, which
-# registers a .desktop entry. The training cockpit had none of it — you had to
-# remember `godot --path game res://arena/console.tscn`. Now:
+#   tools/build_console.sh                 # both consoles + their menu entries
+#   tools/build_console.sh arena           # just the training cockpit
+#   tools/build_console.sh genforge        # just the content cockpit
+#   tools/build_console.sh all --no-install # binaries only
 #
-#   tools/build_console.sh              # export + verify + install the launcher
-#   tools/build_console.sh --no-install # just the binary
+# The codex flavour already had this treatment (tools/package_codex.py exports,
+# stages the PNG and points at an installer); the cockpits had none of it.
 #
 # Like the trainer export, a release template refuses a scene path on the command
-# line (disable_path_overrides), so the preset carries the custom feature
-# "console" and game/project.godot sets run/main_scene.console — the build boots
-# the cockpit by itself.
+# line (disable_path_overrides), so each preset carries a custom feature and
+# game/project.godot maps it to a main scene — run/main_scene.console and
+# run/main_scene.genforge. The build boots the right cockpit by itself.
 #
-# NOTE the binary opens a WINDOW. This script never runs it that way: it verifies
-# with --headless -- --selftest, which is the same gate docs/harness/README lists.
+# NOTE these binaries open a WINDOW. This script never runs them that way: each
+# is verified with --headless -- --selftest, the same gates docs/harness lists.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 REPO="$PWD"
 source "$REPO/tools/dh_term.sh"
 
-PRESET="Arena Console (Linux)"
-OUT="$REPO/builds/console/dh-arena-console.x86_64"
+TARGET="${1:-all}"
 INSTALL=1
-[ "${1:-}" != "--no-install" ] || INSTALL=0
-mkdir -p "$(dirname "$OUT")"
+for arg in "$@"; do [ "$arg" != "--no-install" ] || INSTALL=0; done
+case "$TARGET" in arena|genforge|all|--no-install) ;; *)
+  dh_err "usage: tools/build_console.sh [arena|genforge|all] [--no-install]"; exit 2;; esac
+[ "$TARGET" != "--no-install" ] || TARGET=all
 
-dh_banner "ARENA CONSOLE BUILD"
-dh_kv preset "$PRESET"
-dh_kv output "${OUT#"$REPO"/}"
+# target | preset | output basename | selftest sentinel
+TARGETS=(
+  "arena|Arena Console (Linux)|dh-arena-console.x86_64|CONSOLE SELFTEST OK"
+  "genforge|Genforge Console (Linux)|dh-genforge-console.x86_64|GENFORGE CONSOLE SELFTEST OK"
+)
 
+dh_banner "CONSOLE BUILD"
 command -v godot >/dev/null || { dh_err "godot not on PATH"; exit 1; }
 
-# The icon the .desktop entry points at. build_app_icon.py renders it from the
-# curated source; only regenerate when it is missing, so a hand-tuned PNG stays.
+# The icon the .desktop entries point at. build_app_icon.py renders it from the
+# curated source; only regenerate when missing, so a hand-tuned PNG stays.
 if [ ! -f game/branding/dragon-heroes.png ]; then
   dh_say "rendering the application icon"
   python3 tools/build_app_icon.py
@@ -46,28 +52,39 @@ fi
 # scan, and an export of an unscanned project silently ships a broken script.
 godot --headless --path game --import >/dev/null 2>&1 || true
 
-if ! godot --headless --path game --export-release "$PRESET" "$OUT" 2>&1 | tail -3; then
-  dh_err "export failed — is the 4.6 export template installed? (Editor > Manage Export Templates)"
-  exit 1
-fi
-[ -x "$OUT" ] || { dh_err "no binary at $OUT"; exit 1; }
-dh_ok "exported $(du -h "$OUT" | cut -f1)"
+mkdir -p "$REPO/builds/console"
+BUILT=()
+for row in "${TARGETS[@]}"; do
+  IFS='|' read -r name preset out sentinel <<< "$row"
+  [ "$TARGET" = all ] || [ "$TARGET" = "$name" ] || continue
+  OUT="$REPO/builds/console/$out"
+  dh_rule "$name"
+  dh_kv preset "$preset"
+  dh_kv output "${OUT#"$REPO"/}"
+  if ! godot --headless --path game --export-release "$preset" "$OUT" 2>&1 | tail -3; then
+    dh_err "export failed — is the 4.6 export template installed? (Editor > Manage Export Templates)"
+    exit 1
+  fi
+  [ -x "$OUT" ] || { dh_err "no binary at $OUT"; exit 1; }
+  dh_ok "exported $(du -h "$OUT" | cut -f1)"
 
-# Prove the binary boots the CONSOLE on its own, without opening a window: the
-# release template ignores a scene path, so a missing run/main_scene.console
-# would silently produce a binary that starts the main menu instead.
-PROBE="$(mktemp -d)/selftest.txt"
-if "$OUT" --headless -- --selftest >"$PROBE" 2>&1 && grep -q "CONSOLE SELFTEST OK" "$PROBE"; then
-  dh_ok "boots straight into the cockpit: $(grep -o 'CONSOLE SELFTEST OK.*' "$PROBE" | head -1 | cut -c1-88)"
-else
-  dh_err "the binary did not reach the console selftest — see $PROBE"
-  exit 1
-fi
+  # Prove the binary boots ITS OWN cockpit without opening a window: the release
+  # template ignores a scene path, so a missing run/main_scene.<feature> would
+  # silently produce a binary that starts the main menu instead.
+  PROBE="$(mktemp -d)/selftest.txt"
+  if "$OUT" --headless -- --selftest >"$PROBE" 2>&1 && grep -q "$sentinel" "$PROBE"; then
+    dh_ok "boots straight into the cockpit: $(grep -o "$sentinel.*" "$PROBE" | head -1 | cut -c1-84)"
+  else
+    dh_err "the binary did not reach its selftest — see $PROBE"
+    exit 1
+  fi
+  BUILT+=("$name")
+done
 
 if [ "$INSTALL" -eq 1 ]; then
-  python3 tools/install_arena_launcher.py
+  for name in "${BUILT[@]}"; do python3 tools/install_console_launcher.py "$name"; done
 else
-  dh_say "skipping the desktop entry (--no-install); add it later with:"
-  dh_say "  python3 tools/install_arena_launcher.py"
+  dh_say "skipping the desktop entries (--no-install); add them later with:"
+  dh_say "  python3 tools/install_console_launcher.py all"
 fi
-dh_say "run it from the menu, or directly: $OUT"
+dh_say "run them from the application menu, or directly from builds/console/"

@@ -135,6 +135,12 @@ godot --headless --path game -s res://arena/tools/dump_specs.gd -- --out "$PWD/m
 godot --path game res://arena/console.tscn          # or the menu's ARENA button
 ```
 
+Or as its own application, with an icon in the desktop menu (search "Arena"):
+
+```bash
+tools/build_console.sh arena     # exports, selftests headless, installs the .desktop
+```
+
 The console is the cockpit for everything below — training, the registry and
 the bench — so you rarely need the CLI unless you are scripting.
 
@@ -489,8 +495,17 @@ tools/genforge.py check fen_bells     # one pack
 Or as a cockpit — **main menu → GENFORGE**, or standalone:
 
 ```bash
-godot --path game res://genforge/console.tscn
+godot --path game res://genforge/console.tscn   # a SCENE, so godot runs it — not bash
+tools/build_console.sh genforge                 # or make it an app: icon in the menu
 ```
+
+> `console.tscn` is data, not a program: `./game/genforge/console.tscn` from a shell
+> is "Permission denied" no matter what its mode bits say. Either hand it to godot,
+> or build the app — `tools/build_console.sh` (no argument builds both consoles)
+> exports it, proves it boots into the cockpit headless, and installs the desktop
+> entry with the Dragon Heroes icon. The exported app finds the repository by
+> climbing from its own location (`game/tools/repo_root.gd`), so it drives *this*
+> checkout wherever you launch it from; `DH_REPO=/path/to/repo` overrides that.
 
 PACKS on the left with their approval state; on the right the pack's verdict, one
 ART row per asset (provenance verified? clips complete?) and every finding,

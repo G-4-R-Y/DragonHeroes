@@ -58,7 +58,7 @@ var _template: OptionButton
 var _buttons: Dictionary = {}
 
 func _ready() -> void:
-	_repo = ProjectSettings.globalize_path("res://..").simplify_path()
+	_repo = DhRepoRoot.find()
 	_selftest = OS.get_cmdline_user_args().has("--selftest")
 	_build_ui()
 	_refresh()
@@ -194,6 +194,8 @@ static func _sq(s: String) -> String:
 
 # Blocking, for the sub-second commands. Returns [exit_code, stdout].
 func _tool(args: String) -> Array:
+	if _repo == "":
+		return [127, DhRepoRoot.missing_note()]
 	var out: Array = []
 	var cmd := "cd %s && python3 %s %s" % [_sq(_repo), TOOL, args]
 	var code := OS.execute("bash", ["-lc", cmd], out, true)
@@ -214,6 +216,10 @@ func _tool_json(args: String) -> Dictionary:
 
 func _spawn(args: String, kind: String) -> void:
 	if _pid > 0:
+		return
+	if _repo == "":
+		_proc_note = DhRepoRoot.missing_note()
+		_refresh_ui()
 		return
 	DirAccess.make_dir_recursive_absolute(_repo.path_join(LOG_DIR))
 	var log := _repo.path_join(LOG_DIR).path_join("genforge_console.log")
