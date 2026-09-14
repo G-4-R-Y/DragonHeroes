@@ -451,7 +451,7 @@ func _build_ui() -> void:
 
 	_gate_label = _label("", PALE)
 	_gate_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_gate_label.custom_minimum_size = Vector2(0, 30)
+	_gate_label.custom_minimum_size = Vector2(0, 44)   # 3 lines: 6 checks do not fit in 2
 	right.add_child(_gate_label)
 
 	_build_runs_tab(tabs)
@@ -1454,22 +1454,34 @@ func _refresh_ui() -> void:
 		var metrics: Variant = gate.get("metrics", {})
 		var checks: Variant = metrics.get("checks", metrics) if metrics is Dictionary else {}
 		if checks is Dictionary:
+			# Ricardo, 2026-09-14: "in the arena interface, can we get a little
+			# polishing to better fit everything in there". This line was already
+			# the longest thing on the tab at four checks — "GATE v6: FAIL —
+			# previous pin stays · suite_scripted FAIL wr 0.00 · ..." — and the
+			# statue/heuristic controls added two more. So it is COMPACTED rather
+			# than allowed to grow: the suite_/control_ prefixes carry no
+			# information a reader needs, and a failed sanity check is a property
+			# of its suite rather than a row of its own.
 			for name in checks:
 				var c: Variant = checks[name]
-				if c is Dictionary:
-					# A reported-only control (the heuristic yardstick) carries no
-					# `pass` on purpose, and rendering a missing verdict as FAIL
-					# would show a red bar for a check that never blocks a deploy.
-					var bit := ""
-					if bool(c.get("reported_only", false)):
-						bit = "%s —" % str(name)
-					else:
-						bit = "%s %s" % [str(name), "ok" if bool(c.get("pass", false)) else "FAIL"]
-					if c.has("win_rate"):
-						bit += " wr %.2f" % float(c.win_rate)
-					parts.append(bit)
+				if not (c is Dictionary) or str(name).ends_with("_sanity"):
+					continue
+				var short := str(name).trim_prefix("suite_").trim_prefix("control_")
+				short = short.replace("ladder_vs_deployed", "ladder")
+				var bit := ""
+				if bool(c.get("reported_only", false)):
+					bit = short                     # a yardstick has no verdict
+				else:
+					bit = "%s %s" % [short, "✓" if bool(c.get("pass", false)) else "✗"]
+				if c.has("win_rate"):
+					bit += " %.2f" % float(c.win_rate)
+				# the suite's own sanity check rides along as a marker
+				var sanity: Variant = checks.get("%s_sanity" % str(name), null)
+				if sanity is Dictionary and not bool(sanity.get("pass", true)):
+					bit += " ⚠"
+				parts.append(bit)
 		_gate_label.text = "GATE v%d: %s%s" % [int(gate.get("version", 0)),
-				"PASS — deployed" if passed else "FAIL — previous pin stays",
+				"PASS — deployed" if passed else "FAIL — pin stays",
 				("  ·  " + " · ".join(parts)) if not parts.is_empty() else ""]
 		_gate_label.add_theme_color_override("font_color", GREEN if passed else RED)
 	if is_instance_valid(_chart):

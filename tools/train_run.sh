@@ -25,6 +25,8 @@
 #   tools/train_run.sh --tournament --all                      # the METHOD BRACKET per creature
 #   tools/train_run.sh --tournament --key fen_boar --build core.arena.fen_boar_alpha
 #   GENERATIONS=200 POP=10 EPISODES=6 tools/train_run.sh --all # the real budget
+#   tools/train_all.sh --ppo --steps 8000000                  # PPO over EVERY creature
+#   CLONE=heuristic tools/train_all.sh --ppo                  # clone the heuristic first
 #   tools/train_run.sh --ppo --key cinder_drake --build core.arena.cinder_drake \
 #       --opp-build core.arena.fen_boar_alpha                  # GPU PPO instead of ES
 #   tools/train_run.sh --run-dir ml/runs/<name> --key ... --build ...   # caller names it
@@ -344,17 +346,57 @@ godot --headless --path game --import >/dev/null 2>&1 || true
 T0=$(date +%s)
 
 if [ "$MODE" = "ppo" ]; then
-  dh_rule "ppo $KEY"
-  dh_kv build "$BUILD  vs  $OPP_BUILD"
-  dh_kv budget "$STEPS steps · $ENVS envs · $ARCH · self-play every $SELFPLAY_EVERY"
-  "$PYVENV" -u -m ml.training.ppo --key "$KEY" --build "$BUILD" \
-      --opp-build "$OPP_BUILD" --steps "$STEPS" --envs "$ENVS" --arch "$ARCH" \
-      --selfplay-every "$SELFPLAY_EVERY" --seed "$SEED" "${NET_ARG[@]}" 2>&1 \
-      | tee "$RUN/logs/$KEY.log" \
-      | python3 -u "$REPO/tools/dh_trainfmt.py" --key "$KEY" || dh_err "ppo $KEY failed — see logs/$KEY.log"
-  "$PYVENV" -u -m ml.training.league gate --key "$KEY" --build "$BUILD" \
-      --episodes "$EPISODES" 2>&1 | tee -a "$RUN/logs/$KEY.log" \
-      | python3 -u "$REPO/tools/dh_trainfmt.py" --key "$KEY" || true
+  # PPO over EVERY creature, not just one. `--ppo` read $KEY alone, so
+  # `train_all.sh --ppo` silently trained a single key — Ricardo, 2026-09-14:
+  # "run a train_all experiment (even with PPO only)". With --all it loops the
+  # same key list the ES and tournament branches use; each creature trains as a
+  # mirror, which is what the gate measures.
+  if [ $ALL -eq 1 ]; then PPO_KEYS="$KEYS"; else PPO_KEYS="$KEY $BUILD"; fi
+  N_KEYS=$(echo "$PPO_KEYS" | grep -c . || true); I_KEY=0
+  echo "$PPO_KEYS" | while read -r key build; do
+    [ -n "$key" ] || continue
+    I_KEY=$((I_KEY + 1))
+    if [ $ALL -eq 1 ]; then opp_build="$build"; else opp_build="${OPP_BUILD:-$build}"; fi
+    dh_rule "$I_KEY/$N_KEYS  ppo $key"
+    dh_kv build "$build  vs  $opp_build"
+    dh_kv budget "$STEPS steps · $ENVS envs · $ARCH · self-play every $SELFPLAY_EVERY"
+    dh_kv curriculum "scripts first, self-play at win rate $PROMOTE_WR held $PROMOTE_HOLD updates"
+    # STAGE 0 - clone the heuristic first (tech/25 5.1.2). OFF by default,
+    # because it changes where the policy starts: CLONE=heuristic warm-starts
+    # PPO from a net that already walks at the enemy instead of one whose move
+    # head emits 0.110 +- 0.006 no matter where the enemy is.
+    WARM_ARG=()
+    if [ "${CLONE:-}" = "heuristic" ]; then
+      dh_kv clone "behaviour-cloning the five-rule heuristic before PPO"
+      # SOFT on purpose. distill refuses a teacher that does not beat BOTH
+      # baselines (Ricardo's condition, "once they surpass the default
+      # script/engine behaviour"), and MEASURED 2026-09-14 the five-rule
+      # heuristic clears `scripted` on some builds and not others — drake and
+      # golem yes, fen_boar and gloamfen_stalker no. A build with no qualifying
+      # teacher should train from scratch through the curriculum, not abort the
+      # sweep for the builds that follow it.
+      "$PYVENV" -u -m ml.training.distill --key "${key}_clone" --build "$build" \
+          --teacher heuristic --opp scripted 2>&1 \
+          | tee "$RUN/logs/${key}_clone.log" \
+          || dh_warn "clone $key did not qualify - PPO starts cold for this build"
+      CLONE_JSON=$(python3 "$REPO/tools/dh_latest_net.py" "$RUN/registry.json" "${key}_clone")
+      if [ -n "$CLONE_JSON" ]; then
+        WARM_ARG=(--warm-start "$CLONE_JSON")
+      else
+        dh_warn "clone produced no net for $key - PPO starts cold"
+      fi
+    fi
+    "$PYVENV" -u -m ml.training.ppo --key "$key" --build "$build" \
+        --opp-build "$opp_build" --steps "$STEPS" --envs "$ENVS" --arch "$ARCH" \
+        --selfplay-every "$SELFPLAY_EVERY" --seed "$SEED" \
+        --promote-wr "$PROMOTE_WR" --promote-hold "$PROMOTE_HOLD" \
+        "${WARM_ARG[@]}" "${NET_ARG[@]}" 2>&1 \
+        | tee "$RUN/logs/$key.log" \
+        | python3 -u "$REPO/tools/dh_trainfmt.py" --key "$key" || dh_err "ppo $key failed - see logs/$key.log"
+    "$PYVENV" -u -m ml.training.league gate --key "$key" --build "$build" \
+        --episodes "$EPISODES" 2>&1 | tee -a "$RUN/logs/$key.log" \
+        | python3 -u "$REPO/tools/dh_trainfmt.py" --key "$key" || true
+  done
 elif [ "$MODE" = "tournament" ]; then
   # TRAIN ALL, but each creature's methods fight for the pin instead of one
   # method being assumed right. tournament.py does the gating and the bracket;

@@ -136,6 +136,15 @@ func _walk(node: Node, canvas: Vector2i, path := "") -> Array:
 			out.append({"path": label.substr(maxi(0, label.length() - 40)), "axis": "t",
 					"bottom": c.global_position.x + text_w, "limit": float(canvas.x),
 					"over": (c.global_position.x + text_w) - float(canvas.x)})
+			# Ricardo, 2026-09-14: "in the arena interface, can we get a little
+			# polishing to better fit everything in there". Fitting the CANVAS is
+			# not fitting: a caption clipped by its own column never reaches the
+			# canvas edge, so every check above calls it fine while the reader
+			# sees "cinder_dra…". Measure text against the box that actually
+			# clips it, which is the control's own width.
+			out.append({"path": label.substr(maxi(0, label.length() - 40)), "axis": "c",
+					"bottom": text_w, "limit": maxf(c.size.x, 1.0),
+					"over": text_w - maxf(c.size.x, 1.0)})
 		if not (c is ScrollContainer):
 			out += _walk(c, canvas, label)
 	return out

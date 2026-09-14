@@ -258,6 +258,38 @@ The switch itself is `dh::sim::Arena::set_opp_policy` → `dh_env_set_opp_policy
 
 **One caveat, stated rather than discovered later:** the promotion threshold is measured in `dh-env`, and §5.3's unresolved `dps_taken` divergence means dh-env's opponents are not the arena's. Until that closes, 0.60 in dh-env is not 0.60 in the gate — the gate remains the only verdict.
 
+### 5.1.3 dh-env and the arena disagree hard enough to flip a verdict
+
+Measured 2026-09-14, and it is the sharpest statement of §5.3's parity gap yet. **The same policy, the same build, opposite outcomes:**
+
+| `heuristic` vs `scripted`, `core.arena.cinder_drake` mirror | result |
+|---|---|
+| in `dh-env` (8 episodes) | **win 1.00**, opponent dead every time |
+| in the Godot arena (`league versus`, 3 rounds × 4) | **0–12 episodes**, `hp 0.00/0.24` |
+
+Not a near-miss in either direction. This is why a PPO run can print a healthy win rate while its gate reads `wr 0.00` — the number PPO optimizes and the number the gate reports come from two environments that do not agree, and the gate is the one that matters because it is the game.
+
+Three consequences, all of them live:
+
+1. **A conclusion measured only in dh-env is not evidence about the game.** Every dh-env figure in these docs carries that caveat, including §5.1.2's promotion threshold.
+2. **`distill`'s qualifying gate runs in the arena**, which is correct, and is why the heuristic teacher is refused for builds where dh-env says it wins comfortably.
+3. **Closing `dps_taken` stops being cosmetic.** It was the last open parity term; it is now the thing standing between training and a gate that agrees with it.
+
+### 5.2.4 The heuristic is not one policy, and the qualifying gate is right to say so
+
+`distill --teacher heuristic` refuses to clone a teacher that does not beat both baselines — Ricardo's own condition, *"once they surpass the default script/engine behaviour"*. Measured against `scripted` in dh-env, 8 episodes per cell:
+
+| build | base (walk in) | + range band + strafe |
+|---|---|---|
+| cinder_drake | **1.00** | 0.38 |
+| bog_golem | **1.00** | 0.12 |
+| fen_boar_alpha | 0.00 | **1.00** |
+| gloamfen_stalker | 0.00 | 0.00 |
+
+**No single rule set wins everywhere**, and the two that do win are mutually exclusive: `fen_boar` (move speed 41.8, attack cooldown 1.8 s) has to hold its distance and strafe, while `cinder_drake` (speed 107.5, cooldown 0.9 s) has to close and burst. A build-agnostic "back off while everything is on cooldown" rule was tried and is worse than both everywhere.
+
+The conclusion is not to tune the heuristic per build — that would be fitting it to `scripted` rather than to the game. It is that **the clone stage is optional per build**: where a teacher qualifies, clone it; where none does, the curriculum trains from scratch. `tools/train_run.sh` treats a failed clone as a warning, not an error, so one build without a teacher does not abort the sweep.
+
 ### 5.2.2 Always measure a policy against a statue and a heuristic
 
 A win rate on its own cannot tell "the learner is bad" from "the matchup is hard" from "the gate is wrong". Two controls settle it, and both cost minutes:
