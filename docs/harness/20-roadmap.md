@@ -775,12 +775,41 @@ Rebuild after the packaging commit for clean provenance; archives remain in
     runtime CLIPS instead (`policy_net.act`). Harmless today because the outputs
     are far inside +-1 (measured tanh-vs-clip difference: 0.0000), but it is a
     real train/runtime divergence that will bite once move outputs grow.
-    STILL OPEN: 31 updates is not enough to clear the gate from scratch — the
-    2M-step default is a 40-second run. A 40M-step (610-update) verification run
-    is in flight; its self-play win rate has already moved from 0.20-0.36 (broken
-    move head) to 0.40-0.47. The DEFAULT budget in `tools/train_run.sh` has NOT
-    been raised yet: that is a decision to make on the measurement, not ahead of
-    it.
+    3. **THE STRUCTURAL ONE, found by the verification run: PPO TRAINS IN A
+       DIFFERENT ENVIRONMENT THAN THE ONE IT IS GRADED IN.** The 40M-step
+       (610-update) run finished: training win rate climbed 0.20 -> 0.85, the
+       move head trained hard (`|w| 0.0089 -> 0.0863`, output `|move| 0.027 ->
+       0.944`, 40% of components now saturating) — and the gate still read
+       **0.00 against scripted AND native**. That is a flat contradiction,
+       because the trainer's own opponents are `thirds = native | scripted |
+       self`, so training claims 85% against a mix that INCLUDES the two
+       suites the gate runs. Chased it to the boundary and it is structural:
+         * `ml/training/league.py` (ES) computes fitness with `run_match()`,
+           which spawns a **headless GODOT arena**. ES optimises exactly what
+           the gate measures — which is why ES nets pass.
+         * `ml/training/ppo.py` imports `ml.env.dh_env` and trains entirely in
+           the **C++ dh-env**. It never calls `run_match`, never opens the
+           arena. It is then gated in the arena.
+       So PPO maximises one environment's dynamics and is scored in another's.
+       Every budget, every fix, same 0.00 — consistent with this and with
+       nothing else.
+       NOTE the gate that exists and the one that does not: `policy_parity_
+       test.tscn` already proves the NETWORK forward pass matches bit-for-bit
+       across both runtimes (256 passes, every activation). What has never been
+       gated is the ENVIRONMENT — damage, ranges, cooldowns, timing — so the net
+       computes identical numbers in both worlds and those numbers mean
+       different things.
+       THIS IS RICARDO'S CALL, not a bug to quietly patch. Three routes, and
+       they are not equivalent: (i) gate PPO in dh-env, which makes PPO
+       self-consistent but grades it on something the game does not run;
+       (ii) train PPO through `run_match` like ES, which is correct but throws
+       away the 56,000 steps/s that makes PPO worth having; (iii) build an
+       ENVIRONMENT parity gate between dh-env and the arena — the twin of the
+       policy parity gate — and fix whichever side is wrong. (iii) is the one
+       that pays for itself, because it also protects ES's C++ port.
+    NOT DONE, deliberately: the `tools/train_run.sh` STEPS default is still
+    2,000,000. Raising it would buy longer runs of a net that cannot be scored,
+    so the budget decision waits on the environment decision.
 
   **13g DONE 2026-09-14 — all three, verified on real and synthetic data.**
     * `tools/train_watch.py` now understands the bracket: `tournament_start`,
@@ -829,10 +858,112 @@ Rebuild after the packaging commit for clean provenance; archives remain in
   `a showdown resolved with only one side's policy` and `a bracket did not
   resolve to its deciding showdown`; restored, `CONSOLE SELFTEST OK`.
 
+  **13a ANSWERED 2026-09-14 — and Ricardo was right to push back. I had it
+  wrong.** The entry above said "there are no tile assets (the world is drawn
+  procedurally)". The second half is true, the conclusion was not: the world IS
+  tile-based, and its textures ARE reworkable. Correcting it in full.
+    * **TERRAIN.** `game/prototype/world_gen.gd` runs two `TileMapLayer`s — a
+      base floor (z=-10) and a dual-grid transition layer (z=-9). Their atlases
+      come from `game/prototype/sprites.gd`: `make_tile_atlas()` paints an
+      `ImageTexture` **per pixel in GDScript** (`_tile_px_at`), and
+      `make_transition_atlas(pairs)` does the dual-grid edges. `macro_noise()`
+      (bilinear value noise over the tile lattice, ~50-tile period) picks each
+      region's dominant atlas. Water is one `MultiMesh` quad per water tile
+      under `shaders/water.gdshader`; ground is lit by `shaders/sprite_lit.
+      gdshader` and graded by `post.gdshader` through a 3D-LUT strip baked by
+      `genforge/pipeline/lut_gen.py`. So terrain art is CODE, not files — which
+      is why it did not show up as assets. Two honest routes: (a) rewrite
+      `_tile_px_at` to design/26's rules, cheap and immediate; (b) point the
+      TileMapLayers at a BUNDLED atlas the living pipeline produces, which is
+      the actual "regeneration" — and that needs a tileset recipe kind (grid,
+      variants, dual-grid transition pairs, macro sets) that does not exist yet.
+      (b) is the real work; (a) is available today and is not nothing.
+    * **PARTICLES — not one system, three, and none of them is an image.**
+      1. `ProtoFx` (`game/prototype/fx.gd`): pooled **CPUParticles2D** — 20
+         additive + 12 normal emitters, 4 Line2D bolts, 12 rings, 8 afterimage
+         ghosts, worst case ~400 concurrent particles, nothing allocated
+         mid-fight. CPU by necessity: the project renders with
+         `gl_compatibility` (`game/project.godot`). Its own header already says
+         it is a stand-in — *"The shipping path is GPU-driven particles with
+         explicit budgets (docs/design/17); this pool is its gl_compatibility
+         stand-in and dies when dh-godot lands."*
+      2. `ProtoShaderFx` (`game/prototype/shader_fx.gd`): 12 pooled quads with
+         `canvas_item` FRAGMENT shaders — pure math, SDF + fBm + chromatic
+         dispersion, authored as numpy previews in `genforge/vfx_lab/` (auras,
+         firestorm, impact, necklace_orbit, nova, slash, umbra, vortex) and
+         ported 1:1 into `game/prototype/shaders/*.gdshader`. 17 shader files.
+      3. `ambient.gd`: CPUParticles2D drifting spores.
+      So the answer to *"shaders? GLSL?"* is: the VFX quads are Godot shading
+      language (a GLSL dialect, compiled to GLSL/SPIR-V) — the emitters are
+      engine nodes stepped on the CPU. And they ARE animations, but parametric
+      ones evaluated every frame, not sprite sheets. Running them through an
+      image generator is a category error; REWORKING them is authoring math and
+      budgets, and is entirely possible today.
+    * **The one lever that is genuinely blocked:** GPU-driven particles need a
+      renderer above `gl_compatibility`, which is a canon-level decision
+      (design/17 §3.5 budgets, the mobile reference device open question). That
+      is Ricardo's call, not a task.
+    * **On the state of the art**, stated as a read and not as a receipt: for
+      stylised 2D the current practice is roughly what `ProtoShaderFx` already
+      does — SDF + noise fragment work, resolution-independent and cheap — plus
+      GPU-resident emitters with curl-noise advection for smoke/fire, which we
+      cannot use until the renderer moves. The genuine 2026 headline is not
+      particles at all but 2D global illumination: **Radiance Cascades**, which
+      this repo ALREADY has queued (canon, design/19, design/24 L6 *"Radiance
+      Cascades (graphics, already queued)"*). For a HARD PIXEL GRID the
+      literature and our own pillars agree that more particles is the wrong
+      axis — sub-pixel particle motion fights the grid (design/17 pillar 2,
+      design/26 rule 5), so the win is fewer, better-authored elements under
+      better light.
+    RECOMMENDATION: terrain (a) and a VFX pass are both available NOW and need
+    no provider, so they fit the gap while 13b's repo is pending. Terrain (b)
+    and GPU particles are real projects with a prerequisite each (a tileset
+    recipe kind; a renderer decision).
+
+  **13c — the provider-independent half is DONE, and it found the real blocker.**
+  Step (a) (a local backend) is gated on 13b's repo by Ricardo's own
+  instruction, so the question that could be answered now was: when that repo
+  lands, is the pipeline actually READY to take a six-clip creature? Only one
+  clip has ever been exercised, so nobody knew. Proved it with a synthetic
+  fixture — the 4x2 bellwether sheet stacked 6x into a 4x12 sheet, built through
+  the REAL `genforge.living.build` in a scratch root (`build(path, out_root,
+  root=...)` takes its root as a parameter, so nothing in `genforge/releases/`
+  or `genforge/candidates/` was touched, and the fixture was deleted after).
+  It is a FIXTURE, not art: the frames repeat, and its only job is to exercise
+  the packer, the 30 Hz timeline and the clip gate.
+  RESULT 1 — **the six-clip contract does not fit the pilot's own memory
+  budget.** The build refused with `atlas exceeds decoded memory budget:
+  6690816`. The atlas is packed clips x max_frames at `stride = frame_px + 4`,
+  doubled for albedo + emissive, and `style.max_atlas_bytes` in the release is
+  **4,194,304** (4 MiB). So, per asset:
+      1 clip  x 8 frames @ 128px = 1,115,136   OK      (what ships today)
+      6 clips x 8 frames @ 128px = 6,690,816   REFUSED (1.6x over)
+      6 clips x 6 frames @ 128px = 5,018,112   REFUSED
+      6 clips x 8 frames @  96px = 3,840,000   OK
+      6 clips x 8 frames @  64px = 1,775,616   OK
+  This is a GOOD refusal — the gate is telling us the six-clip contract has a
+  memory cost nobody priced. It is also a decision only Ricardo can make, and it
+  is canon-adjacent: design/26 lists decoded atlas memory as one of the
+  automated gates, and canon's creature band is 48-128 px. The three options are
+  raise `max_atlas_bytes`, drop the cell to 96 px (still inside the band), or
+  cut frames per clip. RECOMMENDATION: 96 px cells. It keeps eight frames per
+  clip (design/26 rule 4 wants readable tells, contact and recovery — frames are
+  the wrong thing to cut), it stays inside canon, and it lands at 3.84 MB
+  against a 4 MiB budget without moving a published number.
+  RESULT 2 — **with the budget satisfied, the pipeline handles six clips
+  perfectly.** At 96 px the build is clean: all six clips packed, the 30 Hz
+  timeline correct (fps 10 -> 3 ticks per frame on every frame), loop flags
+  honoured (idle and move loop, anticipation/attack/hit/death do not), and the
+  clip-coverage blockers GONE — the only blockers left are the three human ones
+  (`Human art/animation review pending`, `Target-device frame-time capture
+  pending`, `Hunt integration and balance playtest pending`), which is exactly
+  what should remain. So the pipeline is ready; the art and the budget decision
+  are what is missing, in that order.
+
   STATUS: logged 2026-09-14. 13e fixed (one measurement outstanding), 13g done,
-  13d done. Remaining order: 13a (an answer he asked for) -> 13c's
-  provider-independent half -> the rest of the ledger. 13b waits on his repo, by
-  his own instruction.
+  13d done, 13a answered, 13c's provider-independent half done with a decision
+  owed by Ricardo (96 px vs a bigger budget). 13b waits on his repo, by his own
+  instruction.
 
 - **Regenerate EVERY asset through the new pipeline — Ricardo, 2026-09-14
   (latest+12):** *"you use our new, improved, pipeline to regenerate all our
