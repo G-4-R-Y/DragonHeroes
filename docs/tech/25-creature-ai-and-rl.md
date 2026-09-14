@@ -234,6 +234,43 @@ Weights live in `ml/training/reward_weights.json` — data, so tuning needs no e
 python3 -m ml.training.reward --explain     # terms, weights, worked examples
 ```
 
+### 5.2.2 Always measure a policy against a statue and a heuristic
+
+A win rate on its own cannot tell "the learner is bad" from "the matchup is hard" from "the gate is wrong". Two controls settle it, and both cost minutes:
+
+* **a statue** — act 1 forever, never move. The floor.
+* **a heuristic** — walk at the foe, attack in reach, spend each kit off cooldown. Five lines.
+
+Measured 2026-09-14, `core.arena.cinder_drake` mirror, 12 episodes each:
+
+| policy | vs scripted (foe hp / reward) | vs native (win / reward) |
+| --- | --- | --- |
+| heuristic | 0.018 / 0.526 | **1.00** / 0.859 |
+| trained net v5.0 | 0.557 / 0.402 | 0.33 / 0.421 |
+| statue | 0.559 / 0.401 | 0.00 / 0.238 |
+
+Against scripted the trained net is **indistinguishable from the statue**. That single row reframed the whole investigation: the gate was honest and the reward model ranked all three correctly (its first independent confirmation), so the learner was the problem. Run these controls before tuning anything.
+
+**The reward model is not the arena's vocabulary.** `episode_terms()` reads `winner_is_self`/`seconds`; an arena row says `winner_side`/`duration_s`. Passed a raw arena row, the two heaviest terms both defaulted to 0.5 and a loss scored 0.528 instead of 0.238 — above real wins, and above the 0.45 ceiling `assert_sane_weights` guarantees. It is refused now; always convert with `from_arena_row(row, side)`.
+
+### 5.2.3 What policy collapse looks like in the weights
+
+`argmax` hides the difference between "entropy collapsed" and "nearly uniform, argmax just has to pick something". Print the softmax and the head outputs instead — drake v5.0, over real observations:
+
+```
+logit means  +0.24  +11.40  +11.40  -2.96  -2.51  -4.13  -4.01
+entropy      0.693 nats (= ln 2 exactly; uniform is 1.946)
+|move| head  mean 0.110  std 0.006  max 0.168   (scale is ±1)
+dodge        sigmoid 1.000
+```
+
+Two distinct failures, and they need different fixes:
+
+1. **The pick head collapsed.** ~15 logits between attack/slam and the kits is e¹⁵ ≈ 3.3 million to 1; the softmax gradient there is nil, so the kits cannot come back. `ENTROPY = 0.01` contributes at most 0.0195 on a 7-way head and cannot hold logits away from ±11. Note it *did* learn the build — the drake's two real kit slots rank above its two empty ones — it simply cannot act on it.
+2. **The move head never trained.** std 0.006 across thousands of observations means the same tiny vector regardless of where the enemy is. The suspected cause is exploration, not the loss: `MOVE_STD = 0.3` is undirected per-tick Gaussian noise, a random walk, while closing distance needs a sustained direction over ~60 ticks. The advantage signal for "walk at the enemy" is never generated.
+
+The entropy bonus is also applied **only to the Categorical**. For the move Normal that is harmless (fixed std ⇒ constant entropy ⇒ no gradient); for the dodge Bernoulli it is not, and the dodge logit duly saturates at +13.0.
+
 ### 5.2.1 `native` is not one AI — and in the arena it used to be asleep
 
 `native` names two different things. In `dh-env` it is `Arena::native_act`, a hand-port of `creature.gd`'s essence that chases from any distance. In the Godot arena it means **no policy driver at all** (`ai_defaults.gd`: *"inert: the body's own AI runs"*), so the real `creature.gd` brain drives the fighter — and that brain has an aggro range:

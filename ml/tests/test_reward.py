@@ -232,3 +232,30 @@ def test_breakdown_contributions_sum_to_the_score():
     assert b["score"] == pytest.approx(reward.score_episodes(eps, W))
     assert sum(d["contribution"] for d in b["terms"].values()) \
         == pytest.approx(b["score"])
+
+
+def test_an_arena_row_is_refused_rather_than_scored_as_a_draw():
+    """The arena says `winner_side`/`duration_s`; this module reads
+    `winner_is_self`/`seconds`. Handed the arena's names, episode_terms used to
+    default BOTH heaviest terms to 0.5 — measured 2026-09-14: a loss scored
+    0.528 instead of 0.238, above real wins and above the 0.45 ceiling
+    assert_sane_weights promises. Silence is the bug; the number looked fine.
+    """
+    lost = {"winner_side": "b", "hp_self": 0.0, "hp_foe": 0.008,
+            "dmg_dealt": 0.992, "dmg_taken": 1.0, "duration_s": 11.9}
+    with pytest.raises(ValueError, match="from_arena_row"):
+        reward.episode_terms(lost)
+    with pytest.raises(ValueError, match="from_arena_row"):
+        reward.episode_score(lost)
+
+    # Converted properly it is an ordinary, unremarkable loss.
+    ok = {"winner_is_self": False, "hp_self": 0.0, "hp_foe": 0.008,
+          "dmg_dealt": 0.992, "dmg_taken": 1.0, "seconds": 11.9}
+    assert reward.episode_score(ok) < 0.45
+
+    # `duration_s` alone is enough to refuse: half an arena row is still wrong.
+    with pytest.raises(ValueError, match="from_arena_row"):
+        reward.episode_terms({"hp_self": 1.0, "duration_s": 3.0})
+
+    # A row that simply has no outcome evidence is a genuine draw, not an error.
+    assert reward.episode_terms({"hp_self": 0.5, "hp_foe": 0.5})["win"] == 0.5

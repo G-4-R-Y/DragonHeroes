@@ -163,7 +163,8 @@ def assert_sane_weights(w: dict, where: str = "weights") -> None:
 def episode_terms(ep: dict, cap_s: float = EPISODE_CAP_S) -> dict:
     """One episode -> each term normalized to [0, 1], higher always better.
 
-    `ep` uses the arena's own episode-row vocabulary so nothing has to translate:
+    `ep` is this module's OWN vocabulary, which is NOT the arena's — run an
+    arena row through `from_arena_row()` first:
         winner_is_self  bool | None   (None = draw)
         hp_self, hp_foe                fractions in [0, 1]
         dmg_dealt, dmg_taken           HEALTH BARS (see ml/eval/env_parity.py)
@@ -171,7 +172,25 @@ def episode_terms(ep: dict, cap_s: float = EPISODE_CAP_S) -> dict:
     Missing damage keys fall back to the health fractions, so recordings made
     before dmg_taken_*/max_hp_* existed still score instead of silently reading
     as zero damage — which would look like a policy that never landed a hit.
+
+    An arena row handed straight to this function used to score as a DRAW — the
+    two heaviest terms, `win` and `duration`, both defaulting to 0.5 — because
+    `winner_side`/`duration_s` are not the names read here. MEASURED 2026-09-14:
+    a loss scored 0.528 instead of 0.238, above several actual wins and above
+    the 0.45 ceiling `assert_sane_weights` is supposed to guarantee. That is the
+    same failure as the mirror-matchup bug (a plausible number instead of an
+    error), so a row carrying outcome evidence in the arena's vocabulary is now
+    REFUSED rather than quietly averaged into a sweep.
     """
+    if "winner_is_self" not in ep:
+        wrong = [k for k in ("winner_side", "winner", "duration_s") if k in ep]
+        if wrong:
+            raise ValueError(
+                f"episode_terms: {wrong} is the ARENA's episode vocabulary, not "
+                f"this module's. Without `winner_is_self` the outcome defaults "
+                f"to a draw and `win`/`duration` both score 0.5, which reads as "
+                f"half a victory for an episode that was lost. Convert with "
+                f"reward.from_arena_row(row, side) first.")
     won = ep.get("winner_is_self")
     hp_self = _clamp01(ep.get("hp_self", 0.0))
     hp_foe = _clamp01(ep.get("hp_foe", 0.0))

@@ -696,6 +696,87 @@ Rebuild after the packaging commit for clean provenance; archives remain in
   currently subtracts `R_TIME` every tick REGARDLESS of outcome, so a losing
   agent is paid to die sooner. See the answer below for what is scored today.
 
+  **15d DONE 2026-09-14 — the diagnosis, and it is NOT the reward model. A
+  five-line heuristic beats every net we have trained.**
+  Method: give the failure a CONTROL. Three policies, same build, same seeds —
+  the trained net, a statue (act 1 forever, never moves), and a heuristic that
+  is literally "walk at the foe; attack in reach; spend each kit the moment it
+  is off cooldown". 12 episodes each, `core.arena.cinder_drake` mirror:
+      vs scripted   heuristic  win 0.00  foe hp 0.018    reward 0.526
+                    net v5.0   win 0.00  foe hp 0.557    reward 0.402
+                    STATUE     win 0.00  foe hp 0.559    reward 0.401
+      vs native     heuristic  win 1.00  foe hp 0.000    reward 0.859
+                    net v5.0   win 0.33  foe hp 0.060    reward 0.421
+                    STATUE     win 0.00  foe hp 0.008    reward 0.238
+  **Against scripted the trained net is statistically indistinguishable from a
+  statue** (0.557 vs 0.559 foe hp). Against native the heuristic wins 12/12
+  where the net wins 4/12. This is not a gate that is too strict and not a
+  reward that is mis-specified — the reward model ranks the three in exactly
+  the right order, which is the first independent confirmation that 15a works.
+  It is the LEARNER.
+
+  WHY, measured in the weights rather than guessed. Softmax over real
+  observations, drake v5.0:
+      logit means  +0.24  +11.40  +11.40  -2.96  -2.51  -4.13  -4.01
+      entropy      0.693 nats  (= ln 2 exactly; uniform would be 1.946)
+      |move| head  mean 0.110   std 0.006   max 0.168   (scale is +-1)
+      dodge        sigmoid 1.000
+  Two separate deaths:
+    1. **The pick head collapsed to a coin flip between attack and slam.** The
+       gap to the kits is ~15 logits, e^15 = 3.3 MILLION to 1. Softmax gradient
+       at p = 3e-7 is nil, so the kits can never come back — the collapse is
+       irreversible, not merely current. `ENTROPY = 0.01` on a 7-way head
+       contributes at most 0.0195 and cannot hold logits away from +-11.
+       It does rank correctly INSIDE the collapse: the drake owns two kits, and
+       the net puts the two real slots (-2.96, -2.51) above the two empty ones
+       (-4.13, -4.01). It learned the build; it just cannot act on it.
+    2. **The move head is dead.** std 0.006 across thousands of real
+       observations means it emits nearly the SAME tiny vector regardless of
+       where the enemy is. Not collapsed onto a bad direction — never trained.
+       The suspected reason is exploration, not the loss: `MOVE_STD = 0.3` is
+       undirected per-tick Gaussian noise, i.e. a random walk, and closing
+       distance needs a SUSTAINED direction over ~60 ticks. Net displacement
+       from per-tick noise is ~0, so the advantage signal for "walk at the
+       enemy" is never generated for the gradient to find. The heuristic's
+       entire margin is that it walks.
+    ALSO FOUND, an asymmetry in the loss: the entropy bonus is applied ONLY to
+    the Categorical. The move Normal (harmless — fixed std, constant entropy,
+    zero gradient) and the dodge Bernoulli (NOT harmless) get none, and the
+    dodge logit duly sits at +13.0, fully saturated with nothing opposing it.
+    Not changed unilaterally: it is a hyperparameter decision, and for this
+    build `dodge_max = 0` so it costs nothing here. Reported, not tuned.
+
+  **A REAL DEFECT IN 15a's OWN CODE, caught by this probe and fixed.**
+  `episode_terms` reads `winner_is_self`/`seconds`; the arena row says
+  `winner_side`/`duration_s`. Hand it an arena row directly and BOTH of the
+  heaviest terms silently defaulted to 0.5 — `win` and `duration` — so a LOSS
+  scored **0.528 instead of 0.238**: above several genuine wins, and above the
+  0.45 ceiling `assert_sane_weights` exists to guarantee. Its own docstring
+  claimed it "uses the arena's own episode-row vocabulary so nothing has to
+  translate", which is exactly false and is what misled me. Same failure class
+  as the mirror-matchup bug earlier today: a plausible number instead of an
+  error. Now REFUSED with a message naming `from_arena_row`, docstring
+  corrected, gated by `test_an_arena_row_is_refused_rather_than_scored_as_a_draw`
+  (which also pins that a row with no outcome evidence at all is still an
+  honest draw, not an error). 122 ml tests pass.
+  I found this because my own probe printed a statue outranking a net that won
+  a third of its fights, and that contradicts an invariant I had just written —
+  so the invariant was right and the probe was wrong. Worth keeping: the
+  enforced invariant is what made the bug visible.
+
+  **THE FORK, for Ricardo — this is a product decision, not a tuning knob.**
+  The heuristic is already a better creature than anything training has
+  produced, and `ml/training/distill.py` already has the machinery to learn
+  from a teacher. Options: (a) warm-start PPO by behaviour-cloning the
+  heuristic, so the move head starts alive and PPO improves a fighter instead
+  of searching from noise — standard, and the fastest route to creatures that
+  fight; (b) fix exploration instead and keep policies fully self-discovered —
+  learned `log_std` and/or temporally correlated move noise, plus an entropy
+  floor on the pick head; (c) ship the heuristic as the creature AI and keep RL
+  for the bosses only. RECOMMENDED: (a) then (b) — clone to get off the floor,
+  then let PPO explore from somewhere worth exploring from. NOT started; the
+  answer changes what creature AI IS.
+
   **15c DONE 2026-09-14 — "stills errors (perhaps no new build?)", and his
   hunch was half right: the build was fine, but TWO real bugs were hiding
   behind that gate, and one of them was mine.**
