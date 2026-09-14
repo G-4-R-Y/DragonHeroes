@@ -66,7 +66,7 @@ func _chase(delta: float, player: Node2D) -> void:
 	else:
 		_move(dir.orthogonal() * _speed() * 0.5 * delta)
 	_separate(delta)
-	if dist > aggro_range * 2.2:
+	if not arena_duel and dist > aggro_range * 2.2:   # a duel has no disengage
 		_state = "idle"
 
 func _strike(player: Node2D) -> void:

@@ -51,6 +51,21 @@ var threat := false              # fought the player — the pet hunts these
 # drive via _move()/bot_attack() — the RL-policy seam.
 var target_override: Node2D = null
 var bot_drive := false
+# ARENA DUEL (game/arena only — set by game/arena/fighter.gd, never by the Hunt).
+# In a duel both fighters are committed combatants placed 300 px apart to fight
+# each other. The Hunt's unaware phase is correct there and wrong here: every
+# species' aggro_range is BELOW that spawn separation (7-13 tiles at TILE = 16,
+# i.e. 112-208 px), so an arena creature starts idle and only wakes if the
+# opponent walks into it, and _chase gives the pursuit up again past
+# aggro_range * 1.8 = 202 px, still inside the gap.
+# MEASURED 2026-09-14, fen_boar mirror, 12 episodes: against a policy that keeps
+# its distance, native dealt 0.083 health bars in 44.7 s — against 0.981 bars
+# when native fights native and the two close on each other. So a policy that
+# kites was being graded against a creature that was asleep, and had been for
+# the whole history of the league.
+# This flag does not change aggro_range, the Hunt, or any creature outside the
+# arena: it says "this body is in a duel", and a duel has no disengage.
+var arena_duel := false
 
 var _state := "idle"            # idle | chase | windup | recover
 var _timer := 0.0
@@ -297,6 +312,14 @@ func _sprite_lift() -> float:
 func _shadow_dims() -> Vector2i:
 	return Vector2i(16, 5)
 
+var _last_drawn_health := 1.0
+
+func _refresh_health_drawing() -> void:
+	var fraction := clampf(hp / maxf(max_hp, 1.0), 0.0, 1.0)
+	if fraction != _last_drawn_health:
+		_last_drawn_health = fraction
+		queue_redraw()
+
 func _physics_process(delta: float) -> void:
 	if dead:
 		return
@@ -333,7 +356,7 @@ func _physics_process(delta: float) -> void:
 	if _stagger_t > 0.0:   # staggered: DoTs keep ticking, the body does not move
 		_stagger_t -= delta
 		_update_anim()
-		queue_redraw()
+		_refresh_health_drawing()
 		return
 	if _enrage_t > 0.0:
 		_enrage_t -= delta
@@ -361,7 +384,7 @@ func _physics_process(delta: float) -> void:
 			if _timer <= 0.0:
 				_state = "chase"
 	_update_anim()
-	queue_redraw()
+	_refresh_health_drawing()
 
 func _update_anim() -> void:
 	if _state == "windup" or _state == "recover":
@@ -443,7 +466,9 @@ func _idle(delta: float, player: Node2D) -> void:
 		if global_position.distance_to(pack_anchor) > 4.0 * TILE:
 			_wander = (pack_anchor - global_position).normalized() * move_speed * 0.3
 	_move(_wander * delta)
-	if player and not player.dead and global_position.distance_to(player.global_position) < aggro_range:
+	if player == null or player.dead:
+		return
+	if arena_duel or global_position.distance_to(player.global_position) < aggro_range:
 		_state = "chase"
 
 func _chase(delta: float, player: Node2D) -> void:
@@ -462,7 +487,7 @@ func _chase(delta: float, player: Node2D) -> void:
 		return
 	_move(to_player.normalized() * _speed() * delta)
 	_separate(delta)
-	if to_player.length() > aggro_range * 1.8:
+	if not arena_duel and to_player.length() > aggro_range * 1.8:
 		_state = "idle"
 
 func _speed() -> float:
@@ -608,8 +633,10 @@ func _separate(delta: float) -> void:
 			continue
 		var d: Vector2 = global_position - other.global_position
 		var min_d: float = body_radius + other.body_radius
-		if d.length() < min_d and d.length() > 0.01:
-			_move(d.normalized() * (min_d - d.length()) * 4.0 * delta)
+		var distance_squared := d.length_squared()
+		if distance_squared < min_d * min_d and distance_squared > 0.0001:
+			var distance := sqrt(distance_squared)
+			_move(d / distance * (min_d - distance) * 4.0 * delta)
 
 # Ignite (runes + class skills): refreshes the burn each application, but a
 # weaker proc never erases a stronger burn's dps (same rule as Bleed stacks).

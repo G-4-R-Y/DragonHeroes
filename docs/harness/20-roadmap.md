@@ -696,6 +696,63 @@ Rebuild after the packaging commit for clean provenance; archives remain in
   currently subtracts `R_TIME` every tick REGARDLESS of outcome, so a losing
   agent is paid to die sooner. See the answer below for what is scored today.
 
+  **15b DONE 2026-09-14 — and it was an AGGRO RANGE, which is a game number,
+  not a training one.** The arena's `native` is not a port of anything: it means
+  NO policy driver (`ai_defaults.gd`: *"inert: the body's own AI runs"*), so the
+  real `creature.gd` brain from the Hunt drives the fighter. dh-env's
+  `Arena::native_act` is a hand-port of its "essence" and chases from any
+  distance. `creature.gd` does not:
+      creature.gd  aggro_range = 7 * TILE, TILE = 16.0   ->  112 px
+      boss.gd 12 tiles, hag 11, wisp 9, terravore 13, pyre 13  ->  144-208 px
+      arena spawns the two fighters at +-150 px           ->  300 px APART
+  **Every species in the arena spawns OUTSIDE its own aggro range.** A native
+  fighter therefore starts idle and WANDERS, waking only if the opponent walks
+  into it — and `_chase` gives the pursuit up again past `aggro_range * 1.8`
+  (202 px), still inside the spawn gap. Against another native or the scripted
+  baseline that never shows, because those close the distance themselves.
+  Against a policy that keeps its distance, native never wakes at all.
+  MEASURED FIRST, THEN FIXED. The baseline matrix, fen_boar mirror, 6 episodes,
+  bars per second each way — native is NOT passive in general:
+      native vs native    0.0220 / 0.0220      scripted vs native  0.0349/0.0256
+      native vs scripted  0.0255 / 0.0348      scripted vs scripted 0.0181/0.0179
+  ...but the DEPLOYED NET vs native in the arena was 0.083 bars dealt in 44.7 s
+  (0.002 bars/s), a 44-second near-standstill, against 0.981 bars when native
+  fights native. So the earlier reading "the arena's native is a standoff" was
+  wrong as stated: it is a standoff only against something that keeps away.
+  FIX: `creature.gd` gains `arena_duel`, set ONLY by `game/arena/fighter.gd` on
+  arena bodies. It skips the aggro gate in `_idle` and the give-up in `_chase`
+  (and in `wisp.gd`, the one subclass with its own). It does not change
+  `aggro_range`, the Hunt, or any creature outside the arena — a duel is two
+  committed combatants placed to fight, and a duel has no disengage. `_idle` is
+  defined only in the base class, so one change covers every species.
+  MEASURED AFTER, same key, same 12 episodes, vs native:
+      term        before -> after (arena)      dh-env    verdict now
+      win_rate     0.083 -> 0.917               0.000
+      dmg_dealt    0.083 -> 0.992               0.662
+      dps_dealt    0.002 -> 0.024               0.021    1.16x  ok
+      dps_taken    0.002 -> 0.020               0.034    1.70x  DIVERGES
+  `dps_dealt` went from **11.37x divergent to 1.16x — agreeing**. Together with
+  the scripted case (1.01x) that is the second baseline to confirm the same
+  thing: **the learner's own damage rate now matches across both runtimes.**
+  The baselines barely moved (native-vs-native 44.7s -> 39.4s, they already
+  closed on each other; scripted-vs-scripted unchanged, scripted is a policy
+  with no aggro concept), which is the control this needed.
+  WHAT IS LEFT, and it is now ONE thing in ONE direction for BOTH baselines:
+  **`dps_taken` — the OPPONENT deals damage faster in dh-env** (2.28x vs
+  scripted, 1.70x vs native). Everything else about the learner agrees.
+  WORTH SAYING PLAINLY: a kiting policy graded against a sleeping native scores
+  draws, and a draw is not a win, so the `suite_native` band ([0.30, 1.00]) was
+  being failed by nets that could not provoke a fight. The deployed fen_boar net
+  moves from 0.083 to 0.917 on exactly that suite. This does NOT retroactively
+  validate any net and nothing was re-gated or re-deployed — but every league
+  number ever recorded against `native` was measured against a creature that
+  may have been asleep, and that has to be said out loud rather than quietly
+  fixed.
+  GATES after the change: ARENA SELFTEST OK (4 matchups, damage flowed, results
+  unchanged), CONSOLE SELFTEST OK, and the Hunt side proven untouched —
+  SPAWNTEST OK, REPOP OK, LEVEL UP OK, RESIDENCY OK. `arena_duel` defaults false
+  and is referenced only from game/arena/fighter.gd.
+
   **15a DONE 2026-09-14 — `ml/training/reward.py`, and answering his question
   first because the answer is most of the justification.**
   WHAT WAS SCORED BEFORE: two different functions, neither seeing most of what

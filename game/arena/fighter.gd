@@ -188,6 +188,16 @@ func setup(def: Dictionary, arena: Node, at: Vector2, policy_spec: String,
 		spec = "scripted"
 	if spec != "native":
 		body.bot_drive = true
+	# Every creature body in the arena is a duellist, not a dungeon inhabitant:
+	# it was placed here to fight the other one. Without this it spawns OUTSIDE
+	# its own aggro_range (300 px apart, every species aggros at 112-208 px) and
+	# stays idle until the opponent closes — so a policy that keeps its distance
+	# was scored against a creature that never woke up. See creature.gd's
+	# `arena_duel` for the measurement. Harmless on bot_drive bodies, which skip
+	# the idle/chase machine entirely; set on all of them so the meaning is
+	# "this body is in a duel", not "this body needs a workaround".
+	if not (body is ProtoPlayer):
+		body.arena_duel = true
 	body.global_position = at
 	arena.add_child(body)
 	if body is ProtoPlayer:
@@ -206,6 +216,8 @@ func setup(def: Dictionary, arena: Node, at: Vector2, policy_spec: String,
 	if body2 != null:   # duo second member: its own body, proxy, and group exit
 		if spec != "native":
 			body2.bot_drive = true
+		if not (body2 is ProtoPlayer):
+			body2.arena_duel = true
 		body2.global_position = at + Vector2(36, 24)
 		arena.add_child(body2)
 		body2.max_hp *= hp_scale

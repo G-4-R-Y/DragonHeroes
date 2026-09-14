@@ -217,6 +217,22 @@ Weights live in `ml/training/reward_weights.json` — data, so tuning needs no e
 python3 -m ml.training.reward --explain     # terms, weights, worked examples
 ```
 
+### 5.2.1 `native` is not one AI — and in the arena it used to be asleep
+
+`native` names two different things. In `dh-env` it is `Arena::native_act`, a hand-port of `creature.gd`'s essence that chases from any distance. In the Godot arena it means **no policy driver at all** (`ai_defaults.gd`: *"inert: the body's own AI runs"*), so the real `creature.gd` brain drives the fighter — and that brain has an aggro range:
+
+| | aggro range | |
+|---|---|---|
+| `creature.gd` | `7 × TILE` (TILE = 16.0) | **112 px** |
+| `wisp.gd` / `hag.gd` / `boss.gd` / `terravore` / `pyre` | 9–13 tiles | **144–208 px** |
+| arena spawn separation | `±150 px` | **300 px** |
+
+**Every species spawns outside its own aggro range.** A native arena fighter starts in `_idle`, wandering, and wakes only if the opponent closes to within 112–208 px; `_chase` then gives up again past `aggro_range × 1.8`. Against another native or the scripted baseline this never shows, because those close the distance themselves. Against a policy that keeps its distance it never wakes at all — measured 2026-09-14 on the deployed `fen_boar` net: **0.083 health bars dealt in 44.7 s (0.002 bars/s)**, against **0.981 bars** when native fights native.
+
+`creature.gd::arena_duel`, set only by `game/arena/fighter.gd`, skips the aggro gate in `_idle` and the disengage in `_chase`. It changes no `aggro_range` and nothing outside the arena: a duel is two committed combatants placed to fight each other, and a duel has no disengage. After it, the same net vs native reads `win_rate 0.083 → 0.917`, `dmg_dealt 0.083 → 0.992`, and `dps_dealt` moves from **11.37× divergent to 1.16× — agreeing**. The baselines barely move (native-vs-native 44.7 s → 39.4 s; scripted-vs-scripted unchanged), which is the control.
+
+A kiting policy graded against a sleeping native scores draws, and a draw is not a win, so the `suite_native` band `[0.30, 1.00]` was being failed by nets that simply could not provoke a fight. Every league number ever recorded against `native` was measured against a creature that may have been asleep.
+
 ### 5.3 Environment parity: the twin of the policy-parity gate
 
 `game/arena/tests/policy_parity_test.tscn` proves the **network** matches across runtimes — same weights, same numbers, bit-for-bit. Nothing proved the **environment** those numbers are spent in, and a net can compute identical outputs in two worlds where identical outputs mean different things. `ml/eval/env_parity.py` closes that: one fixed policy, one fixed baseline, the same seeds, both runtimes, and it reports the gap without taking a position on which side is right.
