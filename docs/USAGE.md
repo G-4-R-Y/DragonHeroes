@@ -588,12 +588,30 @@ tools/build_console.sh genforge                 # or make it an app: icon in the
 > climbing from its own location (`game/tools/repo_root.gd`), so it drives *this*
 > checkout wherever you launch it from; `DH_REPO=/path/to/repo` overrides that.
 
-PACKS on the left with their approval state; on the right the pack's verdict, one
-ART row per asset (provenance verified? clips complete?) and every finding,
-coloured. CHECK / BUILD / REVIEW (opens the bundle's `index.html`) / APPROVE /
-REJECT / CREATE. The console never re-implements the rules — it runs
-`tools/genforge.py --json` and renders the answer, so it cannot say an asset is
-fine when the CI gate says it is not.
+PACKS and the actions on the left (the column scrolls); the panels are tabs on
+the right:
+
+| tab | what it shows |
+|---|---|
+| REVIEW | **the assets themselves** — the bundle's sprite sheet, one clip playing at its own fps, the frame it is on, and the blockers the build refused to clear, listed in red beside the clips they are about |
+| AUDIT | every finding from `tools/genforge.py check`, coloured ok / warn / FAIL |
+| ART | one row per asset: provenance verified? clips complete? Selecting a row loads it into REVIEW |
+| CREATE | draft a new chapter from an existing one, optionally building it |
+
+CHECK / BUILD / REVIEW / APPROVE / REJECT / REFRESH act on the **selected** pack.
+The console never re-implements the rules — it runs `tools/genforge.py --json`
+and renders the answer, so it cannot say an asset is fine when the CI gate says
+it is not.
+
+REVIEW draws the art in the console rather than shelling out to a browser
+(Ricardo, 2026-09-14: *"I can't see anything for reviewing"*). A built bundle
+carries `art/<name>/albedo.png` and an `atlas.json` with the clips, their fps,
+their frame rects, the anchor and the blockers, which is everything a reviewer
+needs; the clip honours `frame_ticks`, so a 3-tick frame holds three times as
+long as a 1-tick one. **OPEN PAGE** still opens the bundle's `index.html` for the
+stat tables. Both consoles size their own window through `DhConsoleFit`
+(`game/tools/console_fit.gd`) and are gated against overflow on both axes by
+`game/genforge/tests/console_layout_probe.tscn` and its arena twin.
 
 `check` is the machine half of the gate and it is deliberately blunt. Run it
 first; it is the fastest way to see what is actually wrong.
@@ -727,7 +745,9 @@ Every row below was run on 2026-09-13 and printed exactly this.
 
 | Gate | Command | Verified pass line |
 |---|---|---|
-| Genforge console | `godot --headless --path game res://genforge/console.tscn -- --selftest` | `GENFORGE CONSOLE SELFTEST OK — 1 pack(s), fen_bells: 14 finding(s) rendered (2 failing), 1 art row(s), review page present` |
+| Genforge console | `godot --headless --path game res://genforge/console.tscn -- --selftest` | `GENFORGE CONSOLE SELFTEST OK — 1 pack(s), fen_bells: 14 finding(s) rendered (1 failing), 1 art row(s); REVIEW drew bellwether at 1056x132, 1 clip(s), 5 blocker(s), frame 128x128` |
+| Genforge console layout | `godot --headless --path game res://genforge/tests/console_layout_probe.tscn --quit-after 300` | `GENFORGE LAYOUT OK — 7 canvases x 1204 controls, nothing leaves the canvas on EITHER axis` |
+| Arena console layout | `godot --headless --path game res://arena/tests/console_layout_probe.tscn --quit-after 300` | `CONSOLE LAYOUT OK — 7 canvases x 2471 controls, nothing leaves the canvas on EITHER axis` |
 | Menu boot | `godot --headless --path game res://prototype/tests/menu_probe.tscn` | `MENU OK — 13 buttons + OPTIONS screen (2 volume sliders, MUSIC/SFX/MODE/FIT/BACK), 2 fields, SFX bus mutes + restores, settings survive a language save, script compiled` |
 | Hunt boot ×3 | `godot --headless --path game res://prototype/main.tscn --quit-after 150` | boots and quits 0. Off-tree staged-water leak fixed; 12 verbose quits pass `python3 tools/check_hunt_exit.py`. Full receipts: `genforge/candidates/hunt-exit/` |
 | Ground state / teardown | `godot --headless --path game res://prototype/tests/ground_state_probe.tscn` | `GROUND STATE OK` — original loot after travel, full bag/cap, collection once, offscreen shot/impact/expiry and forced pending-water cleanup |

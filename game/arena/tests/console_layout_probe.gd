@@ -1,5 +1,14 @@
 # ARENA PROBE — does the cockpit actually FIT the canvas it is rendered into?
 #
+# BOTH AXES. The first version of this file only looked DOWN, and Ricardo came
+# back with "console design is bloated and overflowing ... as well as arena one"
+# (2026-09-14). He was right: the cockpit was 1,984 px wide on a 1,440 px canvas
+# and 50 controls left the screen sideways at 800x450, the canvas _fit_window
+# actually picks on his 1080p desktop. A Label does not wrap by default, so its
+# minimum width is the whole sentence, and that minimum propagates all the way up
+# to the root HBox. Text is checked too: a non-wrapping Label or a Button caption
+# can draw past its own rect with nothing clipping it.
+#
 # Ricardo, 2026-09-14: "graph overflows from the rendered screen." _fit_window
 # picks 1600x900 on a 1080p desktop and then halves the canvas to 800x450 for
 # legible pixel typography, so the console's real budget is 450 logical pixels
@@ -21,14 +30,17 @@ extends Control
 # fall through without setting anything — every candidate needs usable height
 # >= 636 — leaving the console on a canvas 90 logical px shorter than its own
 # content. The rest are what _fit_window can actually pick.
-const CANVASES := [Vector2i(640, 360), Vector2i(800, 450), Vector2i(960, 540),
-		Vector2i(1024, 576), Vector2i(1152, 648), Vector2i(1280, 720), Vector2i(1440, 810)]
+# Every canvas DhConsoleFit can land on, including MIN_CANVAS — the fallback
+# nobody chooses and the only one that used to overflow vertically.
+var CANVASES: Array = DhConsoleFit.every_canvas()
 
 var _last_canvas_h := 0
 var _last_chart_h := 0.0
 
 func _ready() -> void:
 	var bad: Array = []
+	var walked := 0
+	var measured := 0
 	for canvas in CANVASES:
 		var w := get_window()
 		w.content_scale_size = canvas
@@ -56,12 +68,14 @@ func _ready() -> void:
 				for _j in 3:
 					await get_tree().process_frame
 			var rows := _walk(console, canvas)
+			measured += rows.size()
 			over += rows.filter(func(r: Dictionary) -> bool: return r.over > 0.5)
+		walked += 1
 		print("canvas %dx%d — %d control(s) overflow across %s" % [
 				canvas.x, canvas.y, over.size(), str(names)])
 		for r in over:
-			print("    %-40s bottom %.0f > %.0f  (over by %.0f)" % [
-					r.path, r.bottom, r.limit, r.over])
+			print("    [%s] %-40s %.0f > %.0f  (over by %.0f)" % [
+					r.axis, r.path, r.bottom, r.limit, r.over])
 		if not over.is_empty():
 			bad.append(canvas)
 		if tabs != null:
@@ -72,8 +86,17 @@ func _ready() -> void:
 			bad.append(canvas)
 		console.queue_free()
 		await get_tree().process_frame
+	# A gate that passes when it measured NOTHING is worse than no gate. This
+	# file printed OK once while its own script failed to compile (an untyped
+	# `cand` in console_fit.gd) — `bad` was empty because the loop never ran.
+	if walked < 4 or measured < 200:
+		push_error("CONSOLE LAYOUT FAILED — the probe measured almost nothing "
+				+ "(%d canvas(es), %d control(s)); it did not run, it broke" % [walked, measured])
+		get_tree().quit(1)
+		return
 	if bad.is_empty():
-		print("CONSOLE LAYOUT OK — the cockpit fits every canvas _fit_window can pick")
+		print("CONSOLE LAYOUT OK — %d canvases x %d controls, nothing leaves the canvas "
+				% [walked, measured] + "on EITHER axis")
 		get_tree().quit(0)
 	else:
 		push_error("CONSOLE LAYOUT FAILED — overflows at %s" % str(bad))
@@ -94,9 +117,25 @@ func _walk(node: Node, canvas: Vector2i, path := "") -> Array:
 			continue
 		var label: String = path + "/" + (String(c.name) if String(c.name) != "" else c.get_class())
 		var bottom := c.global_position.y + c.size.y
-		out.append({"path": label.substr(maxi(0, label.length() - 40)),
+		var right := c.global_position.x + c.size.x
+		out.append({"path": label.substr(maxi(0, label.length() - 40)), "axis": "y",
 				"bottom": bottom, "limit": float(canvas.y),
 				"over": bottom - float(canvas.y)})
+		# Ricardo, 2026-09-14: the cockpit is "bloated and overflowing". The first
+		# version of this probe only looked DOWN. At 800x450 — what _fit_window
+		# picks on a 1080p desktop — the expensive axis is sideways: a fixed-width
+		# roster column plus a tab full of un-wrapped ItemList rows.
+		out.append({"path": label.substr(maxi(0, label.length() - 40)), "axis": "x",
+				"bottom": right, "limit": float(canvas.x),
+				"over": right - float(canvas.x)})
+		# And text is not the same thing as its box: a Label that does not wrap,
+		# or a Button whose caption is longer than the button, draws past its own
+		# rect with nothing clipping it.
+		var text_w := _text_width(c)
+		if text_w > 0.0:
+			out.append({"path": label.substr(maxi(0, label.length() - 40)), "axis": "t",
+					"bottom": c.global_position.x + text_w, "limit": float(canvas.x),
+					"over": (c.global_position.x + text_w) - float(canvas.x)})
 		if not (c is ScrollContainer):
 			out += _walk(c, canvas, label)
 	return out
@@ -152,6 +191,29 @@ func _check_progress(console: Control, canvas: Vector2i) -> bool:
 			sz.y, chart.custom_minimum_size.y, strip.global_position.y,
 			sz.y - text_bottom])
 	return ok
+
+
+# How wide the text in this control actually draws. Only for controls that do
+# not wrap and do not scroll: an autowrapping Label reflows, a ScrollContainer
+# and an ItemList are allowed to hold more than they show.
+func _text_width(c: Control) -> float:
+	var font := ThemeDB.fallback_font
+	var size := ProtoTheme.SIZE_BODY
+	if c is Label:
+		var l: Label = c
+		if l.autowrap_mode != TextServer.AUTOWRAP_OFF or l.text == "":
+			return 0.0
+		if l.has_theme_font_size_override("font_size"):
+			size = l.get_theme_font_size("font_size")
+		return font.get_string_size(l.text, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
+	if c is Button:
+		var b: Button = c
+		if b.text == "":
+			return 0.0
+		if b.has_theme_font_size_override("font_size"):
+			size = b.get_theme_font_size("font_size")
+		return font.get_string_size(b.text, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x + 12.0
+	return 0.0
 
 
 func _find_tabs(node: Node) -> TabContainer:

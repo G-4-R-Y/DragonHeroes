@@ -197,6 +197,35 @@ interface, filtered by creature"*):
 Selecting a row puts that verdict in the panel above the list. Parsing is
 incremental (name + mtime), so a filter click re-reads nothing.
 
+### Fitting the window, and not overflowing it
+
+Both cockpits size themselves through one shared rule, `game/tools/console_fit.gd`
+(`DhConsoleFit.apply`): walk a candidate ladder against the usable screen rect,
+halve the canvas when the halved height still clears the roster column, and — the
+part that matters — fall back to a canvas derived from the rect when nothing in
+the ladder fits, instead of leaving the project default in place. On a 1080p
+desktop that lands on a 1,600x900 window with an **800x450 canvas**.
+
+That 450x800 budget is the whole layout constraint, and the console broke it for
+a long time sideways (Ricardo, 2026-09-14: *"bloated and overflowing"*). A
+`Label` does not wrap by default, so its minimum width is the entire sentence,
+and that minimum propagates up through the tab, the `TabContainer` and the root
+`HBoxContainer`: the cockpit measured **1,984 px wide on a 1,440 px canvas**.
+Two rules keep it honest now, in both consoles:
+
+- `_label()` **wraps by default**. A caller opts out only for the short captions
+  that sit inside a row, where a wrap would put one word per line.
+- every row of buttons or knobs is an **`HFlowContainer`**, which starts a new
+  line when the width runs out, rather than an `HBoxContainer`, which does not.
+
+`game/arena/tests/console_layout_probe.tscn` and
+`game/genforge/tests/console_layout_probe.tscn` walk every canvas
+`DhConsoleFit` can pick, every tab, and every visible control, on **both axes**
+plus text-versus-rect. They also refuse to pass vacuously: the arena probe once
+printed `CONSOLE LAYOUT OK` while its own script failed to compile, because the
+overflow list was empty when the loop never ran. Both now assert they actually
+walked the canvases and measured the controls before reporting OK.
+
 `--selftest` covers all of it against fixtures under `user://console_selftest/`:
 the gate never reads or writes the real registry, run folders or benchmarks.
 It asserts the registry ordering, that DEPLOY moves the single pin and RETIRE

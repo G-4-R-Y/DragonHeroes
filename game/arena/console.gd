@@ -204,31 +204,10 @@ func _process(delta: float) -> void:
 # logical canvas that fits the screen it opens on (the full-rect containers
 # reflow). At 640x360 the roster column's minimum heights overflowed and the
 # TRAIN/STOP/GATE/WATCH buttons rendered outside the window.
+# The shared rule (game/tools/console_fit.gd) — the genforge cockpit uses the
+# same one, so a fix to either lands in both.
 func _fit_window() -> void:
-	var w := get_window()
-	var usable := DisplayServer.screen_get_usable_rect(w.current_screen)
-	for cand in [Vector2i(1600, 900), Vector2i(1440, 810), Vector2i(1280, 720),
-			Vector2i(1152, 648), Vector2i(1024, 576), Vector2i(960, 540)]:
-		if cand.x <= usable.size.x - 24 and cand.y <= usable.size.y - 96:
-			# the roster column needs ~400 logical px of height; when a 2x integer
-			# step still clears that (1600x900 -> 800x450), take it — the pixel
-			# typography reads at menu size instead of 1:1 dots on a 1080p screen
-			var k := 2 if cand.y / 2 >= 420 else 1
-			w.content_scale_size = cand / k
-			w.size = cand
-			w.position = usable.position + (usable.size - cand) / 2
-			return
-	# NOTHING FIT. The loop used to just end here, which left content_scale_size
-	# at the project default — 640x360 (project.godot window/size/viewport_*) — a
-	# canvas 90 logical px shorter than this console's own content, so the chart
-	# collapsed to its minimum and the panels below it ran off the bottom edge.
-	# Measured in arena/tests/console_layout_probe.tscn; it is the ONLY canvas
-	# that overflows. Ricardo, 2026-09-14: "graph overflows from the rendered
-	# screen." A small or oddly-reported screen must still get a real canvas.
-	var fit := Vector2i(maxi(usable.size.x - 24, 640), maxi(usable.size.y - 96, 360))
-	w.content_scale_size = fit
-	w.size = Vector2i(mini(fit.x, usable.size.x), mini(fit.y, usable.size.y))
-	w.position = usable.position + (usable.size - w.size) / 2
+	DhConsoleFit.apply(get_window())
 
 func _build_ui() -> void:
 	var bg := ColorRect.new()
@@ -510,8 +489,8 @@ func _build_nets_tab(tabs: TabContainer) -> void:
 	_nets_info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_nets_info.custom_minimum_size = Vector2(0, 58)
 	v.add_child(_nets_info)
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 4)
+	var row := HFlowContainer.new()
+	row.add_theme_constant_override("h_separation", 4)
 	_button(row, "DEPLOY", _net_deploy)
 	_button(row, "RETIRE", _net_retire)
 	_button(row, "SET A", func() -> void: _set_side("a"))
@@ -528,8 +507,8 @@ func _build_nets_tab(tabs: TabContainer) -> void:
 func _build_ai_default_row(v: VBoxContainer) -> void:
 	v.add_child(_label("DEFAULT AI — what drives a creature when a match asks for "
 			+ "'default' (game/arena/data/ai_defaults.json)", EMBER))
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 4)
+	var row := HFlowContainer.new()
+	row.add_theme_constant_override("h_separation", 4)
 	_ai_mode = OptionButton.new()
 	for m in ArenaAIDefaults.MODES:
 		_ai_mode.add_item(m)
@@ -628,9 +607,9 @@ func _build_versus_tab(tabs: TabContainer) -> void:
 	v.add_child(_vs_a_label)
 	v.add_child(_vs_b_label)
 
-	var base := HBoxContainer.new()
-	base.add_theme_constant_override("separation", 4)
-	base.add_child(_label("baselines", DIM))
+	var base := HFlowContainer.new()
+	base.add_theme_constant_override("h_separation", 4)
+	base.add_child(_label("baselines", DIM, ProtoTheme.SIZE_BODY, false))
 	for side in ["a", "b"]:
 		for who in BASELINES:
 			var s2 := str(side)
@@ -638,16 +617,16 @@ func _build_versus_tab(tabs: TabContainer) -> void:
 			_button(base, "%s=%s" % [s2.to_upper(), w], func() -> void: _set_baseline(s2, w))
 	v.add_child(base)
 
-	var knobs := HBoxContainer.new()
-	knobs.add_theme_constant_override("separation", 4)
-	knobs.add_child(_label("best of", DIM))
+	var knobs := HFlowContainer.new()
+	knobs.add_theme_constant_override("h_separation", 4)
+	knobs.add_child(_label("best of", DIM, ProtoTheme.SIZE_BODY, false))
 	_vs_best_of = SpinBox.new()
 	_vs_best_of.min_value = 1
 	_vs_best_of.max_value = 99
 	_vs_best_of.value = 9
 	_vs_best_of.rounded = true
 	knobs.add_child(_vs_best_of)
-	knobs.add_child(_label("episodes/round", DIM))
+	knobs.add_child(_label("episodes/round", DIM, ProtoTheme.SIZE_BODY, false))
 	_vs_eps = SpinBox.new()
 	_vs_eps.min_value = 1
 	_vs_eps.max_value = 32
@@ -670,15 +649,15 @@ func _build_versus_tab(tabs: TabContainer) -> void:
 	# Ricardo, 2026-09-14: "a better benchmark interface, filtered by creature".
 	# ml/data/benchmarks/ accumulates forever and holds TWO schemas; one flat
 	# undifferentiated list was unreadable the moment the roster grew.
-	var filt := HBoxContainer.new()
-	filt.add_theme_constant_override("separation", 4)
-	filt.add_child(_label("creature", DIM))
+	var filt := HFlowContainer.new()
+	filt.add_theme_constant_override("h_separation", 4)
+	filt.add_child(_label("creature", DIM, ProtoTheme.SIZE_BODY, false))
 	_vs_filter = OptionButton.new()
 	_vs_filter.focus_mode = Control.FOCUS_NONE
 	_vs_filter.tooltip_text = "Only verdicts that involve this creature — either side, or the bracket's key."
 	_vs_filter.item_selected.connect(func(_i: int) -> void: _refresh_history())
 	filt.add_child(_vs_filter)
-	filt.add_child(_label("kind", DIM))
+	filt.add_child(_label("kind", DIM, ProtoTheme.SIZE_BODY, false))
 	_vs_kind = OptionButton.new()
 	_vs_kind.focus_mode = Control.FOCUS_NONE
 	for row in [["everything", ""], ["head to head", "versus"], ["brackets", "tournament"],
@@ -719,8 +698,8 @@ func _build_rank_tab(tabs: TabContainer) -> void:
 			+ "(native/scripted) are the floor the table is read against. Verdicts land "
 			+ "in ml/data/benchmarks/ and show up in VERSUS as 'global ranks'.", DIM))
 
-	var knobs := HBoxContainer.new()
-	knobs.add_theme_constant_override("separation", 4)
+	var knobs := HFlowContainer.new()
+	knobs.add_theme_constant_override("h_separation", 4)
 	_rank_all_arenas = CheckBox.new()
 	_rank_all_arenas.text = "every arena"
 	_rank_all_arenas.focus_mode = Control.FOCUS_NONE
@@ -733,7 +712,7 @@ func _build_rank_tab(tabs: TabContainer) -> void:
 	_rank_deployed.focus_mode = Control.FOCUS_NONE
 	_rank_deployed.tooltip_text = "Only the deployed pin of each key, not every candidate version."
 	knobs.add_child(_rank_deployed)
-	knobs.add_child(_label("episodes/side", DIM))
+	knobs.add_child(_label("episodes/side", DIM, ProtoTheme.SIZE_BODY, false))
 	_rank_eps = SpinBox.new()
 	_rank_eps.min_value = 1
 	_rank_eps.max_value = 16
@@ -805,9 +784,23 @@ func _rank_run() -> void:
 	if _pid > 0: return
 	_spawn_league(_ladder_args(), "ladder", "ladder")
 
-func _label(text: String, color: Color, size := ProtoTheme.SIZE_BODY) -> Label:
+# Ricardo, 2026-09-14: the cockpit is "bloated and overflowing". It was, and
+# SIDEWAYS — the axis the first layout gate never looked at. A Label does not
+# wrap by default, so its minimum width is the whole string; that minimum
+# propagates up through the tab, the TabContainer and the root HBox, and the
+# cockpit ends up 1,984 px wide on a 1,440 px canvas. Every explanatory line in
+# here is a sentence, so wrapping is the default now and a caller opts OUT for
+# the few places a wrap would be wrong (a cell in a fixed grid).
+func _label(text: String, color: Color, size := ProtoTheme.SIZE_BODY,
+		wrap := true) -> Label:
 	var l := Label.new()
 	l.text = text
+	if wrap:
+		l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		# a wrapping Label still reports its longest WORD as a minimum width;
+		# without this a long path or build id would push the column open again
+		l.custom_minimum_size = Vector2(1, 0)
+		l.clip_text = true
 	l.add_theme_font_size_override("font_size", size)
 	l.add_theme_color_override("font_color", color)
 	return l

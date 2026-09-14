@@ -671,6 +671,33 @@ Rebuild after the packaging commit for clean provenance; archives remain in
      With the tick cheap and the engine resident, that is where a generation's
      time actually goes.
 
+- **Regenerate EVERY asset through the new pipeline — Ricardo, 2026-09-14
+  (latest+12):** *"you use our new, improved, pipeline to regenerate all our
+  assets under the new design overhaul philosophy? From tiles and particles to
+  creatures, player, skill animations, bosses, etc"*
+  NOT STARTED — logged the moment it arrived, per the roadmap rule. This is the
+  largest single content demand in the ledger and it is NOT a console task; it
+  needs three things pinned down before a single image is generated:
+  1. **WHICH philosophy.** "the new design overhaul philosophy" has to resolve to
+     a written, style-locked spec (palette, silhouette rules, frame counts,
+     anchor conventions, lighting) — `docs/art/` + `genforge/prompts/` are the
+     candidates. Regenerating the roster against an unwritten philosophy would
+     produce a second inconsistent set, not an overhaul.
+  2. **WHICH assets, in what order.** tiles · particles/VFX · creatures · player ·
+     skill animations · bosses. These do not share a generator, a prompt family,
+     or a review gate: tiles and particles are not sprite sheets with clips.
+  3. **WHERE it runs.** LOCAL GPUs only (§12.38, standing). The box has a 6 GB
+     card and `docker imagesvc-imagesvc-1` is holding ~3 GB of it (HANDOFF).
+     A full-roster regeneration is a multi-hour job that cannot share the GPU
+     with a training sweep, and Ricardo's is live.
+  Every generated asset also has to clear the EXISTING gate, which is the part
+  that makes this tractable: `tools/genforge.py check` already refuses art whose
+  sha256 does not match the prompt that made it, and refuses a bundle with
+  missing clips. The bellwether v2 entry below is the worked example of exactly
+  this loop for ONE boss, and it is still open.
+  STATUS: needs Ricardo's answers on (1) and (2) before it can start; (3) needs
+  his sweep finished or the GPU freed. Raised with him 2026-09-14.
+
 - **The genforge cockpit is unusable, both consoles overflow, and a sweep shows
   no total — Ricardo, 2026-09-14 (latest+11):** *"assets generation console not
   working properly: console design is bloated and overflowing (as well as arena
@@ -710,7 +737,50 @@ Rebuild after the packaging commit for clean provenance; archives remain in
      It does NOT touch `game/addons/dh_godot/*.so` (that is build_dh_godot.sh),
      so the running workers' mapped extension is safe. Run it LAST, which is also
      the order Ricardo asked for.
-  STATUS: logged 2026-09-14, working item 1 first.
+  **Items 1 AND 2 DONE 2026-09-14** — they were the same mistake, so they were
+  fixed together.
+  THE ARENA CONSOLE OVERFLOWED TOO, and Ricardo was right that the old gate had
+  missed it: `console_layout_probe.gd` only ever looked DOWN. Extended to both
+  axes plus text-vs-rect, it found the cockpit **1,984 px wide on a 1,440 px
+  canvas** and **50 controls off-screen at 800x450** — the canvas `_fit_window`
+  actually picks on a 1080p desktop. Cause: a Label does not wrap by default, so
+  its minimum width is the whole sentence, and that minimum propagates up through
+  the tab, the TabContainer and the root HBox. Fix: `_label()` wraps by default
+  (callers opt OUT for short captions inside a row), and every row of
+  buttons/knobs is an `HFlowContainer` instead of an `HBoxContainer` so it wraps
+  instead of forcing the column open. Result: 0 overflow on both axes at all
+  seven canvases.
+  THE GENFORGE CONSOLE was rebuilt. It had none of what the arena one got: no
+  window fitting, no ScrollContainer, no TabContainer, a 330 px left column, and
+  every panel stacked into one screen. It now fits its window through a SHARED
+  rule — new `game/tools/console_fit.gd` (`DhConsoleFit`), which the arena
+  console now delegates to, so the candidate ladder and the it-fits-nothing
+  fallback exist in one place; the left column is 236 px and scrolls; and the
+  panels are tabs: REVIEW / AUDIT / ART / CREATE.
+  REVIEW IS THE REAL FIX for "I can't see anything for reviewing". The old button
+  called `OS.shell_open` on the bundle's index.html — an external browser,
+  outside the app — and it read `packs[0]`, not the SELECTED pack, so on a
+  multi-pack repo it opened the wrong bundle. The bundle already holds everything
+  a reviewer needs (`art/<name>/albedo.png` + an `atlas.json` with clips, fps,
+  frame rects, anchor and the blockers the build refused to clear), so the
+  console draws it: the sheet, a frame cut out with an AtlasTexture, the clip
+  playing at its own fps and honouring `frame_ticks` (a 3-tick frame holds three
+  times as long — the difference between a review and a flicker), and the
+  blockers listed in red beside the clips they are about. OPEN PAGE keeps the
+  browser route for the stat tables.
+  NEW GATE: `game/genforge/tests/console_layout_probe.tscn` — the same both-axes
+  walk over every canvas and every tab, loading the REAL catalog. Both probes now
+  REFUSE TO PASS VACUOUSLY: the arena one printed `CONSOLE LAYOUT OK` once while
+  its own script failed to compile (an untyped `cand`), because `bad` was empty
+  when the loop never ran. They now assert they walked >= 4 canvases and measured
+  a plausible number of controls before reporting OK.
+  The genforge selftest asserts PIXELS, not plumbing: the sheet decoded
+  (1056x132), a clip produced a non-empty frame region (128x128), the five
+  bellwether blockers reached the list, and the clip actually advances a frame.
+  Gates: `GENFORGE LAYOUT OK` (7 canvases x 1204 controls), `GENFORGE CONSOLE
+  SELFTEST OK`, `CONSOLE LAYOUT OK` (7 x 2471), `CONSOLE SELFTEST OK`. A/B'd the
+  new gate by flipping the wrap default back off — it fails, so it bites.
+  STATUS: items 3 (sweep total + ETA) and 4 (rebuild the packages) queued.
 
 - **Training console: the graph, TRAIN ALL tournaments, a benchmark browser, and
   a global rank — Ricardo, 2026-09-14 (latest+10):** *"to the trianing onsole:

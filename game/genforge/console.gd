@@ -8,12 +8,23 @@
 # console cannot drift into saying an asset is fine when the CI gate says it is
 # not.
 #
-#   PACKS      every release and its bundles, with approval state
+#   PACKS      every release and its bundles, with approval state (left column)
 #   AUDIT      the findings, coloured: ok / warn / FAIL
 #   ART        one row per art entry — provenance verified? clips complete?
-#   REVIEW     opens the bundle's index.html (the offline sprite/stat review)
+#   REVIEW     THE ASSETS THEMSELVES: the sprite sheet, its clips playing at
+#              their own fps, its frame rects and its blockers — in the console
 #   CREATE     draft a new release from an existing chapter, optionally build it
 #   APPROVE    record the human half, pinned to the bundle's content hash
+#
+# REBUILT 2026-09-14. Ricardo: "assets generation console not working properly:
+# console design is bloated and overflowing ... as well as I can't see anything
+# for reviewing". Both were true and they were the same mistake — this was a flat
+# two-column Control with every panel stacked into one screen, no window fitting,
+# no scrolling, no tabs, and a REVIEW button that shelled out to an external
+# browser (on packs[0], not even the selected pack). An assets console has to
+# SHOW the assets. It now fits its window like the arena cockpit
+# (game/tools/console_fit.gd), files the panels into tabs, and draws the bundle's
+# art itself. Gated by game/genforge/tests/console_layout_probe.tscn.
 #
 # Launch:
 #   godot --path game res://genforge/console.tscn
@@ -57,9 +68,27 @@ var _new_title: LineEdit
 var _template: OptionButton
 var _buttons: Dictionary = {}
 
+# REVIEW — the bundle's art, drawn here instead of in someone else's browser
+var _art_pick: OptionButton
+var _clip_pick: OptionButton
+var _clip_list: ItemList
+var _sheet: TextureRect
+var _frame: TextureRect
+var _frame_note: Label
+var _review_note: Label
+var _play_btn: Button
+var _atlas: Dictionary = {}        # the selected art entry's atlas.json
+var _sheet_tex: Texture2D = null
+var _frame_i := 0
+var _frame_t := 0.0
+var _playing := true
+
 func _ready() -> void:
 	_repo = DhRepoRoot.find()
 	_selftest = OS.get_cmdline_user_args().has("--selftest")
+	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	if not _selftest:
+		DhConsoleFit.apply(get_window())   # the same rule the arena cockpit uses
 	_build_ui()
 	_refresh()
 	if _selftest:
@@ -67,9 +96,19 @@ func _ready() -> void:
 
 # ---- UI ------------------------------------------------------------------------------
 
-func _label(text: String, color: Color, size := ProtoTheme.SIZE_BODY) -> Label:
+# Wrapping is the DEFAULT. A Label reports its whole string as its minimum
+# width, and that minimum propagates up through the tab and the root HBox — one
+# unwrapped sentence is all it takes to push the cockpit off the right edge of
+# the screen. Callers opt out for the short captions inside a row, where a wrap
+# would put one word per line.
+func _label(text: String, color: Color, size := ProtoTheme.SIZE_BODY,
+		wrap := true) -> Label:
 	var l := Label.new()
 	l.text = text
+	if wrap:
+		l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		l.custom_minimum_size = Vector2(1, 0)
+		l.clip_text = true
 	l.add_theme_font_size_override("font_size", size)
 	l.add_theme_color_override("font_color", color)
 	return l
@@ -91,29 +130,47 @@ func _list(min_h: int) -> ItemList:
 	return l
 
 func _build_ui() -> void:
+	var bg := ColorRect.new()
+	bg.color = Color("0c1116")
+	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(bg)
+
 	var root := HBoxContainer.new()
 	root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	root.add_theme_constant_override("separation", 10)
+	root.offset_left = 6.0
+	root.offset_top = 6.0
+	root.offset_right = -6.0
+	root.offset_bottom = -6.0
+	root.add_theme_constant_override("separation", 8)
 	add_child(root)
 
-	# ---- left: the packs and the actions
-	var left := VBoxContainer.new()
-	left.custom_minimum_size = Vector2(330, 0)
-	left.add_theme_constant_override("separation", 4)
-	root.add_child(left)
+	# ---- left: the packs and the actions. 236 px, and it SCROLLS — the column
+	# used to be 330 px of stacked panels on a canvas that can be 640 wide.
+	var left_frame := VBoxContainer.new()
+	left_frame.custom_minimum_size = Vector2(236, 0)
+	left_frame.add_theme_constant_override("separation", 3)
+	root.add_child(left_frame)
+	left_frame.add_child(_label("GENFORGE", EMBER, ProtoTheme.SIZE_TITLE))
 
-	left.add_child(_label("GENFORGE", EMBER, ProtoTheme.SIZE_TITLE))
-	left.add_child(_label("content packs — genforge/releases/ + the bundles they bake",
-			DIM))
-	_pack_list = _list(190)
+	var scroll := ScrollContainer.new()
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	left_frame.add_child(scroll)
+	var left := VBoxContainer.new()
+	left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	left.add_theme_constant_override("separation", 3)
+	scroll.add_child(left)
+
+	left.add_child(_label("content packs — genforge/releases/ + the bundles they bake", DIM))
+	_pack_list = _list(120)
 	_pack_list.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_pack_list.item_selected.connect(func(_i: int) -> void: _select_pack())
 	left.add_child(_pack_list)
 
-	var row := GridContainer.new()
-	row.columns = 3
-	row.add_theme_constant_override("h_separation", 4)
-	row.add_theme_constant_override("v_separation", 3)
+	# a row of buttons must WRAP, not force the column open
+	var row := HFlowContainer.new()
+	row.add_theme_constant_override("h_separation", 3)
 	_button(row, "CHECK", _check).tooltip_text = \
 			"Audit this pack: schema, lore refs, art provenance (sha256 of the image " \
 			+ "against the prompt that made it), clip coverage, bundle digests, approval."
@@ -121,7 +178,7 @@ func _build_ui() -> void:
 			"Bake the reviewable bundle. Identical inputs re-verify the existing one " \
 			+ "instead of rewriting it — the bundle is immutable and hash-named."
 	_button(row, "REVIEW", _review).tooltip_text = \
-			"Open the bundle's index.html: sprite sheets, clips, stats and blockers, offline."
+			"Load this pack's bundle into the REVIEW tab: the sheet, the clips, the blockers."
 	_button(row, "APPROVE", func() -> void: _decide("approve"))
 	_button(row, "REJECT", func() -> void: _decide("reject"))
 	_button(row, "REFRESH", _refresh)
@@ -133,59 +190,173 @@ func _build_ui() -> void:
 	_note_edit.text_changed.connect(func(t: String) -> void: _note = t)
 	left.add_child(_note_edit)
 
-	left.add_child(_label("CREATE — draft a new chapter from an existing one", EMBER))
-	left.add_child(_label("a template remap is NOT new content: replace the inherited "
+	_status = _label("", PALE)
+	left.add_child(_status)
+
+	# ---- right: the tabs
+	var right := VBoxContainer.new()
+	right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	right.add_theme_constant_override("separation", 3)
+	root.add_child(right)
+
+	var tabs := TabContainer.new()
+	tabs.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	tabs.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	tabs.add_theme_color_override("font_selected_color", EMBER)
+	tabs.add_theme_color_override("font_unselected_color", DIM)
+	right.add_child(tabs)
+	_build_review_tab(tabs)      # first: this is what the console is FOR
+	_build_audit_tab(tabs)
+	_build_art_tab(tabs)
+	_build_create_tab(tabs)
+
+	if not _selftest:
+		var back := HFlowContainer.new()
+		_button(back, "BACK", func() -> void:
+			get_tree().change_scene_to_file("res://prototype/ui/main_menu.tscn"))
+		right.add_child(back)
+
+# REVIEW — Ricardo, 2026-09-14: "I can't see anything for reviewing". The old
+# button called OS.shell_open on the bundle's index.html: an external browser,
+# outside the app, on packs[0] rather than the selected pack. The bundle already
+# holds everything a reviewer needs — art/<name>/albedo.png and an atlas.json
+# with the clips, their fps, their frame rects and the blockers the build
+# refused to clear — so the console draws it.
+func _build_review_tab(tabs: TabContainer) -> void:
+	var v := VBoxContainer.new()
+	v.name = "REVIEW"
+	v.add_theme_constant_override("separation", 3)
+	tabs.add_child(v)
+
+	var pick := HFlowContainer.new()
+	pick.add_theme_constant_override("h_separation", 4)
+	pick.add_child(_label("art", DIM, ProtoTheme.SIZE_BODY, false))
+	_art_pick = OptionButton.new()
+	_art_pick.focus_mode = Control.FOCUS_NONE
+	_art_pick.item_selected.connect(func(_i: int) -> void: _load_art())
+	pick.add_child(_art_pick)
+	pick.add_child(_label("clip", DIM, ProtoTheme.SIZE_BODY, false))
+	_clip_pick = OptionButton.new()
+	_clip_pick.focus_mode = Control.FOCUS_NONE
+	_clip_pick.item_selected.connect(func(_i: int) -> void: _select_clip())
+	pick.add_child(_clip_pick)
+	_play_btn = _button(pick, "PAUSE", func() -> void:
+		_playing = not _playing
+		_refresh_ui())
+	_button(pick, "OPEN PAGE", _open_page).tooltip_text = \
+			"The bundle's index.html in a browser — the same data, plus the stat tables."
+	v.add_child(pick)
+
+	_review_note = _label("", PALE)
+	_review_note.custom_minimum_size = Vector2(1, 24)
+	v.add_child(_review_note)
+
+	var stage := HBoxContainer.new()
+	stage.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	stage.add_theme_constant_override("separation", 6)
+	v.add_child(stage)
+
+	var frame_col := VBoxContainer.new()
+	frame_col.custom_minimum_size = Vector2(104, 0)
+	frame_col.add_theme_constant_override("separation", 2)
+	stage.add_child(frame_col)
+	frame_col.add_child(_label("FRAME", EMBER))
+	_frame = TextureRect.new()
+	_frame.custom_minimum_size = Vector2(96, 96)
+	_frame.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_frame.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	_frame.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	_frame.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	frame_col.add_child(_frame)
+	_frame_note = _label("", DIM)
+	frame_col.add_child(_frame_note)
+
+	var sheet_col := VBoxContainer.new()
+	sheet_col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	sheet_col.add_theme_constant_override("separation", 2)
+	stage.add_child(sheet_col)
+	sheet_col.add_child(_label("SHEET — every frame in the atlas", EMBER))
+	var sheet_scroll := ScrollContainer.new()
+	sheet_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	sheet_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	sheet_col.add_child(sheet_scroll)
+	_sheet = TextureRect.new()
+	_sheet.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
+	_sheet.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	_sheet.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	_sheet.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	sheet_scroll.add_child(_sheet)
+
+	v.add_child(_label("CLIPS — and the blockers the build refused to clear", EMBER))
+	_clip_list = _list(52)
+	v.add_child(_clip_list)
+
+func _build_audit_tab(tabs: TabContainer) -> void:
+	var v := VBoxContainer.new()
+	v.name = "AUDIT"
+	v.add_theme_constant_override("separation", 3)
+	tabs.add_child(v)
+	v.add_child(_label("AUDIT — every finding, in order", EMBER))
+	v.add_child(_label("the GUI never re-implements a rule: this is what "
+			+ "tools/genforge.py said, rendered.", DIM))
+	_findings = _list(80)
+	_findings.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	v.add_child(_findings)
+	_detail = _label("", PALE)
+	_detail.custom_minimum_size = Vector2(1, 40)
+	v.add_child(_detail)
+
+func _build_art_tab(tabs: TabContainer) -> void:
+	var v := VBoxContainer.new()
+	v.name = "ART"
+	v.add_theme_constant_override("separation", 3)
+	tabs.add_child(v)
+	v.add_child(_label("ART — one row per asset: is the image verifiable, are the "
+			+ "clips complete?", EMBER))
+	v.add_child(_label("provenance = sha256 of the image against the prompt that made "
+			+ "it. A mismatch means the file on disk is not what the prompt produced.", DIM))
+	_art_list = _list(80)
+	_art_list.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_art_list.item_selected.connect(func(i: int) -> void:
+		if _art_pick != null and i < _art_pick.item_count:
+			_art_pick.select(i)
+			_load_art())
+	v.add_child(_art_list)
+
+func _build_create_tab(tabs: TabContainer) -> void:
+	var v := VBoxContainer.new()
+	v.name = "CREATE"
+	v.add_theme_constant_override("separation", 3)
+	tabs.add_child(v)
+	v.add_child(_label("CREATE — draft a new chapter from an existing one", EMBER))
+	v.add_child(_label("a template remap is NOT new content: replace the inherited "
 			+ "stories, kits, art sources and season.", DIM))
 	var form := GridContainer.new()
 	form.columns = 2
 	form.add_theme_constant_override("h_separation", 4)
-	form.add_child(_label("from", DIM))
+	form.add_child(_label("from", DIM, ProtoTheme.SIZE_BODY, false))
 	_template = OptionButton.new()
+	_template.focus_mode = Control.FOCUS_NONE
 	form.add_child(_template)
-	form.add_child(_label("pack", DIM))
+	form.add_child(_label("pack", DIM, ProtoTheme.SIZE_BODY, false))
 	_new_pack = LineEdit.new()
 	_new_pack.placeholder_text = "ash_wake"
+	_new_pack.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	form.add_child(_new_pack)
-	form.add_child(_label("title", DIM))
+	form.add_child(_label("title", DIM, ProtoTheme.SIZE_BODY, false))
 	_new_title = LineEdit.new()
 	_new_title.placeholder_text = "The Ash Wake"
+	_new_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	form.add_child(_new_title)
-	left.add_child(form)
-	var crow := HBoxContainer.new()
+	v.add_child(form)
+	var crow := HFlowContainer.new()
+	crow.add_theme_constant_override("h_separation", 4)
 	_button(crow, "CREATE", func() -> void: _create(false))
 	_button(crow, "CREATE + BUILD", func() -> void: _create(true))
-	left.add_child(crow)
-
-	# ---- right: what the audit says
-	var right := VBoxContainer.new()
-	right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	right.add_theme_constant_override("separation", 4)
-	root.add_child(right)
-
-	_status = _label("", PALE)
-	_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	right.add_child(_status)
-
-	right.add_child(_label("ART — one row per asset: is the image verifiable, are the "
-			+ "clips complete?", EMBER))
-	_art_list = _list(120)
-	right.add_child(_art_list)
-
-	right.add_child(_label("AUDIT — every finding, in order", EMBER))
-	_findings = _list(200)
-	_findings.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	right.add_child(_findings)
-
-	_detail = _label("", PALE)
-	_detail.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_detail.custom_minimum_size = Vector2(0, 56)
-	right.add_child(_detail)
-
-	if not _selftest:
-		var back := HBoxContainer.new()
-		_button(back, "BACK", func() -> void:
-			get_tree().change_scene_to_file("res://prototype/ui/main_menu.tscn"))
-		right.add_child(back)
+	v.add_child(crow)
+	var spacer := Control.new()
+	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	v.add_child(spacer)
 
 # ---- running the tool ------------------------------------------------------------------
 
@@ -235,6 +406,7 @@ func _spawn(args: String, kind: String) -> void:
 	_refresh_ui()
 
 func _process(delta: float) -> void:
+	_advance(delta)                 # the review clip plays whether or not a build runs
 	if _pid <= 0:
 		return
 	_poll += delta
@@ -278,6 +450,9 @@ func _select_pack() -> void:
 	_audit = {}
 	_art_list.clear()
 	_findings.clear()
+	if _art_pick != null:
+		_art_pick.clear()
+	_load_art()                     # clears the sheet, the clips and the note
 	_refresh_ui()
 
 func _check() -> void:
@@ -296,7 +471,9 @@ func _render_audit() -> void:
 	if packs.is_empty():
 		_refresh_ui()
 		return
-	var p: Dictionary = packs[0]
+	var p: Dictionary = _audit_row()
+	if p.is_empty():
+		p = packs[0]
 	for a in p.get("art", []):
 		var d: Dictionary = a
 		var worst := str(d.get("worst", "ok"))
@@ -310,6 +487,9 @@ func _render_audit() -> void:
 		var i := _findings.add_item("[%s] %s: %s" % [level.to_upper(),
 				d.get("who", ""), d.get("message", "")])
 		_findings.set_item_custom_fg_color(i, LEVEL_COLOR.get(level, PALE))
+	# a fresh audit re-arms the review tab: new bundle, new art list
+	_fill_art_pick()
+	_load_art()
 	_refresh_ui()
 
 func _build() -> void:
@@ -320,9 +500,193 @@ func _build() -> void:
 		return
 	_spawn("build " + _sq(pack), "build " + pack)
 
+# ---- REVIEW: the bundle's art, in the console --------------------------------------
+
+# The audit row for the SELECTED pack. The old code read packs[0] unconditionally,
+# so on a multi-pack repo REVIEW opened somebody else's bundle.
+func _audit_row() -> Dictionary:
+	var pack := _selected_pack()
+	for entry in _audit.get("packs", []):
+		var d: Dictionary = entry
+		if pack == "" or str(d.get("pack", "")) == pack:
+			return d
+	return {}
+
+func _bundle_dir() -> String:
+	var row := _audit_row()
+	var bundle := str(row.get("bundle", ""))
+	if bundle == "" or bundle.begins_with("("):
+		return ""
+	return bundle if bundle.begins_with("/") else _repo.path_join(bundle)
+
+# REVIEW arms the tab for the selected pack: CHECK first if it has not run, then
+# list the pack's art entries and load the first one.
 func _review() -> void:
-	var packs: Array = _audit.get("packs", [])
-	var page := str((packs[0] as Dictionary).get("review_page", "")) if not packs.is_empty() else ""
+	if _selected_pack() == "":
+		_proc_note = "pick a pack"
+		_refresh_ui()
+		return
+	if _audit_row().is_empty():
+		_check()
+	_fill_art_pick()
+	_load_art()
+	_refresh_ui()
+
+func _fill_art_pick() -> void:
+	if _art_pick == null:
+		return
+	var want := ""
+	if _art_pick.selected >= 0:
+		want = str(_art_pick.get_item_metadata(_art_pick.selected))
+	_art_pick.clear()
+	for entry in _audit_row().get("art", []):
+		var d: Dictionary = entry
+		var id := str(d.get("id", ""))
+		_art_pick.add_item(id.get_slice(".", id.get_slice_count(".") - 1))
+		_art_pick.set_item_metadata(_art_pick.item_count - 1, id)
+		if want != "" and want == id:
+			_art_pick.select(_art_pick.item_count - 1)
+	if _art_pick.item_count > 0 and _art_pick.selected < 0:
+		_art_pick.select(0)
+
+# atlas.json + albedo.png for the selected art entry. Everything here is outside
+# res://, so the image is loaded from disk at runtime rather than imported.
+func _load_art() -> void:
+	_atlas = {}
+	_sheet_tex = null
+	_frame_i = 0
+	_frame_t = 0.0
+	if _sheet != null:
+		_sheet.texture = null
+	if _frame != null:
+		_frame.texture = null
+	if _clip_list != null:
+		_clip_list.clear()
+	if _clip_pick != null:
+		_clip_pick.clear()
+	var bundle := _bundle_dir()
+	if bundle == "":
+		_review_note.text = "no bundle yet — BUILD this pack, then REVIEW"
+		_refresh_ui()
+		return
+	if _art_pick == null or _art_pick.selected < 0:
+		_review_note.text = "no art entries in this pack's audit — run CHECK"
+		_refresh_ui()
+		return
+	var id := str(_art_pick.get_item_metadata(_art_pick.selected))
+	var short := id.get_slice(".", id.get_slice_count(".") - 1)
+	var dir := bundle.path_join("art").path_join(short)
+	var atlas_raw := FileAccess.get_file_as_string(dir.path_join("atlas.json"))
+	if atlas_raw == "":
+		_review_note.text = "no atlas at %s — the build did not bake this entry" % \
+				dir.path_join("atlas.json")
+		_refresh_ui()
+		return
+	var parsed: Variant = JSON.parse_string(atlas_raw)
+	if not (parsed is Dictionary):
+		_review_note.text = "atlas.json is not readable JSON"
+		_refresh_ui()
+		return
+	_atlas = parsed
+	var albedo := dir.path_join(str(_atlas.get("albedo", "albedo.png")))
+	var img := Image.load_from_file(albedo)
+	if img != null:
+		_sheet_tex = ImageTexture.create_from_image(img)
+		_sheet.texture = _sheet_tex
+	for entry in _atlas.get("clips", []):
+		var c: Dictionary = entry
+		_clip_pick.add_item(str(c.get("name", "?")))
+		_clip_pick.set_item_metadata(_clip_pick.item_count - 1, str(c.get("name", "?")))
+	if _clip_pick.item_count > 0:
+		_clip_pick.select(0)
+	_fill_clip_list()
+	_select_clip()
+
+func _fill_clip_list() -> void:
+	_clip_list.clear()
+	for entry in _atlas.get("clips", []):
+		var c: Dictionary = entry
+		var frames: Array = c.get("frames", [])
+		var i := _clip_list.add_item("%s — %d frame(s) @ %s fps%s" % [
+				str(c.get("name", "?")), frames.size(), str(c.get("fps", "?")),
+				" · loops" if bool(c.get("loop", false)) else ""])
+		_clip_list.set_item_custom_fg_color(i, GREEN)
+	# A blocker is the reason this asset is not shippable. It belongs next to the
+	# clips it is about, not buried in a findings list on another tab.
+	for b in _atlas.get("blockers", []):
+		var i := _clip_list.add_item("BLOCKER — %s" % str(b))
+		_clip_list.set_item_custom_fg_color(i, RED)
+
+func _current_clip() -> Dictionary:
+	if _clip_pick == null or _clip_pick.selected < 0:
+		return {}
+	var want := str(_clip_pick.get_item_metadata(_clip_pick.selected))
+	for entry in _atlas.get("clips", []):
+		var c: Dictionary = entry
+		if str(c.get("name", "")) == want:
+			return c
+	return {}
+
+func _select_clip() -> void:
+	_frame_i = 0
+	_frame_t = 0.0
+	var clip := _current_clip()
+	var blockers: Array = _atlas.get("blockers", [])
+	var anchor: Array = _atlas.get("anchor", [])
+	_review_note.text = "%s · %d clip(s) · %d blocker(s)%s" % [
+			str(_art_pick.get_item_text(_art_pick.selected)) if _art_pick.selected >= 0 else "?",
+			(_atlas.get("clips", []) as Array).size(), blockers.size(),
+			" · anchor %s" % str(anchor) if not anchor.is_empty() else ""]
+	if not blockers.is_empty():
+		_review_note.add_theme_color_override("font_color", EMBER)
+	else:
+		_review_note.add_theme_color_override("font_color", PALE)
+	_show_frame()
+	_refresh_ui()
+
+# One frame of the selected clip, cut out of the sheet with an AtlasTexture so
+# nothing is copied per tick.
+func _show_frame() -> void:
+	var clip := _current_clip()
+	var rects: Array = clip.get("rects", [])
+	if _sheet_tex == null or rects.is_empty():
+		_frame.texture = null
+		_frame_note.text = "no frames"
+		return
+	_frame_i = _frame_i % rects.size()
+	var r: Array = rects[_frame_i]
+	if r.size() < 4:
+		return
+	var at := AtlasTexture.new()
+	at.atlas = _sheet_tex
+	at.region = Rect2(float(r[0]), float(r[1]), float(r[2]), float(r[3]))
+	_frame.texture = at
+	_frame_note.text = "%s  %d/%d  %dx%d" % [str(clip.get("name", "?")),
+			_frame_i + 1, rects.size(), int(r[2]), int(r[3])]
+
+func _advance(delta: float) -> void:
+	if not _playing or _sheet_tex == null:
+		return
+	var clip := _current_clip()
+	var rects: Array = clip.get("rects", [])
+	if rects.size() < 2:
+		return
+	var fps := maxf(float(clip.get("fps", 10)), 1.0)
+	var ticks: Array = clip.get("frame_ticks", [])
+	# frame_ticks is in 1/fps units, so a 3-tick frame is three times as long as
+	# a 1-tick one — honouring it is the difference between a review and a flicker
+	var hold := float(ticks[_frame_i]) if _frame_i < ticks.size() else 1.0
+	_frame_t += delta
+	if _frame_t < maxf(hold, 1.0) / fps:
+		return
+	_frame_t = 0.0
+	_frame_i += 1
+	if _frame_i >= rects.size() and not bool(clip.get("loop", true)):
+		_frame_i = rects.size() - 1
+	_show_frame()
+
+func _open_page() -> void:
+	var page := str(_audit_row().get("review_page", ""))
 	if page == "":
 		_proc_note = "run CHECK first — the review page comes from the audit"
 	elif not FileAccess.file_exists(page):
@@ -368,13 +732,18 @@ func _refresh_ui() -> void:
 	var running := _pid > 0
 	for name in _buttons:
 		(_buttons[name] as Button).disabled = running and name != "REFRESH"
+	if _play_btn != null:
+		_play_btn.text = "PAUSE" if _playing else "PLAY"
+		_play_btn.disabled = _sheet_tex == null
 	var packs: Array = _audit.get("packs", [])
 	if packs.is_empty():
 		_status.text = "%d pack(s) — select one and CHECK.%s" % [
 				_packs.size(), "\n" + _proc_note if _proc_note != "" else ""]
 		_detail.text = ""
 		return
-	var p: Dictionary = packs[0]
+	var p: Dictionary = _audit_row()
+	if p.is_empty():
+		p = packs[0]
 	var approval = p.get("approval")
 	var verdict := "READY — machine checks clean and a human approved it" \
 			if bool(p.get("ready", false)) \
@@ -427,10 +796,58 @@ func _run_selftest() -> void:
 	for i in _findings.item_count:
 		if _findings.get_item_text(i).begins_with("[BAD]"):
 			fails += 1
+	# --- REVIEW: the whole point of an assets console ------------------------
+	# Ricardo, 2026-09-14: "I can't see anything for reviewing". A viewer that
+	# silently shows nothing is the bug being fixed, so this asserts PIXELS:
+	# the sheet really decoded, a clip really produced a frame region, and the
+	# blockers really reached the list next to the clips they are about.
+	_review()
+	var review_ok := true
+	if _art_pick.item_count == 0:
+		review_ok = false
+		push_error("GENFORGE CONSOLE SELFTEST: REVIEW offered no art entries")
+	if _sheet_tex == null or _sheet_tex.get_width() <= 0 or _sheet_tex.get_height() <= 0:
+		review_ok = false
+		push_error("GENFORGE CONSOLE SELFTEST: the sprite sheet did not load — "
+				+ "REVIEW would show an empty box, which is the bug")
+	if _clip_pick.item_count == 0:
+		review_ok = false
+		push_error("GENFORGE CONSOLE SELFTEST: atlas.json produced no clips")
+	var blockers := 0
+	for i in _clip_list.item_count:
+		if _clip_list.get_item_text(i).begins_with("BLOCKER"):
+			blockers += 1
+	# the live catalog's bellwether is missing five of its six required clips;
+	# a REVIEW tab that does not say so is a REVIEW tab that is lying
+	if blockers == 0:
+		review_ok = false
+		push_error("GENFORGE CONSOLE SELFTEST: no blockers shown beside the clips, "
+				+ "but the audit reports failures")
+	var region := Rect2()
+	if _frame.texture is AtlasTexture:
+		region = (_frame.texture as AtlasTexture).region
+	if region.size.x <= 0.0 or region.size.y <= 0.0:
+		review_ok = false
+		push_error("GENFORGE CONSOLE SELFTEST: no frame region — nothing would be drawn")
+	# and it has to MOVE: a still first frame is not a clip review
+	var first := _frame_i
+	_playing = true
+	for _i in 40:
+		_advance(0.25)
+	if _frame_i == first and _clip_list.item_count > 0 \
+			and (_current_clip().get("rects", []) as Array).size() > 1:
+		review_ok = false
+		push_error("GENFORGE CONSOLE SELFTEST: the clip never advanced a frame")
+	if not review_ok:
+		get_tree().quit(1)
+		return
 	# `%` binds tighter than `+`, so the format args must meet the WHOLE string.
 	var line := "GENFORGE CONSOLE SELFTEST OK — %d pack(s), %s: %d finding(s) rendered" \
-			+ " (%d failing), %d art row(s), review page %s"
+			+ " (%d failing), %d art row(s); REVIEW drew %s at %dx%d, %d clip(s), " \
+			+ "%d blocker(s), frame %dx%d"
 	print(line % [packs_seen, p.get("pack", "?"), _findings.item_count, fails,
 			_art_list.item_count,
-			"present" if str(p.get("review_page", "")) != "" else "none"])
+			_art_pick.get_item_text(_art_pick.selected) if _art_pick.selected >= 0 else "?",
+			_sheet_tex.get_width(), _sheet_tex.get_height(), _clip_pick.item_count,
+			blockers, int(region.size.x), int(region.size.y)])
 	get_tree().quit(0)
