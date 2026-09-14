@@ -197,11 +197,29 @@ def test_approving_an_unbuilt_pack_is_refused(tmp_path, monkeypatch):
 
 def test_the_live_audit_still_catches_the_dungeon_boss():
     """Not a mock: the repository's own fen_bells pack must still fail, because
-    bellwether has no provenance and one of six clips. If this ever passes,
-    either the boss was fixed (delete this test and celebrate) or the check
-    stopped checking."""
-    findings = []
+    bellwether ships one of six clips. If this ever passes, either the boss was
+    fixed (delete this test and celebrate) or the check stopped checking.
+
+    HALF OF IT WAS FIXED, 2026-09-13: this test used to assert the PROVENANCE
+    gap, and it went red when the other session backfilled provenance-v1.json —
+    which is the test doing its job in the good direction. check_art is satisfied
+    now; the animation gap is what is left, so that is what this holds."""
     data = json.loads((ROOT / "genforge/releases/bell_beneath_fen.json").read_text())
     bellwether = next(a for a in data["art"] if a["id"].endswith("bellwether"))
-    gf.check_art(bellwether, findings)
-    assert levels(findings, BAD), "bellwether's provenance gap is no longer detected"
+
+    prov: list = []
+    gf.check_art(bellwether, prov)
+    assert not levels(prov, BAD), \
+        f"bellwether's provenance regressed: {levels(prov, BAD)}"
+
+    clips: list = []
+    # The built bundle is what says which clips actually baked — the same one the
+    # CLI audits, resolved the same way.
+    bundle = gf.bundles().get("fen_bells", [None])[0]
+    assert bundle is not None, "fen_bells has no built bundle to audit"
+    gf.check_clips(bellwether, bundle, clips)
+    assert levels(clips, BAD), "bellwether's missing action clips are no longer detected"
+    # The six-row sheet exists (source-v2.png) but was rejected for having a
+    # painted checkerboard instead of alpha, and nothing has been wired into the
+    # release, so the pack still ships idle only.
+    assert "1/6" in levels(clips, BAD)[0][2], levels(clips, BAD)

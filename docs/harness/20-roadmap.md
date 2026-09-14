@@ -671,6 +671,28 @@ Rebuild after the packaging commit for clean provenance; archives remain in
      With the tick cheap and the engine resident, that is where a generation's
      time actually goes.
 
+- **Are the open branches finished enough to merge? — Ricardo, 2026-09-13
+  (latest+9):** *"check whether current open branches are finished in their work
+  to merge into main. It finished some sprite animations for the boss, but
+  credits ended mid flight."*
+  **ANSWERED. There is nothing to merge — the work is not on a branch.**
+  - `codex/modern-pixel-content-engine` @ `d1dbc91` is an **ancestor of master**
+    (0 commits ahead, master 15 ahead; merge-base == the branch tip). Its
+    worktree `/tmp/dragon-heroes-codex-content-engine` is gone — /tmp was
+    cleared — so git marks it `prunable`. Nothing was lost: everything on it is
+    already in master.
+  - `stash@{0}` "codex-icon-packaging-before-rebase" (2026-09-12) is **fully
+    superseded**: `.gitignore` has `builds/codex`, `export_presets.cfg` has both
+    the codex exe path and `application/icon`, and `package_codex.py` +
+    `dragon-heroes.ico` are tracked. Safe to drop — Ricardo's call.
+  - **The in-flight work is UNCOMMITTED in the master working tree**, which is
+    why it looks like a branch and is not one. The boss sprite sheet is the
+    bellwether v2 entry below: generated, rejected for missing alpha, cleanup
+    never run.
+  - Tree state at the time of the check: `content OK`, ctest 4/4, both console
+    selftests OK, `POLICY PARITY OK` — and **one red test**, caused by the
+    other session's provenance backfill, retargeted (see below).
+
 - **Configurable net hyperparameters — Ricardo, 2026-09-13 (latest+8):** *"net
   hyperparams should be configurable, as to test new architectures."*
   `--hidden` landed with distillation; everything else about the architecture is
@@ -945,10 +967,32 @@ Rebuild after the packaging commit for clean provenance; archives remain in
   - **Second gap:** bellwether has only **`idle` of 6 `required_clips`**
     (`idle, move, anticipation, attack, hit, death`). As the role model for
     dungeon bosses it is 1/6 animated.
-  - **STATUS: awaiting Ricardo's call** — backfill a `provenance-v1.json` for
-    bellwether (hash what exists, mark it retro-fitted and unverifiable), or
-    regenerate it through the stepped-up pipeline so the boss the others copy
-    is the one that passes the gate. The 5 missing clips are the same decision.
+  - **RESOLVED both ways by the other session, 2026-09-13 — and the second half
+    is MID-FLIGHT.** It backfilled AND regenerated:
+    - `provenance-v1.json` hashes the legacy `source.png` as a
+      `retrospective-integrity-record`, `generation_verified: false`, status
+      "legacy idle-only reference; missing action clips; not production-approved".
+      Verified independently: sha256 matches, and `check_art` now passes.
+    - `source-v2.png` + `prompt-v2.txt` + `provenance-v2.json` are a NEW
+      generation: 1024×1536, **4 columns × 6 rows = 24 frames**, one row per
+      required clip, `generation_verified: true`, with a `references` entry
+      pointing back at v1 for identity. Verified: both sha256s match, and the
+      sheet visibly carries idle / move / rear / attack / hit / death.
+    - **BUT v2 IS REJECTED** (`cleanup-rejection-v2.json`): the model painted a
+      grey-and-white checkerboard INTO the RGB pixels instead of writing alpha.
+      Confirmed independently — `source-v2.png` is mode RGB, no alpha channel at
+      all (v1 is RGBA). `cleanup-prompt-v2.txt` is written and was never run.
+  - **WHAT IS LEFT (in order):** re-clean v2 to a real transparent RGBA cutout →
+    point `genforge/releases/bell_beneath_fen.json` at `source-v2.png`, change
+    `grid` from `[4, 2]` to `[4, 6]` and define the six clips (frames 0-3, 4-7,
+    8-11, 12-15, 16-19, 20-23) → `tools/genforge.py build fen_bells` → review →
+    approve. The live gate still reads **1/6 clips**, because the release still
+    names v1; nothing downstream knows v2 exists.
+  - **A GATE FIRED ON THIS, correctly:**
+    `test_the_live_audit_still_catches_the_dungeon_boss` went red the moment the
+    provenance backfill landed — it was asserting the PROVENANCE gap, which is
+    now genuinely closed. Retargeted at the remaining animation gap (and now
+    audits against the built bundle, the way the CLI does) rather than deleted.
 
 - **GPU physics, the persistent worker, and 60 Hz — Ricardo, 2026-09-13
   (latest): "but can't we use the gpu to calculate the physics math in the
