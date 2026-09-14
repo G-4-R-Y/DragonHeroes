@@ -63,4 +63,35 @@ func _run() -> void:
 			or player.dodge_charges != ProtoPlayer.DODGE_CHARGES_MAX or player.flask_charges != ProtoPlayer.FLASK_MAX:
 		_verdict(false, "exported Hunt level-up did not refill HP/dodges/flasks")
 		return
-	_verdict(true, "exported menu, icons, isolated saves, streaming Hunt, level-up HP/dodge/flask refill; creatures=%d" % creatures.size())
+	# Exercise input from the real exported PCK, not a direct drink() call.
+	# The scene has to PROCESS again first: R reaches the flask through
+	# main.gd::_unhandled_input, and a PROCESS_MODE_DISABLED node receives no
+	# input callbacks at all, so the press above would land nowhere and this
+	# gate would fail a working flask. (Measured headless: INHERIT delivers
+	# _unhandled_input, DISABLED does not.) The world still holds still --
+	# physics is switched off per node on the next three lines, which is what
+	# the blanket disable was really for.
+	hunt.process_mode = Node.PROCESS_MODE_INHERIT
+	player.set_physics_process(false)
+	hunt.set_physics_process(false)
+	for creature in tree.get_nodes_in_group("creatures"): creature.set_physics_process(false)
+	player.hp = player.max_hp * 0.4
+	for pressed in [true, false]:
+		var event := InputEventKey.new()
+		event.keycode = KEY_R
+		event.physical_keycode = KEY_R
+		event.pressed = pressed
+		Input.parse_input_event(event)
+	for frame in 3: await tree.process_frame
+	if player.flask_charges != 1 or not is_equal_approx(player.hp, player.max_hp * 0.6):
+		_verdict(false, "exported R press did not heal immediately")
+		return
+	player._process_flask(5.0)
+	if not is_equal_approx(player.hp, player.max_hp * 0.8):
+		_verdict(false, "exported Flask exceeded its total healing budget")
+		return
+	for i in 6: player.note_kill()
+	if player.flask_charges != 2 or not is_equal_approx(player.hp, player.max_hp * 0.8):
+		_verdict(false, "exported recharge changed HP or lost its charge")
+		return
+	_verdict(true, "exported menu/icons/isolated saves, streaming Hunt, level-up refill, real R immediate heal, exact Flask total and recharge; creatures=%d" % creatures.size())

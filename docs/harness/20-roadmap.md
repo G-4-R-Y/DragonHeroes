@@ -845,8 +845,73 @@ Rebuild after the packaging commit for clean provenance; archives remain in
        opponent and never beats the other. The environment-parity gate (route
        iii) is still the right build, now with a sharper target: find what
        scripted does in the arena that dh-env's scripted does not.
-       Confirmation run on a different seed is in flight; one seed is not a
-       result.
+       **SECOND SEED CAME BACK AND IT DOES NOT REPLICATE. Correcting the claim
+       above rather than leaving it standing.** Seed 7, same key, same 40M
+       budget: `suite_scripted 0.286` (not 0.00), `suite_native 0.429 PASS` —
+       but `suite_native_sanity mean_loser_hp 0.967, FAIL`, and the self-play
+       rate ended at 0.00. So "PPO now passes the native suite" is NOT
+       established; seed 1 was a favourable draw.
+       WHAT BOTH SEEDS DO ESTABLISH, and it is still a real result: the FLAT
+       ZERO IS GONE. Before this fix the gate read exactly 0.00 on both suites
+       at every budget and every seed. After it:
+         | seed | scripted | native | native sanity |
+         |   1  |   0.00   |  1.00  | pass (loser hp 0.837) |
+         |   7  |   0.286  |  0.429 | FAIL (loser hp 0.967) |
+       The floor moved off zero in three of four suite readings. PPO is no
+       longer structurally incapable of scoring in the arena; it is now merely
+       BAD AND HIGH-VARIANCE there, which is a different and much more tractable
+       problem.
+       NEW FINDING from seed 7's sanity failure — `mean_loser_hp 0.967` means
+       the match ended with the LOSER at 96.7% health, i.e. it was decided on a
+       timeout HP margin, not a kill. The shaping permits it: reward is
+       `R_HP_DELTA * ((prev_foe - foe_hp) - (prev_self - self_hp)) - R_TIME`
+       with `R_TIME` only 0.002/tick, so NOT TAKING DAMAGE scores exactly as
+       well as DEALING it, and an avoidance policy is a local optimum the
+       gate's sanity check is right to reject. That is the next thing to look
+       at on the PPO side, and it is independent of the environment boundary.
+       NOT CLAIMED: that PPO is fixed. It is not. Three defects are fixed and
+       the fourth (the environment seam) plus this fifth (avoidance shaping)
+       are open, with the sanity gate correctly refusing the degenerate policy.
+
+    **ROUTE (iii) BUILT AND IT BIT ON THE FIRST RUN — `ml/eval/env_parity.py`
+    (NEW, 2026-09-14).** The environment parity gate the entry above called
+    "the one that pays for itself". It takes NO position on which runtime is
+    right: it runs ONE FIXED policy (the registry's deployed net, forwarded
+    through `distill.TeacherNet` with `policy_net.act`'s exact decode) against
+    ONE FIXED baseline in BOTH runtimes at the same seeds, and reports the gap.
+    A fixed policy is the whole point — nothing is learning, so any difference
+    is the ENVIRONMENTS disagreeing rather than trainer noise. Exit 0 inside
+    `--tolerance`, 1 outside; durations compare directly because the arena
+    reports `duration_s` and the sim is a fixed 30 Hz, so dh-env's ticks/30 is
+    the same quantity.
+    MEASURED, `fen_boar` deployed v6.0 on `core.arena.fen_boar_alpha`, 12
+    episodes each. The two runtimes do not merely differ, they differ in
+    OPPOSITE DIRECTIONS depending on the opponent:
+      | opponent  | runtime | win_rate | hp_self | hp_foe | seconds |
+      |-----------|---------|----------|---------|--------|---------|
+      | scripted  | dh-env  |  0.000   |  0.000  | 0.913  |  43.3   |
+      | scripted  | arena   |  0.000   |  0.054  | 0.184  |  40.0   |
+      | native    | dh-env  |  0.000   |  0.000  | 0.941  |  —      |
+      | native    | arena   |  0.083   |  0.923  | 0.917  |  —      |
+    Read that twice. Against SCRIPTED the same net leaves the foe at 91% health
+    in dh-env and 18% in the arena — it deals roughly FIVE TIMES the damage in
+    the arena (gap 0.729). Against NATIVE the same net is dead in dh-env and
+    untouched at 92% health in the arena (gap 0.923). So dh-env is
+    systematically more lethal TO the learner and less lethal FROM it.
+    THIS EXPLAINS THE OPEN SYMPTOMS, and it was a prediction before it was a
+    measurement: a PPO net trained in dh-env learns that its attacks barely
+    land and that it dies quickly, so it learns to AVOID — which is exactly the
+    degenerate timeout policy seed 7 produced (`mean_loser_hp 0.967`, sanity
+    FAIL). The avoidance shaping noted above is not a separate bug so much as
+    the rational response to dh-env's dynamics.
+    WHAT IS NOT YET KNOWN: which side is wrong. The probe deliberately does not
+    say. Next is to narrow it with `dmg_taken_a`/`dmg_taken_b`, which the arena
+    already reports per episode and dh-env does not expose — that is the next
+    thing to add, and it turns "they disagree" into "this term disagrees".
+    NOTE a latent crash found on the way: `ml/env/dh_env.py::__del__` calls
+    `self.close()` which touches `self._handle`, but `__init__` can raise before
+    `_handle` is ever assigned (a bad build id does exactly that), so the real
+    error is followed by a confusing `AttributeError` during cleanup.
     NOT DONE, deliberately: the `tools/train_run.sh` STEPS default is still
     2,000,000. Raising it would buy longer runs of a net that cannot be scored,
     so the budget decision waits on the environment decision.
