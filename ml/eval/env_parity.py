@@ -43,7 +43,8 @@ import numpy as np
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
-from ml.env.dh_env import DhEnv                      # noqa: E402
+from ml.env.dh_env import (ACT_DODGE, DhEnv, balance_specs,   # noqa: E402
+                          make_spec, supports_dodge_flag)
 from ml.training import league                       # noqa: E402
 from ml.training.distill import TeacherNet           # noqa: E402
 from ml.training.policy_net import ACTION_LOGITS     # noqa: E402
@@ -64,11 +65,18 @@ def deployed_json(key: str) -> str:
 def act_from(y: np.ndarray) -> tuple[tuple[float, float], int]:
     """The runtime's decode, verbatim: clip the move, argmax the kit, dodge is
     the last logit. Mirrors policy_net.act — if this drifts, the probe measures
-    its own bug instead of the environments'."""
+    its own bug instead of the environments'.
+
+    The dodge logit is OR'd in as a flag rather than replacing the pick. It used
+    to replace it (`7 if dodge else pick`), which is what the single-int C
+    surface allowed at the time, and that is not what the shipping arena does:
+    game/arena/neural_policy.gd attempts the pick and dodges only if the pick
+    was refused. The difference was the bulk of this probe's own headline gap.
+    """
     move = np.clip(y[0:2], -1.0, 1.0)
     pick = int(np.argmax(y[2:2 + ACTION_LOGITS]))
     dodge = bool(y[2 + ACTION_LOGITS] > 0.0)
-    return (float(move[0]), float(move[1])), (7 if dodge else pick)
+    return (float(move[0]), float(move[1])), (pick + ACT_DODGE * int(dodge))
 
 
 def run_dh_env(build: str, policy: str, opp: str, episodes: int,
@@ -76,10 +84,22 @@ def run_dh_env(build: str, policy: str, opp: str, episodes: int,
     """N episodes in the C++ env. `policy` is a net JSON; baselines are refused
     here on purpose — dh-env drives side A externally, so a baseline A would be
     a different experiment than the arena's, not the same one."""
+    if not supports_dodge_flag():
+        raise SystemExit(
+            "env_parity: libdh-env.so predates the dodge flag, so the policy's "
+            "dodge output would be silently dropped and the measurement would "
+            "be of that, not of the environments. Rebuild: "
+            "cmake --build sim/build --target dh-env")
     net = TeacherNet(policy)
     emb = net.embedding(build.split(".")[-1])
     env = DhEnv(build, build, opp=opp, seed=seed)
-    wins = hp_self = hp_foe = ticks = 0.0
+    # The health bar damage is measured against. Mirror matchup, so the two
+    # sides are the same size and balance_specs is a no-op, but go through it
+    # anyway rather than assume: DhEnv applied it, and the divisor has to be
+    # the pool the env actually fought with.
+    sa, sb = balance_specs(make_spec(build), make_spec(build))
+    bar_a, bar_b = max(float(sa.max_hp), 1.0), max(float(sb.max_hp), 1.0)
+    wins = hp_self = hp_foe = ticks = dmg_self = dmg_foe = 0.0
     try:
         for e in range(episodes):
             obs = env.reset(seed + e)
@@ -94,14 +114,23 @@ def run_dh_env(build: str, policy: str, opp: str, episodes: int,
             hp_self += env.hp_frac(0)
             hp_foe += env.hp_frac(1)
             ticks += env.tick
+            # read BEFORE the next reset clears the tally
+            dmg_self += env.damage_taken(0) / bar_a
+            dmg_foe += env.damage_taken(1) / bar_b
     finally:
         env.close()
     n = max(episodes, 1)
+    secs = (ticks / n) / 30.0
     return {"runtime": "dh-env", "episodes": episodes, "win_rate": wins / n,
             "hp_self": hp_self / n, "hp_foe": hp_foe / n,
             # the arena reports wall seconds per episode; the sim is a fixed
             # 30 Hz, so ticks/30 is the same quantity and the columns compare
-            "seconds": (ticks / n) / 30.0}
+            "seconds": secs,
+            # damage in HEALTH BARS, not hit points: dh-env's stats come from
+            # ml/env/specs.json and the arena's from the live content, so raw
+            # hit points are two different units. Bars are one unit.
+            "dmg_dealt": dmg_foe / n, "dmg_taken": dmg_self / n,
+            "dps_dealt": (dmg_foe / n) / max(secs, 1e-6)}
 
 
 def run_arena(build: str, policy: str, opp: str, episodes: int, seed: int,
@@ -111,35 +140,100 @@ def run_arena(build: str, policy: str, opp: str, episodes: int, seed: int,
     eps = row.get("episodes", [])
     n = max(len(eps), 1)
     mean = lambda f: float(np.mean([e[f] for e in eps])) if eps else 0.0
+    # bars(dmg, bar): the same normalisation dh-env does, per episode, using the
+    # health pool that episode actually fought with. max_hp_a/b landed in the
+    # row on 2026-09-14; an older recording has neither those nor dmg_taken_*,
+    # and reports 0.0 rather than inventing a divisor.
+    def bars(dmg_field: str, bar_field: str) -> float:
+        if not eps or bar_field not in eps[0] or dmg_field not in eps[0]:
+            return 0.0
+        return float(np.mean([float(e[dmg_field]) / max(float(e[bar_field]), 1.0)
+                              for e in eps]))
+    secs = mean("duration_s")
+    dmg_dealt = bars("dmg_taken_b", "max_hp_b")
     return {"runtime": "arena", "episodes": len(eps),
             "win_rate": float(row.get("wins_a", 0)) / n,
             "hp_self": mean("hp_a"), "hp_foe": mean("hp_b"),
-            "seconds": mean("duration_s"), "raw": row}
+            "seconds": secs,
+            "dmg_dealt": dmg_dealt, "dmg_taken": bars("dmg_taken_a", "max_hp_a"),
+            "dps_dealt": dmg_dealt / max(secs, 1e-6), "raw": row}
 
 
 def compare(a: dict, b: dict, tolerance: float) -> dict:
     gaps = {}
-    for field in ("win_rate", "hp_self", "hp_foe"):
+    for field in ("win_rate", "hp_self", "hp_foe", "dmg_dealt", "dmg_taken"):
         gaps[field] = round(abs(a[field] - b[field]), 4)
     worst = max(gaps.values()) if gaps else 0.0
     return {"gaps": gaps, "worst": worst, "agree": worst <= tolerance}
 
 
+def diagnose(dh: dict, ar: dict, tolerance: float) -> list[str]:
+    """Turn "the two runtimes disagree" into "THIS term disagrees".
+
+    hp_frac alone cannot separate the two ways a fight can go differently, and
+    they call for opposite fixes: hits that land RARELY (reach, cooldown,
+    tracking, hit detection) versus hits that land SOFTLY (damage numbers,
+    scaling, mitigation). Damage per second separates them, because it is
+    damage per episode with episode length divided out.
+
+    Every line below is stated as a measured ratio. Nothing here decides which
+    runtime is correct — that is a content question, not this probe's.
+    """
+    out: list[str] = []
+    ratio = lambda x, y: x / y if y > 1e-6 else float("inf") if x > 1e-6 else 1.0
+    for side, dealt, secs in (("DEALT by the policy", "dmg_dealt", "seconds"),
+                              ("TAKEN by the policy", "dmg_taken", "seconds")):
+        d_tot, a_tot = dh.get(dealt, 0.0), ar.get(dealt, 0.0)
+        if abs(d_tot - a_tot) <= tolerance:
+            continue
+        d_sec, a_sec = dh.get(secs, 0.0), ar.get(secs, 0.0)
+        d_rate, a_rate = ratio(d_tot, d_sec), ratio(a_tot, a_sec)
+        out.append("{}: {:.3f} bars in dh-env vs {:.3f} in the arena "
+                   "({:.2f}x).".format(side, d_tot, a_tot, ratio(a_tot, d_tot)))
+        rate_gap = ratio(a_rate, d_rate)
+        if 0.8 <= rate_gap <= 1.25:
+            out.append("  ...but PER SECOND they agree ({:.3f} vs {:.3f} "
+                       "bars/s). The episodes are different LENGTHS; the "
+                       "combat itself is not the disagreement.".format(
+                           d_rate, a_rate))
+        else:
+            out.append("  ...and PER SECOND too: {:.3f} vs {:.3f} bars/s "
+                       "({:.2f}x). This is the combat, not the clock — look at "
+                       "reach, cooldown and damage for this build in both "
+                       "runtimes.".format(d_rate, a_rate, rate_gap))
+    if not out:
+        return out
+    out.append("Neither runtime is assumed correct here. The arena is what the "
+               "game ships,")
+    out.append("so it is the reference for CONTENT; dh-env is what PPO trains "
+               "in, so it is")
+    out.append("the one that has to be made to match, unless the arena is the "
+               "one that is wrong.")
+    return out
+
+
 def print_report(dh: dict, ar: dict, verdict: dict, tolerance: float) -> None:
     print()
     print("  ENVIRONMENT PARITY — one fixed policy, two runtimes")
-    print("  " + "-" * 66)
-    head = "  {:<10}{:>11}{:>11}{:>11}{:>11}".format(
-        "runtime", "win_rate", "hp_self", "hp_foe", "seconds")
+    print("  " + "-" * 78)
+    head = "  {:<8}{:>10}{:>9}{:>9}{:>9}{:>10}{:>10}{:>9}".format(
+        "runtime", "win_rate", "hp_self", "hp_foe", "seconds",
+        "dmg_dealt", "dmg_taken", "dps")
     print(head)
     for row in (dh, ar):
-        print("  {:<10}{:>11.3f}{:>11.3f}{:>11.3f}{:>11.1f}".format(
+        print("  {:<8}{:>10.3f}{:>9.3f}{:>9.3f}{:>9.1f}{:>10.3f}{:>10.3f}{:>9.3f}".format(
             row["runtime"], row["win_rate"], row["hp_self"], row["hp_foe"],
-            row["seconds"]))
+            row["seconds"], row["dmg_dealt"], row["dmg_taken"], row["dps_dealt"]))
+    print("  (dmg columns are HEALTH BARS dealt/taken per episode, dps is bars/s)")
     print("  " + "-" * 66)
     for field, gap in verdict["gaps"].items():
         flag = "ok" if gap <= tolerance else "DIVERGES"
         print("  {:<10} gap {:.4f}   {}".format(field, gap, flag))
+    diag = diagnose(dh, ar, tolerance)
+    if diag:
+        print()
+        for line in diag:
+            print("  " + line)
     if verdict["agree"]:
         print("\n  PARITY OK — the two runtimes agree inside {:.3f}.".format(tolerance))
     else:
@@ -175,6 +269,7 @@ def run(args) -> int:
     ar = run_arena(args.build, policy, args.opp, args.episodes,
                    args.seed, args.speed)
     verdict = compare(dh, ar, args.tolerance)
+    verdict["diagnosis"] = diagnose(dh, ar, args.tolerance)
     out = {"schema": "arena.env_parity.v1", "build": args.build,
            "policy": policy, "opponent": args.opp, "episodes": args.episodes,
            "seed": args.seed, "tolerance": args.tolerance,

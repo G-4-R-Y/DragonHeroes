@@ -181,6 +181,100 @@ static void test_arena_conduct_combo() {
     CHECK(burst_seen);
 }
 
+static void test_arena_dodge_is_a_fallback() {
+    // The contract the shipping arena defines (game/arena/neural_policy.gd):
+    //     match pick: 1 -> cmd_attack() ... ;  if dodge_logit > 0 and NOT ok:
+    //     cmd_dodge()
+    // so a dodge flag must never cost the agent its attack. dh-env used to fold
+    // dodge into the act id, which made it an OVERRIDE instead, and a build with
+    // dodge_max = 0 then spent 95-98% of its ticks on a guaranteed no-op.
+    dh::sim::FighterSpec brawler;
+    brawler.max_hp = 400.0f; brawler.damage = 20.0f; brawler.move_speed = 90.0f;
+    brawler.attack_reach = 40.0f; brawler.attack_cd = 0.4f; brawler.body_radius = 9.0f;
+    brawler.dodge_max = 0;                     // exactly the fen_boar case
+    dh::sim::FighterSpec target = brawler;
+    target.max_hp = 4000.0f; target.damage = 0.0f; target.move_speed = 0.0f;
+    target.attack_cd = 99.0f;
+
+    // Chase and swing, with the dodge flag raised on every single tick.
+    auto fight = [&](bool dodge_flag) {
+        dh::sim::Arena a(brawler, target, dh::sim::OppPolicy::kScripted, 21);
+        for (int t = 0; t < 900; ++t) {
+            float o[dh::sim::kObsDim];
+            a.obs(o);
+            const float dx = o[16] * 512.0f, dy = o[17] * 512.0f;
+            const float len = std::sqrt(dx * dx + dy * dy) + 1e-6f;
+            dh::sim::Action act{dx / len, dy / len, 1, dodge_flag};
+            if (a.step(act)) break;
+        }
+        return a.damage_taken(1);
+    };
+    const float plain = fight(false);
+    const float flagged = fight(true);
+    CHECK(plain > 0.0f);                       // the attack lands at all
+    CHECK(flagged == plain);                   // ...and the flag costs nothing
+
+    // An act id of 7 still means dodge and nothing else, so callers written
+    // before the flag existed are unchanged.
+    dh::sim::Arena seven(brawler, target, dh::sim::OppPolicy::kScripted, 21);
+    for (int t = 0; t < 900; ++t) {
+        float o[dh::sim::kObsDim];
+        seven.obs(o);
+        const float dx = o[16] * 512.0f, dy = o[17] * 512.0f;
+        const float len = std::sqrt(dx * dx + dy * dy) + 1e-6f;
+        if (seven.step({dx / len, dy / len, 7})) break;
+    }
+    CHECK(seven.damage_taken(1) == 0.0f);      // never attacked, as before
+}
+
+static void test_arena_damage_accounting() {
+    // damage_taken() is the twin of game/arena/fighter.gd::damage_taken, added
+    // so ml/eval/env_parity.py can name WHICH term the two runtimes disagree on.
+    // Three things have to hold or the number is not comparable to the arena's:
+    // it starts at zero, it accounts for EVERY damage path (including the two
+    // that used to bypass hurt() — mire detonation and field dps), and it is
+    // raw, so a kill costs at least the victim's whole health bar.
+    auto arena = make_test_arena(3, dh::sim::OppPolicy::kNative);
+    CHECK(arena.damage_taken(0) == 0.0f);
+    CHECK(arena.damage_taken(1) == 0.0f);
+
+    // A caster whose ONLY damage is a fire field: if field dps were still
+    // bypassing hurt() this stays at zero while the victim's health falls.
+    dh::sim::FighterSpec burner;
+    // damage feeds the field (dps = damage * 0.3), so it cannot be zero; the
+    // learner simply never issues act 1, so no melee packet is ever swung.
+    burner.max_hp = 600.0f; burner.damage = 30.0f; burner.move_speed = 60.0f;
+    burner.attack_reach = 1.0f; burner.attack_cd = 99.0f;
+    burner.kits[0] = {dh::sim::KitId::kFieldCast, 0.5f, 999.0f, dh::sim::FieldKind::kLava};
+    burner.kit_count = 1;
+    dh::sim::FighterSpec dummy;
+    dummy.max_hp = 600.0f; dummy.damage = 0.0f; dummy.move_speed = 0.0f;
+    dummy.attack_reach = 1.0f; dummy.attack_cd = 99.0f;
+    dh::sim::Arena fire(burner, dummy, dh::sim::OppPolicy::kScripted, 4);
+    const float hp0 = fire.hp_frac(1);
+    for (int t = 0; t < 900; ++t)
+        if (fire.step({0.0f, 0.0f, 3})) break;
+    const float lost = (hp0 - fire.hp_frac(1)) * 600.0f;
+    CHECK(lost > 0.0f);                              // the field did land
+    CHECK(fire.damage_taken(1) >= lost - 0.5f);      // ...and it was counted
+
+    // Raw, not clamped: whoever died absorbed at least a full health bar.
+    dh::sim::Arena duel(make_test_arena(9, dh::sim::OppPolicy::kNative));
+    bool done = false;
+    for (std::uint32_t t = 0; t < dh::sim::kMaxTicks && !done; ++t)
+        done = duel.step({0.0f, 0.0f, 1});
+    const int w = duel.winner();
+    if (w == 0 || w == 1) {
+        const int loser = 1 - w;
+        const float bar = loser == 0 ? 160.0f : 110.0f;
+        CHECK(duel.damage_taken(loser) >= bar - 0.01f);
+    }
+    // reset() clears the tally rather than carrying it into the next episode.
+    duel.reset(9);
+    CHECK(duel.damage_taken(0) == 0.0f);
+    CHECK(duel.damage_taken(1) == 0.0f);
+}
+
 static void test_arena_squad_mode() {
     // 2v2 squad (arena.obs.v2): each side fields a buddy body; episodes end
     // only when BOTH of a fighter's bodies fall; obs carries the ally block.
@@ -257,6 +351,8 @@ int main() {
     test_arena_terminates();
     test_arena_obs_schema();
     test_arena_conduct_combo();
+    test_arena_dodge_is_a_fallback();
+    test_arena_damage_accounting();
     test_arena_squad_mode();
     if (g_failures == 0) {
         std::printf("sim-tests: all checks passed\n");

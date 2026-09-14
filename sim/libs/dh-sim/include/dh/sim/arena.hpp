@@ -54,10 +54,24 @@ struct FighterSpec {
 
 // Learner command: move vector (clamped to unit length) + act id
 // (0 noop, 1 attack, 2 special, 3..6 skill slots, 7 dodge).
+//
+// `dodge` is a SEPARATE flag, not an eighth action, because that is what the
+// network head actually is: ml/training/policy_net.py::act returns
+// (move, pick, dodge) — three outputs — and the shipping arena
+// (game/arena/neural_policy.gd) spends them as "attempt the pick; dodge only if
+// the pick was refused". Folding dodge into the act id made the same weights
+// mean three different things in three runtimes (2026-09-14): an OVERRIDE for
+// anything driving dh-env externally, a FALLBACK in the Godot arena, and
+// nothing at all in mlp_act, which never read the logit. Measured cost on the
+// deployed fen_boar net: it dodged on 95-98% of ticks in dh-env for a build
+// with dodge_max = 0, so 95-98% of its ticks were guaranteed no-ops, and it
+// dealt 0.087 health bars per episode against the arena's 0.816.
+// act 7 still means "dodge, nothing else" so old callers are unchanged.
 struct Action {
     float move_x = 0.0f;
     float move_y = 0.0f;
     int act = 0;
+    bool dodge = false;      // fallback: fires only if `act` was refused
 };
 
 class Arena {
@@ -97,6 +111,15 @@ class Arena {
     int winner() const;                  // -1 undecided/draw, 0 = A, 1 = B
     bool done() const { return winner_ != -2; }
     float hp_frac(int who) const;
+    // Total RAW damage this fighter has been dealt this episode, both bodies.
+    // The twin of game/arena/fighter.gd::damage_taken, and deliberately the
+    // same quantity: the packet as swung, before any clamp to the remaining
+    // hit points, so a 40-damage blow on a 5-hp body counts 40 in both. Damage
+    // aimed at a body that is already down counts in neither (the Godot proxy
+    // returns early on `dead`). Exists so ml/eval/env_parity.py can say WHICH
+    // term the two runtimes disagree on instead of only that they disagree:
+    // hp_frac alone cannot separate "hits rarely land" from "hits land soft".
+    float damage_taken(int who) const { return damage_taken_[who & 1]; }
     std::uint64_t tick() const { return tick_; }
     std::uint64_t state_hash() const;    // determinism fingerprint (tests)
 
@@ -169,6 +192,7 @@ class Arena {
     bool squad_ = false;
     std::uint64_t tick_ = 0;
     int winner_ = -2;                    // -2 fighting, -1 draw, 0/1
+    float damage_taken_[2] = {0.0f, 0.0f};   // per-episode, reset() clears it
     math::Pcg32 combat_rng_;
     math::Pcg32 policy_rng_;
     // scripted-policy state (per fighter, only index 1 used today)

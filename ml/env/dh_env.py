@@ -69,6 +69,19 @@ def _load_lib() -> ctypes.CDLL:
     lib.dh_env_winner.argtypes = [ctypes.c_void_p]
     lib.dh_env_hp_frac.restype = ctypes.c_float
     lib.dh_env_hp_frac.argtypes = [ctypes.c_void_p, ctypes.c_int32]
+    # Raw per-episode damage tally (2026-09-14), the twin of the Godot arena's
+    # dmg_taken_a/dmg_taken_b. Optional for the same reason as the acts entry
+    # point below: a library built before it exists should say so out loud
+    # rather than have ctypes read an undeclared return register.
+    if hasattr(lib, "dh_env_damage_taken"):
+        lib.dh_env_damage_taken.restype = ctypes.c_float
+        lib.dh_env_damage_taken.argtypes = [ctypes.c_void_p, ctypes.c_int32]
+    # The dodge bit (2026-09-14). Same optional-symbol discipline: a library
+    # that predates it would DROP the flag, and a dropped dodge is invisible in
+    # every metric the trainer prints.
+    if hasattr(lib, "dh_env_action_dodge_bit"):
+        lib.dh_env_action_dodge_bit.restype = ctypes.c_int32
+        lib.dh_env_action_dodge_bit.argtypes = []
     lib.dh_env_tick.restype = ctypes.c_uint64
     lib.dh_env_tick.argtypes = [ctypes.c_void_p]
     lib.dh_env_destroy.argtypes = [ctypes.c_void_p]
@@ -117,6 +130,27 @@ def set_opp_weights(handle: int, params, layer_in, layer_out, emb, acts=None) ->
         return True
     l.dh_env_set_opp_weights(*args)
     return acts is None
+
+
+# Dodge is a separate head output, not an eighth action (policy_net.py::act
+# returns move, pick, dodge). OR this into the action int to say "this pick,
+# and dodge if the pick is refused" — the rule game/arena/neural_policy.gd has
+# always used. `act & 7` remains the pick; 0..7 keep their old meanings.
+ACT_DODGE = 8
+
+
+def encode_act(pick, dodge):
+    """(pick, dodge) -> the action int dh-env takes. Works on scalars and on
+    numpy arrays, so the batched rollout does not need a second code path."""
+    return pick + ACT_DODGE * np.asarray(dodge).astype(np.int32)
+
+
+def supports_dodge_flag() -> bool:
+    """False on a library built before the flag existed — in which case the bit
+    is silently dropped and the policy never dodges. Check it rather than
+    assume: the whole reason this bug survived was that nothing announced it."""
+    fn = getattr(lib(), "dh_env_action_dodge_bit", None)
+    return fn is not None and int(fn()) == ACT_DODGE
 
 
 _LIB = None
@@ -190,6 +224,11 @@ class DhEnv:
     def __init__(self, build_a: str, build_b: str, opp: str = "native",
                  seed: int = 0, balance: bool = True,
                  squad: tuple[str, str] | None = None):
+        # FIRST, before anything that can raise: __del__ runs on a half-built
+        # object too, and `self._handle` missing there turns a clear error (a
+        # bad build id out of make_spec) into a confusing AttributeError during
+        # interpreter cleanup that hides the one you actually need to read.
+        self._handle = None
         self.build_a, self.build_b = build_a, build_b
         sa, sb = make_spec(build_a), make_spec(build_b)
         if balance:
@@ -223,6 +262,20 @@ class DhEnv:
     def hp_frac(self, who: int) -> float:
         return lib().dh_env_hp_frac(self._handle, who)
 
+    def damage_taken(self, who: int) -> float:
+        """Raw damage dealt TO `who` this episode (0 learner, 1 opponent).
+
+        Read it BEFORE the reset that clears it. Raises on a library built
+        before the symbol existed, rather than returning a plausible zero that
+        would read as "nothing landed" in ml/eval/env_parity.py.
+        """
+        fn = getattr(lib(), "dh_env_damage_taken", None)
+        if fn is None:
+            raise RuntimeError(
+                "libdh-env.so predates dh_env_damage_taken — rebuild it: "
+                "cmake --build sim/build --target dh-env")
+        return float(fn(self._handle, who))
+
     @property
     def tick(self) -> int:
         return lib().dh_env_tick(self._handle)
@@ -233,7 +286,12 @@ class DhEnv:
             self._handle = None
 
     def __del__(self):
-        self.close()
+        # getattr, not self.close(): __del__ can run before __init__ assigned
+        # anything at all (an exception inside make_spec, an interpreter
+        # already tearing down), and a raise in here is only ever noise on top
+        # of the real traceback.
+        if getattr(self, "_handle", None):
+            self.close()
 
 
 class VecDhEnv:

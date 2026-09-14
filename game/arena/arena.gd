@@ -273,7 +273,9 @@ func _end_episode(winner: ArenaFighter) -> void:
 			"hp_a": snappedf(_fighters[0].hp_frac(), 0.001),
 			"hp_b": snappedf(_fighters[1].hp_frac(), 0.001),
 			"dmg_taken_a": snappedf(_fighters[0].damage_taken, 0.1),
-			"dmg_taken_b": snappedf(_fighters[1].damage_taken, 0.1)}
+			"dmg_taken_b": snappedf(_fighters[1].damage_taken, 0.1),
+			"max_hp_a": snappedf(_fighters[0].max_hp_total(), 0.1),
+			"max_hp_b": snappedf(_fighters[1].max_hp_total(), 0.1)}
 	_results.append(result)
 	_selftest_damage += _fighters[0].damage_taken + _fighters[1].damage_taken
 	if _selftest_stage == 0:   # player-vs-creature: the BUILD must deal damage

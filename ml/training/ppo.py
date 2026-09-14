@@ -44,7 +44,8 @@ import numpy as np
 import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-from ml.env.dh_env import DhEnv, VecDhEnv, OBS_DIM, set_opp_weights  # noqa: E402
+from ml.env.dh_env import (ACT_DODGE, DhEnv, VecDhEnv, OBS_DIM,   # noqa: E402
+                          set_opp_weights, supports_dodge_flag)
 from ml.training import arch as arch_mod                     # noqa: E402
 from ml.training.arch import ACT_CODE, normalize_act         # noqa: E402
 from ml.training.gpu_guard import apply as gpu_apply, clamp_batch  # noqa: E402
@@ -255,6 +256,13 @@ def main() -> None:
             f"that produced a net with win_rate 0.00 against scripted while its "
             f"self-play number read 0.81. Raise the budget to at least "
             f"--steps {MIN_UPDATES * rollout:,}, or lower --envs.")
+    if not supports_dodge_flag():
+        raise SystemExit(
+            f"[ppo:{args.key}] REFUSING to start: libdh-env.so predates the "
+            f"dodge flag (ml/env/dh_env.py::ACT_DODGE), so every dodge this "
+            f"policy chooses is silently dropped while the update still pays "
+            f"its log-probability — training against an env that ignores a "
+            f"third of the head. Rebuild: cmake --build sim/build -j")
 
     if args.exploit or args.arch == "gru":
         # fixed target / no snapshots: gru runs fight native+scripted halves
@@ -350,10 +358,19 @@ def main() -> None:
                 m = m_raw.clamp(-1.0, 1.0)
                 logp = (move_dist.log_prob(m_raw).sum(-1)
                         + act_dist.log_prob(a) + dodge_dist.log_prob(d))
-                acts = torch.where(d > 0.5, torch.full_like(a, 7), a).cpu().numpy()
+                # dodge is a FLAG on the pick, not a replacement for it
+                # (ml/env/dh_env.py::ACT_DODGE). It used to overwrite `a` with
+                # 7, which cost two things at once: in the env the agent lost
+                # its attack on every dodging tick, and in the update below the
+                # true `a` was unrecoverable, so the categorical log-probability
+                # was recomputed for action 0 and the PPO ratio did not even
+                # equal 1 at the unchanged policy. Keeping both in one int fixes
+                # both, because `act & 7` and `act >= 8` invert it exactly.
+                env_act = a + ACT_DODGE * d.long()
+                acts = env_act.cpu().numpy()
                 b_obs[t] = t_obs.cpu()
                 b_move[t] = m_raw.cpu()
-                b_act[t] = torch.where(d > 0.5, torch.full_like(a, 7), a)
+                b_act[t] = env_act
                 b_logp[t] = logp.cpu()
                 b_val[t] = value.cpu()
                 m_np = m.cpu().numpy()
@@ -426,10 +443,9 @@ def main() -> None:
                     for t in range(T):
                         move, logits, dodge, value, h_up = net(
                             b_obs[t, mb].to(device), "*", h_up)
-                        is_dodge = b_act[t, mb].to(device) == 7
-                        a = torch.where(is_dodge,
-                                        torch.zeros_like(b_act[t, mb]).to(device),
-                                        b_act[t, mb].to(device))
+                        stored = b_act[t, mb].to(device)
+                        is_dodge = stored >= ACT_DODGE
+                        a = stored % ACT_DODGE      # exact inverse of the encode
                         cat = torch.distributions.Categorical(logits=logits)
                         logps.append(torch.distributions.Normal(move, MOVE_STD)
                                      .log_prob(b_move[t, mb].to(device)).sum(-1)
@@ -461,8 +477,8 @@ def main() -> None:
                 idx = torch.randperm(T * N, device=device)
                 for mb in idx.split((T * N) // MINIBATCHES):
                     move, logits, dodge, value = net(f_obs[mb])
-                    is_dodge = f_act[mb] == 7
-                    a = torch.where(is_dodge, torch.zeros_like(f_act[mb]), f_act[mb])
+                    is_dodge = f_act[mb] >= ACT_DODGE
+                    a = f_act[mb] % ACT_DODGE       # exact inverse of the encode
                     logp = (torch.distributions.Normal(move, MOVE_STD)
                             .log_prob(f_move[mb]).sum(-1)
                             + torch.distributions.Categorical(logits=logits).log_prob(a)

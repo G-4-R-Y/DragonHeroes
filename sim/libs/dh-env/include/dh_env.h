@@ -23,6 +23,15 @@ extern "C" {
 
 #define DH_ENV_OBS_DIM 31
 #define DH_ENV_MAX_KITS 4
+/* Dodge is a SEPARATE head output, not an eighth action: policy_net.py::act
+ * returns (move, pick, dodge) and game/arena/neural_policy.gd spends them as
+ * "attempt the pick, dodge only if it was refused". OR this bit into `act` to
+ * say the same thing here; `act & 7` stays the pick. Values 0..7 are unchanged
+ * (7 still means dodge and nothing else), so no existing caller moves.
+ * Call dh_env_action_dodge_bit() to detect a library that predates the bit --
+ * an ignored dodge flag is invisible in every metric, and that is exactly how
+ * it went unnoticed until 2026-09-14. */
+#define DH_ENV_ACT_DODGE 8
 
 enum DhKitId { DH_KIT_NONE = 0, DH_KIT_BOLT_VOLLEY, DH_KIT_RADIAL_SLAM,
                DH_KIT_POUNCE, DH_KIT_FIELD_CAST, DH_KIT_ENRAGE };
@@ -114,6 +123,15 @@ DH_API void dh_env_shutdown_pool(void);
 
 DH_API int dh_env_winner(const DhEnv* env);
 DH_API float dh_env_hp_frac(const DhEnv* env, int32_t who);
+/* Raw damage dealt TO `who` (0 learner, 1 opponent) so far this episode — the
+ * twin of the Godot arena's `dmg_taken_a`/`dmg_taken_b`. Read it at the episode
+ * boundary, before the reset that clears it. Added for ml/eval/env_parity.py:
+ * hp_frac says the two runtimes disagree, this says whether the disagreement is
+ * in how OFTEN hits land or in how HARD they land. */
+DH_API float dh_env_damage_taken(const DhEnv* env, int32_t who);
+/* Returns DH_ENV_ACT_DODGE. Absent in a library built before 2026-09-14, which
+ * is how a caller tells that the dodge bit would be silently dropped. */
+DH_API int32_t dh_env_action_dodge_bit(void);
 DH_API uint64_t dh_env_tick(const DhEnv* env);
 DH_API void dh_env_destroy(DhEnv* env);
 

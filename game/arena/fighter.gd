@@ -65,6 +65,17 @@ func hp_frac() -> float:
 		s += f
 	return s / fracs.size()
 
+# Duo-aware health BAR: the pool damage_taken is measured against. Reported per
+# episode so ml/eval/env_parity.py can put the two runtimes' raw damage on one
+# scale — dh-env's specs come from ml/env/specs.json and the arena's from the
+# live content, so absolute hit points are not comparable but bars dealt are.
+func max_hp_total() -> float:
+	var total := 0.0
+	for b in [body, body2]:
+		if b != null and is_instance_valid(b):
+			total += maxf(float(b.max_hp), 1.0)
+	return maxf(total, 1.0)
+
 # Enemies aim at the NEAREST living member's proxy (duo targeting).
 func nearest_proxy_to(pos: Vector2) -> ArenaProxy:
 	var ok1 := is_instance_valid(proxy) and not proxy.dead

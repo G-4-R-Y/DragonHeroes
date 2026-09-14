@@ -78,8 +78,19 @@ Arena::BodyRef Arena::nearest_enemy_body(int who, math::Vec2 from) const {
 
 void Arena::hurt(const BodyRef& ref, float dmg) {
     Fighter& foe = f_[ref.fighter];
-    if (ref.body == 0) foe.hp -= dmg;
-    else foe.hp2 -= dmg;
+    // Every damage packet in the arena goes through here, so the tally below is
+    // exhaustive by construction rather than by the caller remembering. Only
+    // the accounting is conditional: a packet landing on a body that is already
+    // down is still applied (changing that would change the dynamics and the
+    // determinism hash) but is not counted, matching game/arena/proxy.gd, which
+    // returns early on `dead`.
+    if (ref.body == 0) {
+        if (foe.hp > 0.0f) damage_taken_[ref.fighter] += dmg;
+        foe.hp -= dmg;
+    } else {
+        if (foe.hp2 > 0.0f) damage_taken_[ref.fighter] += dmg;
+        foe.hp2 -= dmg;
+    }
 }
 
 void Arena::set_opp_mlp(const float* params, const int* layer_in,
@@ -117,6 +128,7 @@ void Arena::reset(std::uint64_t seed) {
     for (auto& p : pending_) p = Pending{};
     tick_ = 0;
     winner_ = -2;
+    damage_taken_[0] = damage_taken_[1] = 0.0f;
     // symmetric spawns: ONE base angle, fighters opposite, 12.5 tiles out
     const float base_ang = policy_rng_.next_float() * 2.0f * kPi;
     for (int i = 0; i < 2; ++i) {
@@ -350,6 +362,11 @@ Action Arena::mlp_act(int who) {
     for (int i = 1; i < kActionLogits; ++i)
         if (src[2 + i] > src[2 + best]) best = i;
     act.act = best;
+    // The head is [move2, logits7, dodge1] and this used to read only the
+    // first two blocks, so the frozen self-play opponent silently played a
+    // policy that could never dodge — a different policy than the same weights
+    // in game/arena/neural_policy.gd. Same fallback rule as the arena.
+    act.dodge = src[2 + kActionLogits] > 0.0f;
     return act;
 }
 
@@ -495,16 +512,32 @@ void Arena::apply_action(int who, const Action& act) {
     if (ml > 1.0f) mv = mv * (1.0f / ml);
     if (me.windup_t <= 0.0f)
         me.pos = clamp_disc(me.pos + mv * (speed * kArenaDt), me.spec.body_radius);
+    // The dodge body, shared by the explicit act 7 and the act.dodge fallback.
+    const auto do_dodge = [&]() {
+        if (me.dodge_charges <= 0 || me.dodge_t > 0.0f) return;
+        --me.dodge_charges;
+        me.dodge_t = kDodgeTime;
+        const math::Vec2 dir = ml > 0.01f ? mv * (1.0f / (ml > 1.0f ? 1.0f : 1.0f))
+                               : (me.pos - foe.pos).normalized_or_zero();
+        me.pos = clamp_disc(me.pos + dir.normalized_or_zero() * kDodgeDash,
+                            me.spec.body_radius);
+    };
+    // `committed` is game/arena/fighter.gd's `ok`: did the chosen command get
+    // accepted, or was it refused (on cooldown, no such slot, act 0)? The
+    // arena's neural policy dodges only when it was refused, and so do we.
+    bool committed = false;
     switch (act.act) {
         case 1:
             if (me.attack_cd <= 0.0f && me.windup_t <= 0.0f) {
                 if (me.spec.is_ranged) { melee_hit(who); me.attack_cd = me.spec.attack_cd; }
                 else { me.windup_t = kWindup; me.attack_cd = me.spec.attack_cd; }
+                committed = true;
             }
             break;
         case 2:
             if (me.special_cd <= 0.0f) {
                 me.special_cd = me.spec.special_cd;
+                committed = true;
                 const BodyRef tgt = nearest_enemy_body(who, me.pos);
                 const float r = kSlamRadius + tgt.radius;
                 if (foe.alive() && foe.dodge_t <= 0.0f &&
@@ -515,23 +548,20 @@ void Arena::apply_action(int who, const Action& act) {
             break;
         case 3: case 4: case 5: case 6: {
             const int slot = act.act - 3;
-            if (slot < me.spec.kit_count && me.kit_cd[slot] <= 0.0f)
+            if (slot < me.spec.kit_count && me.kit_cd[slot] <= 0.0f) {
                 exec_kit(who, slot);
+                committed = true;
+            }
             break;
         }
         case 7:
-            if (me.dodge_charges > 0 && me.dodge_t <= 0.0f) {
-                --me.dodge_charges;
-                me.dodge_t = kDodgeTime;
-                const math::Vec2 dir = ml > 0.01f ? mv * (1.0f / (ml > 1.0f ? 1.0f : 1.0f))
-                                       : (me.pos - foe.pos).normalized_or_zero();
-                me.pos = clamp_disc(me.pos + dir.normalized_or_zero() * kDodgeDash,
-                                    me.spec.body_radius);
-            }
+            do_dodge();
+            committed = true;      // act 7 IS the commitment, spent or not
             break;
         default:
             break;
     }
+    if (act.dodge && !committed) do_dodge();
 }
 
 bool Arena::step(const Action& learner_act) {
@@ -584,7 +614,8 @@ bool Arena::step(const Action& learner_act) {
                 Fighter& victim = f_[1 - f.owner];
                 if (victim.alive() && victim.dodge_t <= 0.0f &&
                     (victim.pos - f.pos).length() <= f.radius * 1.5f)
-                    victim.hp -= p.damage * 2.0f;
+                    hurt({1 - f.owner, 0, victim.pos, victim.spec.body_radius},
+                         p.damage * 2.0f);
                 f.alive = false;   // the field is consumed
                 p.alive = false;
                 break;
@@ -618,8 +649,8 @@ bool Arena::step(const Action& learner_act) {
             const float bhp = body == 0 ? foe.hp : foe.hp2;
             if (bhp <= 0.0f || (bpos - f.pos).length() >= f.radius + brad) continue;
             if (f.dps > 0.0f) {
-                if (body == 0) { foe.hp -= f.dps * kFieldTick; foe.burn_t = 0.5f; }
-                else foe.hp2 -= f.dps * kFieldTick;
+                hurt({1 - f.owner, body, bpos, brad}, f.dps * kFieldTick);
+                if (body == 0) foe.burn_t = 0.5f;
             }
             if (f.kind == FieldKind::kMire) {
                 if (body == 0) foe.slow_t = 0.5f;

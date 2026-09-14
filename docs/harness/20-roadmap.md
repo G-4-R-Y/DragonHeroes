@@ -971,6 +971,100 @@ Rebuild after the packaging commit for clean provenance; archives remain in
     2,000,000. Raising it would buy longer runs of a net that cannot be scored,
     so the budget decision waits on the environment decision.
 
+    **ROUTE (iii) PAID FOR ITSELF THE SAME DAY — the damage columns named the
+    term, and the term was the ACTION DECODE, not the damage numbers
+    (2026-09-14).** The probe above could only say the two runtimes disagree.
+    `Arena::damage_taken()` (C++), `max_hp_a`/`max_hp_b` on the arena's episode
+    rows and two new columns — `dmg_dealt` / `dmg_taken`, in HEALTH BARS so the
+    two runtimes' different stat sources become one unit — plus a `dps` column
+    that divides episode length out, made it say WHICH term. The split matters
+    because hits that land RARELY (reach, cooldown, tracking) and hits that land
+    SOFTLY (damage, scaling) call for opposite fixes.
+    FIRST RUN WITH THE COLUMNS, `fen_boar` deployed v6.0 vs scripted:
+      | runtime | win | hp_self | hp_foe | secs | dmg_dealt | dmg_taken |
+      | dh-env  |0.000|  0.000  | 0.913  | 43.3 |   0.087   |   1.089   |
+      | arena   |0.000|  0.054  | 0.184  | 40.0 |   0.816   |   0.943   |
+    `dmg_taken` AGREES (gap 0.147, inside tolerance) while `dmg_dealt` is off
+    9.4x, and 10.2x per second. The opponent's offence matches; the learner's
+    does not. That asymmetry is not a damage-number problem — the same combat
+    code serves both sides — so it had to be what the learner DOES.
+    IT WAS. Action histogram of the deployed net in dh-env, 7,684 ticks:
+    `{1: 0.000, 2: 0.047, 3: 0.000, 4: 0.000, 7: 0.952}` — it chose DODGE on
+    95.2% of ticks against scripted and 97.8% against native, and attacked
+    essentially never. And `core.arena.fen_boar_alpha` has `dodge_max = 0`.
+    Every one of those ticks was a guaranteed no-op.
+    **THE ROOT CAUSE: the dodge logit means three different things in the three
+    places that read the same weights.** The head is
+    `[move2, logits7, dodge1]` and `policy_net.act` returns THREE values,
+    (move, pick, dodge) — dodge is a flag, not an eighth action:
+      * `game/arena/neural_policy.gd` (the shipping arena, therefore the
+        contract): attempt `pick`; `if dodge_logit > 0 and not ok` dodge. A
+        FALLBACK. It never costs the agent its attack.
+      * anything driving dh-env externally (`env_parity.act_from`, and PPO's
+        own rollout): `7 if dodge else pick`. An OVERRIDE — the dodge REPLACES
+        the attack. Forced by the single-int C surface, and lossy.
+      * `Arena::mlp_act`, the frozen C++ self-play opponent: reads `src[2..8]`
+        for the argmax and NEVER reads `src[2 + kActionLogits]`. IGNORED
+        entirely — so PPO's self-play opponent was a policy that physically
+        could not dodge, while the same weights in the arena could.
+    This is the exact shape of the tanh-vs-clip defect from earlier today, and
+    the same root cause: no single contract, so three consumers each invented
+    one. Both were invisible because nothing compared the two worlds.
+    FIXED, one contract everywhere: `dh::sim::Action` gains a `dodge` bool;
+    `apply_action` tracks `committed` — the C++ twin of fighter.gd's `ok` — and
+    applies the fallback exactly as the arena does; `mlp_act` now reads the
+    logit; the C surface carries it as bit 3 (`DH_ENV_ACT_DODGE = 8`) so
+    `act & 7` is the pick and 0..7 keep their old meanings byte for byte; and
+    `dh_env_action_dodge_bit()` exists so a stale .so is DETECTED rather than
+    silently dropping the flag — both ppo.py and env_parity.py now refuse to
+    start against a library that predates it.
+    MEASURED AFTER, same key, same 12 episodes, vs scripted:
+      | runtime | dmg_dealt | dmg_taken | secs |
+      | dh-env  |   0.403   |   1.074   | 40.0 |
+      | arena   |   0.816   |   0.943   | 40.0 |
+    `dmg_dealt` gap 0.729 -> 0.413, the ratio 9.4x -> 2.02x, and episode length
+    now matches EXACTLY (40.0 vs 40.0, was 43.3 vs 40.0). Still a real 2x gap,
+    which is the genuine content divergence this probe was built to find; it was
+    simply buried under a decode bug four times its size.
+    **AND THE SAME BUG WAS CORRUPTING PPO'S LIKELIHOOD.** The rollout stored
+    `7` in place of the sampled action, so the update could not recover it and
+    reconstructed `a = 0` for every dodging tick — `Categorical.log_prob` of an
+    action that was never taken, inside the PPO ratio. That ratio must be
+    exactly 1.0 at an unchanged policy, by definition. MEASURED on 4,096
+    samples at init:
+      * old encoding: 43.1% of actions reconstructed WRONG, ratio 0.875-1.165
+      * new encoding: 0.0% wrong, ratio 1.000000 min and max
+    At init the logits are near-uniform so the error reads as only +-17%; on a
+    trained peaked policy it is far larger, and the measured net dodged 95-98%
+    of ticks, so nearly every tick carried a wrong likelihood. This is defect
+    SIX in the PPO chain and the first one that was corrupting the gradient
+    itself rather than the environment around it.
+    GATES: `sim-tests::test_arena_dodge_is_a_fallback` pins the fallback rule
+    (a dodge flag raised on every tick must cost zero damage dealt, and act 7
+    must still mean dodge-only); `test_arena_damage_accounting` pins the tally
+    (starts at zero, survives reset, counts the field/mire paths that used to
+    bypass `hurt()`, and is RAW so a kill costs a full bar). Both were proven to
+    have teeth by reintroducing the bug and watching them go red. A 24-run
+    state_hash matrix over two opponent policies and the mire/storm/field paths
+    is byte-identical before and after, so no existing caller's dynamics moved.
+    ARENA SELFTEST OK and CONSOLE SELFTEST OK after the change.
+    **STILL OPEN, and now cleanly separated from the decode:**
+      * the remaining 2.02x `dmg_dealt` gap vs scripted — real content
+        divergence, the next thing the probe should be pointed at.
+      * **the `native` opponent is a different AI in the two runtimes.** vs
+        native the arena is a near-total standoff (0.083 dealt / 0.077 taken in
+        44.7 s, both fighters near full health at timeout) while dh-env has a
+        real fight (0.662 / 1.071). `Arena::native_act` (C++) and the Godot
+        arena's native policy were written independently for the same name.
+        This is a GAME finding, not only a training one: native is the in-game
+        creature AI.
+      * the avoidance shaping (`R_TIME` 0.002/tick) is untouched and should be
+        re-judged AFTER a PPO run on the fixed decode — the old runs were all
+        made by a policy that could not attack while dodging.
+    ALSO FIXED in passing: `ml/env/dh_env.py::__del__` no longer raises an
+    AttributeError over the top of the real error when `__init__` fails early
+    (a bad build id now prints just the KeyError, verified).
+
   **13g DONE 2026-09-14 — all three, verified on real and synthetic data.**
     * `tools/train_watch.py` now understands the bracket: `tournament_start`,
       `method_start`, `method_done`, `bracket_start` and `tournament_done` all

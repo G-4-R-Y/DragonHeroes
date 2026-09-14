@@ -164,6 +164,34 @@ Weekly item/skill drops and 4–6-week biome drops (canon §4) are the defining 
 - **Actions** mirror the player command pathway (§2.4): move vector, facing, skill-slot activation — so the action space is stable regardless of what skills occupy the slots.
 - Both sides of the schema carry a **schema version**, stamped into replays (R0) and the policy registry (§7), so old replays remain trainable and mismatches fail loudly in CI.
 
+### 5.1 The action head is three outputs, and every runtime must spend them the same way
+
+The arena policy head is `[move_x, move_y, logits_0..6, dodge]` — `ml/training/policy_net.py::act` returns **three** things, `(move, pick, dodge)`, and `dodge` is an independent flag, not an eighth entry in the categorical. The shipping arena (`game/arena/neural_policy.gd`) spends them as:
+
+```gdscript
+match pick:                       # attempt the chosen command
+    1: ok = fighter.cmd_attack()
+    ...
+if dodge_logit > 0.0 and not ok:  # dodge ONLY if the pick was refused
+    ok = fighter.cmd_dodge(...)
+```
+
+**That fallback rule is the contract.** It is easy to lose, because the C surface (`dh_env_step`) carries a single action integer, and folding a separate flag into it is a silent lossy encode. On 2026-09-14 the same weights meant three different things in three places: an **override** for anything driving `dh-env` externally (`7 if dodge else pick` — the dodge replaced the attack), a **fallback** in the Godot arena, and **nothing at all** in `Arena::mlp_act`, the frozen self-play opponent, which never read the logit. Measured cost on the deployed `fen_boar` net, whose build has `dodge_max = 0`: it chose dodge on **95–98% of ticks**, every one of them a guaranteed no-op, and dealt **0.087 health bars per episode against the arena's 0.816**.
+
+The encoding that keeps the contract: bit 3 of the action integer (`DH_ENV_ACT_DODGE = 8`) carries the flag on top of the pick, so `act & 7` is the pick and `act & 8` is "…and dodge if that pick is refused". Values 0–7 are unchanged, 7 still means dodge-and-nothing-else, and `dh_env_action_dodge_bit()` exists so a caller can detect a library too old to understand the bit — a dropped dodge is invisible in every metric a trainer prints, which is exactly how this survived.
+
+**The same encoding is what makes PPO's likelihood correct.** Overwriting the pick with 7 destroyed it, so the update recomputed `Categorical.log_prob(0)` for every dodging tick. Measured at an unchanged policy, where the PPO ratio must be exactly 1: **43.1% of actions reconstructed wrong, ratio spread 0.87–1.17**. With the flag: ratio `1.000000` everywhere, 0% wrong. Gate: `sim-tests::test_arena_dodge_is_a_fallback`.
+
+### 5.2 Environment parity: the twin of the policy-parity gate
+
+`game/arena/tests/policy_parity_test.tscn` proves the **network** matches across runtimes — same weights, same numbers, bit-for-bit. Nothing proved the **environment** those numbers are spent in, and a net can compute identical outputs in two worlds where identical outputs mean different things. `ml/eval/env_parity.py` closes that: one fixed policy, one fixed baseline, the same seeds, both runtimes, and it reports the gap without taking a position on which side is right.
+
+```bash
+python3 -m ml.eval.env_parity --key fen_boar --build core.arena.fen_boar_alpha --opp scripted
+```
+
+It compares `win_rate`, `hp_self`, `hp_foe` and — added 2026-09-14 — `dmg_dealt` / `dmg_taken`, in **health bars**, because `dh-env`'s stats come from `ml/env/specs.json` and the arena's from live content, so absolute hit points are two different units. The damage columns are what turn "they disagree" into "**this term** disagrees": health fraction alone cannot separate hits that land *rarely* (reach, cooldown, tracking) from hits that land *softly* (damage, scaling, mitigation), and those call for opposite fixes. Dividing episode length out — the `dps` column — separates them. `Arena::damage_taken()` and `dmg_taken_a`/`dmg_taken_b` + `max_hp_a`/`max_hp_b` on the arena's episode rows are the two ends of that measurement.
+
 ## 6. Fairness is baked into training, not patched at inference
 
 Canon §9 makes these training-time constraints, and the research history explains why post-hoc nerfs fail: OpenAI Five *had* a 217 ms average reaction time and still read as "programmable-mouse telepathy" because of coordination and precision; AlphaStar's APM caps were gamed by burst micro because they bound on averages ([AI Impacts analysis](https://aiimpacts.org/the-unexpected-difficulty-of-comparing-alphastar-to-humans/)). If the agent never experiences the constraints during training, it learns skills the constraints then break — or finds the gaps in them.

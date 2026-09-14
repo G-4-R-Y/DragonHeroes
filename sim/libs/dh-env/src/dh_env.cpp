@@ -168,9 +168,23 @@ void dh_env_reset(DhEnv* env, uint64_t seed, float* out_obs31) {
     if (out_obs31 != nullptr) env->arena.obs(out_obs31);
 }
 
+// ---- action decoding --------------------------------------------------------
+// The C surface carries ONE action int, but the policy head is
+// [move2, logits7, dodge1] -- pick and dodge are independent. Bit 3 (value 8)
+// carries the dodge flag on top of the pick: `act & 7` is the pick, `act & 8`
+// says "and dodge if that pick is refused", which is exactly what the shipping
+// arena does (game/arena/neural_policy.gd). Values 0..7 are untouched, so every
+// existing caller keeps its behaviour, and dh_env_action_dodge_bit() lets a
+// caller detect a library too old to understand the bit instead of having it
+// silently ignored.
+static dh::sim::Action decode_action(float mx, float my, int32_t act) {
+    dh::sim::Action a{mx, my, act & 7, (act & DH_ENV_ACT_DODGE) != 0};
+    return a;
+}
+
 int dh_env_step(DhEnv* env, float move_x, float move_y, int32_t act,
                 float* out_obs31) {
-    const dh::sim::Action a{move_x, move_y, act};
+    const dh::sim::Action a = decode_action(move_x, move_y, act);
     const bool done = env->arena.step(a);
     if (out_obs31 != nullptr) env->arena.obs(out_obs31);
     return done ? 1 : 0;
@@ -185,7 +199,8 @@ int32_t dh_env_step_many(DhEnv* const* envs, int32_t n, const float* move_xy,
 
     const auto body = [&](int i) {
         DhEnv* e = envs[i];
-        const dh::sim::Action a{move_xy[2 * i], move_xy[2 * i + 1], acts[i]};
+        const dh::sim::Action a =
+            decode_action(move_xy[2 * i], move_xy[2 * i + 1], acts[i]);
         const bool done = e->arena.step(a);
         if (out_obs != nullptr) e->arena.obs(out_obs + static_cast<size_t>(i) * stride);
         if (out_done != nullptr) out_done[i] = done ? 1 : 0;
@@ -227,6 +242,12 @@ int dh_env_winner(const DhEnv* env) { return env->arena.winner(); }
 
 float dh_env_hp_frac(const DhEnv* env, int32_t who) {
     return env->arena.hp_frac(who != 0 ? 1 : 0);
+}
+
+int32_t dh_env_action_dodge_bit(void) { return DH_ENV_ACT_DODGE; }
+
+float dh_env_damage_taken(const DhEnv* env, int32_t who) {
+    return env->arena.damage_taken(who != 0 ? 1 : 0);
 }
 
 uint64_t dh_env_tick(const DhEnv* env) { return env->arena.tick(); }
