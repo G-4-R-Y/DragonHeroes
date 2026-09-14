@@ -972,6 +972,11 @@ def main() -> int:
                                "candidates fight; the winner takes the pin")
     from ml.training.tournament import build_parser as _tourney_args   # lazy: it imports us
     _tourney_args(p_to)
+    p_la = sub.add_parser("ladder",
+                          help="the global rank: every net against every other, "
+                               "both sides on the SAME build")
+    from ml.training.ladder import build_parser as _ladder_args       # lazy: it imports us
+    _ladder_args(p_la)
     p_rr = sub.add_parser("round-robin")
     p_rr.add_argument("--episodes", type=int, default=2)
     p_vs = sub.add_parser("versus", help="best-of-N head to head between two nets")
@@ -1051,6 +1056,10 @@ def main() -> int:
     if args.cmd == "tournament":
         from ml.training.tournament import run as run_tournament
         return run_tournament(args)
+
+    if args.cmd == "ladder":
+        from ml.training.ladder import run as run_ladder
+        return run_ladder(args)
 
     if args.cmd == "versus":
         progress = Progress(args.progress_file or progress_path("versus"))

@@ -117,6 +117,7 @@ became a `TabContainer`.
 | RUNS | every folder under `ml/runs/`, newest first, with its `config.json`, gate verdicts and wall time. OPEN PROGRESS tails **that run's** feed; PROMOTE copies its gate-PASSING nets into `ml/serving` | `tools/train_run.sh --promote` |
 | NETS | the registry: every key's versions, which one is the DEPLOYED pin, its gate checks. DEPLOY moves the pin (clearing the old one — one pin per key), RETIRE clears it, SET A / SET B arm the bench | writes `ml/serving/registry.json` directly |
 | VERSUS | best-of-N between any two sides — a registry net, a weights file, or the native/scripted baselines — plus the BENCHMARK BROWSER over `ml/data/benchmarks/`, filtered by creature and by kind | `league versus` |
+| RANK | the GLOBAL RANK: every net against every other, both sides on the same build. The table of the newest ladder verdict, and the button that writes a new one | `league ladder` |
 
 Three switches in the roster panel decide what TRAIN and TRAIN ALL do:
 
@@ -138,6 +139,36 @@ Three switches in the roster panel decide what TRAIN and TRAIN ALL do:
   the GPU tick does not apply. A single-creature TRAIN never brackets: that is
   the TOURNAMENT button, and it needs a chosen matchup.
 
+### RANK — the global rank
+
+VERSUS answers *is this net better than that one*. RANK answers *which net is
+best, full stop* — Ricardo, 2026-09-14: *"a global rank for the all vs all,
+where every model net compete for the top in a balance fight"*.
+
+The word that carries the weight is **balance**. `league round-robin` fights
+deployed nets across DIFFERENT builds, so its table ranks the creature — its
+stats, its reach, its cooldowns — with the policy as a rounding error. A ranking
+of NETS has to remove the body from the comparison, so `ml/training/ladder.py`:
+
+1. puts **both sides on the same arena build**, making the policy the only
+   variable — a bog_golem net driving a fen_boar is the point, not a mistake;
+2. plays **both orientations** of every pairing with different seeds, because
+   spawn position and the aim-noise stream are not symmetric between sides;
+3. runs **every entrant against every other** in every arena — no seeding, no
+   byes, no strength of schedule to correct for.
+
+Entrants are every registry net with exported weights (every key, every version)
+plus `native` and `scripted`, which are the floor the table is read against.
+`pins only` narrows it to the deployed pin of each key; `every arena` replays
+the whole ladder in every creature build — fairer, and far longer.
+
+Scoring: 3 points to whoever wins more episodes in a pairing, 1 each if tied;
+episode win rate; mean HP margin (how it won); and a Bradley-Terry strength
+fitted over the whole episode matrix and printed on the Elo scale, which is
+order-independent and stays meaningful when a pair never met. Every entrant gets
+half a win and half a loss against a phantom of average strength, or an unbeaten
+net would have no finite maximum-likelihood rating and the column would blow up.
+
 ### The benchmark browser
 
 `ml/data/benchmarks/` accumulates for the life of the project and holds **two
@@ -147,6 +178,7 @@ schemas** that answer different questions:
 |---|---|---|
 | `arena.versus.v1` | `league versus`, and the bracket's own fights | one net against one other, best-of-N |
 | `arena.tournament.v1` | `ml/training/tournament.py` | a whole bracket for ONE creature: entrants, table, champion, whether the pin moved |
+| `arena.ladder.v1` | `ml/training/ladder.py` | the global rank: every net against every other, one row per entrant |
 
 The history used to render both through the versus fields, so every bracket read
 `? vs ?  0-0  ?`. Each schema now has its own row and its own detail panel, and
@@ -160,7 +192,7 @@ interface, filtered by creature"*):
   which is what makes a `native`/`scripted` row filterable at all. A verdict with
   no creature at all (an older or hand-made file) still appears under *all
   creatures* rather than silently vanishing.
-- **kind** — everything / head to head / brackets.
+- **kind** — everything / head to head / brackets / global ranks.
 
 Selecting a row puts that verdict in the panel above the list. Parsing is
 incremental (name + mtime), so a filter click re-reads nothing.
@@ -174,9 +206,11 @@ reads back, that the isolated/GPU run-folder names come out right, that
 TRAIN ALL's two gears dispatch correctly — unticked the sweep's command line is
 byte-for-byte what it was before the bracket existed, ticked it carries
 `--tournament` plus the bracket knobs, and a single-creature run never brackets
-— and that the benchmark browser renders both schemas (no row may ever read
+— that the benchmark browser renders all three schemas (no row may ever read
 `? vs ?` again), filters by creature and by kind, composes the two filters, and
-keeps a creature-less verdict in the list.
+keeps a creature-less verdict in the list, and that RANK shows the newest ladder
+verdict in rank order and dispatches `--all-arenas` / `--deployed-only` only
+when they are asked for.
 
 ## 4. Out of scope (v1)
 

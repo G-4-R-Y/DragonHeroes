@@ -765,7 +765,37 @@ Rebuild after the packaging commit for clean provenance; archives remain in
   asserts exactly that. Parsing is incremental (name + mtime) so a filter click
   re-reads nothing. Selecting a row puts that verdict in the panel above.
   Gates: `CONSOLE SELFTEST OK`, `CONSOLE LAYOUT OK`.
-  STATUS: item 4 queued.
+  **Item 4 DONE 2026-09-14.** New module `ml/training/ladder.py`, also reachable
+  as `league ladder`, plus a RANK tab in the console. `league round-robin` was a
+  STUB — it printed the deployed keys and returned — and even finished it would
+  have ranked the CREATURE, because it fights across different builds. The
+  ladder ranks the NET by removing the body from the comparison: (a) both sides
+  play the SAME arena build, so the only variable is the policy — a bog_golem net
+  driving a fen_boar is the point, not a mistake; (b) every pairing plays BOTH
+  ORIENTATIONS with different seeds, because spawn position and the aim-noise
+  stream are not symmetric between sides and a shared seed would make the second
+  orientation the mirror of the first; (c) every entrant meets every other in
+  every arena. Entrants: every registry net with exported weights (a GRU/squad
+  net with no game_json is skipped with a reason, not a crash) plus native and
+  scripted as the floor. Scoring: 3/1/0 per pairing, episode win rate, mean HP
+  margin, and a Bradley-Terry strength fitted by MM iteration and printed on the
+  Elo scale — order-independent, uses every episode rather than only who won a
+  pairing, and survives a pair that never met. Every entrant carries half a win
+  and half a loss against a phantom of average strength, or an unbeaten net has
+  no finite maximum-likelihood rating and the whole column blows up.
+  FIRST REAL RUN (4 entrants, bog_golem body, 12 matches, 7.2s):
+      1. scripted                 9 pts  6-0-0  100%  hp +0.381  rating  287.0
+      2. grave_shade v1           4 pts  3-0-3   50%  hp +0.107  rating    0.0
+      3. gloam_wisp v1            4 pts  3-0-3   50%  hp +0.103  rating    0.0
+      4. native                   0 pts  0-0-6    0%  hp -0.591  rating -287.0
+  — the scripted baseline beats both trained nets in a body neither was trained
+  for. That is a real finding about transfer, and exactly the question the
+  ladder exists to ask. Worth a look before the next sweep, Ricardo.
+  Gates: 14 tests in `ml/tests/test_ladder.py` (the fairness invariants first —
+  same build both sides, both orientations, different seeds — then the table
+  maths, the finite rating, jobs-independence and the refusals), 98 passed in
+  `ml/tests`, `CONSOLE SELFTEST OK`, `CONSOLE LAYOUT OK` across all 5 tabs.
+  STATUS: all four items of the 2026-09-14 console request are DONE.
 
 - **Are the open branches finished enough to merge? — Ricardo, 2026-09-13
   (latest+9):** *"check whether current open branches are finished in their work

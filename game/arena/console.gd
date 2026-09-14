@@ -122,8 +122,15 @@ var _vs_b := {}
 var _bench: Array = []           # [{name, verdict, kind, keys, when}] newest first
 var _bench_stamp := {}           # name -> modified time, so a re-filter re-reads nothing
 var _vs_filter: OptionButton     # creature
-var _vs_kind: OptionButton       # versus | tournament | everything
+var _vs_kind: OptionButton       # versus | tournament | ladder | everything
 var _vs_count: Label
+# RANK — the global, body-neutral net ranking (ml/training/ladder.py)
+var _rank_table: ItemList
+var _rank_head: Label
+var _rank_btn: Button
+var _rank_all_arenas: CheckBox
+var _rank_deployed: CheckBox
+var _rank_eps: SpinBox
 var _vs_a_label: Label
 var _vs_b_label: Label
 var _vs_eps: SpinBox
@@ -458,6 +465,7 @@ func _build_ui() -> void:
 	_build_runs_tab(tabs)
 	_build_nets_tab(tabs)
 	_build_versus_tab(tabs)
+	_build_rank_tab(tabs)
 
 # ---- RUNS: every isolated run tools/train_run.sh has written ------------------------------
 
@@ -673,7 +681,8 @@ func _build_versus_tab(tabs: TabContainer) -> void:
 	filt.add_child(_label("kind", DIM))
 	_vs_kind = OptionButton.new()
 	_vs_kind.focus_mode = Control.FOCUS_NONE
-	for row in [["everything", ""], ["head to head", "versus"], ["brackets", "tournament"]]:
+	for row in [["everything", ""], ["head to head", "versus"], ["brackets", "tournament"],
+			["global ranks", "ladder"]]:
 		_vs_kind.add_item(str(row[0]))
 		_vs_kind.set_item_metadata(_vs_kind.item_count - 1, str(row[1]))
 	_vs_kind.item_selected.connect(func(_i: int) -> void: _refresh_history())
@@ -690,6 +699,111 @@ func _build_versus_tab(tabs: TabContainer) -> void:
 			_last_verdict = picked.verdict
 			_refresh_ui())
 	v.add_child(_vs_history)
+
+# RANK — Ricardo, 2026-09-14: "a global rank for the all vs all, where every
+# model net compete for the top in a balance fight".
+#
+# VERSUS answers "is this net better than that one". RANK answers "which net is
+# best, full stop" — and the word that carries the weight is BALANCE. A ranking
+# of NETS has to remove the body from the comparison, so every pairing is played
+# with BOTH SIDES ON THE SAME BUILD, and both orientations, so the only variable
+# left is the policy. ml/training/ladder.py does the fighting.
+func _build_rank_tab(tabs: TabContainer) -> void:
+	var v := VBoxContainer.new()
+	v.name = "RANK"
+	v.add_theme_constant_override("separation", 3)
+	tabs.add_child(v)
+	v.add_child(_label("GLOBAL RANK — every net against every other, same body", EMBER))
+	v.add_child(_label("Both sides play the SAME arena build and every pair plays both "
+			+ "sides, so the only thing that differs is the policy. The baselines "
+			+ "(native/scripted) are the floor the table is read against. Verdicts land "
+			+ "in ml/data/benchmarks/ and show up in VERSUS as 'global ranks'.", DIM))
+
+	var knobs := HBoxContainer.new()
+	knobs.add_theme_constant_override("separation", 4)
+	_rank_all_arenas = CheckBox.new()
+	_rank_all_arenas.text = "every arena"
+	_rank_all_arenas.focus_mode = Control.FOCUS_NONE
+	_rank_all_arenas.tooltip_text = ("Replay every pairing in every creature build. "
+			+ "Fairer and far longer — without it the ladder runs in the selected "
+			+ "trainee's build (or the roster's first).")
+	knobs.add_child(_rank_all_arenas)
+	_rank_deployed = CheckBox.new()
+	_rank_deployed.text = "pins only"
+	_rank_deployed.focus_mode = Control.FOCUS_NONE
+	_rank_deployed.tooltip_text = "Only the deployed pin of each key, not every candidate version."
+	knobs.add_child(_rank_deployed)
+	knobs.add_child(_label("episodes/side", DIM))
+	_rank_eps = SpinBox.new()
+	_rank_eps.min_value = 1
+	_rank_eps.max_value = 16
+	_rank_eps.value = 1
+	_rank_eps.rounded = true
+	knobs.add_child(_rank_eps)
+	_rank_btn = _button(knobs, "RUN GLOBAL RANK", _rank_run)
+	_button(knobs, "REFRESH", _refresh_rank)
+	v.add_child(knobs)
+
+	_rank_head = _label("", PALE)
+	_rank_head.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_rank_head.custom_minimum_size = Vector2(0, 30)
+	v.add_child(_rank_head)
+	_rank_table = _list(0, false)
+	_rank_table.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	v.add_child(_rank_table)
+
+# The newest arena.ladder.v1 verdict in the benchmark folder — the ladder is not
+# live-tailable (it emits pairings, not generations), so the table is whatever
+# the last completed run wrote.
+func _refresh_rank() -> void:
+	if _rank_table == null:
+		return
+	_scan_bench()
+	_rank_table.clear()
+	var newest := {}
+	for e in _bench:
+		if str(e.kind) == "ladder":
+			newest = e
+			break                            # _bench is newest first
+	if newest.is_empty():
+		_rank_head.text = "no global rank yet — RUN GLOBAL RANK writes one"
+		return
+	var v: Dictionary = newest.verdict
+	var arenas: Array = _as_strings(v.get("arenas", []))
+	var short: PackedStringArray = []
+	for a in arenas:
+		short.append(str(a).get_slice(".", 2))
+	_rank_head.text = "%s · %d entrants · %d pairing(s) · arena %s · %ss" % [
+			str(newest.when), (v.get("entrants", []) as Array).size(),
+			(v.get("pairings", []) as Array).size(), ", ".join(short),
+			str(v.get("wall_s", "?"))]
+	for row in (v.get("table", []) if v.get("table", []) is Array else []):
+		var r: Dictionary = row
+		_rank_table.add_item("%2d  %-28s pts %-4s %s-%s-%s  win %.0f%%  hp %+.3f  rating %s" % [
+				int(r.get("rank", 0)), str(r.get("label", "?")), str(r.get("points", "?")),
+				str(r.get("ep_wins", 0)), str(r.get("ep_draws", 0)), str(r.get("ep_losses", 0)),
+				float(r.get("win_rate", 0.0)) * 100.0, float(r.get("hp_margin", 0.0)),
+				str(r.get("rating", "?"))])
+		_rank_table.set_item_metadata(_rank_table.item_count - 1, str(r.get("id", "")))
+
+# Runs in the SELECTED trainee's build unless 'every arena' is ticked: one body
+# is the cheap reading, every body is the fair one.
+func _ladder_args() -> String:
+	var args := "ladder --episodes %d --jobs %d --speed %s" % [
+			int(_rank_eps.value), int(_jobs.value), _speed_spec()]
+	if _rank_all_arenas.button_pressed:
+		args += " --all-arenas"
+	else:
+		var build := _selected_build()
+		if build != "":
+			args += " --arena %s" % _sq(build)
+	if _rank_deployed.button_pressed:
+		args += " --deployed-only"
+	return args
+
+func _rank_run() -> void:
+	if _pid > 0: return
+	_spawn_league(_ladder_args(), "ladder", "ladder")
 
 func _label(text: String, color: Color, size := ProtoTheme.SIZE_BODY) -> Label:
 	var l := Label.new()
@@ -1313,6 +1427,8 @@ func _refresh_tabs() -> void:
 		_vs_a_label.text = "A — %s" % (str(_vs_a.get("label", "")) if not _vs_a.is_empty() else "(unset)")
 		_vs_b_label.text = "B — %s" % (str(_vs_b.get("label", "")) if not _vs_b.is_empty() else "(unset)")
 		_vs_btn.disabled = _vs_a.is_empty() or _vs_b.is_empty() or _pid > 0
+	if _rank_btn != null:
+		_rank_btn.disabled = _pid > 0
 	if _vs_result != null and not _last_verdict.is_empty():
 		_vs_result.text = _verdict_detail(_last_verdict)
 
@@ -1762,6 +1878,10 @@ func _verdict_keys(v: Dictionary) -> Array:
 			keys.append(k)
 	if str(v.get("key", "")) != "":
 		add.call(str(v.get("key", "")))
+	for e in (v.get("entrants", []) if v.get("entrants", []) is Array else []):
+		add.call(str((e as Dictionary).get("key", "")))   # a ladder: every entrant's creature
+	for a in (v.get("arenas", []) if v.get("arenas", []) is Array else []):
+		add.call(str(a).get_slice(".", 2))                # and every body it was fought in
 	for side in ["a", "b"]:
 		var s: Dictionary = v.get(side, {})
 		if s.is_empty():
@@ -1779,6 +1899,8 @@ func _verdict_kind(v: Dictionary) -> String:
 		return "tournament"
 	if schema.begins_with("arena.versus"):
 		return "versus"
+	if schema.begins_with("arena.ladder"):
+		return "ladder"
 	return "other"
 
 # "2026-09-14_004448__tournament__bog_golem.json" -> "09-14 00:44". The name is
@@ -1791,6 +1913,10 @@ func _verdict_when(name: String) -> String:
 
 func _verdict_row(e: Dictionary) -> String:
 	var v: Dictionary = e.verdict
+	if str(e.kind) == "ladder":
+		return "%s  ★ global rank  %d entrants · %d arena(s)  champion %s" % [
+				str(e.when), (v.get("entrants", []) as Array).size(),
+				(v.get("arenas", []) as Array).size(), str(v.get("champion", "?"))]
 	if str(e.kind) == "tournament":
 		var pinned := "v%s pinned" % str(v.get("winner_version", "?")) if bool(v.get("deployed", false)) \
 				else "no pin moved"
@@ -1885,11 +2011,30 @@ func _refresh_history() -> void:
 		_vs_history.set_item_metadata(_vs_history.item_count - 1, str(e.name))
 	if _vs_count != null:
 		_vs_count.text = "%d of %d" % [_vs_history.item_count, _bench.size()]
+	_refresh_rank()
 
 # The panel above the list: whatever verdict is in focus, run just now or picked
 # out of the history. A bracket is not a head to head and must not be rendered
 # as one — it has entrants, a champion, and a pin that may or may not have moved.
 func _verdict_detail(v: Dictionary) -> String:
+	if _verdict_kind(v) == "ladder":
+		var arenas: PackedStringArray = []
+		for a in _as_strings(v.get("arenas", [])):
+			arenas.append(str(a).get_slice(".", 2))
+		var out: PackedStringArray = ["★ global rank — %d entrants · %d pairings · arena %s · %ss" % [
+				(v.get("entrants", []) as Array).size(),
+				(v.get("pairings", []) as Array).size(),
+				", ".join(arenas), str(v.get("wall_s", "?"))]]
+		for row in (v.get("table", []) if v.get("table", []) is Array else []):
+			var t: Dictionary = row
+			if int(t.get("rank", 0)) > 4:
+				out.append("   ... %d more — the RANK tab has the whole table"
+						% ((v.get("table", []) as Array).size() - 4))
+				break
+			out.append("   %d. %s  pts %s · win %s · rating %s" % [
+					int(t.get("rank", 0)), str(t.get("label", "?")), str(t.get("points", "?")),
+					str(t.get("win_rate", "?")), str(t.get("rating", "?"))])
+		return "\n".join(out)
 	if _verdict_kind(v) == "tournament":
 		var lines: PackedStringArray = []
 		lines.append("⚔ %s — %s · champion %s · %s" % [
@@ -2201,6 +2346,19 @@ func _selftest_cockpit() -> bool:
 					"rounds_won": 5, "episode_win_rate": 1.0, "gate_pass": false},
 				{"method": "ppo", "label": "ppo v3", "version": 3, "points": 0,
 					"rounds_won": 0, "episode_win_rate": 0.0, "gate_pass": false}]},
+		"2026-09-14_011856__ladder.json": {
+			"schema": "arena.ladder.v1", "arenas": ["core.arena.bog_golem"],
+			"episodes_per_orientation": 1, "wall_s": 7.2, "champion": "scripted",
+			"pairings": [{"a": "bog_golem@v2", "b": "scripted",
+					"arena": "core.arena.bog_golem"}],
+			"entrants": [{"id": "bog_golem@v2", "label": "bog_golem v2 (candidate)",
+					"key": "bog_golem"}, {"id": "scripted", "label": "scripted", "key": ""}],
+			"table": [{"rank": 1, "id": "scripted", "label": "scripted", "points": 3,
+					"ep_wins": 2, "ep_draws": 0, "ep_losses": 0, "win_rate": 1.0,
+					"hp_margin": 0.381, "rating": 287.0},
+				{"rank": 2, "id": "bog_golem@v2", "label": "bog_golem v2 (candidate)",
+					"points": 0, "ep_wins": 0, "ep_draws": 0, "ep_losses": 2,
+					"win_rate": 0.0, "hp_margin": -0.381, "rating": -287.0}]},
 		# no spec, no build: an old or hand-made verdict must still be listed
 		# under "all creatures" instead of silently vanishing from the history
 		"2026-09-12_120000__scripted_vs_native.json": {
@@ -2211,23 +2369,27 @@ func _selftest_cockpit() -> bool:
 		f.store_string(JSON.stringify(bench_fixtures[fixture_name], " "))
 		f.close()
 	_refresh_history()
-	if _vs_history.item_count != 4 or _vs_count.text != "4 of 4":
+	if _vs_history.item_count != 5 or _vs_count.text != "5 of 5":
 		ok = false
-		push_error("CONSOLE SELFTEST: history shows %d rows ('%s'), want 4" % [
+		push_error("CONSOLE SELFTEST: history shows %d rows ('%s'), want 5" % [
 				_vs_history.item_count, _vs_count.text])
-	if _vs_history.get_item_text(0).find("⚔ bog_golem") < 0 \
-			or _vs_history.get_item_text(0).find("champion es") < 0:
+	if _vs_history.get_item_text(0).find("★ global rank") < 0 \
+			or _vs_history.get_item_text(0).find("champion scripted") < 0:
 		ok = false
-		push_error("CONSOLE SELFTEST: newest row is not the bracket: '%s'" % _vs_history.get_item_text(0))
+		push_error("CONSOLE SELFTEST: newest row is not the ladder: '%s'" % _vs_history.get_item_text(0))
+	if _vs_history.get_item_text(1).find("⚔ bog_golem") < 0 \
+			or _vs_history.get_item_text(1).find("champion es") < 0:
+		ok = false
+		push_error("CONSOLE SELFTEST: the bracket row is wrong: '%s'" % _vs_history.get_item_text(1))
 	for row_i in _vs_history.item_count:
 		if _vs_history.get_item_text(row_i).find("? vs ?") >= 0:
 			ok = false
 			push_error("CONSOLE SELFTEST: a verdict rendered through the wrong schema: '%s'"
 					% _vs_history.get_item_text(row_i))
-	if _vs_history.get_item_text(2).find("3-2") < 0:
+	if _vs_history.get_item_text(3).find("3-2") < 0:
 		ok = false
 		push_error("CONSOLE SELFTEST: the head-to-head row lost its score: '%s'"
-				% _vs_history.get_item_text(2))
+				% _vs_history.get_item_text(3))
 	var filtered := func(key: String, kind: String) -> int:
 		for fi in _vs_filter.item_count:
 			if str(_vs_filter.get_item_metadata(fi)) == key:
@@ -2237,18 +2399,20 @@ func _selftest_cockpit() -> bool:
 				_vs_kind.select(ki)
 		_refresh_history()
 		return _vs_history.item_count
-	# bog_golem appears in a head to head AND a bracket; fen_boar in one verdict
-	if filtered.call("bog_golem", "") != 2 or filtered.call("fen_boar", "") != 1:
+	# bog_golem appears in a head to head, a bracket AND the ladder (as an
+	# entrant's key and as the body it was fought in); fen_boar in one verdict
+	if filtered.call("bog_golem", "") != 3 or filtered.call("fen_boar", "") != 1:
 		ok = false
 		push_error("CONSOLE SELFTEST: the creature filter does not select by creature")
-	if filtered.call("", "tournament") != 1 or filtered.call("", "versus") != 3:
+	if filtered.call("", "tournament") != 1 or filtered.call("", "versus") != 3 \
+			or filtered.call("", "ladder") != 1:
 		ok = false
-		push_error("CONSOLE SELFTEST: the kind filter does not split the two schemas")
+		push_error("CONSOLE SELFTEST: the kind filter does not split the three schemas")
 	if filtered.call("bog_golem", "tournament") != 1:
 		ok = false
 		push_error("CONSOLE SELFTEST: the two filters do not compose")
 	var fk := _verdict_keys(bench_fixtures["2026-09-12_120000__scripted_vs_native.json"])
-	if not fk.is_empty() or filtered.call("", "") != 4:
+	if not fk.is_empty() or filtered.call("", "") != 5:
 		ok = false
 		push_error("CONSOLE SELFTEST: a verdict with no creature was dropped from the history")
 	# a bracket's detail panel must show the bracket, not a made-up head to head
@@ -2257,6 +2421,37 @@ func _selftest_cockpit() -> bool:
 			or detail.find("es v2") < 0 or detail.find("vs") >= 0:
 		ok = false
 		push_error("CONSOLE SELFTEST: bracket detail reads '%s'" % detail)
+	# --- RANK: the newest ladder verdict, in rank order ----------------------
+	_refresh_rank()
+	if _rank_table.item_count != 2:
+		ok = false
+		push_error("CONSOLE SELFTEST: rank table shows %d rows, want 2" % _rank_table.item_count)
+	elif str(_rank_table.get_item_metadata(0)) != "scripted" \
+			or str(_rank_table.get_item_metadata(1)) != "bog_golem@v2":
+		ok = false
+		push_error("CONSOLE SELFTEST: rank order is %s, %s" % [
+				str(_rank_table.get_item_metadata(0)), str(_rank_table.get_item_metadata(1))])
+	if _rank_head.text.find("bog_golem") < 0 or _rank_head.text.find("2 entrants") < 0:
+		ok = false
+		push_error("CONSOLE SELFTEST: rank header reads '%s'" % _rank_head.text)
+	# the dispatch, without fighting anything: one body by default, every body on
+	# request, and 'pins only' must reach the ladder as --deployed-only
+	_rank_all_arenas.button_pressed = false
+	_rank_deployed.button_pressed = false
+	var one_body := _ladder_args()
+	if one_body.find("ladder --episodes") != 0 or one_body.find("--all-arenas") >= 0 \
+			or one_body.find("--deployed-only") >= 0:
+		ok = false
+		push_error("CONSOLE SELFTEST: default ladder args are '%s'" % one_body)
+	_rank_all_arenas.button_pressed = true
+	_rank_deployed.button_pressed = true
+	var every_body := _ladder_args()
+	if every_body.find("--all-arenas") < 0 or every_body.find("--deployed-only") < 0 \
+			or every_body.find("--arena ") >= 0:
+		ok = false
+		push_error("CONSOLE SELFTEST: 'every arena' ladder args are '%s'" % every_body)
+	_rank_all_arenas.button_pressed = false
+	_rank_deployed.button_pressed = false
 	_last_verdict = verdict
 	_refresh_ui()
 	if _vs_result.text.find("WINNER: A") < 0 or _vs_result.text.find("clinched in round 5") < 0:

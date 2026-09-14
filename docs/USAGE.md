@@ -256,6 +256,25 @@ CUDA allocation by `ml/training/gpu_guard.py` (half the 6 GB card by default;
 override with `DH_VRAM_FRACTION`). Training stays **local** on the 4050 — no
 cloud GPU (canon §12.38).
 
+### The global rank — every net, same body
+
+```bash
+python3 -m ml.training.ladder --arena core.arena.bog_golem --jobs 16
+python3 -m ml.training.ladder --all-arenas --episodes 2 --jobs 16
+python3 -m ml.training.ladder --keys bog_golem,fen_boar --dry-run
+python3 -m ml.training.league ladder --deployed-only      # the same thing
+```
+
+`league round-robin` fights deployed nets across DIFFERENT builds, which ranks
+the CREATURE. The ladder ranks the NET: both sides play the **same** arena
+build, so the only variable is the policy, and every pairing plays **both
+orientations** so the arena's side bias cancels instead of being baked into the
+table. Entrants are every registry net with exported weights plus the
+`native`/`scripted` baselines. Scoring is 3/1/0 per pairing, with episode win
+rate, mean HP margin and a Bradley-Terry rating on the Elo scale. The verdict
+lands in `ml/data/benchmarks/` as `arena.ladder.v1`; the training console's RANK
+tab reads it.
+
 ### Isolated, cumulative runs (recommended for experiments)
 
 ```bash

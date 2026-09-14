@@ -186,7 +186,12 @@ spectator/headless, ArenaProxy, policy.gd obs `arena.obs.v1`, scripted/neural
 policies, recorder JSONL, builds/cosmetics; `console.gd`/`console.tscn` —
 roster, Train/Stop child process, progress tail + fitness chart, Gate, Watch
 one episode), `ml/training/{policy_net,league}.py` (numpy twin + ES league,
-`--jobs N`, progress writer), `ml/eval/gate.py`, `ml/serving/` (registry +
+`--jobs N`, progress writer), `ml/training/tournament.py` (the method bracket
+per creature; `tools/train_run.sh --tournament` runs it across the roster),
+`ml/training/ladder.py` (the GLOBAL RANK: every net vs every other with both
+sides on the SAME build and both orientations, so the policy is the only
+variable — `league round-robin` ranks the creature, this ranks the net;
+`arena.ladder.v1` verdicts, RANK tab), `ml/eval/gate.py`, `ml/serving/` (registry +
 weights), content `core/arena/builds.json`. THE SEAM: league.py appends one
 JSON event per line to `ml/data/progress/<key>.jsonl` (`--progress-file`
 overrides; events start / match / candidate / generation / registered / gate /
@@ -198,7 +203,8 @@ bit-identical results; 16 workers ≈ 870× real time aggregate on the 20-core b
 (flat past 16); parallelism ceiling = pop × opponents; NO GPU anywhere in this
 tier. Training workers never build camera/HUD (only `--selftest` does, to gate
 that path). Gates: ARENA SELFTEST, CONSOLE SELFTEST (`console.tscn --
---selftest`, headless), COSMETICS, pytest ml (18). Rule: LOCAL GPUs only
+--selftest`, headless), CONSOLE LAYOUT (`console_layout_probe.tscn` — 7 canvases
+x 5 tabs), COSMETICS, pytest ml (98). Rule: LOCAL GPUs only
 (§12.38). Issues: scripted baseline beats native AI — L1 data-driven AI profiles
 is the unlock; fen_boar candidates take 0 wins vs native every match (fitness
 moves on hp margin only) — opponent curriculum/shaping next (design/25 §5).
