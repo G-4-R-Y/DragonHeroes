@@ -360,10 +360,85 @@ has ever run.
 | episode length parity, same | 1.97× | **1.50×** |
 | `dps_taken` parity vs native | 1.57× | **1.47×** |
 
-`dps_taken` is not closed — 1.71× is still outside the 1.25× tolerance, and the
-remaining gap is pace, not total (the damage *totals* now agree inside
-tolerance; the dh-env episode just gets there in 27 s instead of 40 s). But the
-verdict flip that made the gate unusable is gone.
+Those five left `dps_taken` at 1.71×, still outside the 1.25× tolerance. Four
+more divergences closed it.
+
+**6. dh-env trained against level-1 creatures.** `creature.gd::_apply_entry`
+scales hp by `1 + 0.02*(level-1)` and damage by `1 + 0.01*(level-1)`, read from
+`Session.level` once at spawn. `arena.gd` pins that to 20 for every rated match
+— `game/arena/tools/dump_specs.gd` did not. So `ml/env/specs.json` froze
+level-1 bodies: `fen_boar_alpha` at 339.72 max hp against the 468.8 the arena
+fields, 1.38× the hit points and 1.19× the damage, and nothing in the pipeline
+said so. The tool now pins `ARENA_LEVEL = 20` and writes `"level"` into the
+JSON; `ml/tests/test_specs.py` fails loudly if either goes missing.
+
+*While re-dumping, note this and do not rediscover it as a bug:* the five geared
+builds roll their equipment from the match seed, so their rows in `specs.json`
+are **one sample** of a per-seed roll, not a fixed stat block. It does not bite
+today because every build being trained is `kind: creature`.
+
+**7. No knockback.** `creature.gd::take_damage` ends with
+`_move(from_dir * 6.0)` and the arena proxy passes the direction through, so in
+the shipping game every landed hit shoves the victim 6 px and the attacker has
+to re-close before the next swing. The sim had none, so its duellists stayed
+glued together and traded faster than the arena's.
+
+**8. 4.8 px of reach nobody has.** `melee_hit` tested
+`attack_reach + radius + 0.3 * kTile`; `creature.gd::_strike` tests
+`attack_reach + body_radius`, full stop. `_strike_recoil`, the only forward
+motion in that path, is a sprite-pose tween that never moves
+`global_position`. That was 11% of a boar's envelope.
+
+**9. The move magnitude was never read by the game.** This is the one with
+consequences beyond parity. `fighter.gd::pre_tick` spends a move command two
+different ways:
+
+```gdscript
+if me is ProtoPlayer:
+    me._bot_step = _move_dir.limit_length(1.0) * spd * delta      # magnitude kept
+elif me.bot_drive:
+    if _move_dir.length() > 0.05:
+        me._move(_move_dir.normalized() * me._speed() * delta)    # magnitude DISCARDED
+```
+
+A creature body throws the magnitude away: anything longer than 0.05 moves at
+full speed, anything shorter does not move. The sim scaled by magnitude for
+everyone. The deployed net's `|move|` is 0.110 — **it crawled at 11% speed
+through every training step and ran at 100% in the arena on the same weights**.
+PPO spent its entire budget tuning a number the shipping runtime never reads,
+and §5.2.3's "move head std 0.006, magnitude 0.110" reads differently once you
+know that: the head collapsed toward a magnitude that was never a lever.
+
+The same function settles who may walk while winding up: a policy-driven body
+keeps moving (`pre_tick` never looks at `_state`), while a native body freezes
+(its movement lives in `creature.gd`'s state machine, whose `"windup"` branch
+only ticks the timer). The sim froze everyone.
+
+**10. Enrage was a damage buff it never was.** `_enrage_t` appears in exactly
+four places in `creature.gd`: the declaration ("failed snare: +30% speed while
+> 0"), the timer, `_speed()`'s 1.3×, and the setter. No damage multiplier
+anywhere. The sim multiplied every packet by 1.5 while enraged.
+
+| term, fen_boar pin | at the start | now |
+|---|---|---|
+| heuristic vs scripted in dh-env (arena: 0–12) | win **1.00** | win **0.00** |
+| `dps_taken` vs scripted | 2.24× | **1.25×** (tol 1.25×) |
+| `dps_taken` vs native | 1.57× | **1.01×** |
+| `dps_dealt` vs scripted | 1.12× | **1.22×** |
+| episode length vs scripted | 1.97× | **1.12×** |
+| `dmg_dealt` gap vs native | 0.249 | **0.030** |
+
+Measured over 24 episodes at seed 7777, both matchups. **Every rate term now
+passes in both** — `seconds`, `dps_dealt` and `dps_taken` all inside 1.25×.
+
+**`dps_taken` is closed.** What is not, and it is only the absolute outcome
+terms: `dmg_dealt`/`hp_foe` against scripted (0.215, tolerance 0.15) and
+`win_rate` against native (0.50 vs 0.96).
+Both are absolute outcome terms measured on a degenerate policy that barely
+moves and loses to a statue, so they sit on a knife edge and swing with the
+seed; the *rate* terms, which describe the combat rather than who happened to
+survive to the cap, now agree. Re-measure both once a policy exists that
+actually plays.
 
 **The standing consequence: every net trained before 2026-09-14 was trained in a
 different game from the one that grades it.** That is the most likely reason

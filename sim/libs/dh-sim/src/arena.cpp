@@ -22,6 +22,7 @@ constexpr float kFieldTick = 0.25f;
 // 100 ms shorter than the one the shipping game draws, which is 100 ms of
 // dodge window the learner never had to find.
 constexpr float kWindup = 0.35f;
+constexpr float kKnockback = 6.0f;    // creature.gd::take_damage nudge
 constexpr float kKitGate = 0.4f;
 constexpr float kDodgeTime = 0.25f;
 constexpr float kDodgeDash = 3.5f * kTile;
@@ -79,8 +80,20 @@ Arena::BodyRef Arena::nearest_enemy_body(int who, math::Vec2 from) const {
     return best;
 }
 
-void Arena::hurt(const BodyRef& ref, float dmg) {
+void Arena::hurt(const BodyRef& ref, float dmg, math::Vec2 from_dir) {
     Fighter& foe = f_[ref.fighter];
+    // KNOCKBACK. creature.gd::take_damage ends with `_move(from_dir * 6.0)`,
+    // so in the shipping game every landed hit shoves the victim 6 px away and
+    // the attacker has to re-close before the next swing. The sim had none, so
+    // its duellists stayed glued together and traded faster than the arena's —
+    // part of why a dh-env episode ended in 27 s where the arena's ran 40.
+    if (from_dir.length() > 0.0f) {
+        const math::Vec2 d = from_dir.normalized_or_zero();
+        if (ref.body == 0)
+            foe.pos = clamp_disc(foe.pos + d * kKnockback, foe.spec.body_radius);
+        else
+            foe.pos2 = clamp_disc(foe.pos2 + d * kKnockback, foe.buddy_spec.body_radius);
+    }
     // Every damage packet in the arena goes through here, so the tally below is
     // exhaustive by construction rather than by the caller remembering. Only
     // the accounting is conditional: a packet landing on a body that is already
@@ -433,8 +446,12 @@ void Arena::melee_hit(int who) {
     Fighter& foe = f_[1 - who];
     const BodyRef tgt = nearest_enemy_body(who, me.pos);
     if (!foe.alive()) return;
+    // ENRAGE IS SPEED ONLY. creature.gd's _enrage_t appears in exactly four
+    // places — the declaration ("failed snare: +30% speed while > 0"), the
+    // timer, _speed()'s 1.3x, and the setter. There is no damage multiplier
+    // anywhere in the shipping body. The sim invented a 1.5x on every packet.
     float dmg = me.spec.damage;
-    if (me.enrage_t > 0.0f) dmg *= 1.5f;
+    // if (me.enrage_t > 0.0f) dmg *= 1.5f;   // not in creature.gd
     if (me.spec.is_ranged) {
         // Ranged basic = a single bolt instead of a contact hit. It is FIRED
         // here and resolved by the projectile loop, so neither the melee reach
@@ -461,12 +478,18 @@ void Arena::melee_hit(int who) {
         }
         return;
     }
-    const float reach = me.spec.attack_reach + tgt.radius + 0.3f * kTile;
+    // creature.gd::_strike tests `attack_reach + body_radius`, full stop. The
+    // `+ 0.3 * kTile` this used to carry was 4.8 px of reach nobody in the
+    // arena has — 11% on a boar's 42.7 px envelope — and _strike_recoil, the
+    // only forward motion in that path, is a sprite pose tween that never
+    // moves global_position.
+    // const float reach = me.spec.attack_reach + tgt.radius + 0.3f * kTile;
+    const float reach = me.spec.attack_reach + tgt.radius;
     const math::Vec2 to_tgt = tgt.pos - me.pos;
     if (to_tgt.length() > reach) return;
     if (!in_arc(to_tgt, me.aim, me.spec.attack_arc_deg, tgt.radius)) return;
     if (foe.dodge_t > 0.0f) return;    // i-frames
-    hurt(tgt, dmg);
+    hurt(tgt, dmg, me.aim);
 }
 
 void Arena::exec_kit(int who, int slot) {
@@ -474,7 +497,7 @@ void Arena::exec_kit(int who, int slot) {
     const KitSpec& kit = me.spec.kits[slot];
     me.kit_cd[slot] = kit.cd;
     me.kit_gate = kKitGate;
-    const float dmg_mul = me.enrage_t > 0.0f ? 1.5f : 1.0f;
+    const float dmg_mul = 1.0f;   // enrage is speed only (creature.gd::_speed)
     const BodyRef tgt = nearest_enemy_body(who, me.pos);
     switch (kit.id) {
         case KitId::kBoltVolley: {
@@ -508,7 +531,7 @@ void Arena::exec_kit(int who, int slot) {
             Fighter& foe = f_[1 - who];
             if (foe.alive() && foe.dodge_t <= 0.0f &&
                 (tgt.pos - me.pos).length() <= reach)
-                hurt(tgt, me.spec.damage * dmg_mul);
+                hurt(tgt, me.spec.damage * dmg_mul, dir);
             break;
         }
         case KitId::kFieldCast: {
@@ -550,11 +573,11 @@ void Arena::buddy_tick(int who) {
         me.windup2_t -= kArenaDt;
         if (me.windup2_t <= 0.0f) {
             const BodyRef tgt = nearest_enemy_body(who, me.pos2);
-            const float reach = me.buddy_spec.attack_reach + tgt.radius + 0.3f * kTile;
+            const float reach = me.buddy_spec.attack_reach + tgt.radius;
             const math::Vec2 to_tgt = tgt.pos - me.pos2;
             if (foe.dodge_t <= 0.0f && to_tgt.length() <= reach &&
                 in_arc(to_tgt, me.aim2, me.buddy_spec.attack_arc_deg, tgt.radius))
-                hurt(tgt, me.buddy_spec.damage);
+                hurt(tgt, me.buddy_spec.damage, me.aim2);
         }
         return;
     }
@@ -564,7 +587,7 @@ void Arena::buddy_tick(int who) {
     const float reach = me.buddy_spec.attack_reach + tgt.radius;
     if (dist > reach * 0.85f) {
         float speed = me.buddy_spec.move_speed;
-        if (me.slow2_t > 0.0f) speed *= 0.65f;
+        if (me.slow2_t > 0.0f) speed *= 0.7f;   // creature.gd::_speed
         me.pos2 = clamp_disc(me.pos2 + to_foe * (speed * kArenaDt),
                              me.buddy_spec.body_radius);
     } else if (me.attack_cd2 <= 0.0f) {
@@ -580,14 +603,37 @@ void Arena::apply_action(int who, const Action& act) {
     Fighter& me = f_[who];
     Fighter& foe = f_[1 - who];
     if (me.hp <= 0.0f) return;   // a fallen primary acts no more (buddy is autonomous)
-    // movement (slow 35%, enrage haste 30%) — applied here; dash acts below
+    // MOVEMENT, and the two bodies spend a move command differently.
+    // fighter.gd::pre_tick, verbatim:
+    //   player body:   _move_dir.limit_length(1.0) * move_speed * (0.65 if slowed)
+    //   creature body: if len > 0.05: _move_dir.NORMALIZED() * _speed()
+    //                  where _speed() = move_speed * (1.3 if enraged) * (0.7 if slowed)
+    // The creature path throws the MAGNITUDE away: any command longer than
+    // 0.05 moves at full speed, and anything shorter does not move at all.
+    // The sim scaled by the magnitude for everyone, so the deployed net —
+    // |move| 0.110 — crawled at 11% speed in training and ran at 100% in the
+    // arena with the same weights. PPO was tuning a number the shipping
+    // runtime never reads.
     float speed = me.spec.move_speed;
-    if (me.slow_t > 0.0f) speed *= 0.65f;
-    if (me.enrage_t > 0.0f) speed *= 1.3f;
     math::Vec2 mv{act.move_x, act.move_y};
     const float ml = mv.length();
-    if (ml > 1.0f) mv = mv * (1.0f / ml);
-    if (me.windup_t <= 0.0f)
+    if (me.spec.is_player) {
+        if (me.slow_t > 0.0f) speed *= 0.65f;      // the player path's own slow
+        if (ml > 1.0f) mv = mv * (1.0f / ml);      // limit_length, not normalize
+    } else {
+        if (me.slow_t > 0.0f) speed *= 0.7f;       // creature.gd::_speed
+        if (me.enrage_t > 0.0f) speed *= 1.3f;
+        mv = ml > 0.05f ? mv * (1.0f / ml) : math::Vec2{};
+    }
+    // WHO IS ALLOWED TO WALK WHILE WINDING UP. In the arena a policy-driven
+    // body moves from fighter.gd::pre_tick, which runs before the body's
+    // _physics_process and does not look at `_state` at all — so it keeps
+    // walking through its own windup. A NATIVE body moves from creature.gd's
+    // own state machine, whose "windup" branch only ticks the timer, so it
+    // freezes. The sim froze everyone. Side 0 is always externally driven;
+    // side 1 is native only under OppPolicy::kNative.
+    const bool policy_driven = (who & 1) == 0 || opp_policy_ != OppPolicy::kNative;
+    if (me.windup_t <= 0.0f || policy_driven)
         me.pos = clamp_disc(me.pos + mv * (speed * kArenaDt), me.spec.body_radius);
     // The dodge body, shared by the explicit act 7 and the act.dodge fallback.
     const auto do_dodge = [&]() {
@@ -660,8 +706,8 @@ void Arena::apply_action(int who, const Action& act) {
                 const float r = kSlamRadius + tgt.radius;
                 if (foe.alive() && foe.dodge_t <= 0.0f &&
                     (tgt.pos - me.pos).length() <= r)
-                    hurt(tgt, me.spec.damage * 1.2f *
-                         (me.enrage_t > 0.0f ? 1.5f : 1.0f));
+                    hurt(tgt, me.spec.damage * 1.2f,
+                         (tgt.pos - me.pos).normalized_or_zero());
             }
             break;
         case 3: case 4: case 5: case 6: {
@@ -728,7 +774,8 @@ bool Arena::step(const Action& learner_act) {
         const float r = kSlamRadius + tgt.radius;
         if (foe.alive() && foe.dodge_t <= 0.0f &&
             (tgt.pos - me.pos).length() <= r)
-            hurt(tgt, me.spec.damage * 1.5f * (me.enrage_t > 0.0f ? 1.5f : 1.0f));
+            hurt(tgt, me.spec.damage * 1.5f,
+                 (tgt.pos - me.pos).normalized_or_zero());
     }
     // 4. projectiles (storm bolts DETONATE mire fields: conduct combo §12.41)
     for (auto& p : projectiles_) {
@@ -756,7 +803,7 @@ bool Arena::step(const Action& learner_act) {
         if (foe.alive() && foe.dodge_t <= 0.0f) {
             const BodyRef tgt = nearest_enemy_body(p.owner, p.pos);
             if ((tgt.pos - p.pos).length() <= tgt.radius + 2.0f) {
-                hurt(tgt, p.damage);
+                hurt(tgt, p.damage, p.vel.normalized_or_zero());
                 p.alive = false;
             }
         }

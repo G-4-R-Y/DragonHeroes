@@ -4,13 +4,13 @@
       "attack_cd": 1.6,
       "attack_reach": 38.4,
       "body_radius": 20.0,
-      "damage": 22.0,
+      "damage": 34.5399997197092,
       "dodge_max": 0,
       "is_player": false,
       "is_ranged": false,
       "kind": "boss",
       "kits": [],
-      "max_hp": 900.0,
+      "max_hp": 1925.99997706711,
       "move_speed": 88.0,
       "special_cd": 6.0
     },
@@ -18,21 +18,21 @@
       "attack_cd": 0.4,
       "attack_reach": 35.2,
       "body_radius": 8.0,
-      "damage": 121.36,
+      "damage": 148.2888,
       "dodge_max": 3,
       "is_player": true,
       "is_ranged": false,
       "kind": "player",
       "kits": [],
-      "max_hp": 400.0,
-      "move_speed": 95.2,
+      "max_hp": 407.0,
+      "move_speed": 94.4,
       "special_cd": 4.0
     },
     "core.arena.bog_golem": {
       "attack_cd": 1.8,
       "attack_reach": 28.8,
       "body_radius": 15.985,
-      "damage": 25.942,
+      "damage": 30.8709798898287,
       "dodge_max": 0,
       "is_player": false,
       "is_ranged": false,
@@ -51,7 +51,7 @@
           "range": 7.0
         }
       ],
-      "max_hp": 656.64,
+      "max_hp": 906.163194422722,
       "move_speed": 40.32,
       "special_cd": 6.0
     },
@@ -59,7 +59,7 @@
       "attack_cd": 0.9,
       "attack_reach": 28.8,
       "body_radius": 9.84,
-      "damage": 9.632,
+      "damage": 11.4620799590945,
       "dodge_max": 0,
       "is_player": false,
       "is_ranged": false,
@@ -78,7 +78,7 @@
           "range": 9.0
         }
       ],
-      "max_hp": 87.36,
+      "max_hp": 120.556799257994,
       "move_speed": 107.532,
       "special_cd": 6.0
     },
@@ -86,21 +86,21 @@
       "attack_cd": 0.25,
       "attack_reach": 28.8,
       "body_radius": 8.0,
-      "damage": 67.84128,
+      "damage": 61.36128,
       "dodge_max": 3,
       "is_player": true,
       "is_ranged": false,
       "kind": "player",
       "kits": [],
-      "max_hp": 303.45,
-      "move_speed": 127.2,
+      "max_hp": 299.2,
+      "move_speed": 128.0,
       "special_cd": 4.5
     },
     "core.arena.fen_boar_alpha": {
       "attack_cd": 1.8,
       "attack_reach": 28.8,
       "body_radius": 13.915,
-      "damage": 26.061,
+      "damage": 31.0125898893233,
       "dodge_max": 0,
       "is_player": false,
       "is_ranged": false,
@@ -119,7 +119,7 @@
           "range": 112.0
         }
       ],
-      "max_hp": 339.72,
+      "max_hp": 468.813597114533,
       "move_speed": 41.832,
       "special_cd": 6.0
     },
@@ -127,13 +127,13 @@
       "attack_cd": 1.8,
       "attack_reach": 28.8,
       "body_radius": 12.0,
-      "damage": 14.0,
+      "damage": 21.9799998216331,
       "dodge_max": 0,
       "is_player": false,
       "is_ranged": false,
       "kind": "boss",
       "kits": [],
-      "max_hp": 520.0,
+      "max_hp": 1112.79998674989,
       "move_speed": 67.2,
       "special_cd": 6.0
     },
@@ -141,7 +141,7 @@
       "attack_cd": 1.2,
       "attack_reach": 28.8,
       "body_radius": 7.65,
-      "damage": 10.5,
+      "damage": 12.4949999554083,
       "dodge_max": 0,
       "is_player": false,
       "is_ranged": false,
@@ -160,7 +160,7 @@
           "range": 9.0
         }
       ],
-      "max_hp": 85.2,
+      "max_hp": 117.57599927634,
       "move_speed": 75.6,
       "special_cd": 6.0
     },
@@ -168,7 +168,7 @@
       "attack_cd": 0.9,
       "attack_reach": 28.8,
       "body_radius": 8.73,
-      "damage": 16.24,
+      "damage": 19.3255999310315,
       "dodge_max": 0,
       "is_player": false,
       "is_ranged": false,
@@ -187,7 +187,7 @@
           "range": 112.0
         }
       ],
-      "max_hp": 117.6,
+      "max_hp": 162.287999001145,
       "move_speed": 108.864,
       "special_cd": 6.0
     },
@@ -195,7 +195,7 @@
       "attack_cd": 1.2,
       "attack_reach": 28.8,
       "body_radius": 8.37,
-      "damage": 11.76,
+      "damage": 13.9943999500573,
       "dodge_max": 0,
       "is_player": false,
       "is_ranged": false,
@@ -214,7 +214,7 @@
           "range": 7.0
         }
       ],
-      "max_hp": 100.8,
+      "max_hp": 139.103999143839,
       "move_speed": 75.6,
       "special_cd": 6.0
     },
@@ -222,7 +222,7 @@
       "attack_cd": 0.675,
       "attack_reach": 28.8,
       "body_radius": 9.68,
-      "damage": 11.312,
+      "damage": 13.4612799519599,
       "dodge_max": 0,
       "is_player": false,
       "is_ranged": false,
@@ -241,7 +241,7 @@
           "range": 8.0
         }
       ],
-      "max_hp": 83.46,
+      "max_hp": 115.174799291119,
       "move_speed": 160.776,
       "special_cd": 6.0
     },
@@ -249,13 +249,13 @@
       "attack_cd": 0.4,
       "attack_reach": 35.2,
       "body_radius": 8.0,
-      "damage": 103.67848,
+      "damage": 102.835392,
       "dodge_max": 3,
       "is_player": true,
       "is_ranged": false,
       "kind": "player",
       "kits": [],
-      "max_hp": 453.1,
+      "max_hp": 418.6,
       "move_speed": 93.6,
       "special_cd": 4.0
     },
@@ -263,27 +263,27 @@
       "attack_cd": 0.4,
       "attack_reach": 35.2,
       "body_radius": 8.0,
-      "damage": 127.008,
+      "damage": 104.832,
       "dodge_max": 3,
       "is_player": true,
       "is_ranged": false,
       "kind": "player",
       "kits": [],
-      "max_hp": 333.0,
-      "move_speed": 96.0,
+      "max_hp": 331.2,
+      "move_speed": 97.6,
       "special_cd": 4.0
     },
     "core.arena.pyre_sovereign": {
       "attack_cd": 1.7,
       "attack_reach": 41.6,
       "body_radius": 22.0,
-      "damage": 30.0,
+      "damage": 47.0999996177852,
       "dodge_max": 0,
       "is_player": false,
       "is_ranged": false,
       "kind": "boss",
       "kits": [],
-      "max_hp": 1700.0,
+      "max_hp": 3637.99995668232,
       "move_speed": 92.8,
       "special_cd": 6.0
     },
@@ -291,27 +291,27 @@
       "attack_cd": 0.55,
       "attack_reach": 35.2,
       "body_radius": 8.0,
-      "damage": 61.71,
+      "damage": 78.08,
       "dodge_max": 3,
       "is_player": true,
       "is_ranged": true,
       "kind": "player",
       "kits": [],
-      "max_hp": 247.2,
-      "move_speed": 99.2,
+      "max_hp": 203.2,
+      "move_speed": 100.8,
       "special_cd": 5.0
     },
     "core.arena.terravore_colossus": {
       "attack_cd": 2.2,
       "attack_reach": 44.8,
       "body_radius": 26.0,
-      "damage": 34.0,
+      "damage": 53.3799995668232,
       "dodge_max": 0,
       "is_player": false,
       "is_ranged": false,
       "kind": "boss",
       "kits": [],
-      "max_hp": 2300.0,
+      "max_hp": 4921.99994139373,
       "move_speed": 44.8,
       "special_cd": 6.0
     }
@@ -322,6 +322,7 @@
     "lava": 3,
     "mire": 2
   },
+  "level": 20,
   "note": "GENERATED by game/arena/tools/dump_specs.gd — do not hand-edit",
   "schema": "arena.specs.v1"
 }

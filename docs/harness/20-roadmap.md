@@ -793,6 +793,77 @@ Rebuild after the packaging commit for clean provenance; archives remain in
   `test_arena_action_budget_binds_both_sides` and
   `test_arena_swing_is_a_cone_not_a_circle` in `sim/tests/test_main.cpp`.
 
+  **AND THEN FOUR MORE, because the first four did not close it (2026-09-14).**
+  After the fairness layer and the four content fixes above, `dps_taken` was
+  still 1.71x. Chasing the rest found four more divergences, every one of them
+  settled by reading the shipping GDScript:
+    5. **dh-env trained against LEVEL-1 creatures.** `creature.gd::_apply_entry`
+       scales hp by `1 + 0.02*(level-1)` and damage by `1 + 0.01*(level-1)` off
+       `Session.level`, read once at spawn. `arena.gd` pins that to 20 for every
+       rated match — but `game/arena/tools/dump_specs.gd` did not, so
+       `ml/env/specs.json` froze level-1 bodies: `fen_boar_alpha` at 339.72 max
+       hp against the 468.8 the arena actually fields (x1.38 hp, x1.19 damage).
+       The tool now pins `ARENA_LEVEL = 20` and writes `"level"` into the JSON;
+       `ml/tests/test_specs.py` (4 tests) fails loudly if either goes missing.
+       NOTE while re-dumping: the five geared builds roll their equipment from
+       the match seed, so their spec rows are ONE sample of a per-seed roll.
+       Harmless today (every trained build is `kind: creature`) and recorded
+       here so it is not rediscovered as a bug.
+    6. **No knockback.** `creature.gd::take_damage` ends with
+       `_move(from_dir * 6.0)`, and the arena's proxy passes the direction
+       straight through, so every landed hit shoves the victim 6 px and the
+       attacker must re-close. The sim had none, so its duellists stayed glued
+       together and traded faster. `hurt()` now takes the blow direction.
+    7. **4.8 px of reach nobody has.** `melee_hit` tested
+       `attack_reach + radius + 0.3*kTile`; `creature.gd::_strike` tests
+       `attack_reach + body_radius`, full stop — and `_strike_recoil`, the only
+       forward motion in that path, is a sprite tween that never moves
+       `global_position`. 11% of a boar's envelope. Slow multiplier also
+       corrected (0.65 -> 0.7 for creature bodies; the player path keeps 0.65,
+       which is what `pre_tick` actually uses).
+    8. **THE MOVE MAGNITUDE WAS NEVER READ BY THE GAME.** `fighter.gd::pre_tick`
+       spends a move command two different ways: a player body gets
+       `_move_dir.limit_length(1.0) * speed`, but a CREATURE body gets
+       `if len > 0.05: _move_dir.NORMALIZED() * _speed()` — the magnitude is
+       thrown away, so any command longer than 0.05 moves at FULL speed. The sim
+       scaled by magnitude for everyone. The deployed net's `|move|` is 0.110:
+       it crawled at 11% speed through every training step and ran at 100% in
+       the arena with the same weights. **PPO spent its whole budget tuning a
+       number the shipping runtime never reads.** Same function also fixed:
+       policy-driven bodies keep walking through their own windup (`pre_tick`
+       does not look at `_state`), while a NATIVE body freezes (its movement
+       lives in `creature.gd`'s state machine, whose "windup" branch only ticks
+       the timer).
+    9. **Enrage was a damage buff it never was.** `_enrage_t` appears in exactly
+       four places in `creature.gd` — declaration ("failed snare: +30% speed"),
+       timer, `_speed()`'s 1.3x, and the setter. No damage multiplier anywhere.
+       The sim applied 1.5x to every packet while enraged.
+
+  **RESULT — `dps_taken` IS CLOSED, which is what Ricardo asked for.**
+
+  | term, fen_boar pin | before | after |
+  |---|---|---|
+  | heuristic vs scripted in dh-env (arena says 0-12) | win **1.00** | win **0.00** |
+  | `dps_taken` vs scripted | 2.24x | **1.25x** (tol 1.25x) |
+  | `dps_taken` vs native | 1.57x | **1.01x** |
+  | `dps_dealt` vs scripted | 1.12x | **1.22x** |
+  | episode length vs scripted | 1.97x | **1.12x** |
+  | `dmg_dealt` gap vs native | 0.249 | **0.030** |
+
+  (24 episodes, seed 7777, both matchups. **Every RATE term now passes in both
+  matchups** — seconds, `dps_dealt` and `dps_taken` all inside 1.25x.)
+
+  STILL OPEN, and ONLY the absolute outcome terms: `dmg_dealt`/`hp_foe` vs
+  scripted (0.215, tol 0.15) and `win_rate` vs native (0.50 vs 0.96). Both are measured on the DEPLOYED
+  fen_boar net, which is degenerate (it barely moves and is worse than a
+  statue), so its outcomes sit on a knife edge and swing with the seed. The
+  rate terms — which describe the combat rather than who happened to survive —
+  now agree. Re-measure with a policy that actually plays once one exists.
+
+  **THE STANDING CONSEQUENCE FOR R50:** every net trained before today was
+  trained in a materially different game. The converged `train_all` run must
+  start from scratch here, not warm-start from those weights.
+
   **R47/R48/R50 PROGRESS 2026-09-14, in the order they were taken.**
 
   **R47 DONE — `docs/tech/38-reward-model-history.md`.** His ask was for the

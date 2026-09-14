@@ -245,7 +245,10 @@ class Arena {
     struct BodyRef { int fighter = 0; int body = 0; math::Vec2 pos{}; float radius = 8.0f; };
     BodyRef nearest_enemy_body(int who, math::Vec2 from) const;
     math::Vec2 self_body_pos(const Fighter& f) const;
-    void hurt(const BodyRef& ref, float dmg);
+    // `from_dir` is the direction of the blow: creature.gd::take_damage nudges
+    // the victim 6 px along it on EVERY landed packet, and the arena's proxy
+    // passes it straight through. Zero means no nudge (fields, DoTs).
+    void hurt(const BodyRef& ref, float dmg, math::Vec2 from_dir = {});
     math::Vec2 clamp_disc(math::Vec2 p, float margin) const;
     float gauss();                       // Box-Muller on the policy stream
 

@@ -1228,9 +1228,40 @@ Still open:
    1.2x-damage AoE every 6 s, and every arena build shipping today is
    `kind: creature`, so that was a phantom damage source in every match dh-env
    ever ran.
+   Four more followed, because those five left `dps_taken` at 1.71x:
+   (f) **dh-env trained against LEVEL-1 creatures** — `creature.gd` scales hp by
+   1 + 0.02*(level-1) and damage by 1 + 0.01*(level-1) off `Session.level`,
+   which `arena.gd` pins to 20 for every rated match and `dump_specs.gd` did
+   not, so `ml/env/specs.json` held level-1 bodies (fen_boar 339.72 max hp
+   against the arena's 468.8). The tool pins ARENA_LEVEL = 20 and records it in
+   the JSON; `ml/tests/test_specs.py` fails if it goes missing. The five geared
+   builds roll equipment from the match seed, so their spec rows are one sample
+   of a per-seed roll — recorded, not a bug.
+   (g) **no knockback** — `creature.gd::take_damage` ends with
+   `_move(from_dir * 6.0)`, so every landed hit shoves the victim 6 px and the
+   attacker must re-close; the sim's duellists stayed glued together.
+   (h) **4.8 px of reach nobody has** — `_strike` tests
+   `attack_reach + body_radius` and nothing more; `_strike_recoil` is a sprite
+   tween that never moves `global_position`.
+   (i) **the move MAGNITUDE was never read by the game** — `fighter.gd::pre_tick`
+   gives a player body `limit_length(1.0)` but a creature body
+   `normalized() * _speed()` above a 0.05 deadzone, discarding the magnitude
+   entirely. The sim scaled by it for everyone, so the deployed net (|move|
+   0.110) crawled at 11% speed in training and ran at 100% in the arena on the
+   same weights. **PPO spent its whole budget tuning a number the shipping
+   runtime never reads.** Same function settles windup movement: policy-driven
+   bodies keep walking, native bodies freeze.
+   (j) **enrage was a damage buff it never was** — `_enrage_t` is +30% speed in
+   `creature.gd` and nothing else; the sim multiplied every packet by 1.5.
    RESULT: the heuristic that scored win 1.00 in dh-env now scores **0.00**,
-   agreeing with the arena's 0-12; `dps_dealt` parity 1.12x -> 1.02x and
-   `dps_taken` 2.24x -> 1.71x on the deployed fen_boar pin. The fairness layer
-   by itself moved `dps_taken` 2.24x -> 2.23x — necessary, but the content
-   divergences were the damage. **A net trained before this date was trained in
-   a different game**, which is why nothing trained so far beats a statue.
+   agreeing with the arena's 0-12, and **every RATE term passes in both
+   matchups** (24 episodes, seed 7777): `dps_taken` 2.24x -> 1.25x vs scripted
+   and 1.57x -> 1.01x vs native, episode length 1.97x -> 1.12x. Still open, and
+   only the absolute outcome terms: `dmg_dealt` vs scripted (0.215, tol 0.15)
+   and `win_rate` vs native — both measured on a degenerate pin that loses to a
+   statue, so both swing with the seed. The fairness layer BY ITSELF moved
+   `dps_taken` only 2.24x -> 2.23x: necessary, but the content divergences were
+   the damage, and stopping at the fairness layer would have shipped a wrong
+   fix that measured as a success. **A net trained before this date was trained
+   in a different game**, which is why nothing trained so far beats a statue,
+   and why the converged run must start here rather than warm-start.
