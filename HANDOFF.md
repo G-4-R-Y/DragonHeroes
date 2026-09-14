@@ -923,3 +923,56 @@ two-creature spike (§5). DH_*_DIR env vars locate adapter checkouts.
   6e three play modes canon-locked; 6g leaderboard->cosmetics (auras/wings/
   legendary mounts) queued.
 - Packages rebuilt (all of the above inside).
+
+## 2026-09-14 (latest+10) — the training console: graph, bracket sweep, benchmark browser, global rank
+
+Ricardo: *"to the trianing onsole: graph overflows from the rendered screen. Add
+tournament mode for the train all method, as well. Also, a better benchmark
+interface, filtered by creature"* + *"and a global rank for the all vs all,
+where every model net compete for the top in a balance fight"*. All four DONE —
+`3c44285`, `8b2ae3e`, `6844eb2`, `d2d194b`. Roadmap has the full write-ups.
+
+- **Graph overflow** was ONE canvas: 640x360, the project default. `_fit_window`
+  walked candidates that all needed `usable.size.y >= 636`; when none fit the
+  loop just ended and `content_scale_size` stayed at the project default, 90
+  logical px shorter than the console's content. New permanent gate:
+  `game/arena/tests/console_layout_probe.tscn` — 7 canvases x every tab.
+- **TRAIN ALL bracket:** `tools/train_run.sh --tournament` + a `bracket`
+  checkbox. Ticked, TRAIN ALL reads "TRAIN ALL ⚔" and each creature's methods
+  compete for its pin. `--resume` is refused on a tournament run (no
+  per-generation checkpoint exists for a bracket).
+- **Benchmark browser:** `ml/data/benchmarks/` holds THREE schemas now and the
+  history rendered them all through the versus fields — every bracket read
+  "? vs ?  0-0  ?". Each schema has its own row and detail; filtered by creature
+  and by kind, and they compose.
+- **Global rank (NEW `ml/training/ladder.py`, `league ladder`, RANK tab):** both
+  sides on the SAME build, both orientations, every entrant vs every other, so
+  the policy is the only variable. `league round-robin` was a stub AND asked the
+  wrong question (different builds = ranks the creature). Points 3/1/0, episode
+  win rate, HP margin, Bradley-Terry rating on the Elo scale.
+
+**!! game/arena/console.gd HAD NOT PARSED AT HEAD SINCE `aa35f2b` !!** Two call
+sites were committed without their definitions — hunk-level staging across the
+two concurrent sessions split a refactor from its users:
+
+    Parse Error: Identifier "left_frame" not declared            (console.gd:363,364)
+    Parse Error: Too many arguments for "_spawn_train_run()" call
+                 Expected at most 2 but received 3.              (console.gd:857)
+
+Every commit from `aa35f2b` to `3c44285` shipped a console that could not boot.
+The selftest never caught it because it runs the WORKING TREE file, not the
+committed one. `8b2ae3e` carries the missing halves in. **Lesson for both
+sessions: after partial-hunk staging, parse-check the COMMITTED blob, not the
+working tree** — `git show HEAD:<path>` into a scratch copy and run the gate.
+
+**FIRST REAL LADDER (bog_golem body, 4 entrants, 12 matches, 7.2 s):**
+
+     1  scripted                 9 pts  6-0-0  100%  hp +0.381  rating  287.0
+     2  grave_shade v1           4 pts  3-0-3   50%  hp +0.107  rating    0.0
+     3  gloam_wisp v1            4 pts  3-0-3   50%  hp +0.103  rating    0.0
+     4  native                   0 pts  0-0-6    0%  hp -0.591  rating -287.0
+
+The scripted baseline beats both trained nets in a body neither was trained for.
+Worth a look before the next sweep — it says how little these policies transfer.
+
+Gates: CONSOLE SELFTEST OK, CONSOLE LAYOUT OK (5 tabs), pytest ml 98 passed.
