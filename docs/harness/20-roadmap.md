@@ -807,6 +807,46 @@ Rebuild after the packaging commit for clean provenance; archives remain in
        ENVIRONMENT parity gate between dh-env and the arena — the twin of the
        policy parity gate — and fix whichever side is wrong. (iii) is the one
        that pays for itself, because it also protects ES's C++ port.
+    **4. UPDATE 2026-09-14, LATER — finding 3 IS NOT THE WHOLE STORY, and the
+       "consistent with this and with nothing else" above is now falsified.
+       There was a FOURTH defect, and fixing it took `suite_native` from 0.00 to
+       1.00 (PASS) in the Godot arena.** The learner squashed the move head
+       through `tanh` (`torch_policy.py::forward`) while EVERY consumer of those
+       weights clips instead: `policy_net.act` does `np.clip(y[0:2], -1, 1)`,
+       `export_policy_v1` folds the heads into one `"linear"` layer, `pack_for_
+       cpp` hands the same raw weights to the C++ self-play opponent, and
+       `distill.py` takes raw MSE on move. So the thing being optimised was a
+       DIFFERENT FUNCTION OF THE SAME WEIGHTS than the thing being played
+       against and the thing being graded. It hid perfectly while the move head
+       was untrained (defect 2) because the outputs sat near zero, where tanh and
+       clip agree: the measured divergence was 0.0000. Once move actually
+       learned, 40% of components passed +-1 and the divergence measured 0.0760
+       mean / 0.2383 max — and that is when the gate stayed at 0.00.
+       FIXED: the move head is now raw in both `forward()`s (MLP and GRU); the
+       Gaussian mean is unsquashed, the sample is clamped only where the env
+       consumes it, exactly as the runtime does. A `clamp()` in `forward` would
+       have matched the runtime too but killed the gradient on 40% of outputs;
+       raw keeps it everywhere. One contract across trainer, exporter, C++
+       opponent and arena.
+       MEASURED, same key, same 40M budget, seed 1:
+         * before: `suite_scripted 0.00` · `suite_native 0.00` — FAIL
+         * after:  `suite_scripted 0.00` · **`suite_native 1.00, fitness 1.016,
+           PASS`** · native sanity `mean_loser_hp 0.837`
+         * train/runtime divergence 0.0760 -> 0.0000
+       SECOND EFFECT, and it re-reads an earlier number: self-play win rate fell
+       from 0.85-0.90 to ~0.4-0.8. That is the honest figure, not a regression —
+       the learner had been enjoying an artificial edge over a misrendered copy
+       of its own weights. The old 0.85 was partly an artifact of the bug.
+       WHAT THIS DOES AND DOES NOT SETTLE: PPO can now win in the ARENA, which
+       is what finding 3 said it structurally could not do, so the dh-env/arena
+       boundary is NOT a total explanation. It remains a real and ungated seam,
+       and it is still the best explanation for what is LEFT: `suite_scripted`
+       is still 0.00 while native is 1.00 — a net that dominates one arena
+       opponent and never beats the other. The environment-parity gate (route
+       iii) is still the right build, now with a sharper target: find what
+       scripted does in the arena that dh-env's scripted does not.
+       Confirmation run on a different seed is in flight; one seed is not a
+       result.
     NOT DONE, deliberately: the `tools/train_run.sh` STEPS default is still
     2,000,000. Raising it would buy longer runs of a net that cannot be scored,
     so the budget decision waits on the environment decision.

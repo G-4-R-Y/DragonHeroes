@@ -3,7 +3,8 @@
 Same contract (so anything trained here still DEPLOYS to the Godot arena):
   input  = obs[31] ++ embedding[16]          (arena.obs.v1 + content row)
   hidden = arch.hidden, arch.activation      ([64, 64] tanh by default)
-  heads  = move[2] (tanh-squashed), act logits[7], dodge logit[1]
+  heads  = move[2] (RAW — the runtime clips, see below), act logits[7],
+           dodge logit[1]
 plus a PPO value head (NOT exported — the Godot runtime is policy-only).
 
 The shape comes from ml.training.arch — the SAME Arch the numpy stack and the
@@ -101,15 +102,27 @@ class TorchGRUPolicyNet(nn.Module):
         return torch.zeros(batch, HIDDEN[1], device=device)
 
     def forward(self, obs: torch.Tensor, key: str, h: torch.Tensor):
-        """obs[B,31], h[B,64] -> (move, logits, dodge, value, h')."""
+        """obs[B,31], h[B,64] -> (raw move, logits, dodge, value, h')."""
         idx = torch.full((obs.shape[0],), self.key_to_idx.get(key, 0),
                          dtype=torch.long, device=obs.device)
         x = torch.tanh(self.input(torch.cat([obs, self.embeddings(idx)], -1)))
         h = self.gru(x, h)
-        return (torch.tanh(self.head_move(h)), self.head_act(h),
+        return (self.head_move(h), self.head_act(h),
                 self.head_dodge(h).squeeze(-1), self.head_value(h).squeeze(-1), h)
 
 
+# WHY THE MOVE HEAD IS NOT SQUASHED (2026-09-14)
+# The runtime contract is CLIP, not tanh: policy_net.act does
+# `np.clip(y[0:2], -1, 1)`, export_policy_v1 folds the three heads into one
+# "linear" layer, and pack_for_cpp hands the same raw weights to the C++
+# self-play opponent. Squashing here made the learner a DIFFERENT function of
+# the same weights than both the net it played against and the net the gate
+# ran. It stayed invisible while the move head was untrained and its outputs
+# sat near zero; once move actually learned, 40% of outputs passed +-1 and the
+# train/runtime gap measured 0.076 mean (0.238 max) — a net that scored 0.90
+# against its own snapshot and 0.00 at the gate. One contract now: the head
+# emits a raw vector, whoever uses it clips. Gradient still flows everywhere,
+# which a clamp() here would not give.
 class TorchPolicyNet(nn.Module):
     def __init__(self, keys: list[str] | None = None, obs_dim: int = OBS_DIM,
                  hidden: tuple[int, ...] | None = None, arch: Arch | None = None):
@@ -154,9 +167,9 @@ class TorchPolicyNet(nn.Module):
         return x
 
     def forward(self, obs: torch.Tensor, key: str = "*"):
-        """move[-1,1]^2, act logits[7], dodge logit[1], value[1] — batched."""
+        """raw move[2], act logits[7], dodge logit[1], value[1] — batched."""
         h = self._trunk(obs, key)
-        return (torch.tanh(self.head_move(h)), self.head_act(h),
+        return (self.head_move(h), self.head_act(h),
                 self.head_dodge(h).squeeze(-1), self.head_value(h).squeeze(-1))
 
     # ---- continuity with the numpy ES stack ---------------------------------
