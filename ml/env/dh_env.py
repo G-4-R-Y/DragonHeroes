@@ -84,7 +84,39 @@ def _load_lib() -> ctypes.CDLL:
         ctypes.POINTER(ctypes.c_void_p), ctypes.c_int32,
         ctypes.POINTER(ctypes.c_uint64), ctypes.POINTER(ctypes.c_float)]
     lib.dh_env_shutdown_pool.argtypes = []
+    # The frozen self-play opponent. Two entry points: the original (tanh hidden,
+    # linear head) and the one that takes per-layer activation codes, which only
+    # exists in a library built after 2026-09-13. Declaring argtypes for it is how
+    # a stale .so announces itself — an AttributeError here beats a self-play
+    # opponent that silently ran the wrong activation for a million steps.
+    _opp_args = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_float),
+                 ctypes.POINTER(ctypes.c_int32), ctypes.POINTER(ctypes.c_int32),
+                 ctypes.c_int32, ctypes.POINTER(ctypes.c_float)]
+    lib.dh_env_set_opp_weights.argtypes = _opp_args
+    if hasattr(lib, "dh_env_set_opp_weights_acts"):
+        lib.dh_env_set_opp_weights_acts.argtypes = \
+            _opp_args + [ctypes.POINTER(ctypes.c_int32)]
     return lib
+
+
+def set_opp_weights(handle: int, params, layer_in, layer_out, emb, acts=None) -> bool:
+    """Hand a frozen net to one env's opponent slot. Returns True if the per-layer
+    activations went with it; False means the library predates them and the
+    opponent will run tanh hidden / linear head whatever `acts` says — which is
+    correct for every tanh net and WRONG for anything else, so callers warn."""
+    l = lib()
+    args = [ctypes.c_void_p(handle),
+            params.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
+            layer_in.ctypes.data_as(ctypes.POINTER(ctypes.c_int32)),
+            layer_out.ctypes.data_as(ctypes.POINTER(ctypes.c_int32)),
+            len(layer_in),
+            emb.ctypes.data_as(ctypes.POINTER(ctypes.c_float))]
+    if acts is not None and hasattr(l, "dh_env_set_opp_weights_acts"):
+        l.dh_env_set_opp_weights_acts(
+            *args, acts.ctypes.data_as(ctypes.POINTER(ctypes.c_int32)))
+        return True
+    l.dh_env_set_opp_weights(*args)
+    return acts is None
 
 
 _LIB = None

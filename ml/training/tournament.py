@@ -68,6 +68,7 @@ ROOT = Path(__file__).resolve().parent.parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from ml.training import arch as arch_mod                            # noqa: E402
 from ml.training import league                                      # noqa: E402
 
 BENCH_DIR = league.BENCH_DIR
@@ -158,6 +159,8 @@ def method_command(method: str, key: str, build: str, opp_build: str,
                "--episodes", str(knobs["episodes"]), "--jobs", str(knobs["jobs"]),
                "--seed", str(knobs["seed"]), "--speed", str(knobs["speed"]),
                "--checkpoint-every", str(knobs["checkpoint_every"])]
+        if knobs.get("net"):
+            cmd += ["--net", knobs["net"]]
         if knobs.get("opponents"):
             cmd += ["--opponents", knobs["opponents"]]
         return cmd
@@ -173,7 +176,10 @@ def method_command(method: str, key: str, build: str, opp_build: str,
                 "--jobs", str(knobs["jobs"]), "--speed", str(knobs["speed"]),
                 "--samples", str(knobs["samples"]),
                 "--dagger-rounds", str(knobs["dagger_rounds"]),
-                "--envs", str(knobs["envs"]), "--no-gate"]
+                "--envs", str(knobs["envs"]), "--no-gate"] + (
+                # the STUDENT's shape — a distilled net still has to ship, so it
+                # follows the same --net as the other entrants
+                ["--net", knobs["net"]] if knobs.get("net") else [])
     if method == "ppo":
         if not VENV_PY.exists():
             return None
@@ -182,7 +188,8 @@ def method_command(method: str, key: str, build: str, opp_build: str,
                 "--steps", str(knobs["steps"]), "--envs", str(knobs["envs"]),
                 "--arch", knobs["arch"],
                 "--selfplay-every", str(knobs["selfplay_every"]),
-                "--seed", str(knobs["seed"])]
+                "--seed", str(knobs["seed"])] + (
+                ["--net", knobs["net"]] if knobs.get("net") else [])
     return None
 
 
@@ -419,6 +426,12 @@ def plan(keys: list[tuple[str, str]], methods: list[str], knobs: dict,
           f"{f' + {len(extras)} extra(s)' if extras else ''}\n")
     for key, build in keys:
         print(f"  {key:<22s} {build}   ppo opponent: {default_opp_build(build)}")
+    net = arch_mod.resolve(knobs.get("net", ""))
+    from ml.training.policy_net import macs
+    print(f"\n  net '{net.name}': {list(net.hidden)} {net.activation}, "
+          f"init {net.init} — {macs(net.hidden):,} MACs/tick"
+          + ("  (TEACHER-SIZED: it cannot ship, distill the winner)"
+             if macs(net.hidden) > 2 * macs() else ""))
     print(f"\n  per key:")
     if "es" in methods:
         print(f"    es      {knobs['generations']} gens x pop {knobs['pop']} x 2 opponents "
@@ -466,6 +479,14 @@ def build_parser(ap: argparse.ArgumentParser) -> argparse.ArgumentParser:
                     help="skip the gate; the bracket winner takes the pin unchecked")
     ap.add_argument("--method-timeout", type=float, default=0.0,
                     help="seconds before a trainer is given up on (0 = no limit)")
+    # The architecture every entrant trains at. One net per tournament on
+    # purpose: the question a bracket answers is which METHOD wins, and two
+    # methods at two shapes is a confound, not an experiment. To compare
+    # architectures, run the tournament twice and versus the two winners.
+    ap.add_argument("--net", default="",
+                    help="architecture preset for every entrant "
+                         f"({', '.join(sorted(arch_mod.presets()))}); "
+                         "see `python3 -m ml.training.arch`")
     ap.add_argument("--dry-run", action="store_true", help="print the plan and stop")
     ap.add_argument("--out", default="", help="verdict path (single key only)")
     ap.add_argument("--progress-file", default=None)
@@ -513,6 +534,7 @@ def run(args: argparse.Namespace) -> int:
              "speed": args.speed, "opponents": args.opponents,
              "checkpoint_every": args.checkpoint_every,
              "steps": args.steps, "envs": args.envs, "arch": args.arch,
+             "net": args.net,
              "selfplay_every": args.selfplay_every,
              "teacher": args.teacher, "samples": args.samples,
              "dagger_rounds": args.dagger_rounds}

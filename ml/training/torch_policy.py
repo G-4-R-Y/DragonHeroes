@@ -2,9 +2,15 @@
 
 Same contract (so anything trained here still DEPLOYS to the Godot arena):
   input  = obs[31] ++ embedding[16]          (arena.obs.v1 + content row)
-  hidden = [64, 64] tanh
+  hidden = arch.hidden, arch.activation      ([64, 64] tanh by default)
   heads  = move[2] (tanh-squashed), act logits[7], dodge logit[1]
 plus a PPO value head (NOT exported — the Godot runtime is policy-only).
+
+The shape comes from ml.training.arch — the SAME Arch the numpy stack and the
+Godot runtime use, so `--net relu-wide` means one thing across all of them
+(Ricardo, 2026-09-13: "net hyperparams should be configurable, as to test new
+architectures"). Only the hidden activation is configurable: the heads are fixed
+by the arena's action contract, not by the architecture.
 
 Continuity: `from_policy_net` warm-starts from the numpy ES registry weights,
 `export_policy_v1` writes schema "arena.policy.v1" JSON that
@@ -14,15 +20,49 @@ from __future__ import annotations
 
 import json
 
+import sys
+from pathlib import Path
+
 import numpy as np
 import torch
 import torch.nn as nn
+
+ROOT = Path(__file__).resolve().parent.parent.parent
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from ml.training.arch import Arch  # noqa: E402
 
 OBS_DIM = 31
 EMB_DIM = 16
 ACTION_LOGITS = 7
 HIDDEN = (64, 64)
+LEAKY_SLOPE = 0.01      # must equal ml.training.arch.LEAKY_SLOPE
 POLICY_SCHEMA = "arena.policy.v1"
+
+
+def _activate(x: torch.Tensor, name: str) -> torch.Tensor:
+    """The torch twin of ml.training.arch.apply_activation. Exactness across the
+    two is NOT required here (torch trains, it never serves) — but the SHAPE of
+    the function is, or the exported weights mean something else in the arena."""
+    if name == "tanh":
+        return torch.tanh(x)
+    if name == "relu":
+        return torch.relu(x)
+    if name == "leaky_relu":
+        return torch.nn.functional.leaky_relu(x, LEAKY_SLOPE)
+    return x
+
+
+def _init_linear(lin: nn.Linear, arch: Arch) -> None:
+    fan_in = lin.weight.shape[1]
+    if arch.init == "he":
+        nn.init.normal_(lin.weight, 0.0, (2.0 / fan_in) ** 0.5)
+    elif arch.init == "xavier":
+        nn.init.normal_(lin.weight, 0.0, (1.0 / fan_in) ** 0.5)
+    else:
+        nn.init.normal_(lin.weight, 0.0, arch.init_scale)
+    nn.init.zeros_(lin.bias)
 
 
 class TorchGRUPolicyNet(nn.Module):
@@ -72,19 +112,28 @@ class TorchGRUPolicyNet(nn.Module):
 
 class TorchPolicyNet(nn.Module):
     def __init__(self, keys: list[str] | None = None, obs_dim: int = OBS_DIM,
-                 hidden: tuple[int, ...] | None = None):
+                 hidden: tuple[int, ...] | None = None, arch: Arch | None = None):
+        """`arch` carries width, activation and init together; `hidden` is the
+        older width-only shortcut and still overrides the arch's width, so
+        existing callers keep their exact meaning."""
         super().__init__()
         self.keys = list(keys or ["*"])
         self.key_to_idx = {k: i for i, k in enumerate(self.keys)}
-        self.hidden = tuple(hidden) if hidden else HIDDEN
+        self.arch = arch or Arch()
+        if hidden and tuple(hidden) != self.arch.hidden:
+            self.arch = Arch.from_dict({**self.arch.to_dict(), "hidden": list(hidden)},
+                                       name=self.arch.name)
+        self.hidden = self.arch.hidden
         self.embeddings = nn.Embedding(len(self.keys), EMB_DIM)
         nn.init.normal_(self.embeddings.weight, 0.0, 0.1)
         sizes = [obs_dim + EMB_DIM, *self.hidden]
         self.layers = nn.ModuleList()
         for i in range(len(sizes) - 1):
             lin = nn.Linear(sizes[i], sizes[i + 1])
-            nn.init.normal_(lin.weight, 0.0, 0.1)
-            nn.init.zeros_(lin.bias)
+            # Same init rule as the numpy twin — a relu net warm-started from a
+            # 0.1-normal trunk starts half-dead, which looks like a bad seed
+            # rather than the wrong initialiser.
+            _init_linear(lin, self.arch)
             self.layers.append(lin)
         self.head_move = nn.Linear(self.hidden[-1], 2)
         self.head_act = nn.Linear(self.hidden[-1], ACTION_LOGITS)
@@ -101,7 +150,7 @@ class TorchPolicyNet(nn.Module):
                          dtype=torch.long, device=obs.device)
         x = torch.cat([obs, self.embeddings(idx)], dim=-1)
         for lin in self.layers:
-            x = torch.tanh(lin(x))
+            x = _activate(lin(x), self.arch.activation)
         return x
 
     def forward(self, obs: torch.Tensor, key: str = "*"):
@@ -126,7 +175,8 @@ class TorchPolicyNet(nn.Module):
         """Schema arena.policy.v1 — the exact JSON ArenaNeuralPolicy loads."""
         with torch.no_grad():
             layers = [{"w": lin.weight.cpu().numpy().tolist(),
-                       "b": lin.bias.cpu().numpy().tolist(), "act": "tanh"}
+                       "b": lin.bias.cpu().numpy().tolist(),
+                       "act": self.arch.activation}
                       for lin in self.layers]
             # fold the three policy heads into one logits layer, move first:
             # [move_x, move_y, act x7, dodge] == policy_net.HEAD_DIM order
@@ -134,10 +184,14 @@ class TorchPolicyNet(nn.Module):
                            self.head_dodge.weight], dim=0)
             b = torch.cat([self.head_move.bias, self.head_act.bias,
                            self.head_dodge.bias], dim=0)
+            # "linear", not the old "logits": one vocabulary across every
+            # exporter now that activations are an enum. The runtime still
+            # accepts "logits" as an alias, for the nets already in ml/serving.
             layers.append({"w": w.cpu().numpy().tolist(),
-                           "b": b.cpu().numpy().tolist(), "act": "logits"})
+                           "b": b.cpu().numpy().tolist(), "act": "linear"})
             emb = {k: self.embeddings.weight[i].cpu().numpy().tolist()
                    for k, i in self.key_to_idx.items()}
         json.dump({"schema": POLICY_SCHEMA, "obs_dim": OBS_DIM, "emb_dim": EMB_DIM,
+                   "hidden": list(self.hidden), "arch": self.arch.to_dict(),
                    "layers": layers, "embeddings": emb, "explore": explore},
                   open(path, "w"))

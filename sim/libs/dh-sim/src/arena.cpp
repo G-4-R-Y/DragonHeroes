@@ -83,7 +83,8 @@ void Arena::hurt(const BodyRef& ref, float dmg) {
 }
 
 void Arena::set_opp_mlp(const float* params, const int* layer_in,
-                        const int* layer_out, int n_layers, const float* emb16) {
+                        const int* layer_out, int n_layers, const float* emb16,
+                        const int* acts) {
     const int layers = n_layers > 8 ? 8 : n_layers;
     for (int i = 0; i < layers; ++i) {
         if (layer_in[i] > kMlpMaxUnits || layer_out[i] > kMlpMaxUnits) {
@@ -97,6 +98,9 @@ void Arena::set_opp_mlp(const float* params, const int* layer_in,
     for (int i = 0; i < mlp_layers_; ++i) {
         mlp_in_[i] = layer_in[i];
         mlp_out_[i] = layer_out[i];
+        // No acts array = the historical shape: tanh hidden, linear head.
+        mlp_acts_[i] = acts != nullptr ? acts[i]
+                                       : (i < mlp_layers_ - 1 ? kActTanh : kActLinear);
     }
     if (emb16 != nullptr)
         std::memcpy(mlp_emb_, emb16, sizeof(mlp_emb_));
@@ -312,20 +316,28 @@ Action Arena::mlp_act(int who) {
     float buf_a[kMlpMaxUnits], buf_b[kMlpMaxUnits];
     build_obs(f_[who], f_[1 - who], buf_a);
     std::memcpy(buf_a + kObsDim, mlp_emb_, sizeof(mlp_emb_));
-    // forward: tanh hidden layers, linear head [move2, logits7, dodge1].
+    // forward: per-layer activation from mlp_acts_, head [move2, logits7, dodge1].
     // Param packing (dh_env.cpp contract): per layer [W row-major out×in][b out].
+    // This is float32 where the Godot arena runs float64, so it was never a
+    // bit-exact twin of dh-godot — it is the self-play opponent, not a server.
+    // What must match is the FUNCTION: the same activation, layer for layer.
     const float* w = mlp_params_;
     const float* src = buf_a;
     float* dst = buf_b;
     int src_n = mlp_in_[0];
     for (int l = 0; l < mlp_layers_; ++l) {
         const int rows = mlp_out_[l];
-        const bool tanh_act = (l < mlp_layers_ - 1);
+        const int act_code = mlp_acts_[l];
         const float* bias = w + rows * src_n;
         for (int r = 0; r < rows; ++r) {
             float s = bias[r];
             for (int c = 0; c < src_n; ++c) s += w[r * src_n + c] * src[c];
-            dst[r] = tanh_act ? std::tanh(s) : s;
+            switch (act_code) {
+                case kActTanh:      dst[r] = std::tanh(s); break;
+                case kActRelu:      dst[r] = s > 0.0f ? s : 0.0f; break;
+                case kActLeakyRelu: dst[r] = s > 0.0f ? s : kMlpLeakySlope * s; break;
+                default:            dst[r] = s; break;
+            }
         }
         w += rows * src_n + rows;
         src = dst;

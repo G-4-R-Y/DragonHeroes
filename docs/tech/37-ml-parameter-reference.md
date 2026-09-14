@@ -117,14 +117,69 @@ opponent slot is a stateless MLP.
 | | `policy_net.PolicyNet` (numpy, ES) | `torch_policy.TorchPolicyNet` (PPO) | `TorchGRUPolicyNet` |
 |---|---|---|---|
 | Input | `obs[31] ++ embedding[16]` | same | same |
-| Body | 64, 64 tanh | 64, 64 tanh | GRUCell(64) |
+| Body | `arch.hidden`, `arch.activation` (default 64, 64 tanh) | same | GRUCell(64), fixed |
 | Heads | `move[2]`, `act logits[7]`, `dodge logit[1]` | same + a **value head** (not exported) | same + value |
 | Export | `arena.policy.v1` JSON + `.npz` | `arena.policy.v1` JSON | `.pt` only |
-| `INIT_SCALE` | 0.1 | torch default | torch default |
+| Init | `arch.init` (`normal` ×`init_scale`, `he`, `xavier`) | same rule | torch default |
 | `explore` (exported) | 0.05 | 0.05 | — |
 
 New content never changes tensor shapes: it gets a new **embedding row**,
 initialised from the table mean plus small noise (canon §9 §5).
+
+### 2.6b The architecture — `--net` (`ml/training/arch.py`)
+
+Ricardo, 2026-09-13: *"net hyperparams should be configurable, as to test new
+architectures."* One `Arch` — width, activation, init — named in
+`ml/training/architectures.json`, selected the same way on **every** trainer:
+
+```bash
+python3 -m ml.training.arch                       # the presets and what they cost
+python3 -m ml.training.league train --net relu    --key k --build b
+ml/.venv/bin/python -m ml.training.ppo --net relu-wide --key k --build b --opp-build ob
+python3 -m ml.training.distill --net tiny --teacher k@candidate --key k --build b
+python3 -m ml.training.tournament --net relu --all     # every entrant, one shape
+NET=relu-wide tools/train_run.sh --ppo --key k --build b --opp-build ob
+```
+
+| Flag | Default | What it does |
+|---|---|---|
+| `--net` | `default` | A preset from `architectures.json`. Adding one there needs no code |
+| `--hidden` | from the preset | `256,256`. Any depth |
+| `--activation` | from the preset | `tanh`, `relu`, `leaky_relu` (slope 0.01), `linear`. Hidden layers only — the head is always linear |
+| `--init` | from the preset | `normal` (×`--init-scale`), `he` (relu), `xavier` (tanh) |
+| `--init-scale` | 0.1 | Only used by `normal` |
+
+| Preset | Shape | MACs/tick | Note |
+|---|---|---|---|
+| `default` | 64, 64 tanh | 7,744 | **What ships.** Every net in `ml/serving` is this |
+| `tiny` | 32, 32 tanh | 2,848 | Half the cost, for crowded scenes |
+| `relu` | 64, 64 relu, he | 7,744 | Shipping size, different nonlinearity |
+| `wide` | 256, 256 tanh, xavier | 80,128 | **Teacher only** — 10.3× the budget |
+| `relu-wide` | 256, 256 relu, he | 80,128 | Teacher only |
+| `deep` | 128×3 relu, he | 40,064 | Teacher only — depth instead of width |
+
+**Why the activation list is short.** The same forward pass runs in four places,
+and two of them have to be **bit-identical** (`game/arena/neural_policy.gd` and
+`sim/libs/dh-godot` `DhPolicyNet` — a last-bit disagreement invalidates every
+trained weight). `max(0, x)` and a hard-coded 0.01 slope are exactly reproducible
+in GDScript and C++; `gelu`/`silu` would need an `erf`/`exp` equivalence proof
+nobody has written. The gate is
+`godot --headless --path game res://arena/tests/policy_parity_test.tscn --quit-after 20`.
+
+**Activation codes** cross into C++ and are part of the contract:
+`0 linear · 1 tanh · 2 relu · 3 leaky_relu`. The exported JSON carries the NAME;
+`dh_env_set_opp_weights_acts` and `DhPolicyNet.add_layer` carry the code. The
+numbering is chosen so an old `bool use_tanh` still means what it meant.
+
+**Architectures do not warm-start into each other.** `league train` and
+`ppo --warm-start` both refuse a donor of a different shape or activation and say
+so — copying a 64×64 tanh trunk into a 256×256 relu one produces a net that is
+neither. The way across is distillation (`ml/training/distill.py`), which is
+exactly what it is for.
+
+**A wide net cannot ship.** 80,128 MACs is ~1.09 ms/agent/tick against a 16,670 µs
+frame: fifteen agents eat it. Train a teacher wide, distil a `default` student,
+deploy the student.
 
 ### 2.7 Observation schema `arena.obs.v1` — 31 floats
 
@@ -218,8 +273,15 @@ run is identifiable without opening it.
 
 ### 4.1 Weights JSON — `arena.policy.v1`
 
-`{schema, obs_dim: 31, emb_dim: 16, explore: 0.05, embeddings: {key: [16 floats]}, layers: [{w, b, act}]}`
-with `act` = tanh for hidden layers, linear for the head.
+`{schema, obs_dim: 31, emb_dim: 16, explore: 0.05, hidden: [...], arch: {...},
+embeddings: {key: [16 floats]}, layers: [{w, b, act}]}`
+where each layer's `act` is one of `tanh`, `relu`, `leaky_relu`, `linear` (§2.6b).
+The runtime reads the layer shapes and each `act`; `hidden`/`arch`/`macs` are
+metadata so a file on disk can say what it is.
+
+> `act: "logits"` appears in four nets exported before activations were an enum
+> (`cinder_drake_ppo_v2..v5`). It always meant linear and is still accepted as an
+> alias everywhere; nothing writes it any more.
 
 - **Produced by** `league train` (`<key>_v<N>.json`), `ppo` (`<key>_ppo_v<N>.json`),
   `evolve` (via PPO).

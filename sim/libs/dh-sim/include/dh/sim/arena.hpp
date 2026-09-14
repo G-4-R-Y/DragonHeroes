@@ -77,8 +77,17 @@ class Arena {
     // (256x256, ml/training/distill.py) reach here through PPO self-play, and
     // a silent stack overwrite is the worst possible way to find that out.
     static constexpr int kMlpMaxUnits = 512;
+    // Per-layer activation CODES, same numbering as ml/training/arch.py and
+    // dh-godot's DhPolicyNet: 0 linear, 1 tanh, 2 relu, 3 leaky_relu(0.01).
+    // `acts` may be nullptr, which means what this always meant — tanh on every
+    // hidden layer, linear head. An unknown code is treated as linear.
+    // (Ricardo, 2026-09-13: "net hyperparams should be configurable, as to test
+    // new architectures" — this is PPO's FROZEN SELF-PLAY OPPONENT, so a relu
+    // policy played here as tanh is a different opponent than the one trained.)
+    enum MlpAct : int { kActLinear = 0, kActTanh = 1, kActRelu = 2, kActLeakyRelu = 3 };
+    static constexpr float kMlpLeakySlope = 0.01f;
     void set_opp_mlp(const float* params, const int* layer_in, const int* layer_out,
-                     int n_layers, const float* emb16);
+                     int n_layers, const float* emb16, const int* acts = nullptr);
     bool has_opp_mlp() const { return mlp_params_ != nullptr && mlp_layers_ > 0; }
 
     void reset(std::uint64_t seed);
@@ -169,7 +178,7 @@ class Arena {
     float delay_s_[2] = {0.2f, 0.2f};    // fairness obs delay, sampled per reset
     // frozen opponent MLP
     const float* mlp_params_ = nullptr;
-    std::array<int, 8> mlp_in_{}, mlp_out_{};
+    std::array<int, 8> mlp_in_{}, mlp_out_{}, mlp_acts_{};
     int mlp_layers_ = 0;
     float mlp_emb_[16] = {};
 };

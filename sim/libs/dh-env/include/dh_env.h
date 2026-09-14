@@ -57,6 +57,21 @@ DH_API int32_t dh_env_obs_dim(const DhEnv* env);
 DH_API void dh_env_set_opp_weights(DhEnv* env, const float* params,
                                    const int32_t* layer_in, const int32_t* layer_out,
                                    int32_t n_layers, const float* emb16);
+/* Same, plus per-layer activation codes (Ricardo, 2026-09-13: "net hyperparams
+ * should be configurable, as to test new architectures"):
+ *     0 linear   1 tanh   2 relu   3 leaky_relu (slope 0.01)
+ * matching ml/training/arch.py and dh-godot's DhPolicyNet. `acts` may be NULL,
+ * which is exactly dh_env_set_opp_weights (tanh hidden, linear head).
+ *
+ * This is a SECOND symbol rather than a sixth argument on the first, on purpose.
+ * The caller is ctypes (ml/env/dh_env.py) against a .so built separately: adding
+ * a parameter would let a stale library read a register that was never set, and
+ * the damage — a self-play opponent quietly running the wrong policy — is
+ * invisible in every metric PPO prints. A missing SYMBOL is not invisible. */
+DH_API void dh_env_set_opp_weights_acts(DhEnv* env, const float* params,
+                                        const int32_t* layer_in, const int32_t* layer_out,
+                                        int32_t n_layers, const float* emb16,
+                                        const int32_t* acts);
 DH_API void dh_env_reset(DhEnv* env, uint64_t seed, float* out_obs31);
 /* Steps the learner (fighter A); the opponent runs its internal policy.
  * Returns 1 when the episode is done. out_obs31 may be NULL. */

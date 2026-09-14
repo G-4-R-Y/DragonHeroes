@@ -44,7 +44,9 @@ import numpy as np
 import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-from ml.env.dh_env import DhEnv, VecDhEnv, OBS_DIM           # noqa: E402
+from ml.env.dh_env import DhEnv, VecDhEnv, OBS_DIM, set_opp_weights  # noqa: E402
+from ml.training import arch as arch_mod                     # noqa: E402
+from ml.training.arch import ACT_CODE, normalize_act         # noqa: E402
 from ml.training.gpu_guard import apply as gpu_apply, clamp_batch  # noqa: E402
 from ml.training.torch_policy import TorchPolicyNet, TorchGRUPolicyNet  # noqa: E402
 
@@ -71,9 +73,12 @@ GAMMA, LAM, CLIP, ENTROPY, LR, EPOCHS, MINIBATCHES = 0.99, 0.95, 0.2, 0.01, 3e-4
 SNAPSHOTS = REPO / "ml" / "data" / "ppo_snapshots"
 
 
-def pack_for_cpp(net: TorchPolicyNet) -> tuple[np.ndarray, np.ndarray,
+def pack_for_cpp(net: TorchPolicyNet) -> tuple[np.ndarray, np.ndarray, np.ndarray,
                                                 np.ndarray, np.ndarray]:
-    """Torch net -> the C++ packing: per layer [W out×in][b]; emb16 row "*"."""
+    """Torch net -> the C++ packing: per layer [W out×in][b]; emb16 row "*"; and
+    the per-layer activation codes (ml.training.arch.ACT_CODE) — without those
+    the frozen self-play opponent would run a relu net as tanh, which is a
+    different opponent than the one being trained."""
     params, layer_in, layer_out = [], [], []
     with torch.no_grad():
         for lin in net.layers:
@@ -89,26 +94,31 @@ def pack_for_cpp(net: TorchPolicyNet) -> tuple[np.ndarray, np.ndarray,
         layer_in.append(w.shape[1])
         layer_out.append(w.shape[0])
         emb = net.embeddings.weight[net.key_to_idx.get("*", 0)].cpu().numpy()
+    acts = [ACT_CODE[a] for a in net.arch.layer_acts(len(layer_in))]
     return (np.concatenate(params).astype(np.float32),
             np.array(layer_in, dtype=np.int32),
-            np.array(layer_out, dtype=np.int32), emb.astype(np.float32))
+            np.array(layer_out, dtype=np.int32), emb.astype(np.float32),
+            np.array(acts, dtype=np.int32))
 
 
-def pack_from_policy_json(path: str) -> tuple[np.ndarray, np.ndarray,
+def pack_from_policy_json(path: str) -> tuple[np.ndarray, np.ndarray, np.ndarray,
                                               np.ndarray, np.ndarray]:
     """arena.policy.v1 JSON -> the C++ packing (fixed exploiter opponents)."""
     data = json.load(open(path))
-    params, layer_in, layer_out = [], [], []
+    params, layer_in, layer_out, acts = [], [], [], []
     for l in data["layers"]:
         w = np.asarray(l["w"], dtype=np.float32)
         params += [w.ravel(), np.asarray(l["b"], dtype=np.float32)]
         layer_in.append(w.shape[1])
         layer_out.append(w.shape[0])
+        # normalize_act also accepts "logits", the name the old exporter used
+        acts.append(ACT_CODE[normalize_act(l.get("act", "tanh"))])
     emb = np.asarray(data.get("embeddings", {}).get("*", [0.0] * 16),
                      dtype=np.float32)
     return (np.concatenate(params).astype(np.float32),
             np.array(layer_in, dtype=np.int32),
-            np.array(layer_out, dtype=np.int32), emb)
+            np.array(layer_out, dtype=np.int32), emb,
+            np.array(acts, dtype=np.int32))
 
 
 def main() -> None:
@@ -141,10 +151,10 @@ def main() -> None:
                          "default) is fastest on a busy box: a 32-env tick is "
                          "only tens of microseconds, so sync costs more than "
                          "it saves. Raise it only with >=128 envs on idle cores.")
-    ap.add_argument("--hidden", default="",
-                    help="hidden widths, e.g. '256,256' (default 64,64). A wide net is "
-                         "a TEACHER: ~10x the per-tick budget, it cannot ship — distill "
-                         "it with ml/training/distill.py. mlp only.")
+    # --net/--hidden/--activation/--init/--init-scale, identical on every trainer
+    # (ml/training/arch.py). NOTE --arch below is the older mlp-vs-gru switch and
+    # is a different axis entirely; --net picks the SHAPE of the mlp.
+    arch_mod.add_arguments(ap)
     ap.add_argument("--arch", choices=["mlp", "gru"], default="mlp",
                     help="gru = recurrent net (temporal combos/kiting); "
                          "self-play snapshots disabled (C++ opponent is "
@@ -159,12 +169,17 @@ def main() -> None:
     squad = (args.squad_a_buddy, args.squad_b_buddy) \
         if args.squad_a_buddy and args.squad_b_buddy else None
     obs_dim = 36 if squad else OBS_DIM
-    from ml.training.policy_net import macs, parse_hidden
-    hidden = parse_hidden(args.hidden)
-    if args.arch == "gru" and hidden != policy_hidden_default():
-        raise SystemExit("--hidden is mlp only (the GRU stack has its own shape)")
+    from ml.training.policy_net import macs
+    net_arch = arch_mod.from_args(args)
+    hidden = net_arch.hidden
+    if args.arch == "gru" and net_arch != arch_mod.Arch():
+        raise SystemExit("--net/--hidden are mlp only (the GRU stack has its own shape)")
     net = (TorchGRUPolicyNet(["*"], obs_dim=obs_dim) if args.arch == "gru"
-           else TorchPolicyNet(["*"], obs_dim=obs_dim, hidden=hidden)).to(device)
+           else TorchPolicyNet(["*"], obs_dim=obs_dim, arch=net_arch)).to(device)
+    if args.arch != "gru":
+        print(f"[ppo:{args.key}] net '{net_arch.name}': {list(hidden)} "
+              f"{net_arch.activation}, init {net_arch.init} — {macs(hidden):,} MACs/tick",
+              flush=True)
     if hidden != policy_hidden_default():
         # The C++ frozen-opponent MLP (dh-sim Arena::set_opp_mlp) refuses layers
         # wider than kMlpMaxUnits and falls back to scripted, so say up front
@@ -177,8 +192,19 @@ def main() -> None:
               flush=True)
     if args.warm_start:
         from ml.training import policy_net
-        es = policy_net.PolicyNet()
+        es = policy_net.PolicyNet(arch=net_arch)
         data = json.load(open(args.warm_start))
+        # A warm start only means anything if the donor has THIS shape. Copying a
+        # 64x64 tanh trunk into a 256x256 relu one used to half-work (zip() just
+        # stopped at the shorter list) and produced a net that was neither.
+        src_h = [len(l["b"]) for l in data["layers"][:-1]]
+        src_a = normalize_act(data["layers"][0].get("act", "tanh"))
+        if tuple(src_h) != tuple(hidden) or src_a != net_arch.activation:
+            raise SystemExit(
+                f"--warm-start {Path(args.warm_start).name} is {src_h} {src_a}; "
+                f"this run is {list(hidden)} {net_arch.activation}. Warm-starting "
+                f"across architectures is not a thing — drop --warm-start, or "
+                f"distill (ml/training/distill.py).")
         for i, l in enumerate(data["layers"]):
             es.weights[i] = np.asarray(l["w"], dtype=np.float32)
             es.biases[i] = np.asarray(l["b"], dtype=np.float32)
@@ -221,17 +247,18 @@ def main() -> None:
     prev_foe = np.ones(args.envs, dtype=np.float32)
 
     def refresh_selfplay() -> None:
-        params, li, lo, emb = pack_for_cpp(net)
-        import ctypes
+        params, li, lo, emb, acts = pack_for_cpp(net)
+        exact = True
         for e in mlp_envs:   # only the self-play third gets the fresh snapshot
-            lib = __import__("ml.env.dh_env", fromlist=["lib"]).lib()
-            lib.dh_env_set_opp_weights(
-                ctypes.c_void_p(e._handle),
-                params.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
-                li.ctypes.data_as(ctypes.POINTER(ctypes.c_int32)),
-                lo.ctypes.data_as(ctypes.POINTER(ctypes.c_int32)),
-                len(li), emb.ctypes.data_as(ctypes.POINTER(ctypes.c_float)))
-        refresh_selfplay.keepalive = (params, li, lo, emb)   # borrowed pointers!
+            exact = set_opp_weights(e._handle, params, li, lo, emb, acts)
+        if not exact and not refresh_selfplay.warned:
+            refresh_selfplay.warned = True
+            print(f"[ppo:{args.key}] WARNING libdh-env.so predates per-layer "
+                  f"activations — the self-play opponent will run "
+                  f"tanh/linear, not {net.arch.activation}. Rebuild: "
+                  f"cmake --build sim/build -j", flush=True)
+        refresh_selfplay.keepalive = (params, li, lo, emb, acts)  # borrowed pointers!
+    refresh_selfplay.warned = False
 
     iteration = 0
     done_steps = 0
@@ -241,15 +268,10 @@ def main() -> None:
         # EXPLOITER MODE (AlphaStar league shape): the opponent is a FIXED
         # target net — this run's only job is finding its weaknesses
         packed = pack_from_policy_json(args.exploit)
-        import ctypes
-        lib = __import__("ml.env.dh_env", fromlist=["lib"]).lib()
         for e in envs:
-            lib.dh_env_set_opp_weights(
-                ctypes.c_void_p(e._handle),
-                packed[0].ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
-                packed[1].ctypes.data_as(ctypes.POINTER(ctypes.c_int32)),
-                packed[2].ctypes.data_as(ctypes.POINTER(ctypes.c_int32)),
-                len(packed[1]), packed[3].ctypes.data_as(ctypes.POINTER(ctypes.c_float)))
+            set_opp_weights(e._handle, packed[0], packed[1], packed[2],
+                            packed[3], packed[4])
+        exploiter_keepalive = packed          # borrowed pointers!
         print(f"[ppo:{args.key}] EXPLOITER vs {Path(args.exploit).name}")
     elif args.arch != "gru" and not squad:
         refresh_selfplay()   # the opponent is the learner's own frozen snapshot

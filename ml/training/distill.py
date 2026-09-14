@@ -12,11 +12,13 @@ then it teaches; the 64x64 student is what the game loads.
     # 1. train a teacher (PPO on the GPU is the one that can actually use width)
     ml/.venv/bin/python -m ml.training.ppo --key fen_boar_alpha \
         --build core.arena.fen_boar_alpha --opp-build core.arena.gloamfen_stalker \
-        --hidden 256,256 --steps 2000000
+        --net relu-wide --steps 2000000       # python3 -m ml.training.arch lists them
 
     # 2. distill it (this module): qualify -> collect -> fit -> gate
     python3 -m ml.training.distill --key fen_boar_alpha \
         --build core.arena.fen_boar_alpha --teacher fen_boar_alpha@candidate
+        # the student is --net default unless you say otherwise; a relu-wide
+        # teacher can perfectly well teach a tanh 64x64 student.
 
 THE QUALIFYING GATE IS RICARDO'S CONDITION, MADE EXECUTABLE
 "once they surpass the default script/engine behaviour". A teacher that cannot
@@ -67,6 +69,9 @@ if str(ROOT) not in sys.path:
 from ml.training import league                                          # noqa: E402
 from ml.training.policy_net import (ACTION_LOGITS, EMB_DIM, HEAD_DIM,   # noqa: E402
                                     OBS_DIM, PolicyNet, macs, parse_hidden)
+from ml.training import arch as arch_mod                                # noqa: E402
+from ml.training.arch import (Arch, activation_grad,                    # noqa: E402
+                              apply_activation, normalize_act)
 
 BENCH_DIR = league.BENCH_DIR
 
@@ -87,11 +92,18 @@ class TeacherNet:
         self.path = str(path)
         self.w = [np.asarray(l["w"], dtype=np.float64) for l in doc["layers"]]
         self.b = [np.asarray(l["b"], dtype=np.float64) for l in doc["layers"]]
-        # "logits" is what PPO's folded head calls linear; anything not tanh is linear
-        self.tanh = [str(l.get("act", "")) == "tanh" for l in doc["layers"]]
+        # Whatever the teacher was trained with. normalize_act also accepts the
+        # old "logits" name PPO's folded head used; an activation neither we nor
+        # the arena knows is refused, because distilling from a net we forward
+        # WRONG would teach the student the wrong function perfectly.
+        try:
+            self.acts = [normalize_act(l.get("act", "tanh")) for l in doc["layers"]]
+        except ValueError as e:
+            raise SystemExit(f"distill: {path}: {e}")
         self.embeddings = {k: np.asarray(v, dtype=np.float64)
                            for k, v in doc.get("embeddings", {}).items()}
         self.hidden = tuple(int(x.shape[0]) for x in self.w[:-1])
+        self.activation = self.acts[0] if len(self.acts) > 1 else "linear"
 
     def embedding(self, key: str) -> np.ndarray:
         row = self.embeddings.get(key, self.embeddings.get("*"))
@@ -101,10 +113,8 @@ class TeacherNet:
         return row
 
     def forward(self, x: np.ndarray) -> np.ndarray:
-        for w, b, t in zip(self.w, self.b, self.tanh):
-            x = x @ w.T + b
-            if t:
-                x = np.tanh(x)
+        for w, b, a in zip(self.w, self.b, self.acts):
+            x = apply_activation(x @ w.T + b, a)
         return x
 
 
@@ -113,14 +123,24 @@ class TeacherNet:
 
 class Student:
     """The shipping-shaped net, trained by gradient descent instead of ES. Same
-    tanh MLP as PolicyNet — this holds it as batched float64 arrays so a training
-    step is a handful of matmuls, then hands the weights back to a PolicyNet for
-    export (which is what guarantees the runtime reads the same file as always)."""
+    MLP as PolicyNet — this holds it as batched float64 arrays so a training step
+    is a handful of matmuls, then hands the weights back to a PolicyNet for export
+    (which is what guarantees the runtime reads the same file as always).
 
-    def __init__(self, hidden: tuple[int, ...], seed: int = 0):
+    The student's architecture is its OWN (`arch`), independent of the teacher's:
+    that is the entire point — a 256x256 relu teacher distilled into whatever
+    shape the game can actually afford."""
+
+    def __init__(self, hidden: tuple[int, ...], seed: int = 0,
+                 arch: Arch | None = None):
         rng = np.random.default_rng(seed)
         sizes = [OBS_DIM + EMB_DIM, *hidden, HEAD_DIM]
         self.hidden = hidden
+        self.arch = arch or Arch(hidden=tuple(hidden))
+        self.acts = self.arch.layer_acts(len(sizes) - 1)
+        # He init regardless of activation: this is supervised regression onto a
+        # teacher, not a fresh search, and the deep-net variance argument holds
+        # for tanh here too. (The Arch's init governs FROM-SCRATCH nets — ES/PPO.)
         self.w = [rng.normal(0, np.sqrt(2.0 / sizes[i]), (sizes[i + 1], sizes[i]))
                   for i in range(len(sizes) - 1)]
         self.b = [np.zeros(sizes[i + 1]) for i in range(len(sizes) - 1)]
@@ -130,9 +150,8 @@ class Student:
 
     def forward(self, x: np.ndarray) -> tuple[np.ndarray, list[np.ndarray]]:
         acts = [x]
-        for i, (w, b) in enumerate(zip(self.w, self.b)):
-            z = acts[-1] @ w.T + b
-            acts.append(np.tanh(z) if i < len(self.w) - 1 else z)
+        for (w, b, a) in zip(self.w, self.b, self.acts):
+            acts.append(apply_activation(acts[-1] @ w.T + b, a))
         return acts[-1], acts
 
     def backward(self, acts: list[np.ndarray], dy: np.ndarray,
@@ -143,7 +162,9 @@ class Student:
             grads_w[i] = d.T @ acts[i]
             grads_b[i] = d.sum(axis=0)
             if i > 0:
-                d = (d @ self.w[i]) * (1.0 - acts[i] ** 2)      # tanh'
+                # acts[i] is POST-activation of layer i-1, which is what
+                # activation_grad wants (tanh' = 1-y^2, relu' = y>0).
+                d = (d @ self.w[i]) * activation_grad(acts[i], self.acts[i - 1])
         self.t += 1
         params = self.w + self.b
         grads = grads_w + grads_b
@@ -155,7 +176,7 @@ class Student:
             p -= lr * mh / (np.sqrt(vh) + eps)
 
     def to_policy_net(self, embeddings: dict[str, np.ndarray]) -> PolicyNet:
-        net = PolicyNet(hidden=self.hidden)
+        net = PolicyNet(arch=self.arch)
         net.weights = [w.astype(np.float32) for w in self.w]
         net.biases = [b.astype(np.float32) for b in self.b]
         net.embeddings = {k: v.astype(np.float32) for k, v in embeddings.items()}
@@ -307,7 +328,8 @@ def fit(student: Student, xs: np.ndarray, ys: np.ndarray, epochs: int, batch: in
 
 
 def distill(key: str, build: str, teacher_spec: str, opp_build: str = "",
-            hidden: str = "", opp: str = "native", envs: int = 64,
+            hidden: str = "", arch: Arch | None = None,
+            opp: str = "native", envs: int = 64,
             samples: int = 200_000, dagger_rounds: int = 3, epochs: int = 4,
             batch: int = 512, lr: float = 1e-3, temperature: float = 2.0,
             weights: tuple[float, float, float] = (1.0, 1.0, 0.5),
@@ -324,9 +346,15 @@ def distill(key: str, build: str, teacher_spec: str, opp_build: str = "",
     if teacher_path in ("native", "scripted"):
         raise SystemExit("distill: the teacher must be a net, not a baseline")
     teacher = TeacherNet(teacher_path)
-    want = parse_hidden(hidden)
-    print(f"[distill] {key}: teacher {teacher_label} {teacher.hidden} "
-          f"({macs(teacher.hidden):,} MACs) -> student {want} ({macs(want):,} MACs), "
+    student_arch = arch or Arch()
+    if hidden:
+        student_arch = Arch.from_dict(
+            {**student_arch.to_dict(), "hidden": list(parse_hidden(hidden))},
+            name=student_arch.name)
+    want = student_arch.hidden
+    print(f"[distill] {key}: teacher {teacher_label} {list(teacher.hidden)} "
+          f"{teacher.activation} ({macs(teacher.hidden):,} MACs) -> student "
+          f"{list(want)} {student_arch.activation} ({macs(want):,} MACs), "
           f"{macs(teacher.hidden) / max(macs(want), 1):.1f}x smaller", flush=True)
     progress.emit("distill_start", key=key, build=build, teacher=teacher_label,
                   teacher_hidden=list(teacher.hidden), student_hidden=list(want))
@@ -335,8 +363,10 @@ def distill(key: str, build: str, teacher_spec: str, opp_build: str = "",
                      "build": build, "opp_build": opp_build,
                      "teacher": {"spec": teacher_spec, "label": teacher_label,
                                  "path": teacher_path, "hidden": list(teacher.hidden),
+                                 "activation": teacher.activation,
                                  "macs": macs(teacher.hidden)},
-                     "student": {"hidden": list(want), "macs": macs(want)},
+                     "student": {"hidden": list(want), "macs": macs(want),
+                                 "arch": student_arch.to_dict()},
                      "rounds": []}
 
     # 1. the teacher must surpass the default behaviour
@@ -359,7 +389,7 @@ def distill(key: str, build: str, teacher_spec: str, opp_build: str = "",
 
     # 2 + 3. DAgger: collect, fit, repeat with the student driving
     emb = teacher.embedding(key if key in teacher.embeddings else "*")
-    student = Student(want, seed=seed)
+    student = Student(want, seed=seed, arch=student_arch)
     xs_all: list[np.ndarray] = []
     ys_all: list[np.ndarray] = []
     for r in range(max(1, dagger_rounds)):
@@ -426,7 +456,9 @@ def main() -> int:
                          "<key>, <key>@v7, <key>@candidate")
     ap.add_argument("--opp-build", default="", help="who the rollouts fight (default: itself)")
     ap.add_argument("--opp", default="native", choices=["native", "scripted", "mlp"])
-    ap.add_argument("--hidden", default="", help="the STUDENT's width (default 64,64)")
+    # The STUDENT's architecture (the teacher's comes off its own file). Same
+    # five flags as every other trainer — ml/training/arch.py.
+    arch_mod.add_arguments(ap)
     ap.add_argument("--envs", type=int, default=64)
     ap.add_argument("--samples", type=int, default=200_000, help="per DAgger round")
     ap.add_argument("--dagger-rounds", type=int, default=3,
@@ -456,7 +488,8 @@ def main() -> int:
     a = ap.parse_args()
     progress = league.Progress(a.progress_file or league.progress_path(a.key))
     with progress.guard():
-        v = distill(a.key, a.build, a.teacher, opp_build=a.opp_build, hidden=a.hidden,
+        v = distill(a.key, a.build, a.teacher, opp_build=a.opp_build,
+                    arch=arch_mod.from_args(a),
                     opp=a.opp, envs=a.envs, samples=a.samples,
                     dagger_rounds=a.dagger_rounds, epochs=a.epochs, batch=a.batch,
                     lr=a.lr, temperature=a.temperature,

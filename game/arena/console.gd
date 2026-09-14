@@ -84,6 +84,7 @@ var _pop: SpinBox
 var _eps: SpinBox
 var _jobs: SpinBox
 var _speed: OptionButton
+var _net: OptionButton
 var _hint: Label
 var _train_btn: Button
 var _train_all_btn: Button
@@ -285,6 +286,27 @@ func _build_ui() -> void:
 	_speed.item_selected.connect(func(_i: int) -> void: _refresh_ui())
 	speed_row.add_child(_speed)
 	left.add_child(speed_row)
+
+	# NET — the architecture every trainer shares (Ricardo, 2026-09-13: "net
+	# hyperparams should be configurable, as to test new architectures"). The
+	# list is read from ml/training/architectures.json, so adding a preset there
+	# is all it takes to try it from here.
+	var net_row := HBoxContainer.new()
+	net_row.add_theme_constant_override("separation", 4)
+	net_row.add_child(_label("net", DIM))
+	_net = OptionButton.new()
+	_net.focus_mode = Control.FOCUS_NONE
+	_net.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	for row in _architectures():
+		var i := _net.get_item_count()
+		_net.add_item("%s  %s %s" % [row.name, str(row.hidden), row.activation], i)
+		_net.set_item_metadata(i, row.name)
+		_net.set_item_tooltip(i, "%s MACs/tick — %s" % [row.macs, row.note])
+		if row.name == "default":
+			_net.select(i)
+	_net.item_selected.connect(func(_i: int) -> void: _refresh_ui())
+	net_row.add_child(_net)
+	left.add_child(net_row)
 
 	_hint = _label("", DIM)
 	_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -599,6 +621,41 @@ func _button(parent: Container, text: String, cb: Callable) -> Button:
 	b.pressed.connect(cb)
 	parent.add_child(b)
 	return b
+
+# ml/training/architectures.json, or just the shipping shape if it is unreadable
+# (a console with no repo still has to draw).
+func _architectures() -> Array:
+	var fallback := [{"name": "default", "hidden": [64, 64], "activation": "tanh",
+			"macs": "7,744", "note": "what ships today"}]
+	if _repo == "":
+		return fallback
+	var raw := FileAccess.get_file_as_string(
+			_repo.path_join("ml/training/architectures.json"))
+	if raw.is_empty():
+		return fallback
+	var doc: Variant = JSON.parse_string(raw)
+	if not (doc is Dictionary):
+		return fallback
+	var out: Array = []
+	for name in (doc as Dictionary).keys():
+		var spec: Dictionary = doc[name]
+		var hidden: Array = spec.get("hidden", [64, 64])
+		var sizes: Array = [47] + hidden + [10]
+		var macs := 0
+		for i in sizes.size() - 1:
+			macs += int(sizes[i]) * int(sizes[i + 1])
+		out.append({"name": str(name), "hidden": hidden,
+				"activation": str(spec.get("activation", "tanh")),
+				"macs": String.num_uint64(macs), "note": str(spec.get("note", ""))})
+	return fallback if out.is_empty() else out
+
+# "" for the deployed shape — train_run.sh then passes no --net at all, so a
+# default run's command line is exactly what it was before this existed.
+func _net_spec() -> String:
+	if _net == null or _net.selected < 0:
+		return ""
+	var name := str(_net.get_item_metadata(_net.selected))
+	return "" if name == "default" else name
 
 func _spin(parent: Container, text: String, lo: int, hi: int, val: int) -> SpinBox:
 	parent.add_child(_label(text, DIM))
@@ -1638,6 +1695,8 @@ func _spawn_train_run(key: String, build: String) -> void:
 		var opp := _selected_opponents()
 		var opp_build: String = str(opp[0]) if not opp.is_empty() else build
 		env = "ENVS=512 EPISODES=%d SEED=2026 " % int(_eps.value)
+		if _net_spec() != "":
+			env += "NET=%s " % _sq(_net_spec())
 		args = "--ppo --key %s --build %s --opp-build %s --run-dir %s" % [
 				_sq(key), _sq(build), _sq(opp_build), _sq(run_dir)]
 	else:
@@ -1647,6 +1706,8 @@ func _spawn_train_run(key: String, build: String) -> void:
 		var opps := _opponent_spec()
 		if opps != "":
 			env += "OPPONENTS=%s " % _sq(opps)
+		if _net_spec() != "":
+			env += "NET=%s " % _sq(_net_spec())
 		args = "--key %s --build %s --run-dir %s" % [_sq(key), _sq(build), _sq(run_dir)]
 	var cmd := "cd %s && exec env %stools/train_run.sh %s >> %s 2>&1" % [
 			_sq(_repo), env, args, _sq(log_path)]
@@ -1854,4 +1915,30 @@ func _selftest_cockpit() -> bool:
 	if dir_ppo.find("envs512") < 0:
 		ok = false
 		push_error("CONSOLE SELFTEST: PPO run dir '%s'" % dir_ppo)
+
+	# --- the NET dropdown: the real presets, and no NET= on a default run ---
+	# The list must come off ml/training/architectures.json, or the console would
+	# quietly offer one architecture while the trainers know six. And "default"
+	# must produce NO env var, so an ordinary TRAIN's command line is unchanged.
+	var names: Array = []
+	for row in _architectures():
+		names.append(str(row.name))
+	if not names.has("default") or not names.has("wide"):
+		ok = false
+		push_error("CONSOLE SELFTEST: architectures.json read as %s" % str(names))
+	for i in _net.get_item_count():
+		if str(_net.get_item_metadata(i)) == "default":
+			_net.select(i)
+	if _net_spec() != "":
+		ok = false
+		push_error("CONSOLE SELFTEST: the default net would pass NET=%s" % _net_spec())
+	for i in _net.get_item_count():
+		if str(_net.get_item_metadata(i)) == "wide":
+			_net.select(i)
+	if _net_spec() != "wide":
+		ok = false
+		push_error("CONSOLE SELFTEST: selecting 'wide' yields '%s'" % _net_spec())
+	for i in _net.get_item_count():
+		if str(_net.get_item_metadata(i)) == "default":
+			_net.select(i)
 	return ok

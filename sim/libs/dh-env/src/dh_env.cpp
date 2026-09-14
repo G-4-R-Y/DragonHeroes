@@ -156,6 +156,13 @@ void dh_env_set_opp_weights(DhEnv* env, const float* params,
     env->arena.set_opp_mlp(params, layer_in, layer_out, n_layers, emb16);
 }
 
+void dh_env_set_opp_weights_acts(DhEnv* env, const float* params,
+                                 const int32_t* layer_in, const int32_t* layer_out,
+                                 int32_t n_layers, const float* emb16,
+                                 const int32_t* acts) {
+    env->arena.set_opp_mlp(params, layer_in, layer_out, n_layers, emb16, acts);
+}
+
 void dh_env_reset(DhEnv* env, uint64_t seed, float* out_obs31) {
     env->arena.reset(seed);
     if (out_obs31 != nullptr) env->arena.obs(out_obs31);

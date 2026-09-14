@@ -32,6 +32,11 @@
 #
 # Env knobs (ES): GENERATIONS (20) POP (8) EPISODES (4) JOBS (desktop: min(nproc-4, 16); throughput: nproc) SEED (2026)
 #                 SPEED (max) OPPONENTS ("") CHECKPOINT_EVERY (25)
+# Env knobs (both): NET ("" = the deployed 64x64 tanh). An architecture preset
+#                 from ml/training/architectures.json — `python3 -m ml.training.arch`
+#                 lists them with their per-tick cost. It lands in config.json, so a
+#                 run folder always says which architecture produced its nets.
+#                   NET=relu-wide tools/train_run.sh --ppo --key ...   # a teacher
 #
 # CHECKPOINT_EVERY exists because the trainer registers its net only when the
 # WHOLE generation loop finishes: without it, killing a 1000-generation run
@@ -69,6 +74,8 @@ fi
 JOBS="${JOBS:-$TRAIN_DEFAULT_JOBS}"; SEED="${SEED:-2026}"; SPEED="${SPEED:-max}"
 OPPONENTS="${OPPONENTS:-}"; CHECKPOINT_EVERY="${CHECKPOINT_EVERY:-25}"
 STEPS="${STEPS:-2000000}"; ENVS="${ENVS:-512}"; ARCH="${ARCH:-mlp}"  # ENVS was 32 pre-batching
+# NET is the SHAPE (architectures.json); ARCH above is the older mlp-vs-gru axis.
+NET="${NET:-}"; NET_ARG=(); [ -z "$NET" ] || NET_ARG=(--net "$NET")
 SELFPLAY_EVERY="${SELFPLAY_EVERY:-4}"
 PYVENV="$REPO/ml/.venv/bin/python"
 
@@ -274,6 +281,7 @@ json.dump({
          "jobs": $JOBS, "seed": $SEED, "speed": "$SPEED", "opponents": "$OPPONENTS"},
   "ppo": {"steps": $STEPS, "envs": $ENVS, "arch": "$ARCH",
           "selfplay_every": $SELFPLAY_EVERY, "build": "$BUILD", "opp_build": "$OPP_BUILD"},
+  "net": "$NET" or "default",
   "env": {"git_head": sh("git", "rev-parse", "--short", "HEAD"),
           "git_dirty": bool(sh("git", "status", "--porcelain")),
           "godot": sh("godot", "--version"), "torch": torch_v,
@@ -285,6 +293,7 @@ PY
 dh_banner "DRAGON HEROES" "TRAINING FORGE · isolated, cumulative runs"
 dh_kv run "${RUN#"$REPO"/}"
 dh_kv mode "$MODE · $KEYS_LABEL · $KNOBS"
+[ -z "$NET" ] || dh_kv net "$NET (ml/training/architectures.json)"
 dh_kv seeded "$SEEDED"
 dh_kv checkpoint "every $CHECKPOINT_EVERY generations — kill it and resume with: tools/train_run.sh --resume ${RUN#"$REPO"/}"
 dh_kv isolated "DH_SERVING_DIR=$RUN — ml/serving is untouched"
@@ -302,7 +311,7 @@ if [ "$MODE" = "ppo" ]; then
   dh_kv budget "$STEPS steps · $ENVS envs · $ARCH · self-play every $SELFPLAY_EVERY"
   "$PYVENV" -u -m ml.training.ppo --key "$KEY" --build "$BUILD" \
       --opp-build "$OPP_BUILD" --steps "$STEPS" --envs "$ENVS" --arch "$ARCH" \
-      --selfplay-every "$SELFPLAY_EVERY" --seed "$SEED" 2>&1 \
+      --selfplay-every "$SELFPLAY_EVERY" --seed "$SEED" "${NET_ARG[@]}" 2>&1 \
       | tee "$RUN/logs/$KEY.log" \
       | python3 -u "$REPO/tools/dh_trainfmt.py" --key "$KEY" || dh_err "ppo $KEY failed — see logs/$KEY.log"
   "$PYVENV" -u -m ml.training.league gate --key "$KEY" --build "$BUILD" \
@@ -324,7 +333,8 @@ else
     python3 -u -m ml.training.league train --key "$key" --build "$build" \
         --generations "$GENERATIONS" --pop "$POP" --episodes "$EPISODES" \
         --jobs "$JOBS" --seed "$SEED" --speed "$SPEED" \
-        --checkpoint-every "$CHECKPOINT_EVERY" "${RESUME_ARG[@]}" "${OPP_ARG[@]}" 2>&1 \
+        --checkpoint-every "$CHECKPOINT_EVERY" "${RESUME_ARG[@]}" "${OPP_ARG[@]}" \
+        "${NET_ARG[@]}" 2>&1 \
         | tee "$RUN/logs/$key.log" \
         | python3 -u "$REPO/tools/dh_trainfmt.py" --key "$key" \
             --generations "$GENERATIONS" --pop "$POP" \

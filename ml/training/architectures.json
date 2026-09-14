@@ -1,0 +1,14 @@
+{
+ "default": {"hidden": [64, 64], "activation": "tanh", "init": "normal", "init_scale": 0.1,
+             "note": "what ships today; every deployed net is this shape"},
+ "tiny":    {"hidden": [32, 32], "activation": "tanh", "init": "normal", "init_scale": 0.1,
+             "note": "half the cost — for crowded scenes, if it can still fight"},
+ "relu":    {"hidden": [64, 64], "activation": "relu", "init": "he",
+             "note": "shipping size, relu instead of tanh"},
+ "wide":    {"hidden": [256, 256], "activation": "tanh", "init": "xavier",
+             "note": "TEACHER ONLY — 10.3x the tick budget, distill it"},
+ "relu-wide": {"hidden": [256, 256], "activation": "relu", "init": "he",
+             "note": "TEACHER ONLY — the one to beat `wide` with"},
+ "deep":    {"hidden": [128, 128, 128], "activation": "relu", "init": "he",
+             "note": "TEACHER ONLY — depth instead of width, 5.2x"}
+}

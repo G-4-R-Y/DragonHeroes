@@ -182,7 +182,50 @@ GENERATIONS=2 POP=4 EPISODES=2 tools/train_all.sh   # quick smoke of the same
 
 Extra flags: `--sigma` (0.02), `--lr` (0.02), `--seed` (2026),
 `--opponents "native@core.arena.gloamfen_stalker,scripted@core.arena.dusk_revenant"`,
-`--progress-file`, `--speed max|N` (default `max`).
+`--progress-file`, `--speed max|N` (default `max`), and `--net` (below).
+
+### Trying a different architecture (`--net`)
+
+The net's shape is a parameter, not a constant — width, activation and init live
+in one place and every trainer takes the same five flags:
+
+```bash
+python3 -m ml.training.arch                    # the presets, and what each costs per tick
+python3 -m ml.training.league   train --net relu      --key fen_boar --build core.arena.fen_boar_alpha
+ml/.venv/bin/python -m ml.training.ppo --net relu-wide --key fen_boar \
+    --build core.arena.fen_boar_alpha --opp-build core.arena.cinder_drake
+python3 -m ml.training.distill  --net tiny --teacher fen_boar@candidate \
+    --key fen_boar --build core.arena.fen_boar_alpha
+python3 -m ml.training.tournament --net relu --all       # every method, one architecture
+NET=relu-wide tools/train_run.sh --ppo --key fen_boar \
+    --build core.arena.fen_boar_alpha --opp-build core.arena.cinder_drake
+```
+
+In the console it is the **net** row under *speed*; the list is read from
+`ml/training/architectures.json`, so a preset added there shows up with no code
+change. Override any part with `--hidden 256,256`, `--activation relu`,
+`--init he`, `--init-scale 0.1`.
+
+| Preset | Shape | MACs/tick | Use |
+|---|---|---|---|
+| `default` | 64, 64 tanh | 7,744 | **What ships.** Every deployed net is this |
+| `tiny` | 32, 32 tanh | 2,848 | Half the cost — for crowded scenes, if it can still fight |
+| `relu` | 64, 64 relu | 7,744 | Shipping size, different nonlinearity |
+| `wide` / `relu-wide` | 256, 256 | 80,128 | **Teacher only** — 10.3× the budget |
+| `deep` | 128 × 3 relu | 40,064 | Teacher only |
+
+> **A wide net is a teacher, never a shipped policy.** 80,128 MACs is ~1.09 ms per
+> agent per tick against a 16,670 µs frame — fifteen agents eat it whole. Train it
+> wide, then distil a `default` student (§"Teachers and students") and deploy that.
+>
+> **Architectures never warm-start into each other.** A run whose `--net` differs
+> from the deployed pin starts fresh and says so; `ppo --warm-start` refuses
+> outright. Crossing shapes is what distillation is for.
+>
+> Activations are `tanh`, `relu`, `leaky_relu` (slope 0.01) and `linear` and the
+> list is short on purpose: the same forward pass must be **bit-identical** in
+> GDScript and C++, which `max(0, x)` is and `gelu` is not. The gate is
+> `godot --headless --path game res://arena/tests/policy_parity_test.tscn --quit-after 20`.
 
 **Scaling.** A generation is `pop × opponents` independent matches — that is the
 most workers that can ever be busy, so `--jobs` past it idles. Raise `--pop` to
@@ -205,8 +248,10 @@ ml/.venv/bin/python -m ml.training.evolve --key fen_boar --build core.arena.fen_
     --opp-build core.arena.cinder_drake --pop 4 --generations 3 --steps 500000
 ```
 
-`--warm-start <registry JSON/npz>` initialises from an existing net,
-`--exploit <build>` targets a specific opponent. VRAM is capped before the first
+`--warm-start <registry JSON/npz>` initialises from an existing net (same
+architecture only), `--exploit <build>` targets a specific opponent, `--net`
+picks the architecture (above; `--arch mlp|gru` is a different axis — recurrent
+vs feed-forward — and the GRU stack keeps its own fixed shape). VRAM is capped before the first
 CUDA allocation by `ml/training/gpu_guard.py` (half the 6 GB card by default;
 override with `DH_VRAM_FRACTION`). Training stays **local** on the 4050 — no
 cloud GPU (canon §12.38).
@@ -370,15 +415,17 @@ a 256×256 net is 80,128 MACs and ~1.09 ms, and fifteen of those eat a whole
 # 1. a teacher. PPO on the GPU is the trainer that can actually use the width.
 ml/.venv/bin/python -m ml.training.ppo --key fen_boar_alpha \
     --build core.arena.fen_boar_alpha --opp-build core.arena.gloamfen_stalker \
-    --hidden 256,256 --steps 2000000
+    --net relu-wide --steps 2000000
 
 # 2. distill it into the 64x64 net the game loads
 python3 -m ml.training.distill --key fen_boar_alpha \
     --build core.arena.fen_boar_alpha --teacher fen_boar_alpha@candidate
 ```
 
-`--hidden` also works on `league train` (ES), though ES scales poorly with
-parameter count — gradients are what use width.
+`--net` also works on `league train` (ES), though ES scales poorly with parameter
+count — gradients are what use width. The student's architecture is its own: a
+`relu-wide` teacher can perfectly well teach a `default` tanh student, which is
+the entire point.
 
 **A teacher must earn the job.** Before a single observation is collected it
 plays `versus` against **both** `native` and `scripted` in the real Godot arena
@@ -399,7 +446,7 @@ teacher. The student registers as a normal candidate and gates like any other ne
 | flag | default | what it does |
 |---|---|---|
 | `--teacher` | required | the wide net, in `versus --a` syntax |
-| `--hidden` | `64,64` | the STUDENT's width |
+| `--net` (+ `--hidden --activation --init`) | `default` | the STUDENT's architecture; the teacher's comes off its own file |
 | `--samples` / `--dagger-rounds` | 200000 / 3 | per round, and how many rounds |
 | `--epochs --batch --lr --temperature` | 4 / 512 / 1e-3 / 2.0 | the fit |
 | `--qualify-margin` | 0.55 | the bar the teacher must clear vs both baselines |
@@ -659,11 +706,12 @@ Every row below was run on 2026-09-13 and printed exactly this.
 | Hunt level-up | `godot --headless --path game res://prototype/tests/level_up_probe.tscn` | `LEVEL UP OK — real kills refresh stats/HP/HUD/dodges/flasks; party parity; no gear heal, duplicate refill, build reroll or revival` |
 | FX budget | `godot --headless --path game res://prototype/tests/fx_stress.tscn --quit-after 260` | `FXSTRESS OK ribbons_peak<=40(40) lights_peak<=32(32) telegraphs_peak<=24(20) labels_peak<=48(48) nodes_created_after_warmup=0 draws<120(0) frame_ms<16.6(2.19)` |
 | Escape to Haven | `godot --headless --path game res://prototype/tests/esc_probe.tscn` | `ESC OK — returned to haven.tscn (static mem 99 -> 46 MB)` |
-| Flasks | `godot --headless --path game res://prototype/tests/flask_probe.tscn` | `FLASK OK — drink heals 40% over 2s, charge spent, 6 kills rekindle, empty refuses, haven refills` |
+| Flasks | `godot --headless --path game res://prototype/tests/flask_probe.tscn` | `FLASK OK — real R/click, 20% now + 20% over 2s, exact budget, recharge never heals, full/empty/dead feedback` |
 | Repopulation | `godot --headless --path game res://prototype/tests/repop_probe.tscn` | `REPOP OK — field restocked 0 -> 10 creatures across 3 species` |
 | Arena | `godot --headless --path game res://arena/arena.tscn -- --selftest` | `ARENA SELFTEST OK — 4 matchups, damage flowed, no orphan proxies, HUD 4134 frames` |
 | Training console | `godot --headless --path game res://arena/console.tscn -- --selftest` | `CONSOLE SELFTEST OK — 2 generations, 8/12 matches, ETA 1:20, chart draws 2, hint '12 matches/gen (pop 6 × 2 opp) · jobs 20 · 20 cores — 8 workers idle: pop 10 fills them'` |
 | Cosmetics | `godot --headless --path game res://arena/tests/cosmetics_test.tscn --quit-after 140` | `COSMETICS OK` |
+| Policy parity | `godot --headless --path game res://arena/tests/policy_parity_test.tscn --quit-after 20` | `POLICY PARITY OK — 256 forward passes matched bit-for-bit across linear, tanh, relu, leaky_relu` |
 | Lair journey | `python3 tools/check_lair_journey.py` | `LAIR JOURNEY OK: earned_artifacts=2, entrances=1, fps=60.0, lair_unlocks=1, rush_round=2.0, world_return_preserved=True` |
 | Co-op | `bash tools/mp_test.sh` | `MP HOST OK` + `MP CLIENT OK — 10 snapshots received` + `MP TEST OK` |
 | Content | `python3 tools/validate_content.py` | `content OK: 46 definitions across 11 types, 5 registries, 0 problems` |

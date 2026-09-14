@@ -685,7 +685,46 @@ Rebuild after the packaging commit for clean provenance; archives remain in
        two must stay BIT-IDENTICAL or every trained weight is invalidated
     4. `sim/libs/dh-sim` `Arena::mlp_act` — PPO's frozen self-play opponent,
        which hard-codes tanh for hidden layers today
-  STATUS: in progress.
+  **DONE 2026-09-13.** `ml/training/arch.py` + `ml/training/architectures.json`:
+  one `Arch` (hidden / activation / init / init_scale), named presets, and the
+  SAME five flags on every trainer — `--net --hidden --activation --init
+  --init-scale` on `league train`, `ppo`, `distill` and `tournament`, plus
+  `NET=` on `tools/train_run.sh` and a **net** row in the arena console read
+  straight from `architectures.json`. Presets shipped: `default` (64,64 tanh,
+  7,744 MACs — what ships), `tiny`, `relu`, `wide`, `relu-wide`, `deep`.
+  All four surfaces landed:
+    1. `PolicyNet(arch=)`, forward/save/load/export carry the activation; a net
+       saved before `arch` existed still loads as tanh.
+    2. `TorchPolicyNet(arch=)` — trunk activation + he/xavier init; the exporter
+       now writes `"linear"` instead of `"logits"` for the folded head.
+    3. `DhPolicyNet::add_layer` takes an activation CODE (0 linear, 1 tanh,
+       2 relu, 3 leaky_relu) instead of a bool — numbered so an old
+       `true`/`false` still means what it meant — and `neural_policy.gd`
+       branches on the same code in its hot loop.
+    4. `Arena::set_opp_mlp` gains an optional `acts` array, reached through a
+       NEW C symbol `dh_env_set_opp_weights_acts` rather than a sixth argument
+       on the old one: ctypes against a stale `.so` would have read a register
+       nobody set, and "the self-play opponent quietly ran the wrong policy" is
+       invisible in every metric PPO prints. A missing symbol is not.
+  **The activation set is deliberately four.** Surfaces 3a and 3b must agree
+  BIT FOR BIT; `max(0,x)` and a hard-coded 0.01 leaky slope do, `gelu`/`silu`
+  would need an erf/exp equivalence proof nobody has written.
+  **A regression this nearly caused:** the strict activation check would have
+  REFUSED `cinder_drake_ppo_v2..v5`, which carry `act: "logits"` from the old
+  exporter. Kept as a read-side alias for linear, everywhere.
+  Gates: `POLICY PARITY OK — 256 forward passes matched bit-for-bit across
+  linear, tanh, relu, leaky_relu` (new,
+  `game/arena/tests/policy_parity_test.tscn`); `ml/tests/test_arch.py` 28 tests
+  including a per-activation finite-difference check of the student's backward
+  pass and a real `libdh-env` episode proving the frozen opponent runs the
+  activation it was handed (and that no-acts still reproduces tanh exactly);
+  `CONSOLE SELFTEST OK` with the NET row asserted to read the real JSON and to
+  pass NO `NET=` for `default`; ctest 4/4. End-to-end: a relu net trained
+  through the real Godot arena (`--net relu` → `['relu','relu','linear']` on
+  disk).
+  **STILL OPEN:** the GRU stack keeps its fixed shape (`--net` is mlp-only, and
+  `ppo` says so); no wide teacher has been TRAINED yet — that is Ricardo's GPU
+  run and the real test of whether width beats ES.
 
 - **An asset generation console — Ricardo, 2026-09-13 (latest+7):** *"And how
   about the asset generation console?"* — asked right after `tools/genforge.py`

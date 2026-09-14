@@ -17,12 +17,25 @@ var _emb := {}
 # went through a Variant. A flat PackedFloat64Array indexed by o * n_in + j
 # keeps the identical numbers (the exported weights are float32-exact, and the
 # accumulator was always a GDScript float) with none of the boxing.
-var _layers: Array = []         # [{w: PackedFloat64Array flat [out*in], b: ..., n_in, n_out, tanh}]
+var _layers: Array = []         # [{w: PackedFloat64Array flat [out*in], b: ..., n_in, n_out, act}]
 # The same forward pass in C++ (sim/libs/dh-godot), when the GDExtension is
 # built. Even flattened, GDScript spends ~400 ns per multiply-add; this is the
 # rest of that gap. It is OPTIONAL on purpose — a checkout without the extension
 # runs the GDScript path below and gets identical numbers, just slower.
 var _cnet: Object = null
+
+# Activation codes, shared with ml/training/arch.py and sim/libs/dh-godot
+# (DhPolicyNet::Activation). Ricardo, 2026-09-13: "net hyperparams should be
+# configurable, as to test new architectures" — a layer used to be tanh-or-not.
+# The set stays tiny because BOTH forward passes below have to produce the same
+# bits: max(0, x) and a hard-coded slope do, erf/exp curves would need a proof.
+# 1 == the old `true` and 0 == the old `false`, so nothing on disk changes meaning.
+const ACT_CODES := {"linear": 0, "tanh": 1, "relu": 2, "leaky_relu": 3,
+		# "logits" is what the PPO exporter called its folded head before this
+		# was an enum, and four nets in ml/serving/weights carry it TODAY. It has
+		# always meant linear; refusing it would retire them.
+		"logits": 0}
+const LEAKY_SLOPE := 0.01
 
 func policy_id() -> String:
 	return "neural:" + path.get_file()
@@ -58,8 +71,15 @@ static func from_file(p: String) -> ArenaNeuralPolicy:
 		var b_src: Array = l.get("b", [])
 		for o in mini(n_out, b_src.size()):
 			bias[o] = float(b_src[o])
+		# Default tanh: nets exported before activations were configurable carry
+		# "act": "tanh" already, and anything older had no key and WAS tanh.
+		var act_name := str(l.get("act", "tanh"))
+		if not ACT_CODES.has(act_name):
+			push_error("NeuralPolicy: unknown activation '%s' in %s" % [act_name, p])
+			pol._layers.clear()
+			return pol
 		pol._layers.append({"w": flat, "b": bias, "n_in": n_in, "n_out": n_out,
-				"tanh": str(l.get("act", "tanh")) == "tanh"})
+				"act": int(ACT_CODES[act_name])})
 	pol.explore = float(data.get("explore", 0.05))
 	pol._build_native()
 	return pol
@@ -75,7 +95,7 @@ func _build_native() -> void:
 		# add_layer refuses a flattening that does not match n_in * n_out. If it
 		# ever does, stay on the GDScript path rather than run a net we cannot
 		# vouch for.
-		if not bool(n.call("add_layer", l.w, l.b, l.n_in, l.n_out, l.tanh)):
+		if not bool(n.call("add_layer", l.w, l.b, l.n_in, l.n_out, l.act)):
 			push_warning("DhPolicyNet rejected a layer — using the GDScript forward pass")
 			return
 	_cnet = n
@@ -96,7 +116,7 @@ func _forward(x: PackedFloat64Array) -> PackedFloat64Array:
 		var b: PackedFloat64Array = l.b
 		var n_in: int = l.n_in
 		var n_out: int = l.n_out
-		var use_tanh: bool = l.tanh
+		var act: int = l.act
 		var lim: int = mini(n_in, out.size())
 		var nxt := PackedFloat64Array()
 		nxt.resize(n_out)
@@ -105,7 +125,14 @@ func _forward(x: PackedFloat64Array) -> PackedFloat64Array:
 			var s: float = b[o]
 			for j in lim:
 				s += w[base + j] * out[j]
-			nxt[o] = tanh(s) if use_tanh else s
+			# Branch on the code, not through a helper call: this is the hot
+			# loop, and it must read as the same arithmetic as activate() in
+			# sim/libs/dh-godot/src/dh_policy_net.cpp.
+			match act:
+				1: nxt[o] = tanh(s)
+				2: nxt[o] = s if s > 0.0 else 0.0
+				3: nxt[o] = s if s > 0.0 else LEAKY_SLOPE * s
+				_: nxt[o] = s
 		out = nxt
 	return out
 

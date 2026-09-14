@@ -8,7 +8,7 @@ ONE architecture serves both nets Ricardo asked for (docs/design/23):
 
 Layout (must match the GDScript runtime exactly):
   input  = obs[OBS_DIM] ++ embedding[EMB_DIM]
-  hidden = HIDDEN tanh, [64, 64] by default
+  hidden = arch.hidden, arch.activation — [64, 64] tanh by default
   head   = HEAD_DIM linear: [move_x, move_y, logit x ACTION_LOGITS, dodge_logit]
 
 WIDTH IS A PARAMETER (Ricardo, 2026-09-13: "train bigger models and use them to
@@ -19,15 +19,30 @@ those eat a whole 60 FPS frame. So a wide net is a TEACHER, never a shipped
 policy; ml/training/distill.py turns one into a 64x64 student that can ship.
 Only the DEFAULT is (64, 64) — pass `hidden=` to build something else.
 
+THE SHAPE IS A PARAMETER TOO (Ricardo, 2026-09-13: "net hyperparams should be
+configurable, as to test new architectures"). Width, activation, init and init
+scale all live in one ml.training.arch.Arch, named in
+ml/training/architectures.json, and every trainer takes the same `--net` flag.
+A net carries its own arch in both its .npz and its exported JSON, so a relu
+teacher loads and runs as a relu teacher no matter what the default says.
+
 Weights are stored as .npz for training and exported as JSON (schema
 "arena.policy.v1") for the Godot runtime.
 """
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 
 import numpy as np
+
+ROOT = Path(__file__).resolve().parent.parent.parent
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from ml.training.arch import (Arch, activation_grad,  # noqa: E402
+                              apply_activation, resolve)
 
 OBS_DIM = 31
 EMB_DIM = 16
@@ -36,7 +51,8 @@ HEAD_DIM = 2 + ACTION_LOGITS + 1
 HIDDEN = (64, 64)
 POLICY_SCHEMA = "arena.policy.v1"
 
-INIT_SCALE = 0.1
+INIT_SCALE = 0.1        # the default Arch's scale; kept as a name for old callers
+DEFAULT_ARCH = Arch()
 
 
 def parse_hidden(spec: str | None) -> tuple[int, ...]:
@@ -63,17 +79,32 @@ def macs(hidden: tuple[int, ...] | None = None) -> int:
 class PolicyNet:
     """A small MLP + content-id embedding table."""
 
-    def __init__(self, seed: int = 0, hidden: tuple[int, ...] | str | None = None):
+    def __init__(self, seed: int = 0, hidden: tuple[int, ...] | str | None = None,
+                 arch: Arch | None = None):
+        """`arch` is the whole shape; `hidden` is the older width-only shortcut and
+        still works (it overrides the arch's width, so `PolicyNet(hidden=...)` in
+        existing code keeps meaning exactly what it meant)."""
+        self.arch = arch or DEFAULT_ARCH
+        if hidden:
+            h = parse_hidden(hidden) if isinstance(hidden, str) else tuple(hidden)
+            if h != self.arch.hidden:
+                self.arch = Arch.from_dict({**self.arch.to_dict(), "hidden": list(h)},
+                                           name=self.arch.name)
+        self.hidden = self.arch.hidden
         rng = np.random.default_rng(seed)
-        self.hidden = parse_hidden(hidden) if isinstance(hidden, str) else \
-            tuple(hidden) if hidden else HIDDEN
         sizes = layer_sizes(self.hidden)
         self.weights = [
-            rng.normal(0.0, INIT_SCALE, size=(sizes[i + 1], sizes[i])).astype(np.float32)
+            self.arch.init_weight(rng, sizes[i + 1], sizes[i]).astype(np.float32)
             for i in range(len(sizes) - 1)
         ]
         self.biases = [np.zeros(sizes[i + 1], dtype=np.float32) for i in range(len(sizes) - 1)]
         self.embeddings: dict[str, np.ndarray] = {}
+
+    @property
+    def acts(self) -> list[str]:
+        """Per-layer activation names, the hidden ones from the arch and the head
+        always linear. This list IS the contract the runtimes read."""
+        return self.arch.layer_acts(len(self.weights))
 
     # ---- embeddings ---------------------------------------------------------
 
@@ -94,10 +125,8 @@ class PolicyNet:
     def forward(self, obs: np.ndarray, key: str = "*") -> np.ndarray:
         assert obs.shape[-1] == OBS_DIM, f"obs must be [{OBS_DIM}] (arena.obs.v1)"
         x = np.concatenate([obs, self.ensure_embedding(key)])
-        for i, (w, b) in enumerate(zip(self.weights, self.biases)):
-            x = w @ x + b
-            if i < len(self.weights) - 1:
-                x = np.tanh(x)
+        for (w, b, a) in zip(self.weights, self.biases, self.acts):
+            x = apply_activation(w @ x + b, a)
         return x
 
     def act(self, obs: np.ndarray, key: str = "*") -> tuple[np.ndarray, int, bool]:
@@ -128,7 +157,7 @@ class PolicyNet:
             i += e.size
 
     def clone(self) -> "PolicyNet":
-        other = PolicyNet(hidden=self.hidden)
+        other = PolicyNet(arch=self.arch)
         other.weights = [w.copy() for w in self.weights]
         other.biases = [b.copy() for b in self.biases]
         other.embeddings = {k: v.copy() for k, v in self.embeddings.items()}
@@ -142,6 +171,9 @@ class PolicyNet:
         keys = list(self.embeddings.keys())
         payload["emb_keys"] = np.array(keys)
         payload["hidden"] = np.array(self.hidden, dtype=np.int64)
+        # The whole arch, not just the width: a relu teacher that reloaded as a
+        # tanh teacher would silently be a DIFFERENT net with the same weights.
+        payload["arch"] = np.array(json.dumps(self.arch.to_dict()))
         for k in keys:
             payload[f"emb:{k}"] = self.embeddings[k]
         np.savez(path, **payload)
@@ -156,7 +188,11 @@ class PolicyNet:
         n_layers = sum(1 for k in data.files if k.startswith("w") and k[1:].isdigit())
         hidden = (tuple(int(x) for x in data["hidden"]) if "hidden" in data.files
                   else tuple(data[f"w{i}"].shape[0] for i in range(n_layers - 1)))
-        net = PolicyNet(hidden=hidden)
+        # Same story for the rest of the arch: `arch` arrived with configurable
+        # hyperparameters, and every net saved before it was tanh/normal/0.1.
+        arch = (Arch.from_dict(json.loads(str(data["arch"]))) if "arch" in data.files
+                else Arch(hidden=hidden))
+        net = PolicyNet(arch=arch, hidden=hidden)
         net.weights = [data[f"w{i}"] for i in range(n_layers)]
         net.biases = [data[f"b{i}"] for i in range(n_layers)]
         net.embeddings = {str(k): data[f"emb:{k}"] for k in data["emb_keys"]}
@@ -164,16 +200,18 @@ class PolicyNet:
 
     def export_game_json(self, path: str | Path, explore: float = 0.05) -> None:
         """The exact file game/arena/neural_policy.gd consumes."""
-        acts = ["tanh"] * (len(self.weights) - 1) + ["linear"]
+        acts = self.acts
         doc = {
             "schema": POLICY_SCHEMA,
             "obs_dim": OBS_DIM,
             "emb_dim": EMB_DIM,
             "explore": explore,
-            # Metadata: the runtime reads the layer shapes themselves and ignores
-            # these, but a net on disk should be able to say how big it is.
+            # Metadata: the runtime reads the layer shapes and each layer's "act"
+            # and ignores these, but a net on disk should be able to say how big
+            # it is and which preset it came from.
             "hidden": list(self.hidden),
             "macs": macs(self.hidden),
+            "arch": self.arch.to_dict(),
             "embeddings": {k: [float(x) for x in v] for k, v in self.embeddings.items()},
             "layers": [
                 {"w": [[float(x) for x in row] for row in w], "b": [float(x) for x in b], "act": a}
