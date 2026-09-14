@@ -198,6 +198,17 @@ func _fit_window() -> void:
 			w.size = cand
 			w.position = usable.position + (usable.size - cand) / 2
 			return
+	# NOTHING FIT. The loop used to just end here, which left content_scale_size
+	# at the project default — 640x360 (project.godot window/size/viewport_*) — a
+	# canvas 90 logical px shorter than this console's own content, so the chart
+	# collapsed to its minimum and the panels below it ran off the bottom edge.
+	# Measured in arena/tests/console_layout_probe.tscn; it is the ONLY canvas
+	# that overflows. Ricardo, 2026-09-14: "graph overflows from the rendered
+	# screen." A small or oddly-reported screen must still get a real canvas.
+	var fit := Vector2i(maxi(usable.size.x - 24, 640), maxi(usable.size.y - 96, 360))
+	w.content_scale_size = fit
+	w.size = Vector2i(mini(fit.x, usable.size.x), mini(fit.y, usable.size.y))
+	w.position = usable.position + (usable.size - w.size) / 2
 
 func _build_ui() -> void:
 	var bg := ColorRect.new()
@@ -381,9 +392,18 @@ func _build_ui() -> void:
 
 	right.add_child(_label("FITNESS by GENERATION", EMBER))
 	_chart = Control.new()
-	_chart.custom_minimum_size = Vector2(0, 120)
+	# 64, not 120. This is a FLOOR, and the chart is the column's only expanding
+	# child, so on any real canvas it still takes everything left over (194 px at
+	# 800x450, 554 at 1440x810 — measured). A floor of 120 only ever mattered on a
+	# canvas too short for the column, where it pushed the strip and the gate
+	# verdict off the bottom of the screen instead of giving up its own height.
+	_chart.custom_minimum_size = Vector2(0, 64)
 	_chart.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_chart.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# draw_string is NOT clipped to a Control's rect. Every label below is placed
+	# inside the box on purpose, but one bad tick range should dirty this panel,
+	# not paint over its neighbours and off the bottom of the screen.
+	_chart.clip_contents = true
 	_chart.draw.connect(_on_chart_draw)
 	right.add_child(_chart)
 
@@ -391,6 +411,7 @@ func _build_ui() -> void:
 	_strip = Control.new()
 	_strip.custom_minimum_size = Vector2(0, 58)
 	_strip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_strip.clip_contents = true
 	_strip.draw.connect(_on_strip_draw)
 	right.add_child(_strip)
 
@@ -1253,7 +1274,12 @@ func _on_chart_draw() -> void:
 	var l := 34.0
 	var r := sz.x - 8.0
 	var t := 10.0
-	var b := sz.y - 14.0
+	# The x-tick row lives BELOW b, so b has to leave room for a whole line of
+	# text — ascent and descent. It used to be a flat sz.y - 14 with the baseline
+	# at b + 12, which put the descenders past the bottom edge (measured: 1 px at
+	# SIZE_BODY, and more the moment the theme font changes).
+	var line_h := font.get_ascent(ProtoTheme.SIZE_BODY) + font.get_descent(ProtoTheme.SIZE_BODY)
+	var b := sz.y - line_h - 3.0
 	# y: the 0..1 fitness band, widened to 0.25 steps when shaping pushes past it
 	var lo := 0.0
 	var hi := 1.0
@@ -1277,21 +1303,32 @@ func _on_chart_draw() -> void:
 		return l + (g / float(gmax)) * (r - l) if gmax > 0 else (l + r) * 0.5
 	var yf := func(v: float) -> float:
 		return b - (v - lo) / (hi - lo) * (b - t)
-	# grid + y ticks
-	var v := lo
+	# grid + y ticks. The label step is chosen so the rows cannot collide: a run
+	# whose fitness shaping runs to -3 used to draw eighteen 0.25 labels into a
+	# 96 px band, which is a grey smear, not an axis.
+	var band := maxf(b - t, 1.0)
+	var v_step := 0.25
+	for candidate_step in [0.25, 0.5, 1.0, 2.0, 5.0, 10.0, 25.0]:
+		v_step = candidate_step
+		if (hi - lo) / v_step * (line_h + 2.0) <= band:
+			break
+	var v := ceilf(lo / v_step) * v_step
 	while v <= hi + 0.001:
 		var y := _px(yf.call(v))
 		c.draw_line(Vector2(_px(l), y), Vector2(_px(r), y), Color(0.14, 0.19, 0.25), 1.0)
 		c.draw_string(font, Vector2(2, y + 3), "%.2f" % v, HORIZONTAL_ALIGNMENT_RIGHT,
 				int(l) - 6, ProtoTheme.SIZE_BODY, DIM)
-		v += 0.25
-	# x ticks (thin out past 8 generations)
-	var step := maxi(1, ceili((gmax + 1) / 8.0))
+		v += v_step
+	# x ticks (thin out so the labels never touch: ~26 px each at body size)
+	var per_label := font.get_string_size("g000", HORIZONTAL_ALIGNMENT_LEFT, -1,
+			ProtoTheme.SIZE_BODY).x + 6.0
+	var fit_n := maxi(2, int((r - l) / maxf(per_label, 1.0)))
+	var step := maxi(1, ceili((gmax + 1) / float(fit_n)))
 	for g in range(0, gmax + 1, step):
 		var x := _px(xf.call(float(g)))
-		c.draw_line(Vector2(x, _px(b)), Vector2(x, _px(b) + 3), ProtoTheme.PANEL_BORDER, 1.0)
-		c.draw_string(font, Vector2(x - 12, b + 12), "g%d" % g, HORIZONTAL_ALIGNMENT_CENTER,
-				24, ProtoTheme.SIZE_BODY, DIM)
+		c.draw_line(Vector2(x, _px(b)), Vector2(x, _px(b) + 2), ProtoTheme.PANEL_BORDER, 1.0)
+		c.draw_string(font, Vector2(x - 12, b + font.get_ascent(ProtoTheme.SIZE_BODY) + 2),
+				"g%d" % g, HORIZONTAL_ALIGNMENT_CENTER, 24, ProtoTheme.SIZE_BODY, DIM)
 	# axes
 	c.draw_line(Vector2(_px(l), _px(t)), Vector2(_px(l), _px(b)), Color(0.35, 0.45, 0.6), 1.0)
 	c.draw_line(Vector2(_px(l), _px(b)), Vector2(_px(r), _px(b)), Color(0.35, 0.45, 0.6), 1.0)

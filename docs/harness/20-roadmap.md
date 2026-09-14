@@ -671,6 +671,64 @@ Rebuild after the packaging commit for clean provenance; archives remain in
      With the tick cheap and the engine resident, that is where a generation's
      time actually goes.
 
+- **Training console: the graph, TRAIN ALL tournaments, a benchmark browser, and
+  a global rank — Ricardo, 2026-09-14 (latest+10):** *"to the trianing onsole:
+  graph overflows from the rendered screen. Add tournament mode for the train all
+  method, as well. Also, a better benchmark interface, filtered by creature"* and,
+  mid-turn: *"and a global rank for the all vs all, where every model net compete
+  for the top in a balance fight"*.
+  Four items, in the order they arrived:
+  1. **The fitness graph overflows.** MEASURED, not guessed
+     (`game/arena/tests/console_layout_probe.tscn`, new): no container overflows
+     at any canvas `_fit_window` can pick (800x450 through 1440x810) — the bug is
+     the chart's own DRAWING. Two findings: (a) `_chart` is pinned at its 120 px
+     minimum at EVERY canvas, because the PROGRESS column never asked for
+     vertical fill, so ~100 logical px sit unused BELOW the strip while the plot
+     is squeezed into 96 px of band; (b) `clip_contents` is false on both the
+     chart and the strip and `draw_string` is not clipped to a Control's rect, so
+     the x-tick row (baseline `b + 12`, plus descent) bleeds past the bottom edge
+     — 1 px today, and unbounded the moment a tick range or a label grows.
+     FIX: let the column fill, clip both canvases, keep the ticks inside the box,
+     and make the probe a permanent gate so this cannot come back.
+  2. **Tournament mode for TRAIN ALL.** `league tournament --all` already exists
+     (`ml/training/tournament.py`, `aa35f2b`); the console's TRAIN ALL still goes
+     through `tools/train_run.sh --all`, i.e. ES only. Wanted: the sweep runs the
+     METHOD BRACKET per creature.
+  3. **A better benchmark interface, filtered by creature.** Today VERSUS shows a
+     flat `ml/data/benchmarks/` history with no filter, so a roster of creatures
+     produces one undifferentiated list.
+  4. **A global rank — all vs all, every net, balanced.** *"every model net
+     compete for the top in a balance fight"*. `league round-robin` exists but
+     fights only DEPLOYED policies, and across different builds — which ranks the
+     CREATURE, not the net. A fair ranking needs the mirror: both sides on the
+     SAME build so the only variable is the policy.
+  **Item 1 DONE 2026-09-14.** The overflow is real and reproducible, and it is
+  ONE canvas: **640x360**, the project default. `_fit_window` walks a candidate
+  list from 1600x900 down to 960x540 and every entry needs `usable.size.y >= 636`
+  — if none fits, the loop simply ENDED, leaving `content_scale_size` at the
+  project default, a canvas 90 logical px shorter than the console's own content.
+  There the chart collapsed to its floor and the strip, the gate verdict and the
+  column bottom ran off the screen (measured: 6-9 px past the edge at every level
+  of the tree). Fixes: `_fit_window` now always lands on a real canvas derived
+  from the usable rect; the chart's floor drops 120 -> 64 so a short canvas costs
+  the CHART height instead of pushing its neighbours off-screen; `clip_contents`
+  goes on the chart and the strip (`draw_string` is not clipped to a Control's
+  rect, and the x-tick row was already bleeding 1 px); the x-tick baseline is
+  computed from the font's ascent/descent instead of a hard-coded `b + 12`; and
+  the y-tick step is chosen from a ladder so a run whose shaping reaches -3 draws
+  a readable axis instead of eighteen labels smeared through a 96 px band.
+  Gate: `game/arena/tests/console_layout_probe.tscn` walks all 7 canvases x all 4
+  tabs with a loaded 200-generation run and asserts (a) nothing visible leaves
+  the canvas, (b) the chart absorbs every pixel the canvas grows by, (c) the tick
+  text lands inside, (d) clipping is on. `CONSOLE LAYOUT OK`.
+  **A correction worth recording:** the first version of this probe parented the
+  console to a Node2D, which gives a Control no rect to anchor against, so the
+  whole cockpit laid out at its content minimum and the probe "found" a chart
+  stuck at 120 px on an 810 px canvas. I added a `size_flags_vertical` line to
+  "fix" that, then A/B'd it and found it a no-op — the harness was the bug. The
+  line was removed rather than left in with a wrong explanation.
+  STATUS: items 2-4 queued in order.
+
 - **Are the open branches finished enough to merge? — Ricardo, 2026-09-13
   (latest+9):** *"check whether current open branches are finished in their work
   to merge into main. It finished some sprite animations for the boss, but

@@ -712,6 +712,7 @@ Every row below was run on 2026-09-13 and printed exactly this.
 | Training console | `godot --headless --path game res://arena/console.tscn -- --selftest` | `CONSOLE SELFTEST OK — 2 generations, 8/12 matches, ETA 1:20, chart draws 2, hint '12 matches/gen (pop 6 × 2 opp) · jobs 20 · 20 cores — 8 workers idle: pop 10 fills them'` |
 | Cosmetics | `godot --headless --path game res://arena/tests/cosmetics_test.tscn --quit-after 140` | `COSMETICS OK` |
 | Policy parity | `godot --headless --path game res://arena/tests/policy_parity_test.tscn --quit-after 20` | `POLICY PARITY OK — 256 forward passes matched bit-for-bit across linear, tanh, relu, leaky_relu` |
+| Console layout | `godot --headless --path game res://arena/tests/console_layout_probe.tscn --quit-after 300` | `CONSOLE LAYOUT OK — the cockpit fits every canvas _fit_window can pick` |
 | Lair journey | `python3 tools/check_lair_journey.py` | `LAIR JOURNEY OK: earned_artifacts=2, entrances=1, fps=60.0, lair_unlocks=1, rush_round=2.0, world_return_preserved=True` |
 | Co-op | `bash tools/mp_test.sh` | `MP HOST OK` + `MP CLIENT OK — 10 snapshots received` + `MP TEST OK` |
 | Content | `python3 tools/validate_content.py` | `content OK: 46 definitions across 11 types, 5 registries, 0 problems` |
