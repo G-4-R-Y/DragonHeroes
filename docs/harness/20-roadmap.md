@@ -696,6 +696,67 @@ Rebuild after the packaging commit for clean provenance; archives remain in
   currently subtracts `R_TIME` every tick REGARDLESS of outcome, so a losing
   agent is paid to die sooner. See the answer below for what is scored today.
 
+  **INTERRUPTION 2026-09-14 (latest+15) — seven new demands, recorded VERBATIM
+  before any of them is worked. Prompt, in his order:**
+  *"bosses still don't spawn like hordes, and there's still a single biome. How
+  are assets gen going?*
+  *How's our final reward function? make sure to document everything, including
+  the reward function versions as we update it with new rationale (trace the
+  whole story up to the current one)*
+  *genforge console interface is MUCH better now, we just can't go back from it
+  to the main menu. Also, in the arena interface, can we get a little polishing
+  to better fit everything in there, as well?*
+  *finally: after tuning the arena training as to learn from scripts first and,
+  once reliably wiining against it, self playing, run a train_all experiment
+  (even with PPO only) - make sure to get enough steps as so the model actually
+  converges"*
+
+  | R44 | NOW | Bosses still do not spawn like hordes do. | with R36/R29; encounter spawn parity between boss and horde paths, actual in-world spawn evidence |
+  | R45 | NOW | Still a single biome in play. | with R09/R29; distinct biome generation reaching the played world, not only the generator |
+  | R46 | ANSWER | "How are assets gen going?" — a question, owed a status answer, not a task. | 13b/13c; local image-gen repo still not delivered to reference_repos |
+  | R47 | NOW | Document the reward function fully, INCLUDING every version with its rationale — trace the whole story up to the current one. | tech/25 §5.2, tech/37; a versioned changelog, not a snapshot of the current weights |
+  | R48 | NOW | GenForge console cannot return to the main menu. | genforge console scene; real Back navigation evidence (same class as R38's arena Back) |
+  | R49 | NOW | Arena interface needs polishing to fit everything in. | design/23/17; COLLISION RISK — the other session owns game/arena/console.gd, check before editing |
+  | R50 | NOW / the big one | Tune arena training to learn from SCRIPTS first, then self-play once reliably winning; then run a train_all experiment (PPO is fine alone) with enough steps that the model actually converges. | tech/25 §4.2, tools/train_all.sh; a real curriculum + a converged run, not a smoke run |
+
+  **R50 IS ALREADY HALF UNDER WAY and his instruction sharpens it.** 15e's
+  decision (clone the heuristic, then PPO) is the same shape as his curriculum
+  and slots in ahead of it: heuristic -> scripted -> self-play. The evidence
+  that the curriculum is the right frame is in 15d — the nets never learned to
+  MOVE, so self-play from noise had two policies that both stand still teaching
+  each other nothing. "enough steps as so the model actually converges" is a
+  direct correction of every smoke run in this session (11 updates); no
+  conclusion may be drawn from a short run again.
+  STRATEGY AT THIS INTERRUPTION, so nothing is lost: gate controls (statue floor
+  + heuristic yardstick) are LANDED in ml/eval/gate.py, game/arena/statue_policy.gd
+  and heuristic_policy.gd, with two tests proven to have teeth. The heuristic
+  TEACHER (ml/training/heuristic.py) is written and smoke-tested. Next: wire
+  `--teacher heuristic` into distill.py, then the curriculum, then train_all.
+
+  **15e — RICARDO'S TWO DECISIONS ON THE COLLAPSE (2026-09-14), taken on the
+  15d evidence. Both are now the work.**
+  1. **Creature AI: clone the heuristic, then PPO.** *"Clone the heuristic,
+     then PPO"* — behaviour-clone the five-line heuristic into the net so the
+     move head starts alive and the policy starts from something that can win,
+     then let PPO improve a fighter instead of searching from noise. The net
+     stays a net and may surpass its teacher; this is a starting point, not a
+     ceiling. `ml/training/distill.py` already has the machinery.
+  2. **The gate must refuse a net that loses to a statue.** *"Add the
+     statue/heuristic controls to the gate"* — the statue is a hard floor
+     (refuse deployment below it) and the heuristic is a reported yardstick.
+     This is deliberately independent of decision 1: it stops this class of
+     regression shipping again whatever produces the nets.
+  NOT chosen, and kept per the standing rule rather than deleted: (b) fix
+  exploration only and keep policies fully self-discovered (learned `log_std`,
+  temporally correlated move noise, entropy floor) — still the right SECOND
+  step after cloning, and the 15d measurements are its brief; (c) ship the
+  heuristic as creature AI with RL for bosses only.
+  ALSO NOT chosen: unpinning `fen_boar` v6.0 today. The pin stays until a
+  replacement actually beats the controls, so live behaviour stays known and
+  stable while this is fixed.
+  ORDER: the gate controls first — they are the safety net, they are smaller,
+  and they protect every net produced after them.
+
   **15d DONE 2026-09-14 — the diagnosis, and it is NOT the reward model. A
   five-line heuristic beats every net we have trained.**
   Method: give the failure a CONTROL. Three policies, same build, same seeds —

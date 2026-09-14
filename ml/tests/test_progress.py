@@ -194,7 +194,13 @@ def test_cli_gate_emits_gate_event(sandbox, monkeypatch):
     g = events[0]
     assert g["ev"] == "gate" and g["version"] == 1 and g["pass"] is True
     assert g["metrics"]["suite_scripted"]["pass"] is True
-    assert all("pass" in check for check in g["metrics"].values())
+    # Every ENFORCED check carries a verdict; a reported-only control carries
+    # `reported_only` instead and deliberately no `pass`, so the console cannot
+    # render a yardstick as if it were a bar (gate.py::CONTROLS, tech/25 §5.2.2).
+    for name, check in g["metrics"].items():
+        assert ("pass" in check) ^ bool(check.get("reported_only")), name
+    assert g["metrics"]["control_statue"]["pass"] is True
+    assert g["metrics"]["control_heuristic"]["reported_only"] is True
     assert league.deployed(league.load_registry(), "fen_boar")["version"] == 1
 
 

@@ -248,3 +248,53 @@ def test_checkpoint_commits_in_a_single_rename(tmp_path, monkeypatch):
     assert written == ["_ckpt_solo.npz"], f"checkpoint is not one file: {written}"
     league.clear_checkpoint("solo")
     assert sorted((tmp_path / "weights").iterdir()) == [], "clearing left a sidecar"
+
+
+def test_gate_refuses_a_net_that_cannot_beat_a_statue(monkeypatch, tmp_path):
+    """Ricardo, 2026-09-14: "Add the statue/heuristic controls to the gate."
+
+    The deployed fen_boar v6.0 took LESS health off its opponent than a body
+    standing still did, in both matchups, and shipped anyway — the gate of the
+    day had no check that could see it. The statue is the floor now: strong
+    everywhere else is not enough.
+    """
+    monkeypatch.setattr(league, "EPISODES_DIR", tmp_path)
+
+    def by_opponent(a, b, policy_a, policy_b, *args, **kw):
+        # wins everything it is currently checked on, loses to the statue
+        if policy_b == "statue":
+            return _result(wins_a=1, wins_b=3, winner="b", hp_a=0.0, hp_b=0.6)
+        return _result()
+
+    monkeypatch.setattr(gate, "run_match", by_opponent)
+    reg = {"policies": []}
+    cand = {"key": "fen_boar", "version": 1, "game_json": "x.json",
+            "deployed": False, "eval": {}}
+    assert not run_gate(reg, cand, "core.arena.fen_boar_alpha", episodes=4)
+    assert not cand["deployed"]
+    checks = cand["eval"]["checks"]
+    assert checks["suite_scripted"]["pass"]          # it looked fine everywhere else
+    assert not checks["control_statue"]["pass"]      # this is what caught it
+    assert checks["control_statue"]["win_rate"] == 0.25
+
+
+def test_gate_reports_the_heuristic_without_requiring_it(monkeypatch, tmp_path):
+    """The heuristic is a yardstick, not a bar. A net that cannot yet beat five
+    rules may still be the best we have — but it must never be invisible again,
+    which is how a policy worse than a statue came to be deployed."""
+    monkeypatch.setattr(league, "EPISODES_DIR", tmp_path)
+
+    def by_opponent(a, b, policy_a, policy_b, *args, **kw):
+        if policy_b == "heuristic":
+            return _result(wins_a=0, wins_b=4, winner="b", hp_a=0.0, hp_b=0.7)
+        return _result()
+
+    monkeypatch.setattr(gate, "run_match", by_opponent)
+    reg = {"policies": []}
+    cand = {"key": "fen_boar", "version": 1, "game_json": "x.json",
+            "deployed": False, "eval": {}}
+    assert run_gate(reg, cand, "core.arena.fen_boar_alpha", episodes=4)
+    entry = cand["eval"]["checks"]["control_heuristic"]
+    assert entry["win_rate"] == 0.0          # lost every episode...
+    assert entry["reported_only"] is True    # ...and it is on the record
+    assert "pass" not in entry               # but it did not block the deploy

@@ -1457,7 +1457,14 @@ func _refresh_ui() -> void:
 			for name in checks:
 				var c: Variant = checks[name]
 				if c is Dictionary:
-					var bit := "%s %s" % [str(name), "ok" if bool(c.get("pass", false)) else "FAIL"]
+					# A reported-only control (the heuristic yardstick) carries no
+					# `pass` on purpose, and rendering a missing verdict as FAIL
+					# would show a red bar for a check that never blocks a deploy.
+					var bit := ""
+					if bool(c.get("reported_only", false)):
+						bit = "%s —" % str(name)
+					else:
+						bit = "%s %s" % [str(name), "ok" if bool(c.get("pass", false)) else "FAIL"]
 					if c.has("win_rate"):
 						bit += " wr %.2f" % float(c.win_rate)
 					parts.append(bit)

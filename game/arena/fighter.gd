@@ -256,6 +256,10 @@ func setup(def: Dictionary, arena: Node, at: Vector2, policy_spec: String,
 		policy = ArenaPolicy.new()   # inert: the body's own AI runs
 	elif spec == "scripted" or spec == "":
 		policy = ArenaScriptedPolicy.new()
+	elif spec == "statue":
+		policy = ArenaStatuePolicy.new()          # the gate's floor (tech/25 §5.2.2)
+	elif spec == "heuristic":
+		policy = ArenaHeuristicPolicy.new()       # the gate's yardstick
 	else:
 		policy = ArenaNeuralPolicy.from_file(spec)
 

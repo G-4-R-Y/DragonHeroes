@@ -335,8 +335,11 @@ Canonical requirement (§9): an **automated evaluation gate** sits between any t
 | Behavior regression | Distributional checks on action-rate, reaction-time, positioning-entropy, and skill-usage statistics vs. the previous deployed policy; alarms on drift beyond thresholds |
 | Fairness audit | Constraints of §6 verified *at inference*: measured reaction distribution, burst-APM ceiling, observation parity assertions |
 | Sanity/degeneracy | No out-of-bounds states, no stalling loops, no zero-action collapses across the eval batch |
+| **Controls** (§5.2.2) | **`STATUE_FLOOR = 0.75` vs the statue — ENFORCED.** Plus the win rate vs the heuristic, reported |
 
 A failed gate means the fleet stays on the previous pinned policy version. That failure mode is deliberately boring (see open question 5).
+
+**Why the controls are a gate check and not a probe.** Every other row above compares the candidate against something *tuned* — a scripted battery, past policies, itself. None of them can answer "is this better than nothing?", and on 2026-09-14 the answer for the deployed `fen_boar` v6.0 was no: it took less health off its opponent than a body standing still did, in both matchups, and the gate had nothing that could see it. The statue is now a floor (`ml/eval/gate.py::STATUE_FLOOR`), the heuristic is reported beside it, and both are ordinary arena policies (`game/arena/statue_policy.gd`, `heuristic_policy.gd`) so `league versus`, the training console and the gate all reach them by name. Ricardo's call, on being shown the measurement: *"Add the statue/heuristic controls to the gate."*
 
 ## 9. Reward hacking — defended against, and weaponized
 

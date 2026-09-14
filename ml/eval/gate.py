@@ -7,6 +7,12 @@ Checks (all proposals, tuned as the league matures):
      win rate inside [BAND_LO, BAND_HI] (improvement without tier-jumps).
   3. Sanity/degeneracy — every episode must deal damage both ways on average;
      zero-damage episodes mean a stall or broken policy.
+  4. CONTROLS (tech/25 §5.2.2) — the candidate vs a statue (attacks, never
+     moves) and vs a five-line heuristic (walks at the foe, spends kits off
+     cooldown). The statue is a hard FLOOR: a net that cannot beat a body
+     standing still is broken whatever its other win rates say. The heuristic
+     is REPORTED, not required — a yardstick, so a collapse can never again be
+     invisible.
 
 A failed gate keeps the fleet on the previous pinned version — deliberately
 boring (tech/25 §8).
@@ -15,6 +21,7 @@ BANDS (the constants below are the contract; docs/tech/37 carries the why):
     SCRIPTED_BAND   (0.30, 1.00)  vs the scripted baseline AND the native AI
     LADDER_BAND     (0.25, 0.90)  vs the currently deployed net of the same key
     MIN_DAMAGE_FRAC 0.05          mean loser hp deficit per episode
+    STATUE_FLOOR    0.75          vs the statue control — ENFORCED
 WHAT A VERDICT WRITES: the candidate's registry entry gains
 `eval.checks = {<check>: {"win_rate": .., "pass": bool}}`, and on a pass its
 `deployed` flag is set while the previous pin for that key is cleared — one
@@ -36,6 +43,13 @@ from league import fitness, run_match  # noqa: E402
 SCRIPTED_BAND = (0.30, 1.00)     # vs scripted/native suite (proposal)
 LADDER_BAND = (0.25, 0.90)       # vs the currently deployed self (proposal)
 MIN_DAMAGE_FRAC = 0.05           # mean loser hp deficit per episode (sanity)
+# The floor, and it is set where it is because beating a body that never moves
+# should not be close. Measured 2026-09-14: the deployed fen_boar v6.0 took
+# LESS health off its opponent than the statue did, in both matchups, and the
+# gate of the day had no way to notice. Ricardo, on being shown that: "Add the
+# statue/heuristic controls to the gate."
+STATUE_FLOOR = 0.75              # vs the statue control — ENFORCED
+CONTROLS = ("statue", "heuristic")
 
 
 def run_gate(reg: dict, cand: dict, build: str, episodes: int = 4,
@@ -60,6 +74,25 @@ def run_gate(reg: dict, cand: dict, build: str, episodes: int = 4,
         ok_all &= sane
         report["checks"][f"suite_{suite_policy}_sanity"] = {
             "mean_loser_hp": round(mean_loser_hp, 3), "pass": sane}
+
+    # 4. controls: the floor and the yardstick (tech/25 §5.2.2)
+    for control in CONTROLS:
+        result = run_match(build, build, cand["game_json"], control,
+                           episodes, seed + 7, record=True)
+        wins = result["wins_a"] / max(len(result["episodes"]), 1)
+        fit = fitness(result, "a")
+        entry = {"win_rate": round(wins, 3), "fitness": round(fit, 3)}
+        if control == "statue":
+            # ENFORCED. Anything below this is not a weak policy, it is a broken
+            # one, and the previous pin is better than shipping it.
+            entry["floor"] = STATUE_FLOOR
+            entry["pass"] = wins >= STATUE_FLOOR
+            ok_all &= entry["pass"]
+        else:
+            # REPORTED. A net that cannot yet beat five rules is not necessarily
+            # unshippable — but it must never again be invisible.
+            entry["reported_only"] = True
+        report["checks"][f"control_{control}"] = entry
 
     # 2. ladder vs deployed self
     dep = None

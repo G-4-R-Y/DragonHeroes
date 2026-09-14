@@ -67,6 +67,8 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from ml.training import league                                          # noqa: E402
+from ml.training.heuristic import teacher_for as heuristic_teacher_for  # noqa: E402
+from ml.env.dh_env import ACT_DODGE                                      # noqa: E402
 from ml.training.policy_net import (ACTION_LOGITS, EMB_DIM, HEAD_DIM,   # noqa: E402
                                     OBS_DIM, PolicyNet, macs, parse_hidden)
 from ml.training import arch as arch_mod                                # noqa: E402
@@ -274,7 +276,12 @@ def collect(teacher: TeacherNet, student: Student | None, emb: np.ndarray,
             got += take
             drive = ty if student is None else student.forward(x)[0]
             moves = np.clip(drive[:, :2], -1.0, 1.0).astype(np.float32)
+            # Bit 3 is the dodge FLAG, not an eighth action (tech/25 §5.1). This
+            # dropped it, so every DAgger state came from a driver that could
+            # never dodge — the exact divergence the dodge-contract commit fixed
+            # in the other three runtimes.
             acts = np.argmax(drive[:, 2:2 + ACTION_LOGITS], axis=1).astype(np.int32)
+            acts |= (drive[:, 2 + ACTION_LOGITS] > 0.0).astype(np.int32) * ACT_DODGE
             obs, done, _hp, winner = vec.step(moves, acts)
             idx = np.flatnonzero(done)
             if idx.size:
@@ -342,10 +349,22 @@ def distill(key: str, build: str, teacher_spec: str, opp_build: str = "",
     progress = progress or league.Progress(None)
     started, t0 = time.strftime("%Y-%m-%dT%H:%M:%S"), time.monotonic()
     opp_build = opp_build or build
-    teacher_path, teacher_label = league.resolve_policy(teacher_spec)
-    if teacher_path in ("native", "scripted"):
-        raise SystemExit("distill: the teacher must be a net, not a baseline")
-    teacher = TeacherNet(teacher_path)
+    # The heuristic teacher is a FUNCTION, not weights (ml/training/heuristic.py,
+    # Ricardo 2026-09-14: "Clone the heuristic, then PPO"). Everything downstream
+    # — qualify, DAgger collection, the KD fit, the gate — only ever asks a
+    # teacher for forward() and embedding(), so it needs no other special case.
+    if teacher_spec in ("heuristic", "statue"):
+        if teacher_spec == "statue":
+            raise SystemExit(
+                "distill: the statue is the gate's FLOOR, not a teacher — "
+                "cloning a body that never moves is the collapse we are fixing")
+        teacher_path, teacher_label = "heuristic", "heuristic"
+        teacher = heuristic_teacher_for(build)
+    else:
+        teacher_path, teacher_label = league.resolve_policy(teacher_spec)
+        if teacher_path in ("native", "scripted"):
+            raise SystemExit("distill: the teacher must be a net, not a baseline")
+        teacher = TeacherNet(teacher_path)
     student_arch = arch or Arch()
     if hidden:
         student_arch = Arch.from_dict(
@@ -453,7 +472,9 @@ def main() -> int:
     ap.add_argument("--build", required=True)
     ap.add_argument("--teacher", required=True,
                     help="the wide net, in `league versus --a` syntax: a path, "
-                         "<key>, <key>@v7, <key>@candidate")
+                         "<key>, <key>@v7, <key>@candidate — or the literal "
+                         "'heuristic' for the five-rule teacher, which is a "
+                         "function rather than weights (tech/25 §5.2.2)")
     ap.add_argument("--opp-build", default="", help="who the rollouts fight (default: itself)")
     ap.add_argument("--opp", default="native", choices=["native", "scripted", "mlp"])
     # The STUDENT's architecture (the teacher's comes off its own file). Same
