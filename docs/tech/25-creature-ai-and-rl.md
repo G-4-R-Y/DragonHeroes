@@ -275,6 +275,101 @@ Three consequences, all of them live:
 2. **`distill`'s qualifying gate runs in the arena**, which is correct, and is why the heuristic teacher is refused for builds where dh-env says it wins comfortably.
 3. **Closing `dps_taken` stops being cosmetic.** It was the last open parity term; it is now the thing standing between training and a gate that agrees with it.
 
+**RESOLVED the same day — see §5.1.4.** The flip is gone (dh-env now scores that
+heuristic 0.00, agreeing with the arena) and it took five fixes, not one. Read
+§5.1.4 before trusting any dh-env measurement recorded above this line.
+
+### 5.1.4 Closing it: dh-env was not the game
+
+Resolved the same day, on Ricardo's "close `dps_taken` first". The flip had five
+causes, and only one of them was the one already suspected. Each was settled by
+reading the shipping GDScript and matching it, never by picking whichever number
+looked nicer.
+
+**1. The fairness layer of canon §9 §6 existed only in the arena.** `delay_s_`
+was sampled on every `reset` and never read — grep found exactly two
+occurrences, the declaration and the assignment — and there was no action budget
+anywhere in the sim. So PPO trained a policy acting 60 times a second on
+zero-latency information, and the gate then measured the same weights acting
+6 times a second on 200 ms-stale information. That is the exact inverse of the
+canon rule, which says fairness is *baked into training, not patched at
+inference*.
+
+The sim now carries it on **both** sides:
+
+| piece | where | twin in `game/arena` |
+|---|---|---|
+| 24-frame obs ring per side, `obs()` returns `now - delay_s_` | `Arena::push_fairness_frame` / `Arena::obs` | `policy.gd::_obs_log` / `delayed_obs()` |
+| delayed `Percept` (foe pos, distance, foe windup, own hp) behind every built-in mind; own cooldowns and position stay live | `Arena::percept`, used by `scripted_act` / `native_act` / `mlp_act` | `scripted_policy.gd`: reads those four out of `delayed_obs()`, everything else through live `cmd_*` |
+| 6 commits/s, only an ACCEPTED command spends budget | `Arena::budget_ok` in `apply_action` | `policy.gd::can_commit` / `note_commit` |
+| undelayed truth, for probes and replay only | `Arena::obs_now` | — (nothing in the arena may read it) |
+
+The budget lives in `apply_action` rather than in the minds because the
+learner's action arrives from outside the sim; that is the one structural
+difference from the GDScript, and it makes the cap apply to both sides at one
+chokepoint. `set_obs_delay` / `set_action_budget` ablate either knob so this is
+measurable rather than arguable — and the delay is **drawn before being
+overridden**, or an ablation would shift the policy RNG stream and measure two
+changes at once.
+
+**And it was not the damage.** Measured: the fairness layer alone moved
+`dps_taken` from 2.24× to 2.23×. It was still necessary — training and grading
+on different information is indefensible — but the deployed net barely moves
+(`|move|` 0.110), and a stale view of a nearly-stationary target is the same
+view. The budget never binds for the scripted mind either, whose cooldowns hold
+it far below 6 commits/s; on a gatling build it binds hard (200 commits → 60).
+**Believing the fairness layer was the whole answer would have shipped a wrong
+fix that measured as a success.**
+
+**2. Ranged basic attacks could not fire.** `melee_hit` gated the bolt behind
+*melee* reach (≈2.5 tiles) while both minds only ever shoot from a 4–7 tile
+band, and refused the shot outright if the target happened to be dodging. A
+scripted ranged drake landed **zero** basic-attack damage on a standing target
+in 15 s. Its twin, `player.gd::_cast_bolt`, has no range gate at all — the
+bolt's own life and speed are the range.
+
+**3. A swing was a circle, not a cone.** `creature.gd::_strike` and
+`player.gd::_arc_hit` both test an arc (90° creature, 110° geared) around the
+direction locked when the windup begins. The sim had no arc and no aim, so every
+swing connected and a target could not circle out of one. Now
+`FighterSpec::attack_arc_deg` plus a `Fighter::aim` locked at commit —
+deliberately **not** a `DhFighterSpec` field, because that struct crosses the C
+API by value and a silently widened struct read by a stale `.so` is exactly the
+failure the optional-symbol rule exists to prevent; `dh_env` derives it from
+`is_player`, which is already in the struct.
+
+**4. The attack cooldown started at the wrong end.** `creature.gd` sets `_cd`
+inside `_strike`, *after* the windup has run; the sim set it at the commit. Sim
+attack period 1.20 s against the arena's 1.55 s — 29% more swings per second out
+of identical content. `kWindup` was also 0.25 against `windup_time`'s 0.35,
+i.e. 100 ms of dodge window the learner never had to learn to find.
+
+**5. Creatures had a whirlwind they do not own.** `fighter.gd::cmd_special`
+sends a geared body to `_whirlwind` / `_frost_nova` / `_fan_of_knives`, and a
+creature body straight to `bot_attack` — one more ordinary swing on the ordinary
+cooldown. The sim gave everyone the geared version: an instant, arc-free,
+1.2×-damage AoE every 6 s. **Every arena build shipping today is
+`kind: creature`**, so that was a phantom damage source in every match dh-env
+has ever run.
+
+| measurement | before | after |
+|---|---|---|
+| `heuristic` vs `scripted`, cinder_drake, in dh-env | win **1.00** | win **0.00** (the arena says 0–12) |
+| `dps_dealt` parity, fen_boar pin vs scripted | 1.12× | **1.02×** |
+| `dps_taken` parity, same | 2.24× | **1.71×** |
+| episode length parity, same | 1.97× | **1.50×** |
+| `dps_taken` parity vs native | 1.57× | **1.47×** |
+
+`dps_taken` is not closed — 1.71× is still outside the 1.25× tolerance, and the
+remaining gap is pace, not total (the damage *totals* now agree inside
+tolerance; the dh-env episode just gets there in 27 s instead of 40 s). But the
+verdict flip that made the gate unusable is gone.
+
+**The standing consequence: every net trained before 2026-09-14 was trained in a
+different game from the one that grades it.** That is the most likely reason
+nothing trained so far beats a statue, and it means the converged `train_all`
+run must start from here, not from those weights.
+
 ### 5.2.4 The heuristic is not one policy, and the qualifying gate is right to say so
 
 `distill --teacher heuristic` refuses to clone a teacher that does not beat both baselines — Ricardo's own condition, *"once they surpass the default script/engine behaviour"*. Measured against `scripted` in dh-env, 8 episodes per cell:

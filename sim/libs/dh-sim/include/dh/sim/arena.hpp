@@ -42,6 +42,16 @@ struct FighterSpec {
     float damage = 10.0f;
     float move_speed = 4.5f * 16.0f;   // px/s (creature.gd default)
     float attack_reach = 1.8f * 16.0f;
+    // A swing is a CONE, not a circle — creature.gd 90 deg, player.gd 110.
+    // The sim had no arc at all until 2026-09-14, so every swing it threw
+    // connected while its Godot twin missed whatever had circled out of the
+    // cone during the windup. Measured: the same build took 2.24x the damage
+    // per second in dh-env and its episodes ran half as long. Not carried on
+    // DhFighterSpec on purpose — that struct crosses the C API BY VALUE, and
+    // a silently-resized struct against a stale .so is the one failure mode
+    // the optional-symbol rule exists to prevent. dh_env derives it from
+    // is_player instead, which is already in the struct.
+    float attack_arc_deg = 90.0f;
     float attack_cd = 1.2f;
     float body_radius = 8.0f;
     bool is_player = false;
@@ -119,7 +129,33 @@ class Arena {
 
     void reset(std::uint64_t seed);
     bool step(const Action& act);        // true once the episode is done
-    void obs(float* out) const;          // learner obs (31 or 36 by squad flag)
+    // FAIRNESS ABLATION (probes and tests only; the shipping default is the
+    // sampled 150-250 ms). Pinning the delay is how ml/eval/fairness_probe.py
+    // proved that this one number, alone, flips a verdict from win 1.00 to
+    // 0.00 — it needs to be settable from outside, not monkey-patched.
+    // seconds < 0 restores "resample per reset".
+    void set_obs_delay(float seconds) {
+        delay_override_ = seconds;
+        if (seconds >= 0.0f) delay_s_[0] = delay_s_[1] = seconds;   // now, too
+    }
+    float obs_delay(int side) const { return delay_s_[side & 1]; }
+    // commits per second; <= 0 means uncapped (what the sim did before).
+    void set_action_budget(int commits_per_s) {
+        // The stamp ring holds kActionBudget entries, so it cannot police a cap
+        // looser than that — anything above it is the uncapped case anyway.
+        budget_cap_ = commits_per_s > kActionBudget ? kActionBudget : commits_per_s;
+    }
+    int action_budget() const { return budget_cap_; }
+
+    // The swing cone test, shared by melee strikes and the buddy's. Public
+    // because it is pure geometry and the suite pins it directly.
+    static bool in_arc(const math::Vec2& to_tgt, const math::Vec2& aim,
+                       float arc_deg, float tgt_radius);
+
+    void obs(float* out) const;          // learner obs, DELAYED (canon §9 §6)
+    // The undelayed truth. For probes, tests and replay traces only — a policy
+    // that reads this is not playing the game the gate measures.
+    void obs_now(float* out) const { build_obs(f_[0], f_[1], out); }
     int obs_dim() const { return squad_ ? kObsV2Dim : kObsDim; }
     int winner() const;                  // -1 undecided/draw, 0 = A, 1 = B
     bool done() const { return winner_ != -2; }
@@ -154,6 +190,10 @@ class Arena {
         float hp = 0.0f;
         float attack_cd = 0.0f, special_cd = 0.0f;
         float windup_t = 0.0f;           // > 0: telegraphing a melee hit
+        // The direction the swing was COMMITTED to, locked when the windup
+        // begins (creature.gd::_begin_windup stores _attack_dir the same way).
+        // Locking it is what lets a circling target leave the cone.
+        math::Vec2 aim{1.0f, 0.0f}, aim2{1.0f, 0.0f};
         float slow_t = 0.0f, burn_t = 0.0f, bleed_t = 0.0f, dot_dps = 0.0f;
         float enrage_t = 0.0f;
         float dodge_t = 0.0f;            // i-frames remaining
@@ -196,6 +236,7 @@ class Arena {
     Action native_act(int who, float dt);
     Action scripted_act(int who, float dt);
     Action mlp_act(int who);
+    math::Vec2 commit_aim(int who);      // the direction a swing is locked to
     void apply_action(int who, const Action& act);
     void exec_kit(int who, int slot);
     void melee_hit(int who);
@@ -224,7 +265,58 @@ class Arena {
     float strafe_dir_[2] = {1.0f, 1.0f};
     float strafe_t_[2] = {0.0f, 0.0f};
     float retreat_t_[2] = {0.0f, 0.0f};
+    // FAIRNESS (canon §9 §6). This field was SAMPLED here and never read
+    // anywhere — grep 2026-09-14 found exactly two occurrences, this one and
+    // its assignment — while game/arena/policy.gd delayed every policy by
+    // 150-250 ms. So PPO trained on zero-latency information and the gate
+    // measured the same net on 200 ms-stale information, which is the inverse
+    // of the canon rule ("baked into TRAINING, not patched at inference").
+    // MEASURED: the identical heuristic scores win 1.00 in dh-env and 0-12 in
+    // the arena; imposing this delay inside dh-env drops it to 0.00, which is
+    // the whole divergence.
     float delay_s_[2] = {0.2f, 0.2f};    // fairness obs delay, sampled per reset
+    float delay_override_ = -1.0f;       // >= 0 pins it (ablation)
+    // Ring of past observation frames, newest last — the twin of
+    // ArenaPolicy::_obs_log, same 24-frame depth (0.4 s at 60 Hz, comfortably
+    // more than the 0.25 s worst case).
+    static constexpr int kObsLog = 24;
+    // Per SIDE: side 1's self-view cannot be mirrored out of side 0's (its own
+    // cooldowns are simply not in there), so a frozen-net opponent needs its
+    // own ring. One extra build_obs a tick.
+    float obs_log_[2][kObsLog][kObsV2Dim] = {};
+    float obs_log_t_[kObsLog] = {};
+    int obs_log_n_ = 0;                  // frames written since reset
+    // What a MIND is allowed to know about the other side. The learner reads
+    // its stale world through obs(); the built-in minds used to read f_[] live,
+    // which is why they landed 1.70-2.28x the damage their Godot twins land
+    // (dps_taken, the gap that flipped the gate verdict). scripted_policy.gd
+    // takes foe pos, distance, foe windup and its own hp out of delayed_obs()
+    // and everything else (own cooldowns, own position) live; so does this.
+    struct Percept {
+        math::Vec2 foe_pos{};            // where the foe WAS, delay_s_ ago
+        float foe_radius = 0.0f;
+        float foe_dist = 0.0f;           // obs[18], measured at that time
+        float foe_windup = 0.0f;         // obs[22]
+        float self_hp_frac = 1.0f;       // obs[0]
+        bool foe_alive = true;
+    };
+    Percept percept_log_[2][kObsLog] = {};
+    void push_fairness_frame();          // one ring write: obs + both percepts
+    Percept percept(int who) const;      // the frame that side may act on now
+    int fair_frame_at(float target) const;   // ring index, oldest if none fits
+    // Burst-binding action budget (policy.gd ACTION_BUDGET/BUDGET_WINDOW): a
+    // mind may COMMIT (attack/special/kit/dodge) at most 6 times a second.
+    // Enforced in apply_action for both sides at once — the learner's action
+    // arrives from outside, so the cap cannot live in the minds like it does
+    // in GDScript. A refused commit costs nothing, exactly as cmd_* returning
+    // false costs nothing there.
+    static constexpr int kActionBudget = 6;
+    static constexpr float kBudgetWindow = 1.0f;
+    int budget_cap_ = kActionBudget;     // <= 0 uncaps it (ablation)
+    float commit_t_[2][kActionBudget] = {};
+    int commit_n_[2] = {0, 0};
+    bool budget_ok(int who) const;
+    void note_commit_time(int who);
     // frozen opponent MLP
     const float* mlp_params_ = nullptr;
     std::array<int, 8> mlp_in_{}, mlp_out_{}, mlp_acts_{};

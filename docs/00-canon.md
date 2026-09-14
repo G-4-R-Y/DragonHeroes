@@ -283,7 +283,15 @@
   (obs+action pairs logged from the first playtest — canonical requirement).
 - **Serving:** ONNX (INT8) on server CPU only. **Policy weights never ship to clients.**
 - **Fairness baked into training** (not post-hoc): 150–250 ms observation delay, burst
-  action-rate caps, aim noise, client-equivalent observations only.
+  action-rate caps, aim noise, client-equivalent observations only. **This held only
+  in `game/arena` until 2026-09-14** — `dh::sim::Arena` sampled the delay and never
+  read it, and had no action budget at all, so PPO trained at zero latency and the
+  gate graded the identical net through 200 ms of lag. It now lives in the sim for
+  BOTH sides: a 24-frame ring per side behind `obs()`, a delayed `Percept` (foe
+  position, distance, foe windup, own hp) behind every built-in mind, and the
+  6 commits/s budget enforced in `apply_action`. `obs_now()` is the undelayed truth
+  and is for probes, tests and replay traces only — a policy that reads it is not
+  playing the game the gate measures. See §12.51.
 - **Weekly-content compatibility:** observation/action schema uses entity-set encodings
   with learned embeddings per content ID (new content = new embedding rows, not new
   tensor shapes); warm-start fine-tunes per patch; automated eval gate before any bot
@@ -838,7 +846,8 @@ Still open:
    Godot workers); tier 2 adds DEPTH: (a) **dh-sim arena** — a deterministic
    C++20 twin of game/arena (same 60 Hz tick, same arena.obs.v1 31 floats,
    same kits/fields/projectiles/fairness delays, native + scripted + frozen-MLP
-   opponents), no Godot, no I/O (canon boundaries); (b) **dh-env C API**
+   opponents), no Godot, no I/O (canon boundaries) — the "same fairness delays"
+   claim was FALSE from the day it was written until §12.51 closed it; (b) **dh-env C API**
    (create/reset/step/winner/destroy) consumed from Python via **ctypes**
    (nanobind deferred — zero vendored deps); (c) **specs.json is GENERATED**
    from the real Godot bodies (game/arena/tools/dump_specs.tscn) — balance
@@ -1117,3 +1126,111 @@ Still open:
    visual/player/biome/VFX upgrades, live in harness/20-roadmap.md. These are
    decisions/specifications; implementation statuses and test receipts must
    never be inferred from this canon entry.
+
+48. **A world that remembers, and connected weekly stories (2026-09-13,
+   Ricardo; full prompt in harness/requests/2026-09-12-recovery.md).**
+   Offscreen travel must not delete wounded encounters or uncollected loot,
+   reroll item identity, or cancel a live projectile. Rendering residency and
+   simulation lifetime are different: shots may still expire naturally or hit
+   offscreen. Local Hunt ground loot persists for the expedition; this does not
+   certify an editable save for the official economy.
+
+   Every new generated set carries a story, defined creature archetypes and
+   intertwined threads that connect to earlier content. Orun's individual
+   silhouette, material identity, magical motif, learnable kit and discoverable
+   history are the quality contract for the entire creature catalog, not only
+   legendary showcases. Local source reuse, deterministic baking and explicit
+   provenance keep production affordable; a template or recolor does not by
+   itself satisfy the visual quality gate.
+
+   Exploration must visibly offer the five biomes and authored procedural
+   surprises: dungeons/lairs, villages, NPCs, quests, events and rare roaming
+   bosses. Legendary, mythic, divine and demonic loot themes deepen discovery;
+   "demonic" does not silently insert a new tier into existing rarity/save math.
+   Lore and encounters use versioned stable IDs and retain already explored
+   geography. Details and spectacle must respect streaming/frame budgets.
+
+   Future player decisions and guild actions influence political events and
+   subsequent season stories. Publish attributed consequences and preserve
+   character progress. Verified world outcomes inform reviewed story branches;
+   a raw client report, bot farm or popularity vote cannot unilaterally rewrite
+   canon or mint rewards. Design/28 owns narrative/agency and exploration gates;
+   tech/36 owns official trust. Keep file-specific documentation alongside the
+   central systems map so another session can continue the implementation.
+
+49. **Urgent playtest repair (2026-09-13, Ricardo; R34–R38).**
+   Protect a responsive 60 FPS client while local training is available. New
+   training launches should leave capacity for play by default; explicit worker
+   counts remain possible. Preserve the ongoing pre-checkpoint sweep. An FPS cap
+   is not proof of sustained performance; report actual frame intervals and
+   retained failures alongside hardware and training load.
+
+   Flask playtest tuning preserves its 40%-max-HP budget: 20% immediately on an
+   accepted R/click, then 20% over two seconds. Two charges, six kills per recharge,
+   the existing 0.8-second drink slowdown, and Haven/respawn/level-up refills remain.
+   Recharge restores a charge without healing HP; level-up is a separate refill.
+   Full HP, empty, already healing and dead states need clear feedback. Clamp the
+   last healing tick, never revive through drinking, and keep co-op HP/charge
+   decisions on the host. This is prototype tuning, not a shipped native protocol.
+
+   Arena Back must receive real input; Train All must launch an isolated roster
+   sweep. Skills and runes need a dedicated readable view. Boss combos must be
+   learnable from animation, including roaming encounters; proper dungeon pacing
+   and guaranteed completion loot remain R36, beyond the current Orun trial.
+
+50. **Mercenaries and useful gold (2026-09-13, Ricardo; R33/R39).**
+   Schedule player and visibly tagged [AI] mercenaries linked to notoriety and
+   bounties. A bounty has one claim, a defined funding source, anti-collusion rules
+   and no reward-multiplication path; a death or disconnect cannot recreate its
+   escrow. Hunt PvP consent/eligibility remains a design decision before activation.
+   Gold should buy desirable mounts, pets/eggs and useful or special equipment,
+   including mythic, legendary, angelic and demonic themes. Evaluate recurring
+   service/crafting sinks and assets as ways to retain value through death; do not
+   promise stable prices or copy another game's sink prices without simulation.
+   The supplied CipSoft comparison is archived as user research material.
+
+   Player-market gold packages are a proposal to evaluate, not enabled commerce.
+   Cashable gold must not become a route to paid random eggs, rerolls or random
+   crafting rewards. Fixed disclosed purchases and earned-only noncashable
+   randomness need separate accounting and review. Existing no-paid-randomness,
+   web-only marketplace and economy-writer rules continue to apply. Design/15/27,
+   tech/36 and roadmap R33/R39 own the remaining design and economy gates.
+
+51. **dh-env was not the game (2026-09-14, from Ricardo's "close dps_taken
+   first").** One fixed policy scored **win 1.00 in dh-env and 0-12 in the Godot
+   arena**. Five divergences, each settled by reading the shipping GDScript, not
+   by argument:
+   (a) **the fairness layer of §9 existed only in the arena** — `delay_s_` was
+   sampled every reset and never read, and there was no action budget at all, so
+   PPO trained on zero-latency information and the gate graded the same weights
+   on 200 ms-stale information. Now both sides of the sim observe through a
+   24-frame ring, the built-in minds decide on a delayed `Percept`, and
+   `apply_action` enforces 6 commits/s. Ablation knobs (`set_obs_delay`,
+   `set_action_budget`) exist so this is measurable, and the delay is drawn
+   before being overridden so an ablation shifts nothing else.
+   (b) **ranged basic attacks could not fire** — the bolt sat behind melee reach
+   (~2.5 tiles) while every mind shoots from 4-7, so a scripted ranged drake did
+   zero basic damage to a standing target in 15 s. `player.gd::_cast_bolt` has
+   no range gate; neither does the sim now.
+   (c) **a swing was a circle, not a cone** — no arc and no aim existed in the
+   sim, so every swing connected. `FighterSpec::attack_arc_deg` (90 creature /
+   110 geared, from `creature.gd` and `player.gd`) with the direction locked at
+   windup start. Deliberately NOT added to `DhFighterSpec`: that struct crosses
+   the C API by value, and a silently widened struct read by a stale `.so` is
+   the failure the optional-symbol rule exists to prevent.
+   (d) **the attack cooldown started at the commit, not at the strike** —
+   `creature.gd` sets `_cd` inside `_strike`, after the windup. Attack period
+   1.20 s against the arena's 1.55 s: 29% more swings per second out of the same
+   content. `kWindup` also corrected 0.25 -> 0.35.
+   (e) **creatures had a whirlwind they do not own** — `fighter.gd::cmd_special`
+   sends a geared body to whirlwind/nova/fan-of-knives and a creature body
+   straight to `bot_attack`. The sim gave everyone an instant, arc-free,
+   1.2x-damage AoE every 6 s, and every arena build shipping today is
+   `kind: creature`, so that was a phantom damage source in every match dh-env
+   ever ran.
+   RESULT: the heuristic that scored win 1.00 in dh-env now scores **0.00**,
+   agreeing with the arena's 0-12; `dps_dealt` parity 1.12x -> 1.02x and
+   `dps_taken` 2.24x -> 1.71x on the deployed fen_boar pin. The fairness layer
+   by itself moved `dps_taken` 2.24x -> 2.23x — necessary, but the content
+   divergences were the damage. **A net trained before this date was trained in
+   a different game**, which is why nothing trained so far beats a statue.

@@ -71,7 +71,12 @@ fighter from ever hitting its own proxy.
 
 **Fairness is baked in** (canon §9 §6): all policies observe through a sampled
 150–250 ms delay buffer, aim through gaussian noise, and commit actions under a
-burst-binding cap (6 commits/s). **Observation schema `arena.obs.v1`** (31
+burst-binding cap (6 commits/s). **In `dh::sim::Arena` too, since 2026-09-14** —
+it had none of this until then (canon §12.51, tech/25 §5.1.4), which is why a
+policy could win 1.00 in training and lose 0–12 here. The sim's twin pieces are
+`Arena::obs` (the ring), `Arena::percept` (what a built-in mind may act on) and
+`Arena::budget_ok` (the cap); `Arena::obs_now` is the undelayed truth and exists
+for probes and replay traces only. **Observation schema `arena.obs.v1`** (31
 floats, fixed and versioned — header of `policy.gd`) + 16-dim embedding slot;
 `ml/training/policy_net.py` is the byte-exact numpy twin.
 

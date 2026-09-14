@@ -22,6 +22,11 @@ dh::sim::FighterSpec to_cpp(const DhFighterSpec& s) {
     out.body_radius = s.body_radius;
     out.special_cd = s.special_cd > 0.0f ? s.special_cd : 6.0f;
     out.is_player = s.is_player != 0;
+    // The swing cone. NOT a struct field: DhFighterSpec crosses this boundary
+    // by value, so widening it would let a stale .so read garbage silently.
+    // is_player already distinguishes the two chassis, and the two numbers are
+    // fixed content (player.gd 110 deg, creature.gd 90).
+    out.attack_arc_deg = out.is_player ? 110.0f : 90.0f;
     out.is_ranged = s.is_ranged != 0;
     out.dodge_max = s.dodge_max;
     out.kit_count = s.kit_count > DH_ENV_MAX_KITS ? DH_ENV_MAX_KITS : s.kit_count;

@@ -696,6 +696,103 @@ Rebuild after the packaging commit for clean provenance; archives remain in
   currently subtracts `R_TIME` every tick REGARDLESS of outcome, so a losing
   agent is paid to die sooner. See the answer below for what is scored today.
 
+  **INTERRUPTION 2026-09-14 (latest+16) — R51, recorded VERBATIM before work.**
+  *"can i visualize dh-env vs arena? or none is watchable? I would like to click
+  in the console to render the current match (or last best) and watch it - this
+  can help with debbugging as well"*
+
+  | R51 | NOW with R50 | Watch a match from the console — render the current or last-best match, for dh-env AND the arena, as a debugging tool. | design/23; arena is already watchable, dh-env is headless C++ with no renderer; needs a trace dump + a replay viewer |
+
+  ANSWER, and it is half yes: the **Godot arena is watchable today** (the
+  console already has Watch, and `arena.tscn` has a spectator path and HUD).
+  **dh-env is not, and cannot be** — it is headless C++ with no renderer at all;
+  it produces state, not pixels. The way to make it watchable is a TRACE: dump
+  per-tick positions/actions/hp from dh-env and replay them in the Godot arena.
+  That is not a detour from R50 — it is the exact instrument the parity work
+  needs, because the two environments can then be watched side by side on the
+  same seed with the same policy.
+
+  **AND IT ARRIVES ON TOP OF THE ROOT CAUSE, found minutes earlier.** Ricardo's
+  decision this turn was "Close dps_taken first" (over running train_all now)
+  and "20M steps per creature" for the eventual run. Chasing it found something
+  larger than a damage-rate gap:
+  **THE FAIRNESS LAYER EXISTS ONLY IN THE ARENA, NOT IN dh-env — the exact
+  inverse of canon §9 §6, which says it is "baked into TRAINING, not patched at
+  inference".**
+    * `game/arena/policy.gd`: every policy observes through a sampled 150-250 ms
+      DELAY buffer, aims through gaussian noise, and commits under
+      `ACTION_BUDGET = 6` commits per second.
+    * `sim/libs/dh-sim/src/arena.cpp`: `delay_s_` is SAMPLED on reset and then
+      **never read anywhere** — grep confirms exactly two occurrences, the
+      assignment and the declaration. The comment above `build_obs` claims "The
+      learner's obs (dh_env_step out-param) is delayed the same way so training
+      matches the eval gate's information state." That sentence is false.
+      There is no obs log, no delay, and NO action budget of any kind.
+  So PPO trains a policy that acts **60 times a second on zero-latency
+  information**, and the gate then measures it acting **6 times a second on
+  200 ms-stale information**. A 10x action-rate difference and a 12-tick
+  information difference between training and serving. `dps_taken` 1.70-2.28x
+  is the SYMPTOM: nothing throttles anyone in dh-env.
+  STATUS: proven by grep; the confirming experiment (impose the arena's budget
+  and delay on the heuristic inside dh-env and watch win 1.00 collapse) is next.
+
+  **FAIRNESS LAYER BUILT, AND IT WAS NOT THE WHOLE STORY (2026-09-14, later).**
+  The layer is now in `dh::sim::Arena` on BOTH sides, with ablation knobs so it
+  can be measured rather than argued about:
+    * a 24-frame ring PER SIDE; `obs()` returns the frame at `now - delay_s_`,
+      and `obs_now()` is the undelayed truth for probes/tests/replay only;
+    * the built-in minds (`scripted_act`, `native_act`, `mlp_act`) decide on a
+      delayed `Percept` — foe position, distance, foe windup, own hp — keeping
+      own cooldowns/position live, exactly the split `scripted_policy.gd` makes
+      between `delayed_obs()` and the live `cmd_*` calls;
+    * `ACTION_BUDGET = 6` commits/s enforced in `apply_action` for both sides
+      (the learner's action arrives from outside, so it cannot live in the
+      minds as it does in GDScript); only an ACCEPTED command spends budget;
+    * `set_obs_delay(s)` / `set_action_budget(n)` ablate either knob, and the
+      delay is DRAWN then overridden so an ablation does not also shift the
+      policy RNG stream.
+  MEASURED, and this is the part that matters: **the fairness layer alone moved
+  `dps_taken` from 2.24x to 2.23x.** It was necessary — training on zero-latency
+  information while grading on stale information is indefensible — but it is
+  not what made dh-env's opponent deadlier. The deployed net barely moves
+  (|move| 0.110), and a stale view of a nearly-stationary target is the same
+  view. The budget likewise never binds for the scripted mind, whose cooldowns
+  already hold it far below 6 commits/s (measured: it binds hard on a gatling
+  build, 200 commits -> 60).
+
+  **WHAT `dps_taken` ACTUALLY WAS: four content divergences, each checked
+  against the shipping GDScript rather than reasoned about.**
+    1. **Ranged basic attacks could not fire.** `melee_hit` gated the bolt
+       behind MELEE reach (~2.5 tiles) while both minds only ever shoot from a
+       4-7 tile band, and refused the shot outright if the target was dodging.
+       A scripted ranged drake landed ZERO basic damage on a standing target in
+       15 s. Its twin, `player.gd::_cast_bolt`, has no range gate at all.
+    2. **A swing was a circle, not a cone.** `creature.gd::_strike` and
+       `player.gd::_arc_hit` both test an arc (90 deg creature, 110 player)
+       around the direction locked at windup start; the sim had no arc and no
+       aim, so every swing connected. Now `FighterSpec::attack_arc_deg` plus a
+       `Fighter::aim` locked at commit — deliberately NOT a `DhFighterSpec`
+       field, because that struct crosses the C API by value and a silently
+       widened struct against a stale `.so` is precisely what the
+       optional-symbol rule exists to prevent; `dh_env` derives it from
+       `is_player`, already in the struct.
+    3. **The attack cooldown started at the wrong end.** `creature.gd` sets
+       `_cd` inside `_strike`, AFTER the windup; the sim set it at the commit.
+       Attack period 1.20 s against the arena's 1.55 s — 29% more swings per
+       second out of identical content. Fixed: the cooldown starts when the
+       strike lands. `kWindup` also corrected 0.25 -> 0.35 (`windup_time`),
+       which is 100 ms of dodge window the learner never had to find.
+    4. **Creatures had a whirlwind they do not own.** `fighter.gd::cmd_special`
+       sends a geared body to `_whirlwind`/`_frost_nova`/`_fan_of_knives` and a
+       CREATURE body straight to `bot_attack` — one more ordinary swing. The
+       sim gave everyone the geared version: an instant, arc-free, 1.2x-damage
+       AoE every 6 s. Every arena build shipping today is `kind: creature`, so
+       that was a phantom damage source in every match dh-env has ever run.
+  Gated by `test_arena_obs_is_delayed_for_fairness`,
+  `test_arena_minds_read_the_delayed_world`,
+  `test_arena_action_budget_binds_both_sides` and
+  `test_arena_swing_is_a_cone_not_a_circle` in `sim/tests/test_main.cpp`.
+
   **R47/R48/R50 PROGRESS 2026-09-14, in the order they were taken.**
 
   **R47 DONE — `docs/tech/38-reward-model-history.md`.** His ask was for the

@@ -109,6 +109,84 @@ static dh::sim::Arena make_test_arena(std::uint64_t seed, dh::sim::OppPolicy opp
     return dh::sim::Arena(boar, drake, opp, seed);
 }
 
+static void test_arena_action_budget_binds_both_sides() {
+    // FAIRNESS (canon §9 §6): 6 commits a second, burst-bound. A build whose
+    // cooldowns already limit it below six proves nothing, so this uses a
+    // gatling build (ranged, 0.05 s cooldown, no windup) that WANTS 20/s.
+    dh::sim::FighterSpec gun;
+    gun.max_hp = 400.0f; gun.damage = 3.0f; gun.move_speed = 90.0f;
+    gun.attack_reach = 200.0f; gun.attack_cd = 0.05f; gun.body_radius = 9.0f;
+    gun.is_ranged = true; gun.kit_count = 0;
+    dh::sim::FighterSpec wall = gun;
+    wall.max_hp = 4000.0f;                  // outlasts 10 s of fire
+    auto commits = [&](int cap) {
+        dh::sim::Arena a(gun, wall, dh::sim::OppPolicy::kScripted, 3);
+        a.set_action_budget(cap);
+        int n = 0;
+        for (int t = 0; t < 600 && !a.step({0.0f, 0.0f, 1}); ++t)
+            if (a.last_commit(0) >= 0) ++n;
+        return n;
+    };
+    const int capped = commits(6), uncapped = commits(0);
+    CHECK(capped <= 6 * 10 + 1);            // 6 a second over 10 s, plus edge
+    CHECK(uncapped > capped * 2);           // and the cap is what did it
+}
+
+static void test_arena_minds_read_the_delayed_world() {
+    // The half of the fairness layer that was missing longest: obs() delayed
+    // the LEARNER's view while scripted_act/native_act read f_[] live, so
+    // dh-env's opponent fought on information its Godot twin never has.
+    //
+    // What this pins is CONSUMPTION, not advantage. A stale view is not
+    // uniformly worse — MEASURED over 8 seeds against a circling learner, the
+    // damage a scripted mind lands moves around by a few percent either way
+    // and no monotone claim survives. What must hold is that the delay reaches
+    // the decision at all: change only this number and the fight must differ.
+    auto fight = [](float delay) {
+        auto a = make_test_arena(9, dh::sim::OppPolicy::kScripted);
+        a.set_obs_delay(delay);
+        a.reset(9);
+        for (int t = 0; t < 900 && !a.step({std::cos(static_cast<float>(t) * 0.04f),
+                                            std::sin(static_cast<float>(t) * 0.04f),
+                                            0}); ++t) {}
+        return a.state_hash();
+    };
+    CHECK(fight(0.0f) == fight(0.0f));      // still deterministic
+    CHECK(fight(0.0f) != fight(0.25f));     // and the delay is actually read
+    // Pinning the delay must not consume a different number of RNG draws than
+    // sampling it, or the ablation would be measuring two changes at once.
+    CHECK(fight(0.25f) != fight(0.15f));
+
+    // The delay is per side, in range, and resampled per reset unless pinned.
+    auto arena = make_test_arena(9, dh::sim::OppPolicy::kScripted);
+    for (int side = 0; side < 2; ++side) {
+        CHECK(arena.obs_delay(side) >= 0.15f);
+        CHECK(arena.obs_delay(side) <= 0.25f);
+    }
+    arena.set_obs_delay(0.2f);
+    CHECK(arena.obs_delay(0) == 0.2f && arena.obs_delay(1) == 0.2f);
+    arena.set_obs_delay(-1.0f);
+    arena.reset(10);
+    CHECK(arena.obs_delay(1) >= 0.15f && arena.obs_delay(1) <= 0.25f);
+}
+
+static void test_arena_swing_is_a_cone_not_a_circle() {
+    // creature.gd::_strike and player.gd::_arc_hit both gate on an ARC around
+    // the direction the swing was committed to; the sim had no arc at all, so
+    // every swing it threw connected. Walk a target THROUGH the cone edge:
+    // in reach the whole time, hit only while it is in front.
+    const dh::math::Vec2 aim{1.0f, 0.0f};
+    CHECK(dh::sim::Arena::in_arc({10.0f, 0.0f}, aim, 90.0f, 8.0f));    // dead ahead
+    CHECK(dh::sim::Arena::in_arc({10.0f, 9.0f}, aim, 90.0f, 8.0f));    // inside 45 deg
+    CHECK(!dh::sim::Arena::in_arc({10.0f, 30.0f}, aim, 90.0f, 8.0f));  // outside it
+    CHECK(!dh::sim::Arena::in_arc({-10.0f, 0.0f}, aim, 90.0f, 8.0f));  // behind
+    CHECK(dh::sim::Arena::in_arc({-10.0f, 0.0f}, aim, 110.0f, 40.0f)); // point blank
+    // A wider cone can never hit less than a narrower one.
+    for (float y = -40.0f; y <= 40.0f; y += 5.0f)
+        if (dh::sim::Arena::in_arc({10.0f, y}, aim, 90.0f, 8.0f))
+            CHECK(dh::sim::Arena::in_arc({10.0f, y}, aim, 110.0f, 8.0f));
+}
+
 static void test_arena_determinism() {
     auto run = [](std::uint64_t seed) {
         auto arena = make_test_arena(seed, dh::sim::OppPolicy::kScripted);
@@ -151,11 +229,45 @@ static void test_arena_obs_schema() {
     const float dist = std::sqrt(dx * dx + dy * dy);
     CHECK(dist > 300.0f && dist < 500.0f);       // symmetric 12.5-tile spawns
     CHECK(o[18] > 0.5f && o[18] < 1.0f);         // normalized distance agrees
-    // step once with a kit cast: creature cooldown slots must light up (o[7..10])
+    // A kit cast lights up a cooldown slot (o[7..10]) — but NOT IMMEDIATELY.
+    // FAIRNESS (canon §9 §6): obs() returns the world as it was 150-250 ms ago,
+    // the same view game/arena/policy.gd::delayed_obs gives every policy. This
+    // used to be absent from the sim entirely (delay_s_ was sampled and never
+    // read), so PPO trained at zero latency while the gate measured 200 ms —
+    // and the identical policy scored win 1.00 in dh-env against 0-12 in the
+    // arena. The assertion order below is the contract: stale first, then true.
     dh::sim::Action cast{0.0f, 0.0f, 3};
     arena.step(cast);
     arena.obs(o);
-    CHECK(o[7] > 0.0f);
+    CHECK(o[7] == 0.0f);          // one tick later the learner cannot know yet
+    for (int i = 0; i < 20; ++i) arena.step({0.0f, 0.0f, 0});   // > 0.25 s
+    arena.obs(o);
+    CHECK(o[7] > 0.0f);           // ...and now it does
+}
+
+static void test_arena_obs_is_delayed_for_fairness() {
+    // The delay is a RANGE (0.15-0.25 s), sampled per reset, so pin the
+    // property rather than a tick count: the learner's view must lag the truth
+    // by somewhere between 9 and 15 ticks at 60 Hz, and must never run ahead.
+    auto arena = make_test_arena(11, dh::sim::OppPolicy::kScripted);
+    float o[dh::sim::kObsDim];
+    // Walk one way for a while; the reported position must trail the real one.
+    for (int i = 0; i < 60; ++i) arena.step({1.0f, 0.0f, 0});
+    arena.obs(o);
+    const float seen_x = o[1] * 512.0f;
+    float truth[dh::sim::kObsDim];
+    arena.obs_now(truth);
+    const float real_x = truth[1] * 512.0f;
+    CHECK(real_x > seen_x);                       // the view LAGS, never leads
+    // 0.15-0.25 s of travel at this build's speed, with slack for clamping.
+    const float lag = real_x - seen_x;
+    CHECK(lag > 0.5f && lag < 60.0f);
+
+    // Before enough history exists the oldest frame is used rather than an
+    // invented one — the same thing ArenaPolicy does with its own ring.
+    arena.reset(11);
+    arena.obs(o);
+    CHECK(o[0] == 1.0f && o[15] == 1.0f);         // a real frame, not zeros
 }
 
 static void test_arena_conduct_combo() {
@@ -431,6 +543,10 @@ int main() {
     test_arena_determinism();
     test_arena_terminates();
     test_arena_obs_schema();
+    test_arena_obs_is_delayed_for_fairness();
+    test_arena_action_budget_binds_both_sides();
+    test_arena_minds_read_the_delayed_world();
+    test_arena_swing_is_a_cone_not_a_circle();
     test_arena_conduct_combo();
     test_arena_opponent_mind_can_change_between_episodes();
     test_arena_reports_what_actually_committed();

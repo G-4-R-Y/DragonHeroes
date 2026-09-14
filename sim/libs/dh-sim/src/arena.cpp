@@ -18,7 +18,10 @@ constexpr float kSlamDelay = 0.45f;
 constexpr float kFieldRadius = 2.5f * kTile;
 constexpr float kFieldLife = 6.0f;
 constexpr float kFieldTick = 0.25f;
-constexpr float kWindup = 0.25f;
+// creature.gd::windup_time. Was 0.25 here until 2026-09-14 — a telegraph
+// 100 ms shorter than the one the shipping game draws, which is 100 ms of
+// dodge window the learner never had to find.
+constexpr float kWindup = 0.35f;
 constexpr float kKitGate = 0.4f;
 constexpr float kDodgeTime = 0.25f;
 constexpr float kDodgeDash = 3.5f * kTile;
@@ -130,6 +133,10 @@ void Arena::reset(std::uint64_t seed) {
     winner_ = -2;
     damage_taken_[0] = damage_taken_[1] = 0.0f;
     last_commit_[0] = last_commit_[1] = -1;
+    obs_log_n_ = 0;                 // the fairness ring starts empty each episode
+    commit_n_[0] = commit_n_[1] = 0;
+    for (int i = 0; i < 2; ++i)
+        for (int j = 0; j < kActionBudget; ++j) commit_t_[i][j] = -kBudgetWindow;
     // symmetric spawns: ONE base angle, fighters opposite, 12.5 tiles out
     const float base_ang = policy_rng_.next_float() * 2.0f * kPi;
     for (int i = 0; i < 2; ++i) {
@@ -143,10 +150,15 @@ void Arena::reset(std::uint64_t seed) {
         const float ang = base_ang + (i == 0 ? 0.0f : kPi);
         f_[i].pos = {std::cos(ang) * 12.5f * kTile, std::sin(ang) * 12.5f * kTile};
         f_[i].pos2 = f_[i].pos + math::Vec2{2.2f * kTile, 1.5f * kTile};
-        delay_s_[i] = 0.15f + policy_rng_.next_float() * 0.10f;   // fairness
+        // Draw FIRST, override after: an ablation that skipped the draw would
+        // shift the whole policy RNG stream and the two runs would differ by
+        // more than the delay, which is the one thing being measured.
+        const float sampled = 0.15f + policy_rng_.next_float() * 0.10f;
+        delay_s_[i] = delay_override_ >= 0.0f ? delay_override_ : sampled;
         strafe_t_[i] = retreat_t_[i] = 0.0f;
         strafe_dir_[i] = 1.0f;
     }
+    push_fairness_frame();   // tick 0 exists before the first step asks for it
 }
 
 float Arena::gauss() {
@@ -252,10 +264,12 @@ Action Arena::native_act(int who, float /*dt*/) {
     Fighter& me = f_[who];
     Fighter& foe = f_[1 - who];
     if (me.windup_t > 0.0f || !foe.alive() || me.hp <= 0.0f) return act;
-    const BodyRef tgt = nearest_enemy_body(who, me.pos);
-    const math::Vec2 to_foe = (tgt.pos - me.pos).normalized_or_zero();
-    const float dist = (tgt.pos - me.pos).length();
-    const float reach = me.spec.attack_reach + tgt.radius;
+    // FAIRNESS: decide on the stale view, not on f_[]. Own state (windup,
+    // cooldowns, position) stays live — fighter.gd's cmd_* resolve live too.
+    const Percept p = percept(who);
+    const math::Vec2 to_foe = (p.foe_pos - me.pos).normalized_or_zero();
+    const float dist = p.foe_dist;
+    const float reach = me.spec.attack_reach + p.foe_radius;
     if (me.spec.is_ranged) {
         // hold a 4-7 tile band, bolt on cooldown
         if (dist < 4.0f * kTile) act = {-to_foe.x, -to_foe.y, 0};
@@ -283,18 +297,20 @@ Action Arena::scripted_act(int who, float dt) {
     Fighter& me = f_[who];
     Fighter& foe = f_[1 - who];
     if (!foe.alive() || me.windup_t > 0.0f || me.hp <= 0.0f) return act;
+    const Percept p = percept(who);      // FAIRNESS: the stale view, as above
     strafe_t_[who] -= dt;
     if (strafe_t_[who] <= 0.0f) {
         strafe_t_[who] = 0.8f + policy_rng_.next_float() * 0.8f;
         strafe_dir_[who] = policy_rng_.next_float() < 0.5f ? -1.0f : 1.0f;
     }
-    if (me.hp_frac() < 0.25f && retreat_t_[who] <= 0.0f) retreat_t_[who] = 2.5f;
+    if (p.self_hp_frac < 0.25f && retreat_t_[who] <= 0.0f) retreat_t_[who] = 2.5f;
     retreat_t_[who] = retreat_t_[who] > dt ? retreat_t_[who] - dt : 0.0f;
-    const BodyRef tgt = nearest_enemy_body(who, me.pos);
-    const math::Vec2 to_foe = (tgt.pos - me.pos).normalized_or_zero();
-    const float dist = (tgt.pos - me.pos).length();
-    // dodge a close windup
-    const float foe_windup = tgt.body == 0 ? foe.windup_t : foe.windup2_t;
+    const math::Vec2 to_foe = (p.foe_pos - me.pos).normalized_or_zero();
+    const float dist = p.foe_dist;
+    // dodge a close windup — the reaction is gated by the delay, which is the
+    // entire point: 200 ms is most of kWindup, so a telegraph seen this late
+    // is a telegraph half spent.
+    const float foe_windup = p.foe_windup;
     if (foe_windup > 0.0f && dist < 3.0f * kTile && me.dodge_charges > 0) {
         act = {-to_foe.x, -to_foe.y, 7};
         return act;
@@ -327,7 +343,15 @@ Action Arena::mlp_act(int who) {
     // Sized by kMlpMaxUnits, not by the shipping net: set_opp_mlp refuses
     // anything wider, so the loop below can never run past these.
     float buf_a[kMlpMaxUnits], buf_b[kMlpMaxUnits];
-    build_obs(f_[who], f_[1 - who], buf_a);
+    // FAIRNESS: a frozen net opponent reads the same stale world its live twin
+    // reads through obs(). who==1 here, so this is the mirror of obs()'s frame.
+    if (obs_log_n_ > 0) {
+        const float now = static_cast<float>(tick_) * kArenaDt;
+        const float* src = obs_log_[who & 1][fair_frame_at(now - delay_s_[who & 1])];
+        for (int i = 0; i < kObsDim; ++i) buf_a[i] = src[i];
+    } else {
+        build_obs(f_[who], f_[1 - who], buf_a);
+    }
     std::memcpy(buf_a + kObsDim, mlp_emb_, sizeof(mlp_emb_));
     // forward: per-layer activation from mlp_acts_, head [move2, logits7, dodge1].
     // Param packing (dh_env.cpp contract): per layer [W row-major out×in][b out].
@@ -373,17 +397,61 @@ Action Arena::mlp_act(int who) {
 
 // ---- combat -----------------------------------------------------------------
 
+math::Vec2 Arena::commit_aim(int who) {
+    // What the body points at when it swings. A creature body takes the LIVE
+    // direction (fighter.gd::proxy_of_enemy_dir); a geared player body takes
+    // the policy's aim, which is the DELAYED foe position through gaussian
+    // dispersion (policy.gd::noisy_aim). Both are the reference behaviour —
+    // the sim used to have no aim at all.
+    const Fighter& me = f_[who];
+    if (!me.spec.is_player) {
+        const BodyRef tgt = nearest_enemy_body(who, me.pos);
+        const math::Vec2 d = (tgt.pos - me.pos).normalized_or_zero();
+        return d.length() > 0.0f ? d : math::Vec2{1.0f, 0.0f};
+    }
+    const Percept p = percept(who);
+    const math::Vec2 d = (p.foe_pos - me.pos).normalized_or_zero();
+    if (d.length() <= 0.0f) return math::Vec2{1.0f, 0.0f};
+    const float a = gauss() * kAimNoise;
+    return {d.x * std::cos(a) - d.y * std::sin(a),
+            d.x * std::sin(a) + d.y * std::cos(a)};
+}
+
+bool Arena::in_arc(const math::Vec2& to_tgt, const math::Vec2& aim,
+                   float arc_deg, float tgt_radius) {
+    // player.gd::_arc_hit / creature.gd::_strike, same test: inside the cone,
+    // with a point-blank exemption because a zero vector has no direction.
+    const float len = to_tgt.length();
+    if (len <= 0.5f * tgt_radius) return true;
+    const float cos_half = std::cos(arc_deg * 0.5f * kPi / 180.0f);
+    const math::Vec2 n = to_tgt.normalized_or_zero();
+    return n.x * aim.x + n.y * aim.y >= cos_half;
+}
+
 void Arena::melee_hit(int who) {
     Fighter& me = f_[who];
     Fighter& foe = f_[1 - who];
     const BodyRef tgt = nearest_enemy_body(who, me.pos);
-    const float reach = me.spec.attack_reach + tgt.radius + 0.3f * kTile;
-    if (!foe.alive() || (tgt.pos - me.pos).length() > reach) return;
-    if (foe.dodge_t > 0.0f) return;    // i-frames
+    if (!foe.alive()) return;
     float dmg = me.spec.damage;
     if (me.enrage_t > 0.0f) dmg *= 1.5f;
     if (me.spec.is_ranged) {
-        // ranged basic = a single bolt instead of a contact hit
+        // Ranged basic = a single bolt instead of a contact hit. It is FIRED
+        // here and resolved by the projectile loop, so neither the melee reach
+        // nor the target's i-frames belong in front of it.
+        //
+        // BUG THIS REPLACES (2026-09-14): the two lines below used to sit above
+        // this branch, unchanged from the melee path —
+        //     const float reach = me.spec.attack_reach + tgt.radius + 0.3f*kTile;
+        //     if (!foe.alive() || (tgt.pos - me.pos).length() > reach) return;
+        //     if (foe.dodge_t > 0.0f) return;
+        // — so a bolt needed the shooter to be inside ~2.5 tiles while both
+        // built-in minds only ever FIRE from a 4-7 tile band, and refused the
+        // shot if the target happened to be dodging. Measured effect: a
+        // scripted ranged drake landed ZERO basic-attack damage on a standing
+        // target in 15 s. Its Godot twin (player.gd::_cast_bolt, the Mage kit)
+        // has no range gate at all — the bolt's own life and speed are the
+        // range — which is what this now matches.
         for (auto& p : projectiles_) {
             if (p.alive) continue;
             const math::Vec2 dir = (tgt.pos - me.pos).normalized_or_zero();
@@ -393,6 +461,11 @@ void Arena::melee_hit(int who) {
         }
         return;
     }
+    const float reach = me.spec.attack_reach + tgt.radius + 0.3f * kTile;
+    const math::Vec2 to_tgt = tgt.pos - me.pos;
+    if (to_tgt.length() > reach) return;
+    if (!in_arc(to_tgt, me.aim, me.spec.attack_arc_deg, tgt.radius)) return;
+    if (foe.dodge_t > 0.0f) return;    // i-frames
     hurt(tgt, dmg);
 }
 
@@ -478,7 +551,9 @@ void Arena::buddy_tick(int who) {
         if (me.windup2_t <= 0.0f) {
             const BodyRef tgt = nearest_enemy_body(who, me.pos2);
             const float reach = me.buddy_spec.attack_reach + tgt.radius + 0.3f * kTile;
-            if (foe.dodge_t <= 0.0f && (tgt.pos - me.pos2).length() <= reach)
+            const math::Vec2 to_tgt = tgt.pos - me.pos2;
+            if (foe.dodge_t <= 0.0f && to_tgt.length() <= reach &&
+                in_arc(to_tgt, me.aim2, me.buddy_spec.attack_arc_deg, tgt.radius))
                 hurt(tgt, me.buddy_spec.damage);
         }
         return;
@@ -495,6 +570,7 @@ void Arena::buddy_tick(int who) {
     } else if (me.attack_cd2 <= 0.0f) {
         me.windup2_t = kWindup;
         me.attack_cd2 = me.buddy_spec.attack_cd;
+        me.aim2 = to_foe.length() > 0.0f ? to_foe : math::Vec2{1.0f, 0.0f};
     }
     me.attack_cd2 = me.attack_cd2 > kArenaDt ? me.attack_cd2 - kArenaDt : 0.0f;
     me.slow2_t = me.slow2_t > kArenaDt ? me.slow2_t - kArenaDt : 0.0f;
@@ -528,15 +604,55 @@ void Arena::apply_action(int who, const Action& act) {
     // arena's neural policy dodges only when it was refused, and so do we.
     bool committed = false;
     last_commit_[who & 1] = -1;
+    // FAIRNESS: the burst-binding rate cap (policy.gd ACTION_BUDGET). Over
+    // budget, every commit is refused and only movement survives the tick —
+    // the same shape as can_commit() returning false in GDScript, except it is
+    // enforced here because the learner's action arrives from outside.
+    if (!budget_ok(who & 1)) return;
     switch (act.act) {
         case 1:
             if (me.attack_cd <= 0.0f && me.windup_t <= 0.0f) {
-                if (me.spec.is_ranged) { melee_hit(who); me.attack_cd = me.spec.attack_cd; }
-                else { me.windup_t = kWindup; me.attack_cd = me.spec.attack_cd; }
+                me.aim = commit_aim(who);      // locked HERE, spent later
+                if (me.spec.is_ranged) {
+                    // instant, like player.gd::_cast_bolt: cooldown starts now
+                    melee_hit(who);
+                    me.attack_cd = me.spec.attack_cd;
+                } else {
+                    // A swing costs windup THEN cooldown. creature.gd sets
+                    // _cd inside _strike, after the windup has run; this used
+                    // to set it here, at the commit, which made the sim's
+                    // attack period attack_cd where the arena's is
+                    // windup_time + attack_cd — 1.20 s against 1.55 s, i.e.
+                    // 29% more swings per second for the same content.
+                    me.windup_t = kWindup;
+                }
                 committed = true;
             }
             break;
         case 2:
+            // A GEARED body has a special: whirlwind / frost nova / fan of
+            // knives, on its own cooldown (player.gd, via fighter.gd::
+            // cmd_special). A CREATURE body has none — fighter.gd sends the
+            // same call straight to bot_attack, so its "special" is one more
+            // ordinary swing sharing the ordinary cooldown.
+            //
+            // The sim gave every fighter the geared version: an instant,
+            // arc-free, 1.2x-damage AoE every 6 s that the arena never
+            // performs. On a creature build that is a whole phantom damage
+            // source, and every arena build shipping today is kind=creature.
+            if (!me.spec.is_player) {
+                if (me.attack_cd <= 0.0f && me.windup_t <= 0.0f) {
+                    me.aim = commit_aim(who);
+                    if (me.spec.is_ranged) {
+                        melee_hit(who);
+                        me.attack_cd = me.spec.attack_cd;
+                    } else {
+                        me.windup_t = kWindup;
+                    }
+                    committed = true;
+                }
+                break;
+            }
             if (me.special_cd <= 0.0f) {
                 me.special_cd = me.spec.special_cd;
                 committed = true;
@@ -570,6 +686,9 @@ void Arena::apply_action(int who, const Action& act) {
     } else if (committed) {
         last_commit_[who & 1] = act.act;
     }
+    // Only an ACCEPTED command spends budget — a cast refused on cooldown is
+    // free, exactly as a cmd_* returning false never reaches note_commit().
+    if (committed) note_commit_time(who & 1);
 }
 
 bool Arena::step(const Action& learner_act) {
@@ -591,7 +710,10 @@ bool Arena::step(const Action& learner_act) {
     for (int i = 0; i < 2; ++i) {
         if (f_[i].windup_t > 0.0f) {
             f_[i].windup_t -= kArenaDt;
-            if (f_[i].windup_t <= 0.0f) melee_hit(i);
+            if (f_[i].windup_t <= 0.0f) {
+                melee_hit(i);
+                f_[i].attack_cd = f_[i].spec.attack_cd;   // _strike sets _cd
+            }
         }
     }
     // 3. pending slams
@@ -689,6 +811,7 @@ bool Arena::step(const Action& learner_act) {
         f_[i].vel2 = (f_[i].pos2 - prev2[i]) * (1.0f / kArenaDt);
     }
     ++tick_;
+    push_fairness_frame();       // fairness ring: this tick's truth, read later
     // 8. outcome
     if (!f_[0].alive() || !f_[1].alive())
         winner_ = f_[0].alive() ? 0 : (f_[1].alive() ? 1 : -1);
@@ -699,8 +822,86 @@ bool Arena::step(const Action& learner_act) {
     return done();
 }
 
+void Arena::push_fairness_frame() {
+    // Newest frame goes at the end of the ring; the caller reads whichever one
+    // is old enough. Cost is one build_obs plus two nearest-body queries per
+    // tick, which the learner's own obs call was already paying most of.
+    const int slot = obs_log_n_ % kObsLog;
+    obs_log_t_[slot] = static_cast<float>(tick_) * kArenaDt;
+    for (int who = 0; who < 2; ++who) {
+        const Fighter& me = f_[who];
+        const Fighter& foe = f_[1 - who];
+        build_obs(me, foe, obs_log_[who][slot]);
+        const BodyRef tgt = nearest_enemy_body(who, me.pos);
+        Percept& p = percept_log_[who][slot];
+        p.foe_pos = tgt.pos;
+        p.foe_radius = tgt.radius;
+        p.foe_dist = (tgt.pos - me.pos).length();
+        p.foe_windup = tgt.body == 0 ? foe.windup_t : foe.windup2_t;
+        p.self_hp_frac = me.hp_frac();
+        p.foe_alive = foe.alive();
+    }
+    ++obs_log_n_;
+}
+
+int Arena::fair_frame_at(float target) const {
+    // Oldest frame first, take the newest one that is old ENOUGH — and if none
+    // is (the opening ticks), the oldest available, which is what the Godot
+    // policy does with its own ring rather than inventing a frame.
+    const int have = obs_log_n_ < kObsLog ? obs_log_n_ : kObsLog;
+    const int oldest = obs_log_n_ - have;
+    int pick = oldest;
+    for (int i = oldest; i < obs_log_n_; ++i) {
+        if (obs_log_t_[i % kObsLog] <= target) pick = i;
+        else break;
+    }
+    return pick % kObsLog;
+}
+
+Arena::Percept Arena::percept(int who) const {
+    const Fighter& me = f_[who];
+    const Fighter& foe = f_[1 - who];
+    if (obs_log_n_ <= 0) {               // before the first frame exists
+        const BodyRef tgt = nearest_enemy_body(who, me.pos);
+        return Percept{tgt.pos, tgt.radius, (tgt.pos - me.pos).length(),
+                       tgt.body == 0 ? foe.windup_t : foe.windup2_t,
+                       me.hp_frac(), foe.alive()};
+    }
+    const float now = static_cast<float>(tick_) * kArenaDt;
+    return percept_log_[who][fair_frame_at(now - delay_s_[who])];
+}
+
+bool Arena::budget_ok(int who) const {
+    // 6 commits inside a 1 s sliding window, counted off the ring of stamps.
+    if (budget_cap_ <= 0) return true;               // ablated
+    const float now = static_cast<float>(tick_) * kArenaDt;
+    int live = 0;
+    const int have = commit_n_[who] < kActionBudget ? commit_n_[who] : kActionBudget;
+    for (int i = 0; i < have; ++i)
+        if (now - commit_t_[who][i] <= kBudgetWindow) ++live;
+    return live < budget_cap_;
+}
+
+void Arena::note_commit_time(int who) {
+    commit_t_[who][commit_n_[who] % kActionBudget] =
+        static_cast<float>(tick_) * kArenaDt;
+    ++commit_n_[who];
+}
+
 void Arena::obs(float* out31) const {
-    build_obs(f_[0], f_[1], out31);
+    // FAIRNESS (canon §9 §6): the learner sees the world as it was 150-250 ms
+    // ago, exactly as game/arena/policy.gd::delayed_obs does. Without this,
+    // PPO trained at zero latency and the gate measured the same net at 200 ms,
+    // and the identical policy scored win 1.00 in dh-env against 0-12 in the
+    // arena. This is an OUTPUT, not simulation state, so no state_hash moves.
+    const int dim = obs_dim();
+    if (obs_log_n_ <= 0) {                 // before the first frame exists
+        build_obs(f_[0], f_[1], out31);
+        return;
+    }
+    const float now = static_cast<float>(tick_) * kArenaDt;
+    const float* src = obs_log_[0][fair_frame_at(now - delay_s_[0])];
+    for (int i = 0; i < dim; ++i) out31[i] = src[i];
 }
 
 std::uint64_t Arena::state_hash() const {
@@ -716,6 +917,7 @@ std::uint64_t Arena::state_hash() const {
         mix_bytes(&f.hp, sizeof(f.hp));
         mix_bytes(&f.attack_cd, sizeof(f.attack_cd));
         mix_bytes(&f.windup_t, sizeof(f.windup_t));
+        mix_bytes(&f.aim, sizeof(f.aim));   // decides whether the swing lands
     }
     for (const auto& p : projectiles_)
         if (p.alive) mix_bytes(&p.pos, sizeof(p.pos));
