@@ -150,6 +150,13 @@ DhEnv* dh_env_create_squad(DhFighterSpec a, DhFighterSpec a_buddy,
 
 int32_t dh_env_obs_dim(const DhEnv* env) { return env->arena.obs_dim(); }
 
+int32_t dh_env_set_opp_policy(DhEnv* env, int32_t opp_policy) {
+    if (env == nullptr) return 0;
+    if (opp_policy < 0 || opp_policy > 2) return 0;
+    return env->arena.set_opp_policy(
+        static_cast<dh::sim::OppPolicy>(opp_policy)) ? 1 : 0;
+}
+
 void dh_env_set_opp_weights(DhEnv* env, const float* params,
                             const int32_t* layer_in, const int32_t* layer_out,
                             int32_t n_layers, const float* emb16) {

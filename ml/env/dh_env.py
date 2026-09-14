@@ -60,6 +60,9 @@ def _load_lib() -> ctypes.CDLL:
                                         ctypes.c_uint64]
     lib.dh_env_obs_dim.restype = ctypes.c_int32
     lib.dh_env_obs_dim.argtypes = [ctypes.c_void_p]
+    if hasattr(lib, "dh_env_set_opp_policy"):
+        lib.dh_env_set_opp_policy.restype = ctypes.c_int32
+        lib.dh_env_set_opp_policy.argtypes = [ctypes.c_void_p, ctypes.c_int32]
     lib.dh_env_reset.argtypes = [ctypes.c_void_p, ctypes.c_uint64,
                                  ctypes.POINTER(ctypes.c_float)]
     lib.dh_env_step.restype = ctypes.c_int
@@ -175,6 +178,12 @@ def tick_hz() -> float:
     return float(fn())
 
 
+def supports_opp_switch() -> bool:
+    """False on a library built before the opponent could be switched mid-run,
+    in which case a curriculum would never leave its first phase."""
+    return getattr(lib(), "dh_env_set_opp_policy", None) is not None
+
+
 def supports_dodge_flag() -> bool:
     """False on a library built before the flag existed — in which case the bit
     is silently dropped and the policy never dodges. Check it rather than
@@ -284,6 +293,26 @@ class DhEnv:
         done = lib().dh_env_step(self._handle, float(move[0]), float(move[1]),
                                  int(act), self._obs)
         return bool(done), np.array(self._obs, dtype=np.float32)
+
+    def set_opp(self, opp: str) -> bool:
+        """Change the opponent's MIND mid-run — Ricardo's curriculum: "learn
+        from scripts first and, once reliably wiining against it, self playing".
+
+        Call it between episodes. Determinism is untouched: the opponent's
+        policy is not arena state. Returns False if the library refused the
+        switch ("mlp" with no weights handed over yet), and raises rather than
+        pretending on a library too old to have the symbol — a curriculum that
+        silently never promotes looks exactly like a policy that never learns.
+        """
+        if opp not in OPP:
+            raise ValueError(f"dh_env: unknown opponent '{opp}' — {sorted(OPP)}")
+        fn = getattr(lib(), "dh_env_set_opp_policy", None)
+        if fn is None:
+            raise AttributeError(
+                "libdh-env predates dh_env_set_opp_policy: the opponent "
+                "curriculum cannot switch and every phase would silently stay "
+                "on the first one. Rebuild: cmake --build sim/build -j")
+        return bool(fn(self._handle, OPP[opp]))
 
     @property
     def winner(self) -> int:

@@ -82,6 +82,19 @@ class Arena {
           const FighterSpec& b, const FighterSpec& b_buddy,
           OppPolicy opp, std::uint64_t seed);
 
+    // Ricardo's curriculum, 2026-09-14: "learn from scripts first and, once
+    // reliably wiining against it, self playing". The opponent's MIND is not
+    // part of the arena's state, so it can change between episodes without
+    // disturbing determinism — every state_hash is a function of the seed and
+    // the actions, not of who chose them. Switching to kMlp without weights set
+    // would fight an unset net, so that is refused.
+    bool set_opp_policy(OppPolicy p) {
+        if (p == OppPolicy::kMlp && !has_opp_mlp()) return false;
+        opp_policy_ = p;
+        return true;
+    }
+    OppPolicy opp_policy() const { return opp_policy_; }
+
     // Frozen opponent net (OppPolicy::kMlp): flat row-major weights + biases,
     // layer row sizes [in0,out0,in1,out1,...], and the 16-float embedding row
     // appended to the obs (policy_net.py layout: obs31 ++ emb16, tanh hidden).

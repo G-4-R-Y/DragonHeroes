@@ -45,7 +45,8 @@ import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from ml.env.dh_env import (ACT_DODGE, DhEnv, VecDhEnv, OBS_DIM,   # noqa: E402
-                          set_opp_weights, supports_dodge_flag, tick_hz)
+                          set_opp_weights, supports_dodge_flag,
+                          supports_opp_switch, tick_hz)
 from ml.training import arch as arch_mod                     # noqa: E402
 from ml.training import reward as reward_model               # noqa: E402
 from ml.training.arch import ACT_CODE, normalize_act         # noqa: E402
@@ -180,6 +181,22 @@ def main() -> None:
     #   envs=64   9,747 steps/s     envs=512  56,288 steps/s  <- the knee
     #   envs=1024 57,757 steps/s    envs=2048 56,414 steps/s  (flat past 512)
     ap.add_argument("--envs", type=int, default=512)
+    # RICARDO'S CURRICULUM, 2026-09-14: "after tuning the arena training as to
+    # learn from scripts first and, once reliably wiining against it, self
+    # playing". Before this, a third of the envs were self-play from step 0 —
+    # two policies that both stand still, teaching each other nothing. The
+    # script phase gives the learner an opponent that actually fights, so there
+    # is a gradient to climb before it is allowed to play itself.
+    ap.add_argument("--curriculum", dest="curriculum", action="store_true",
+                    default=True, help="scripts first, self-play on promotion "
+                                       "(default; --no-curriculum for the old "
+                                       "fixed native/scripted/mlp thirds)")
+    ap.add_argument("--no-curriculum", dest="curriculum", action="store_false")
+    ap.add_argument("--promote-wr", type=float, default=0.60,
+                    help="win rate vs the scripts that promotes to self-play")
+    ap.add_argument("--promote-hold", type=int, default=3,
+                    help="consecutive updates the win rate must HOLD — "
+                         "'reliably winning', not 'won once'")
     ap.add_argument("--selfplay-every", type=int, default=4,
                     help="refresh the frozen self-play opponent every K iterations")
     ap.add_argument("--warm-start", default="", help="registry JSON/npz to init from")
@@ -310,13 +327,29 @@ def main() -> None:
         envs = [DhEnv(args.build, args.opp_build, opp=opps[i],
                       seed=args.seed + i, squad=squad)
                 for i in range(args.envs)]
+    elif args.curriculum:
+        # PHASE 1 — scripts only. Both of them: the gate requires beating
+        # `scripted` AND `native`, so training against one and gating on two is
+        # how a net passes half a gate.
+        envs = [DhEnv(args.build, args.opp_build,
+                      opp=("scripted" if i % 2 == 0 else "native"),
+                      seed=args.seed + i, squad=squad)
+                for i in range(args.envs)]
     else:
         thirds = [("native",), ("scripted",), ("mlp",)]
         envs = [DhEnv(args.build, args.opp_build, opp=thirds[i % 3][0],
                       seed=args.seed + i, squad=squad)
                 for i in range(args.envs)]
+    curriculum = bool(args.curriculum) and not args.exploit \
+        and args.arch != "gru" and not squad
+    if curriculum and not supports_opp_switch():
+        raise SystemExit(
+            f"[ppo:{args.key}] libdh-env.so predates dh_env_set_opp_policy, so "
+            f"the curriculum could never leave its script phase and would look "
+            f"exactly like a run that simply never self-played. Rebuild: "
+            f"cmake --build sim/build -j   (or pass --no-curriculum)")
     mlp_envs = envs if args.exploit else \
-        ([] if (args.arch == "gru" or squad) else envs[2::3])
+        ([] if (args.arch == "gru" or squad or curriculum) else envs[2::3])
     # ONE ctypes crossing per tick instead of four per env per tick
     # (Ricardo, 2026-09-13: "do it!"). Measured on the dev box while it was
     # fully loaded: 32 envs 56.6k -> 352.6k steps/s (6.2x), 128 envs 55.0k ->
@@ -344,6 +377,31 @@ def main() -> None:
     iteration = 0
     done_steps = 0
     results: list[int] = []
+    # The promotion gate must read the SCRIPT envs only. A pooled win rate rises
+    # on its own as self-play gets easier against a frozen snapshot of itself,
+    # so pooling would let a policy promote on its own reflection.
+    env_is_script = [True] * args.envs if curriculum else [False] * args.envs
+    script_results: list[int] = []
+    promoted = not curriculum
+    holding = 0
+
+    def promote() -> None:
+        """Phase 2: a third of the envs start fighting the learner's own frozen
+        snapshot. Weights FIRST — set_opp_policy refuses kMlp on an env that has
+        never been handed a net, which is the whole point of that refusal."""
+        nonlocal promoted, mlp_envs
+        mlp_envs = envs[2::3]
+        refresh_selfplay()
+        switched = 0
+        for i in range(2, args.envs, 3):
+            if envs[i].set_opp("mlp"):
+                env_is_script[i] = False
+                switched += 1
+        promoted = True
+        print(f"[ppo:{args.key}] CURRICULUM phase 2/2 — PROMOTED at "
+              f"iteration {iteration}, {done_steps:,} steps: {switched} of "
+              f"{args.envs} envs now fight past selves, the rest stay on "
+              f"scripts.", flush=True)
     t0 = time.time()
     if args.exploit:
         # EXPLOITER MODE (AlphaStar league shape): the opponent is a FIXED
@@ -354,8 +412,13 @@ def main() -> None:
                             packed[3], packed[4])
         exploiter_keepalive = packed          # borrowed pointers!
         print(f"[ppo:{args.key}] EXPLOITER vs {Path(args.exploit).name}")
-    elif args.arch != "gru" and not squad:
+    elif args.arch != "gru" and not squad and not curriculum:
         refresh_selfplay()   # the opponent is the learner's own frozen snapshot
+    elif curriculum:
+        print(f"[ppo:{args.key}] CURRICULUM phase 1/2 — scripts only "
+              f"(scripted + native). Self-play unlocks at win rate "
+              f">= {args.promote_wr:.2f} held for {args.promote_hold} updates.",
+              flush=True)
     # combo tracking per env: last kit act + tick (chain bonus window)
     last_kit = np.full(args.envs, -1, dtype=np.int64)
     last_kit_tick = np.full(args.envs, -1000, dtype=np.int64)
@@ -370,7 +433,7 @@ def main() -> None:
     while done_steps < args.steps:
         iteration += 1
         if not args.exploit and args.arch != "gru" and not squad \
-                and iteration % args.selfplay_every == 0:
+                and promoted and iteration % args.selfplay_every == 0:
             refresh_selfplay()   # past-self becomes the opponent
         # ---- rollout --------------------------------------------------------
         t_roll = time.time()
@@ -472,6 +535,10 @@ def main() -> None:
                         }, reward_weights)
                         r[e] += R_TERMINAL * (ep_score - 0.5)
                     results.extend(int(x) for x in w)
+                    if curriculum and not promoted:
+                        script_results.extend(
+                            int(w[j]) for j, e in enumerate(fin)
+                            if env_is_script[int(e)])
                     vec.reset_done(fin, rng.integers(1, 2**31, size=fin.size)
                                    .astype(np.uint64))
                     prev_self[fin] = 1.0
@@ -576,6 +643,19 @@ def main() -> None:
         upd_s = time.time() - t_upd
         recent = results[-200:]
         wr = sum(1 for w in recent if w == 0) / max(1, len(recent))
+        # "once reliably wiining against it" — HELD, not touched. A win rate
+        # that crosses the line for one update and falls back has not learned
+        # to beat the scripts, it has had a good batch.
+        script_wr = float("nan")
+        if curriculum and not promoted:
+            window = script_results[-200:]
+            # A promotion decided on a handful of episodes is noise wearing a
+            # threshold. Require a real sample before the counter can move.
+            if len(window) >= 40:
+                script_wr = sum(1 for w in window if w == 0) / len(window)
+                holding = holding + 1 if script_wr >= args.promote_wr else 0
+                if holding >= args.promote_hold:
+                    promote()
         sps = done_steps / (time.time() - t0)
         shown = min(done_steps, args.steps)
         eta = max(0.0, (args.steps - done_steps)) / max(sps, 1.0)
@@ -584,7 +664,10 @@ def main() -> None:
         print(f"[ppo:{args.key}] it={iteration} steps={shown:,}/{args.steps:,} "
               f"sps={sps:,.0f} roll={roll_s:.1f}s({T * N / max(roll_s, 1e-6):,.0f}/s) "
               f"upd={upd_s:.1f}s win_rate(last {len(recent)})={wr:.2f} "
-              f"eta={int(eta) // 60:d}m{int(eta) % 60:02d}s", flush=True)
+              + (f"scripts={script_wr:.2f}({holding}/{args.promote_hold}) "
+                 if (curriculum and not promoted and script_wr == script_wr)
+                 else ("scripts=n/a " if (curriculum and not promoted) else ""))
+              + f"eta={int(eta) // 60:d}m{int(eta) % 60:02d}s", flush=True)
     # ---- export: the same JSON the Godot arena gates ------------------------
     WEIGHTS_DIR.mkdir(parents=True, exist_ok=True)
     reg = json.load(open(REGISTRY)) if REGISTRY.exists() else \

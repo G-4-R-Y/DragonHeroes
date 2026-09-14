@@ -696,6 +696,70 @@ Rebuild after the packaging commit for clean provenance; archives remain in
   currently subtracts `R_TIME` every tick REGARDLESS of outcome, so a losing
   agent is paid to die sooner. See the answer below for what is scored today.
 
+  **R47/R48/R50 PROGRESS 2026-09-14, in the order they were taken.**
+
+  **R47 DONE — `docs/tech/38-reward-model-history.md`.** His ask was for the
+  VERSIONS with their rationale, not a snapshot, so the file is a changelog and
+  states its own rule: a version is never deleted, only superseded, because
+  every ranking in this repo's history was made by one of them. v0 (two
+  functions that disagreed, three defects), v1 (kept and runnable), v2 (weights,
+  the two enforced invariants, worked ordering), then v2.0.1 the mirror
+  matchup, v2.0.2 the 72x kit hack, v2.0.3 the vocabulary trap, v2.0.4 the
+  ground-truth validation. Open items listed as open: R_TIME never re-judged,
+  dps_taken parity unresolved, weights reasoned about but never tuned,
+  hp_foe/hp_self partly double-counting damage. Indexed in docs/README.md.
+
+  **R48 DONE — and the interesting half is why it was invisible.** The BACK
+  button EXISTED, at the bottom of the console's RIGHT column under a
+  TabContainer set to expand-fill, so any tab whose contents wanted more height
+  than the viewport had pushed the only way out off the bottom edge. Moved to
+  the title row (left column, fixed 236 px, first row) and Esc now leaves too —
+  there was no input handler at all, so a button that depended on there being
+  room for it was the ONLY exit. THE REASON NOBODY CAUGHT IT: the layout probe
+  measures 1204 controls across 7 canvases and 4 tabs and set `_selftest = true`,
+  which was exactly the flag that skipped building the BACK button. The one
+  control that went missing was the one control the gate could not see. It is
+  built under selftest now (inert) and the probe asserts a BACK button exists,
+  is visible in tree and lies inside the canvas on both axes — found by ROLE, so
+  moving it stays allowed and losing it does not. Teeth proven: removing the
+  button fails all 28 canvas/tab combinations.
+
+  **R50 IN FLIGHT — the curriculum is built and smoke-verified; the converged
+  train_all run is NOT started yet.** Three stages, each gated on the last:
+  clone (`distill --teacher heuristic`) -> scripts -> self-play.
+  WHAT WAS WRONG BEFORE: a third of the envs were self-play FROM STEP 0. Given
+  15d (the move head never trained), that is two policies which both stand
+  still teaching each other nothing, for a third of every rollout.
+  PHASE 1 is BOTH scripts, not one, because the gate requires beating
+  `scripted` AND `native` — training on one and gating on two is how a net
+  passes half a gate. PROMOTION is HELD (`--promote-hold 3`), resets to zero on
+  any update below `--promote-wr 0.60`, and refuses to consider fewer than 40
+  script episodes: "once reliably wiining", not "won once". It reads the SCRIPT
+  envs only — a pooled win rate rises on its own as self-play gets easier
+  against a frozen snapshot of yourself, which would let a policy promote on
+  its own reflection.
+  MECHANISM: `Arena::set_opp_policy` -> `dh_env_set_opp_policy` -> `DhEnv.set_opp`,
+  a NEW C symbol so a stale .so raises instead of leaving a run silently stuck
+  in phase 1 forever (which looks exactly like a policy that never learns).
+  Promoting into an unset self-play net is REFUSED. Determinism unaffected and
+  PINNED: `sim-tests::test_arena_opponent_mind_can_change_between_episodes`
+  proves the two minds produce different state_hashes AND that switching
+  reproduces each one exactly. MEASURED while writing it: the minds are
+  IDENTICAL at 200 ticks (both just closing distance) and diverge only by 600
+  — native settles into a 0.449/0.449 standoff where scripted reaches
+  0.316/0.669. A shorter test would have passed for the wrong reason.
+  SMOKE: 13 updates on cinder_drake, phase 1 announced, `scripts=0.69(1/2)`
+  tracked separately, PROMOTED at iteration 2 with 10 of 32 envs switched.
+  **CAVEAT, stated now rather than discovered later: the threshold is measured
+  in dh-env, and the unresolved `dps_taken` divergence means dh-env's scripted
+  is NOT the arena's scripted. 0.60 in dh-env is not 0.60 in the gate.** The
+  gate remains the only verdict. That is also why the smoke's 0.69 against
+  scripts sits beside a measured 0.00 arena win rate without contradiction.
+  STILL TO DO for R50: run the clone stage for real, chain it into PPO via
+  `--warm-start`, then the train_all experiment at a budget that converges —
+  his words, "make sure to get enough steps as so the model actually
+  converges", which is a direct correction of every 11-update smoke run today.
+
   **INTERRUPTION 2026-09-14 (latest+15) — seven new demands, recorded VERBATIM
   before any of them is worked. Prompt, in his order:**
   *"bosses still don't spawn like hordes, and there's still a single biome. How

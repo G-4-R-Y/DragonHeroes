@@ -804,12 +804,17 @@ BENCH_DIR = ROOT / "ml" / "data" / "benchmarks"
 def resolve_policy(spec: str, reg: dict | None = None) -> tuple[str, str]:
     """A versus side -> (policy argument for the arena, human label).
 
-    Accepted: "native", "scripted", a path to an arena.policy.v1 JSON, or a
-    registry reference "<key>" (its deployed pin, else its newest candidate) or
-    "<key>@v3" / "<key>@candidate" / "<key>@deployed" to pin one exactly.
+    Accepted: "native", "scripted", "statue", "heuristic", a path to an
+    arena.policy.v1 JSON, or a registry reference "<key>" (its deployed pin,
+    else its newest candidate) or "<key>@v3" / "<key>@candidate" /
+    "<key>@deployed" to pin one exactly.
+
+    `statue` and `heuristic` are the gate's controls (docs/tech/25 §5.2.2) —
+    ordinary arena policies, so they are reachable from `versus`, the console
+    and the gate by the same name rather than living only inside the gate.
     """
     spec = (spec or "").strip()
-    if spec in ("native", "scripted"):
+    if spec in ("native", "scripted", "statue", "heuristic"):
         return spec, spec
     path = Path(spec)
     if path.exists() and path.suffix == ".json" and path.is_file():

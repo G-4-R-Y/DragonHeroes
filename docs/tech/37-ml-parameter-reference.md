@@ -52,6 +52,9 @@ net from any of them can be gated and deployed by the same path.
 | `gate` | `--key` / `--build` / `--episodes` | required, required, 4 | Runs §5's checks on the newest candidate |
 | `STATUE_FLOOR` | 0.75 | Gate floor vs the **statue** control (attacks, never moves). ENFORCED: a net below it is broken, not weak, and the previous pin ships instead. Set high on purpose — beating a body standing still should not be close. The deployed fen_boar v6.0 took LESS health off its opponent than the statue did, in both matchups (tech/25 §5.2.2) |
 | `CONTROLS` | `("statue", "heuristic")` | The gate's two controls. `statue` is the floor; `heuristic` (walk at the foe, spend kits off cooldown) is **reported, not required** — a yardstick, so a collapse can never again be invisible |
+| `--curriculum` / `--no-curriculum` | on | Scripts first, self-play on promotion (tech/25 §5.1.2). `--no-curriculum` restores the old fixed native/scripted/mlp thirds, which put a third of every rollout on self-play from step 0 |
+| `--promote-wr` | 0.60 | Win rate **against the script envs only** that unlocks self-play. Pooling in the self-play envs would let a policy promote on its own reflection |
+| `--promote-hold` | 3 | Consecutive updates the win rate must HOLD — "reliably winning", not "won once". Resets to 0 on any update below the bar; no promotion before 40 script episodes have finished |
 | `round-robin` | `--episodes` | 2 | Deployed policies fight each other; prints the table |
 
 ### 2.2 `league.py` — internal constants

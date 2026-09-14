@@ -59,6 +59,15 @@ DH_API DhEnv* dh_env_create_squad(DhFighterSpec a, DhFighterSpec a_buddy,
                                   DhFighterSpec b, DhFighterSpec b_buddy,
                                   int32_t opp_policy, uint64_t seed);
 DH_API int32_t dh_env_obs_dim(const DhEnv* env);
+
+/* Change the opponent's MIND between episodes — Ricardo's curriculum, 2026-09-14:
+ * "learn from scripts first and, once reliably wiining against it, self playing".
+ * A NEW symbol rather than a changed dh_env_create, so a stale .so announces
+ * itself with AttributeError instead of a silently unchanged opponent.
+ * Returns 0 if refused (DH_OPP_MLP with no weights set), 1 on success.
+ * Determinism is untouched: the opponent's policy is not arena state, and
+ * state_hash is a function of the seed and the actions taken. */
+DH_API int32_t dh_env_set_opp_policy(DhEnv* env, int32_t opp_policy);
 /* Frozen opponent net (DH_OPP_MLP). Packing: per layer [W row-major out x in]
  * then [b out], layers concatenated; layer_in/out arrays, n_layers <= 8;
  * emb16 = the content embedding row (policy_net.py layout). `params` must

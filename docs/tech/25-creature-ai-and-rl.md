@@ -234,6 +234,30 @@ Weights live in `ml/training/reward_weights.json` — data, so tuning needs no e
 python3 -m ml.training.reward --explain     # terms, weights, worked examples
 ```
 
+### 5.1.2 The opponent curriculum: clone, then scripts, then self-play
+
+Ricardo, 2026-09-14: *"after tuning the arena training as to learn from scripts first and, once reliably wiining against it, self playing, run a train_all experiment"*.
+
+Before this, PPO put **a third of its environments on self-play from step 0**. Given §5.2.3's finding — that the move head never trained — that meant two policies which both stand still, teaching each other nothing, for a third of every rollout. Self-play only teaches you something once you have something to teach.
+
+Three stages, each one gated on the last:
+
+| stage | opponent | leaves when |
+|---|---|---|
+| **0. clone** (`distill --teacher heuristic`) | — | the student exists; optional but recommended, it is what gets the move head off zero |
+| **1. scripts** | `scripted` + `native`, half the envs each | win rate ≥ `--promote-wr` (0.60) **held** for `--promote-hold` (3) consecutive updates |
+| **2. self-play** | a third of envs switch to the learner's own frozen snapshot; the rest stay on scripts | end of run |
+
+Both scripts, not one: the gate requires beating `scripted` **and** `native`, and training against one while gating on two is how a net passes half a gate.
+
+**Held, not touched.** A win rate that crosses the line for one update and falls back has not learned to beat the scripts — it has had a good batch. The counter resets to zero on any update below the threshold, and no promotion is considered until at least 40 script episodes have finished, because a promotion decided on a handful of episodes is noise wearing a threshold.
+
+**Measured on the script envs only.** A pooled win rate rises on its own as self-play gets easier against a frozen snapshot of yourself, so pooling would let a policy promote on its own reflection.
+
+The switch itself is `dh::sim::Arena::set_opp_policy` → `dh_env_set_opp_policy` → `DhEnv.set_opp` — a new C symbol, so a stale `.so` raises rather than leaving a run silently stuck in phase 1 forever, which would look exactly like a policy that never learns. Determinism is untouched: the opponent's mind is not arena state, and `state_hash` is a function of the seed and the actions taken, not of who chose them (`sim-tests::test_arena_opponent_mind_can_change_between_episodes` pins both halves of that). Switching to the self-play opponent before weights have been handed over is **refused**, because promoting into an unset net would look like a policy that suddenly got much better.
+
+**One caveat, stated rather than discovered later:** the promotion threshold is measured in `dh-env`, and §5.3's unresolved `dps_taken` divergence means dh-env's opponents are not the arena's. Until that closes, 0.60 in dh-env is not 0.60 in the gate — the gate remains the only verdict.
+
 ### 5.2.2 Always measure a policy against a statue and a heuristic
 
 A win rate on its own cannot tell "the learner is bad" from "the matchup is hard" from "the gate is wrong". Two controls settle it, and both cost minutes:

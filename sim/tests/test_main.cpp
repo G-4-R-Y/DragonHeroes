@@ -181,6 +181,49 @@ static void test_arena_conduct_combo() {
     CHECK(burst_seen);
 }
 
+static void test_arena_opponent_mind_can_change_between_episodes() {
+    // Ricardo's curriculum, 2026-09-14: "learn from scripts first and, once
+    // reliably wiining against it, self playing". Switching the opponent's MIND
+    // must change the fight and must NOT change determinism: state_hash is a
+    // function of the seed and the actions taken, not of who chose them.
+    // cinder_drake's real numbers, run 600 ticks (10 s): MEASURED, the two
+    // minds are still identical at 200 ticks because both are just closing the
+    // distance, and diverge only once the fight starts — native settles into a
+    // 0.449/0.449 standoff where scripted reaches 0.316/0.669. A tankier pair can end an episode in the same state from
+    // either mind, which would make this test pass for the wrong reason.
+    dh::sim::FighterSpec s;
+    s.max_hp = 87.36f; s.damage = 9.632f; s.move_speed = 107.532f;
+    s.attack_reach = 28.8f; s.attack_cd = 0.9f; s.body_radius = 9.84f;
+    s.special_cd = 6.0f;
+
+    const auto play = [&](dh::sim::OppPolicy p) {
+        dh::sim::Arena a(s, s, p, 11);
+        a.reset(4242);
+        for (int t = 0; t < 600; ++t) if (a.step({1.0f, 0.0f, 1})) break;
+        return a.state_hash();
+    };
+    const std::uint64_t h_scripted = play(dh::sim::OppPolicy::kScripted);
+    const std::uint64_t h_native = play(dh::sim::OppPolicy::kNative);
+    CHECK(h_scripted != h_native);          // the two minds really do differ
+
+    // Same arena, switched between episodes, reproduces each one exactly.
+    dh::sim::Arena a(s, s, dh::sim::OppPolicy::kScripted, 11);
+    a.reset(4242);
+    for (int t = 0; t < 600; ++t) if (a.step({1.0f, 0.0f, 1})) break;
+    CHECK(a.state_hash() == h_scripted);
+    CHECK(a.set_opp_policy(dh::sim::OppPolicy::kNative));
+    CHECK(a.opp_policy() == dh::sim::OppPolicy::kNative);
+    a.reset(4242);
+    for (int t = 0; t < 600; ++t) if (a.step({1.0f, 0.0f, 1})) break;
+    CHECK(a.state_hash() == h_native);
+
+    // kMlp with no weights is REFUSED rather than fighting an unset net — a
+    // curriculum that silently promoted into a null opponent would look like a
+    // policy that suddenly got much better.
+    CHECK(!a.set_opp_policy(dh::sim::OppPolicy::kMlp));
+    CHECK(a.opp_policy() == dh::sim::OppPolicy::kNative);
+}
+
 static void test_arena_reports_what_actually_committed() {
     // last_commit() is the difference between paying for INTENT and paying for
     // EFFECT. PPO's kit bonus fired whenever the agent SELECTED a kit, and a kit
@@ -389,6 +432,7 @@ int main() {
     test_arena_terminates();
     test_arena_obs_schema();
     test_arena_conduct_combo();
+    test_arena_opponent_mind_can_change_between_episodes();
     test_arena_reports_what_actually_committed();
     test_arena_dodge_is_a_fallback();
     test_arena_damage_accounting();
