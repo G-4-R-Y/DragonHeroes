@@ -113,6 +113,21 @@ func _label(text: String, color: Color, size := ProtoTheme.SIZE_BODY,
 	l.add_theme_color_override("font_color", color)
 	return l
 
+func _to_main_menu() -> void:
+	if _selftest:
+		return        # the button is LAID OUT under selftest, it just does not navigate
+	get_tree().change_scene_to_file("res://prototype/ui/main_menu.tscn")
+
+# A way out that no layout can take away. The BACK button was unreachable
+# because it depended on there being room for it; Escape does not.
+func _unhandled_input(event: InputEvent) -> void:
+	if _selftest:
+		return
+	if event.is_action_pressed("ui_cancel"):
+		get_viewport().set_input_as_handled()
+		_to_main_menu()
+
+
 func _button(parent: Container, text: String, cb: Callable) -> Button:
 	var b := Button.new()
 	b.text = text
@@ -151,7 +166,21 @@ func _build_ui() -> void:
 	left_frame.custom_minimum_size = Vector2(236, 0)
 	left_frame.add_theme_constant_override("separation", 3)
 	root.add_child(left_frame)
-	left_frame.add_child(_label("GENFORGE", EMBER, ProtoTheme.SIZE_TITLE))
+	# Ricardo, 2026-09-14: "we just can't go back from it to the main menu".
+	# The BACK button existed, at the bottom of the RIGHT column under a
+	# TabContainer that expands to fill — so whenever a tab's contents wanted
+	# more height than the viewport had, the only way out was pushed off the
+	# bottom edge. It lives in the title row now: the left column is a fixed
+	# 236 px and its first row is never the one that gets clipped.
+	var title_row := HBoxContainer.new()
+	title_row.add_theme_constant_override("separation", 6)
+	left_frame.add_child(title_row)
+	# Built even under --selftest, deliberately: the layout probe skipped the old
+	# BACK button, which is exactly why nobody measured the one control that had
+	# been pushed off the canvas. A button that is never laid out is never gated.
+	_button(title_row, "< BACK", _to_main_menu).tooltip_text = \
+			"Back to the main menu (Esc)"
+	title_row.add_child(_label("GENFORGE", EMBER, ProtoTheme.SIZE_TITLE))
 
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -210,11 +239,7 @@ func _build_ui() -> void:
 	_build_art_tab(tabs)
 	_build_create_tab(tabs)
 
-	if not _selftest:
-		var back := HFlowContainer.new()
-		_button(back, "BACK", func() -> void:
-			get_tree().change_scene_to_file("res://prototype/ui/main_menu.tscn"))
-		right.add_child(back)
+	# (BACK now lives in the title row above — see _build_ui's title_row.)
 
 # REVIEW — Ricardo, 2026-09-14: "I can't see anything for reviewing". The old
 # button called OS.shell_open on the bundle's index.html: an external browser,

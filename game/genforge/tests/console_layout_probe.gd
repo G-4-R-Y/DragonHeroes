@@ -22,13 +22,14 @@ func _ready() -> void:
 	var bad: Array = []
 	var walked := 0
 	var measured := 0
+	var no_back: Array = []
 	for canvas in CANVASES:
 		var w := get_window()
 		w.content_scale_size = canvas
 		w.size = canvas
 		set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 		var console: Control = load("res://genforge/console.gd").new()
-		console.set("_selftest", true)         # no window fitting, no BACK button
+		console.set("_selftest", true)         # no window fitting; BACK is still laid out
 		add_child(console)
 		console.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 		for _i in 4:
@@ -50,6 +51,21 @@ func _ready() -> void:
 			var rows := _walk(console, canvas)
 			measured += rows.size()
 			over += rows.filter(func(r: Dictionary) -> bool: return r.over > 0.5)
+			# Ricardo, 2026-09-14: "we just can't go back from it to the main
+			# menu". The way out must be VISIBLE and ON the canvas at every size
+			# and on every tab — a gate that measures 1204 controls and not that
+			# one is how the button went missing in the first place.
+			var back: Button = _find_back(console)
+			if back == null or not back.is_visible_in_tree():
+				no_back.append("%dx%d/%s (missing)" % [canvas.x, canvas.y,
+						tabs.get_tab_title(ti) if tabs != null else "?"])
+			elif back.global_position.y + back.size.y > float(canvas.y) + 0.5 \
+					or back.global_position.x + back.size.x > float(canvas.x) + 0.5 \
+					or back.size.x < 1.0 or back.size.y < 1.0:
+				no_back.append("%dx%d/%s (off-canvas at %s size %s)" % [
+						canvas.x, canvas.y,
+						tabs.get_tab_title(ti) if tabs != null else "?",
+						str(back.global_position), str(back.size)])
 		walked += 1
 		print("canvas %dx%d — %d control(s) overflow across %s" % [
 				canvas.x, canvas.y, over.size(), str(names)])
@@ -66,9 +82,14 @@ func _ready() -> void:
 				+ "(%d canvas(es), %d control(s)); it did not run, it broke" % [walked, measured])
 		get_tree().quit(1)
 		return
+	if not no_back.is_empty():
+		push_error("GENFORGE LAYOUT FAILED — no usable way back to the main menu at: %s"
+				% str(no_back))
+		get_tree().quit(1)
+		return
 	if bad.is_empty():
 		print("GENFORGE LAYOUT OK — %d canvases x %d controls, nothing leaves the canvas "
-				% [walked, measured] + "on EITHER axis")
+				% [walked, measured] + "on EITHER axis; BACK visible and on-canvas throughout")
 		get_tree().quit(0)
 	else:
 		push_error("GENFORGE LAYOUT FAILED — overflows at %s" % str(bad))
@@ -153,3 +174,15 @@ func _load_it_up(console: Control) -> void:
 				+ "bundle's content hash\n5 blocker(s) the build refused to clear")
 	if console.has_method("_refresh_ui"):
 		console.call("_refresh_ui")
+
+
+# The way out, wherever it is put. Found by role rather than by position, so
+# moving it is allowed and losing it is not.
+func _find_back(node: Node) -> Button:
+	for child in node.get_children():
+		if child is Button and String((child as Button).text).to_upper().contains("BACK"):
+			return child
+		var deeper := _find_back(child)
+		if deeper != null:
+			return deeper
+	return null

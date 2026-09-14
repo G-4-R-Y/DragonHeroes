@@ -789,6 +789,7 @@ Every row below was run on 2026-09-13 and printed exactly this.
 
 | Gate | Command | Verified pass line |
 |---|---|---|
+| Genforge layout + way back | `godot --headless --path game res://genforge/tests/console_layout_probe.tscn --quit-after 300` | `GENFORGE LAYOUT OK — 7 canvases x 1204 controls, nothing leaves the canvas on EITHER axis; BACK visible and on-canvas throughout` |
 | Genforge console | `godot --headless --path game res://genforge/console.tscn -- --selftest` | `GENFORGE CONSOLE SELFTEST OK — 1 pack(s), fen_bells: 14 finding(s) rendered (1 failing), 1 art row(s); REVIEW drew bellwether at 1056x132, 1 clip(s), 5 blocker(s), frame 128x128` |
 | Genforge console layout | `godot --headless --path game res://genforge/tests/console_layout_probe.tscn --quit-after 300` | `GENFORGE LAYOUT OK — 7 canvases x 1204 controls, nothing leaves the canvas on EITHER axis` |
 | Arena console layout | `godot --headless --path game res://arena/tests/console_layout_probe.tscn --quit-after 300` | `CONSOLE LAYOUT OK — 7 canvases x 2471 controls, nothing leaves the canvas on EITHER axis` |
