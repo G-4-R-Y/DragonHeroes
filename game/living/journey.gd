@@ -60,10 +60,24 @@ func enter(source: Node, entrance: Dictionary) -> void:
 	world.process_mode = Node.PROCESS_MODE_DISABLED
 	# Keep the exact Hunt alive and paused. A separate canvas covers it, preserving
 	# player position, packs, terrain and streaming state on the return journey.
+	# load() can return null — a damaged install, or (Ricardo, 2026-09-14) the
+	# build directory being replaced under a RUNNING game, which unlinks the
+	# process's cwd and takes Godot's whole DirAccess layer with it. Calling
+	# .instantiate() on that null took the game down at the doorway. Fail the
+	# entry instead: the Hunt is restored and the player keeps playing.
+	var packed: PackedScene = load("res://living/trial.tscn") as PackedScene
+	var trial: Node = packed.instantiate() if packed != null else null
+	if trial == null:
+		push_error("LAIR: res://living/trial.tscn could not be loaded — the "
+				+ "lair cannot open. If the game was updated while running, "
+				+ "restart it.")
+		world.process_mode = old_process_mode
+		world = null
+		return
 	overlay = CanvasLayer.new()
 	overlay.layer = 100
 	get_tree().root.add_child(overlay)
-	overlay.add_child(load("res://living/trial.tscn").instantiate())
+	overlay.add_child(trial)
 
 func leave() -> void:
 	if is_instance_valid(world) and is_instance_valid(overlay):

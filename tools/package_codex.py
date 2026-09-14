@@ -61,6 +61,34 @@ def source_info():
             "branch": subprocess.check_output(["git", "branch", "--show-current"], cwd=ROOT, text=True).strip()}
 
 
+def processes_using(directory: Path) -> list[tuple[int, str]]:
+    """Every live process whose cwd is inside `directory`.
+
+    Replacing a directory out from under a running process unlinks its cwd, and
+    on Linux that is not a soft failure: getcwd() starts returning NULL, which
+    takes out every relative path the process later resolves. For a running
+    Godot that means res:// stops loading and the next load() returns null.
+    Linux-only and best-effort by design: /proc may deny us a read, and a miss
+    here must never block packaging on a platform that has no /proc.
+    """
+    found: list[tuple[int, str]] = []
+    proc = Path("/proc")
+    if not proc.is_dir():
+        return found
+    target = directory.resolve()
+    for entry in proc.iterdir():
+        if not entry.name.isdigit():
+            continue
+        try:
+            cwd = (entry / "cwd").resolve()
+            if cwd == target or target in cwd.parents:
+                name = (entry / "comm").read_text().strip()
+                found.append((int(entry.name), name))
+        except (OSError, PermissionError):
+            continue
+    return found
+
+
 def package(platform, review, env):
     windows = platform == "windows"
     preset = "Windows Desktop" if windows else "Linux/X11"
@@ -95,6 +123,12 @@ def package(platform, review, env):
             "Haven includes MAIN MENU; stables/mount cards show sprites and saved nicknames.\n"
             "Character tabs wrap into two rows. Hunter actions have distinct finite clips.\n"
             "World streaming recovers from interrupted loads and distant travel.\n"
+            "Distant wounded encounters and dropped loot return with their original state.\n"
+            "Offscreen projectiles keep moving, hitting and expiring normally.\n"
+            "Flask R/click heals 20% immediately + 20% over 2 seconds; recharge only restores charges.\n"
+            "Arena has a working BACK and TRAIN ALL for isolated creature sweeps.\n"
+            "New sweeps default to at most four workers; explicit JOBS overrides this.\n"
+            "Performance under heavy concurrent training remains an active optimization task.\n"
             "The remaining art/biome/enchanted-build work is tracked in the repository\n"
             "at docs/harness/20-roadmap.md; this is an incremental playable build.\n\n"
             "CONTENT REVIEW: open content-review/index.html in your browser.\n"
@@ -147,6 +181,15 @@ def package(platform, review, env):
                 raise RuntimeError("Archive CRC check failed")
         destination = OUT / platform
         # This tool owns only builds/codex/{linux,windows}; normal builds are separate.
+        in_use = processes_using(destination)
+        if in_use:
+            raise RuntimeError(
+                f"{destination} is the working directory of running process(es) "
+                + ", ".join(f"{pid} ({name})" for pid, name in in_use)
+                + ". Replacing it would unlink their cwd: getcwd() then returns "
+                  "NULL, Godot's DirAccess stops resolving res:// and the game "
+                  "dies at the next load() (Ricardo, 2026-09-14 — it crashed at "
+                  "a lair doorway). Close the running build and package again.")
         if destination.exists():
             shutil.rmtree(destination)
         archive.replace(OUT / archive.name)

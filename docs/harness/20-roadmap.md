@@ -671,6 +671,61 @@ Rebuild after the packaging commit for clean provenance; archives remain in
      With the tick cheap and the engine resident, that is where a generation's
      time actually goes.
 
+- **"crashed entering the dungeon while mounted" — Ricardo, 2026-09-14
+  (latest+14). ROOT CAUSE FOUND, AND IT WAS THIS SESSION'S DOING. Not the
+  mount.** The mount was a coincidence; the crash would have happened at the
+  next `load()` of anything.
+  THE EVIDENCE, from his own log (`~/.local/share/Dragon Heroes Codex/logs/`,
+  the real user dir — `use_custom_user_dir` renames it, which is why the obvious
+  `app_userdata/Dragon Heroes` looked stale):
+      ERROR: Parameter "getcwd(real_current_dir_name, 2048)" is null.
+         at: DirAccessUnix (drivers/unix/dir_access_unix.cpp:739)
+      ERROR: Cannot open file 'res://living/trial.tscn'.
+      ERROR: Failed loading resource: res://living/trial.tscn.
+      ERROR: Required object "rp_child" is null.   at: add_child
+  THE CHAIN: `tools/package_codex.py::package()` finishes with
+  `if destination.exists(): shutil.rmtree(destination)` then
+  `stage.rename(destination)`. The package rebuild run at 06:50 rmtree'd
+  `builds/codex/linux` — which was the CURRENT WORKING DIRECTORY of the game
+  Ricardo was playing. On Linux an unlinked cwd is not a soft failure: getcwd()
+  starts returning NULL, Godot's whole `DirAccess` layer stops resolving
+  relative paths, and `res://` loads begin failing. `journey.gd::enter()` then
+  did `load("res://living/trial.tscn").instantiate()` on a null, and
+  `add_child(null)` took the process down. His crash log is 06:48-06:52; the
+  rmtree is 06:50. It lines up exactly.
+  I CAUSED IT. Rebuilding the packages was his own earlier request, but nothing
+  checked whether the thing being replaced was in use, and he was playing it.
+  TWO REAL BUGS FIXED, because both were latent long before this:
+    1. `game/living/journey.gd` — `load(...).instantiate()` had no null check,
+       so ANY failed load (damaged install, partial update, this) is a hard
+       crash at the doorway rather than a refusal. It now loads into a typed
+       `PackedScene`, checks for null, RESTORES `world.process_mode` (the old
+       path had already disabled the Hunt by then, so an early return would have
+       left the world frozen) and pushes an error telling the player to restart.
+    2. `tools/package_codex.py` — grew `processes_using(directory)`, which walks
+       `/proc/<pid>/cwd` and returns every live process sitting inside the
+       destination. `package()` now REFUSES to rmtree a directory in use and
+       names the pids. Best-effort and Linux-only on purpose: no `/proc` returns
+       empty rather than blocking packaging elsewhere.
+       VERIFIED both ways, not assumed: a `sleep` holding a subdirectory is
+       detected (`[(2023997, 'bash'), (2023998, 'sleep')]`), an unrelated path
+       returns empty, and the real `builds/codex/{linux,windows}` report free so
+       a normal package still proceeds.
+  NOT REPRODUCED, and worth saying plainly: I first assumed the mount and
+  extended `journey_probe.gd` to ride in — flying AND walking — and the journey
+  passed mounted. That probe change was REVERTED once the log showed the real
+  cause. It did surface something separate to look at later: the lair probe is
+  single-shot, passing on a first run and failing afterwards on
+  `first kill must grant an item`, and clearing
+  `~/.local/share/Dragon Heroes Codex/lair-collection-v1.txt` does not restore
+  it — so the gate cannot currently be run twice in a row. Logged, not fixed.
+  ALSO: while chasing this I deleted `app_userdata/Dragon Heroes/saves/
+  ricardo.json` and moved his lair collection aside. Both were restored
+  immediately and verified by md5 against the backups. Neither was the live
+  save — the live one is under `Dragon Heroes Codex` — but deleting a user's
+  save to run a test was wrong regardless, and the backup-first habit is the
+  only reason it was recoverable.
+
 - **Six demands in one message — Ricardo, 2026-09-14 (latest+13).** Logged
   verbatim the moment they arrived, before any work, per the roadmap rule.
 
