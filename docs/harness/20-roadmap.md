@@ -671,6 +671,47 @@ Rebuild after the packaging commit for clean provenance; archives remain in
      With the tick cheap and the engine resident, that is where a generation's
      time actually goes.
 
+- **The genforge cockpit is unusable, both consoles overflow, and a sweep shows
+  no total — Ricardo, 2026-09-14 (latest+11):** *"assets generation console not
+  working properly: console design is bloated and overflowing (as well as arena
+  one, but this latter is much more polished), as ell as I can't see anything for
+  reviewing"* and *"Finally: in tournament viz i can't see the total progress,
+  only current key progress! Nor estimated time to conclude the full run"* and,
+  mid-turn: *"lastly, can you make our regular build build the latest game
+  version, which inludes the other session's updates?"*
+  Four items, in the order they arrived:
+  1. **The genforge console is bloated and overflows.** `game/genforge/console.gd`
+     is a flat two-column Control with NO `_fit_window`, no ScrollContainer and no
+     TabContainer — every panel is stacked into one screen at whatever canvas the
+     project default gives it. The arena console got all three plus a layout gate
+     (`console_layout_probe.tscn`, `3c44285`); the genforge one got none of it.
+     It also has no layout gate at all, which is why nobody noticed.
+  2. **"I can't see anything for reviewing".** REVIEW calls
+     `OS.shell_open("file://" + page)` on the bundle's index.html — an external
+     browser, outside the app, and it reads `packs[0]` rather than the SELECTED
+     pack, so on a multi-pack repo it opens the wrong one (or nothing). An assets
+     console has to SHOW the assets: the sprite sheet, its clips, its blockers,
+     in the console.
+  3. **A sweep shows no total and no ETA.** The console's chart and ETA are
+     per-KEY (`_eta_s()` reads `_run`, which is one key's feed). TRAIN ALL and
+     `--tournament --all` walk the whole roster, so the number Ricardo wants —
+     "key 3 of 7, 41% of the whole run, done at 04:10" — is not anywhere on the
+     screen. The sweep's own progress folder has every key's feed; nothing reads
+     across them.
+  4. **Rebuild the shipping packages from the current tree**, including the other
+     session's uncommitted work. `tools/package_codex.py all` is the full
+     pipeline (icon, content validation, sim build + ctest, Windows cross build,
+     both exports, icon verification, Linux smoke, offline review staging,
+     BUILD-INFO manifest, zip + CRC). `builds/codex` is from 2026-09-13 02:38 and
+     the handoff says it still carries b622aa6.
+     CAUTION LOGGED: Ricardo's `gloam_wisp` sweep (16 godot workers) was live when
+     this arrived. package_codex rebuilds `sim/build` and runs ctest and two
+     exports — CPU contention with the sweep, and an import pass over `game/`.
+     It does NOT touch `game/addons/dh_godot/*.so` (that is build_dh_godot.sh),
+     so the running workers' mapped extension is safe. Run it LAST, which is also
+     the order Ricardo asked for.
+  STATUS: logged 2026-09-14, working item 1 first.
+
 - **Training console: the graph, TRAIN ALL tournaments, a benchmark browser, and
   a global rank — Ricardo, 2026-09-14 (latest+10):** *"to the trianing onsole:
   graph overflows from the rendered screen. Add tournament mode for the train all
