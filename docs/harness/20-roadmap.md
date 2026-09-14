@@ -727,7 +727,29 @@ Rebuild after the packaging commit for clean provenance; archives remain in
   stuck at 120 px on an 810 px canvas. I added a `size_flags_vertical` line to
   "fix" that, then A/B'd it and found it a no-op — the harness was the bug. The
   line was removed rather than left in with a wrong explanation.
-  STATUS: items 2-4 queued in order.
+  **Item 2 DONE 2026-09-14.** TRAIN ALL has a second gear. `tools/train_run.sh`
+  gained `--tournament`: the same isolated run folder, the same `$DH_SERVING_DIR`
+  isolation and the same per-key progress feed as the ES sweep, but each key goes
+  through `ml/training/tournament.py` instead of `league train` + `league gate` —
+  every method trains that creature, each is gated against the same
+  pre-tournament pin, and the candidates fight best-of-N for the pin. New env
+  knobs `METHODS` (es,ppo) `BEST_OF` (5) `BRACKET_EPISODES` (1) `GATE_EPISODES`
+  (= EPISODES, 0 skips) `METHOD_TIMEOUT` `TEACHER`; the existing ES and PPO dials
+  feed the bracket's es and ppo entrants, so one set of knobs drives everything.
+  `--resume` is REFUSED on a tournament run rather than silently retraining: a
+  method is a whole subprocess and the fight only means anything once every
+  entrant finished, so there is no per-generation checkpoint to continue from.
+  In the console it is one checkbox, `bracket`, next to `isolated run` / `GPU
+  (PPO)`; ticked, TRAIN ALL reads `TRAIN ALL ⚔` and dispatches
+  `--tournament --all`. The decision is a pure function (`_sweep_flags`) so the
+  selftest checks the dispatch without launching a sweep: unticked it must be
+  byte-for-byte the old command line, ticked it must carry `--tournament` plus
+  the bracket knobs, and a single-creature TRAIN must never bracket (the
+  TOURNAMENT button is that path — it needs a chosen matchup).
+  Verified: `--tournament --key bog_golem` end to end into a throwaway run dir —
+  bracket ran, pin moved, `summary.txt` and the verdict JSON written, `ml/serving`
+  untouched. Gates: `CONSOLE SELFTEST OK`, `CONSOLE LAYOUT OK`.
+  STATUS: items 3-4 queued in order.
 
 - **Are the open branches finished enough to merge? — Ricardo, 2026-09-13
   (latest+9):** *"check whether current open branches are finished in their work

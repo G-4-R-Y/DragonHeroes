@@ -109,6 +109,7 @@ var _chart_draws := 0
 # cockpit tabs
 var _isolated: CheckBox
 var _gpu: CheckBox
+var _bracket: CheckBox
 var _runs: ItemList
 var _runs_info: Label
 var _runs_open_btn: Button
@@ -143,6 +144,7 @@ var _poll_accum := 0.0
 var _run := {}
 
 func _ready() -> void:
+	_previous_canvas = get_window().content_scale_size
 	_selftest = OS.get_cmdline_user_args().has("--selftest")
 	_repo = DhRepoRoot.find()  # not res://.. — an exported app would answer builds/
 	theme = ProtoTheme.get_theme()
@@ -165,6 +167,10 @@ func _ready() -> void:
 	if _selftest:
 		_run_selftest()
 
+func _exit_tree() -> void:
+	if _previous_canvas != Vector2i.ZERO:
+		get_window().content_scale_size = _previous_canvas
+
 func _process(delta: float) -> void:
 	_poll_accum += delta
 	if _poll_accum < POLL_S:
@@ -175,6 +181,7 @@ func _process(delta: float) -> void:
 		_pid = -1
 		_pid_kind = ""
 	_poll_progress()
+	_follow_sweep()
 	_poll_versus()
 	_refresh_ui()
 
@@ -214,17 +221,18 @@ func _build_ui() -> void:
 	var bg := ColorRect.new()
 	bg.color = Color("0c1116")
 	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(bg)
 
 	# BACK — the console also opens from the title menu in-process (standalone
 	# console.tscn boots keep working; hidden in the selftest)
 	if not _selftest:
 		var back := Button.new()
-		back.text = "< BACK"
+		back.name = "ArenaBack"
+		back.text = ProtoLang.t("opt_back")
 		back.focus_mode = Control.FOCUS_NONE
 		back.add_theme_font_size_override("font_size", 8)
 		back.position = Vector2(6, 4)
-		back.z_index = 10
 		back.pressed.connect(func() -> void:
 			get_tree().change_scene_to_file("res://prototype/ui/main_menu.tscn"))
 		add_child(back)
@@ -232,23 +240,31 @@ func _build_ui() -> void:
 	var hb := HBoxContainer.new()
 	hb.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	hb.offset_left = 8.0
-	hb.offset_top = 6.0
+	hb.offset_top = 28.0   # reserve input/layout space for Back; z-index cannot fix hit testing
 	hb.offset_right = -8.0
 	hb.offset_bottom = -6.0
 	hb.add_theme_constant_override("separation", 10)
 	add_child(hb)
 
 	# ---- left: the roster panel (fixed width; the chart takes the rest)
-	var left := VBoxContainer.new()
-	left.custom_minimum_size = Vector2(236, 0)
-	left.add_theme_constant_override("separation", 3)
-	hb.add_child(left)
+	var left_frame := VBoxContainer.new()
+	left_frame.custom_minimum_size = Vector2(236, 0)
+	left_frame.add_theme_constant_override("separation", 3)
+	hb.add_child(left_frame)
 
 	var title := _label("TRAINING CONSOLE", EMBER, ProtoTheme.SIZE_TITLE)
 	var big := ProtoTheme.font_big()
 	if big != null:
 		title.add_theme_font_override("font", big)
-	left.add_child(title)
+	left_frame.add_child(title)
+	var roster_scroll := ScrollContainer.new()
+	roster_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	roster_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	left_frame.add_child(roster_scroll)
+	var left := VBoxContainer.new()
+	left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	left.add_theme_constant_override("separation", 3)
+	roster_scroll.add_child(left)
 
 	left.add_child(_label("trainee — the build the net plays as", DIM))
 	_trainee = _list(88, false)
@@ -343,6 +359,19 @@ func _build_ui() -> void:
 	_gpu.tooltip_text = "ml/training/ppo.py on CUDA instead of the ES league"
 	_gpu.toggled.connect(func(_on: bool) -> void: _refresh_ui())
 	mode_row.add_child(_gpu)
+	# TRAIN ALL's second gear (Ricardo, 2026-09-14: "Add tournament mode for the
+	# train all method, as well"). Off, the sweep trains every creature ONE way
+	# and assumes that was the right one; on, every method trains each creature
+	# and the candidates fight for that creature's pin — the TOURNAMENT button's
+	# bracket, applied across the whole roster.
+	_bracket = CheckBox.new()
+	_bracket.text = "bracket"
+	_bracket.focus_mode = Control.FOCUS_NONE
+	_bracket.tooltip_text = ("TRAIN ALL only: tools/train_run.sh --tournament — every method "
+			+ "trains each creature, then the candidates fight best-of-%d for the pin. "
+			+ "PPO is one of the entrants, so the GPU tick does not apply.") % TOURNEY_BEST_OF
+	_bracket.toggled.connect(func(_on: bool) -> void: _refresh_ui())
+	mode_row.add_child(_bracket)
 	left.add_child(mode_row)
 
 	var btns := GridContainer.new()
@@ -830,6 +859,7 @@ func _spawn_league(args: String, kind: String, key: String) -> void:
 	_refresh_ui()
 
 func _train() -> void:
+	if _pid > 0: return
 	var build := _selected_build()
 	var key := _key()
 	if build == "" or not _valid_key(key):
@@ -853,7 +883,9 @@ func _train() -> void:
 
 func _train_all() -> void:
 	if _pid > 0: return
-	# Every creature, own registry; --all is the ES sweep, PPO requires a chosen matchup.
+	# Every creature, own registry. Plain: --all is the ES sweep (PPO requires a
+	# chosen matchup). Ticked 'bracket': --tournament --all, so each creature's
+	# methods compete and only the winner takes that creature's pin.
 	_spawn_train_run("all-creatures", "", true)
 
 # TRAIN ALL trains one way and assumes it was the right one. TOURNAMENT makes the
@@ -1105,6 +1137,9 @@ func _refresh_ui() -> void:
 	var running := _pid > 0
 	_train_btn.disabled = running
 	_train_all_btn.disabled = running
+	if _bracket != null:
+		# the label is the only place the two gears are visible at a glance
+		_train_all_btn.text = "TRAIN ALL ⚔" if _bracket.button_pressed else "TRAIN ALL"
 	if _tourney_btn != null:
 		_tourney_btn.disabled = running
 	_refresh_ai_default()
@@ -1714,21 +1749,24 @@ func _refresh_history() -> void:
 
 # The console's own run folder name: DATE FIRST so ml/runs/ sorts by time, and
 # --run-dir hands it to the script so we know where to tail from.
-func _console_run_dir(key: String) -> String:
+func _console_run_dir(key: String, all_creatures := false) -> String:
 	var t := Time.get_datetime_dict_from_system()
 	var stamp := "%04d-%02d-%02d_%02d%02d" % [t.year, t.month, t.day, t.hour, t.minute]
-	var knobs := ("steps%d_envs%d" % [2000000, 512]) if _gpu.button_pressed \
+	var knobs := ("steps%d_envs%d" % [2000000, 512]) if _gpu.button_pressed and not all_creatures \
 			else ("g%d_p%d_e%d_j%d" % [int(_gens.value), int(_pop.value),
 					int(_eps.value), int(_jobs.value)])
-	return RUNS_DIR.path_join("%s__%s-console__%s" % [stamp, key, knobs])
+	# Distinct directories even for two clicks in the same minute: never silently
+	# replace an earlier experiment's configuration/registry.
+	return RUNS_DIR.path_join("%s%02d-%d__%s-console__%s" % [stamp, t.second, Time.get_ticks_usec(), key, knobs])
 
-func _spawn_train_run(key: String, build: String) -> void:
-	var run_dir := _console_run_dir(key)
+func _spawn_train_run(key: String, build: String, all_creatures := false) -> void:
+	var run_dir := _console_run_dir(key, all_creatures)
+	_sweep_progress = _repo.path_join(run_dir).path_join("progress") if all_creatures else ""
 	var log_path := _repo.path_join(_log_rel(key))
 	DirAccess.make_dir_recursive_absolute(_repo.path_join(LOG_DIR))
 	var env := ""
 	var args := ""
-	if _gpu.button_pressed:
+	if _gpu.button_pressed and not all_creatures:
 		var opp := _selected_opponents()
 		var opp_build: String = str(opp[0]) if not opp.is_empty() else build
 		env = "ENVS=512 EPISODES=%d SEED=2026 " % int(_eps.value)
@@ -1746,20 +1784,55 @@ func _spawn_train_run(key: String, build: String) -> void:
 		if _net_spec() != "":
 			env += "NET=%s " % _sq(_net_spec())
 		args = "--key %s --build %s --run-dir %s" % [_sq(key), _sq(build), _sq(run_dir)]
+		if all_creatures: args = "--all --run-dir %s" % _sq(run_dir)
+		var sweep := _sweep_flags(all_creatures)
+		env += str(sweep.env)
+		args = str(sweep.prefix) + args
 	var cmd := "cd %s && exec env %stools/train_run.sh %s >> %s 2>&1" % [
 			_sq(_repo), env, args, _sq(log_path)]
-	_pid = OS.create_process("bash", ["-lc", cmd])
+	_pid = _launch_training(cmd)
 	if _pid <= 0:
 		_pid = -1
 		_proc_note = "could not spawn tools/train_run.sh"
 	else:
-		_pid_kind = "ppo" if _gpu.button_pressed else "train"
+		_pid_kind = ("tournament-all" if (_bracket != null and _bracket.button_pressed) else "train-all") \
+				if all_creatures else ("ppo" if _gpu.button_pressed else "train")
 		_proc_note = "%s started · pid %d · %s" % [_pid_kind, _pid, run_dir]
 	# the isolated run writes its progress inside the run folder
 	_attach(_repo.path_join(run_dir).path_join("progress").path_join(key + ".jsonl"), 0)
 	_cmd_label.text = "env %stools/train_run.sh %s" % [env, args]
 	_refresh_runs()
 	_refresh_ui()
+
+# TRAIN ALL's two gears, as data: plain is the ES sweep, 'bracket' is
+# tools/train_run.sh --tournament (every method trains each creature, the
+# candidates fight for that creature's pin). Pure, so the selftest can check the
+# dispatch without launching a sweep. A single-creature run never brackets — the
+# TOURNAMENT button is that path, and it needs a chosen matchup.
+func _sweep_flags(all_creatures: bool) -> Dictionary:
+	if not all_creatures or _bracket == null or not _bracket.button_pressed:
+		return {"env": "", "prefix": ""}
+	return {"env": "METHODS=es,ppo BEST_OF=%d STEPS=%d " % [TOURNEY_BEST_OF, TOURNEY_PPO_STEPS],
+			"prefix": "--tournament "}
+
+# Test seam exercises the exact dispatch command without starting a real sweep.
+func _launch_training(command: String) -> int:
+	return OS.create_process("bash", ["-lc", command])
+
+func _follow_sweep() -> void:
+	if _sweep_progress == "": return
+	var directory := DirAccess.open(_sweep_progress)
+	if directory == null: return
+	var latest := ""
+	var modified := -1
+	for file in directory.get_files():
+		if not file.ends_with(".jsonl"): continue
+		var path := _sweep_progress.path_join(file)
+		var stamp := FileAccess.get_modified_time(path)
+		if stamp > modified or (stamp == modified and path > latest):
+			modified = stamp
+			latest = path
+	if latest != "" and latest != _tail_path: _attach(latest, 0)
 
 func _run_selftest() -> void:
 	var path := ProjectSettings.globalize_path("user://console_fixture.jsonl")
@@ -1978,4 +2051,35 @@ func _selftest_cockpit() -> bool:
 	for i in _net.get_item_count():
 		if str(_net.get_item_metadata(i)) == "default":
 			_net.select(i)
+
+	# --- TRAIN ALL's two gears (Ricardo: "tournament mode for the train all") --
+	# Unticked, the sweep's command line must be byte-for-byte what it was before
+	# the bracket existed; ticked, it must reach tools/train_run.sh --tournament
+	# with the bracket knobs. And a single-creature TRAIN never brackets.
+	_bracket.button_pressed = false
+	var plain := _sweep_flags(true)
+	if str(plain.env) != "" or str(plain.prefix) != "":
+		ok = false
+		push_error("CONSOLE SELFTEST: an unticked bracket changed the sweep: '%s' '%s'" % [
+				str(plain.env), str(plain.prefix)])
+	_bracket.button_pressed = true
+	var brack := _sweep_flags(true)
+	if str(brack.prefix) != "--tournament " or str(brack.env).find("METHODS=es,ppo") < 0 \
+			or str(brack.env).find("BEST_OF=%d" % TOURNEY_BEST_OF) < 0:
+		ok = false
+		push_error("CONSOLE SELFTEST: bracket dispatch is '%s%s'" % [
+				str(brack.env), str(brack.prefix)])
+	var single := _sweep_flags(false)
+	if str(single.env) != "" or str(single.prefix) != "":
+		ok = false
+		push_error("CONSOLE SELFTEST: the bracket leaked into a single-creature run")
+	_refresh_ui()
+	if _train_all_btn.text != "TRAIN ALL ⚔":
+		ok = false
+		push_error("CONSOLE SELFTEST: TRAIN ALL does not show the bracket gear: '%s'" % _train_all_btn.text)
+	_bracket.button_pressed = false
+	_refresh_ui()
+	if _train_all_btn.text != "TRAIN ALL":
+		ok = false
+		push_error("CONSOLE SELFTEST: TRAIN ALL stuck in the bracket gear: '%s'" % _train_all_btn.text)
 	return ok

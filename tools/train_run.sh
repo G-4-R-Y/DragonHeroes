@@ -22,6 +22,8 @@
 #   tools/train_run.sh --all                                  # every creature build
 #   tools/train_run.sh --key fen_boar --build core.arena.fen_boar_alpha
 #   tools/train_run.sh --all --label sweep-highpop             # name it
+#   tools/train_run.sh --tournament --all                      # the METHOD BRACKET per creature
+#   tools/train_run.sh --tournament --key fen_boar --build core.arena.fen_boar_alpha
 #   GENERATIONS=200 POP=10 EPISODES=6 tools/train_run.sh --all # the real budget
 #   tools/train_run.sh --ppo --key cinder_drake --build core.arena.cinder_drake \
 #       --opp-build core.arena.fen_boar_alpha                  # GPU PPO instead of ES
@@ -44,6 +46,20 @@
 # generation, reusing the same run folder (and therefore the same registry,
 # weights and progress feed).
 # Env knobs (PPO): STEPS (2000000) ENVS (512) ARCH (mlp) SELFPLAY_EVERY (4)
+#
+# --tournament is TRAIN ALL's other gear. The plain sweep trains every creature
+# ONE way (ES, or PPO with --ppo) and assumes that was the right way; the
+# tournament sweep makes the methods compete per creature: each trains the same
+# key in its own subprocess, each is gated against the same pre-tournament pin,
+# then the candidates FIGHT best-of-N and only the winner takes the pin
+# (ml/training/tournament.py). Same run folder, same $DH_SERVING_DIR isolation,
+# same per-key progress feed — the console's chart follows it unchanged.
+# Env knobs (tournament): METHODS (es,ppo) BEST_OF (5) BRACKET_EPISODES (1)
+#                 GATE_EPISODES (= EPISODES; 0 skips the gate) METHOD_TIMEOUT (0 = none)
+#                 TEACHER ("" — a wide net's key for the `distill` method)
+# The ES knobs above feed the bracket's es entrant and the PPO knobs its ppo
+# entrant, so one set of dials drives the whole bracket:
+#   METHODS=es,ppo,distill TEACHER=cinder_drake BEST_OF=9 tools/train_run.sh --tournament --all
 set -euo pipefail
 cd "$(dirname "$0")/.."
 REPO="$PWD"
@@ -77,6 +93,11 @@ STEPS="${STEPS:-2000000}"; ENVS="${ENVS:-512}"; ARCH="${ARCH:-mlp}"  # ENVS was 
 # NET is the SHAPE (architectures.json); ARCH above is the older mlp-vs-gru axis.
 NET="${NET:-}"; NET_ARG=(); [ -z "$NET" ] || NET_ARG=(--net "$NET")
 SELFPLAY_EVERY="${SELFPLAY_EVERY:-4}"
+# --tournament: the bracket's own dials. GATE_EPISODES defaults to EPISODES so
+# the tournament gate is exactly as strict as the sweep gate it replaces.
+METHODS="${METHODS:-es,ppo}"; BEST_OF="${BEST_OF:-5}"
+BRACKET_EPISODES="${BRACKET_EPISODES:-1}"; GATE_EPISODES="${GATE_EPISODES:-$EPISODES}"
+METHOD_TIMEOUT="${METHOD_TIMEOUT:-0}"; TEACHER="${TEACHER:-}"
 PYVENV="$REPO/ml/.venv/bin/python"
 
 MODE="es"; ALL=0; KEY=""; BUILD=""; OPP_BUILD=""; LABEL=""; FRESH=0; NOTE=""
@@ -94,6 +115,7 @@ while [ $# -gt 0 ]; do
     --run-dir) RUN_DIR="$2"; shift 2;;
     --resume) RESUME_RUN="$2"; shift 2;;
     --ppo) MODE="ppo"; shift;;
+    --tournament) MODE="tournament"; shift;;
     --list) MODE="list"; shift;;
     --promote) MODE="promote"; RUN_IN="${2:-}"; shift 2 || shift;;
     -h|--help) sed -n '2,40p' "$0"; exit 0;;
@@ -181,11 +203,19 @@ if [ -z "$RESUME_RUN" ]; then      # a resume reads all of this back from config
 fi
 [ "$MODE" != "ppo" ] || [ -n "$OPP_BUILD" ] || { echo "--ppo needs --opp-build" >&2; exit 2; }
 [ "$MODE" != "ppo" ] || [ -x "$PYVENV" ] || { echo "PPO needs ml/.venv (torch)" >&2; exit 2; }
+# A bracket has no checkpoint to resume from: a method is a whole subprocess and
+# the fight only means anything once every entrant finished. Say so instead of
+# silently retraining hours of work under the same folder.
+[ "$MODE" != "tournament" ] || [ -z "$RESUME_RUN" ] || {
+  echo "--resume cannot continue a tournament run (a bracket has no per-generation checkpoint)." >&2
+  echo "Start a new one, or resume the ES sweep with --resume and no --tournament." >&2; exit 2; }
 
 if [ $ALL -eq 1 ]; then KEYS_LABEL="all-creatures"; else KEYS_LABEL="$KEY"; fi
 if [ -n "$LABEL" ]; then KEYS_LABEL="${KEYS_LABEL}-${LABEL}"; fi
 if [ "$MODE" = "ppo" ]; then
   KNOBS="steps${STEPS}_envs${ENVS}_${ARCH}_sp${SELFPLAY_EVERY}"
+elif [ "$MODE" = "tournament" ]; then
+  KNOBS="bracket-$(echo "$METHODS" | tr ',' '-')_bo${BEST_OF}_g${GENERATIONS}_p${POP}_e${EPISODES}"
 else
   KNOBS="g${GENERATIONS}_p${POP}_e${EPISODES}_j${JOBS}_s${SEED}"
 fi
@@ -281,6 +311,9 @@ json.dump({
          "jobs": $JOBS, "seed": $SEED, "speed": "$SPEED", "opponents": "$OPPONENTS"},
   "ppo": {"steps": $STEPS, "envs": $ENVS, "arch": "$ARCH",
           "selfplay_every": $SELFPLAY_EVERY, "build": "$BUILD", "opp_build": "$OPP_BUILD"},
+  "tournament": {"methods": "$METHODS", "best_of": $BEST_OF,
+                 "bracket_episodes": $BRACKET_EPISODES, "gate_episodes": $GATE_EPISODES,
+                 "method_timeout": $METHOD_TIMEOUT, "teacher": "$TEACHER"},
   "net": "$NET" or "default",
   "env": {"git_head": sh("git", "rev-parse", "--short", "HEAD"),
           "git_dirty": bool(sh("git", "status", "--porcelain")),
@@ -295,7 +328,12 @@ dh_kv run "${RUN#"$REPO"/}"
 dh_kv mode "$MODE · $KEYS_LABEL · $KNOBS"
 [ -z "$NET" ] || dh_kv net "$NET (ml/training/architectures.json)"
 dh_kv seeded "$SEEDED"
-dh_kv checkpoint "every $CHECKPOINT_EVERY generations — kill it and resume with: tools/train_run.sh --resume ${RUN#"$REPO"/}"
+if [ "$MODE" = "tournament" ]; then
+  dh_kv bracket "$METHODS · best-of $BEST_OF · gate $GATE_EPISODES episodes — the methods compete, the winner takes the pin"
+  dh_kv checkpoint "none — a bracket restarts from the top (each method is a whole subprocess)"
+else
+  dh_kv checkpoint "every $CHECKPOINT_EVERY generations — kill it and resume with: tools/train_run.sh --resume ${RUN#"$REPO"/}"
+fi
 dh_kv isolated "DH_SERVING_DIR=$RUN — ml/serving is untouched"
 dh_kv watch "tools/train_watch.py ${RUN#"$REPO"/}"
 [ -z "$NOTE" ] || dh_kv note "$NOTE"
@@ -317,6 +355,38 @@ if [ "$MODE" = "ppo" ]; then
   "$PYVENV" -u -m ml.training.league gate --key "$KEY" --build "$BUILD" \
       --episodes "$EPISODES" 2>&1 | tee -a "$RUN/logs/$KEY.log" \
       | python3 -u "$REPO/tools/dh_trainfmt.py" --key "$KEY" || true
+elif [ "$MODE" = "tournament" ]; then
+  # TRAIN ALL, but each creature's methods fight for the pin instead of one
+  # method being assumed right. tournament.py does the gating and the bracket;
+  # this loop only supplies the keys so the run folder, the per-key logs and the
+  # console's per-key progress feed look exactly like the ES sweep's.
+  OPP_ARG=(); [ -z "$OPPONENTS" ] || OPP_ARG=(--opponents "$OPPONENTS")
+  OPPB_ARG=(); [ -z "$OPP_BUILD" ] || OPPB_ARG=(--opp-build "$OPP_BUILD")
+  TEACHER_ARG=(); [ -z "$TEACHER" ] || TEACHER_ARG=(--teacher "$TEACHER")
+  TIMEOUT_ARG=(); [ "$METHOD_TIMEOUT" = "0" ] || TIMEOUT_ARG=(--method-timeout "$METHOD_TIMEOUT")
+  GATE_ARG=(--gate-episodes "$GATE_EPISODES"); [ "$GATE_EPISODES" -gt 0 ] || GATE_ARG=(--no-gate)
+  N_KEYS=$(echo "$KEYS" | grep -c . || true); I_KEY=0
+  echo "$KEYS" | while read -r key build; do
+    [ -n "$key" ] || continue
+    I_KEY=$((I_KEY + 1))
+    dh_rule "$I_KEY/$N_KEYS  $key  ·  bracket $METHODS"
+    dh_kv build "$build"
+    dh_kv budget "best-of $BEST_OF · es: $GENERATIONS gens × pop $POP · ppo: $STEPS steps · $JOBS jobs"
+    python3 -u -m ml.training.tournament --key "$key" --build "$build" \
+        --methods "$METHODS" --best-of "$BEST_OF" \
+        --bracket-episodes "$BRACKET_EPISODES" "${GATE_ARG[@]}" \
+        --generations "$GENERATIONS" --pop "$POP" --episodes "$EPISODES" \
+        --jobs "$JOBS" --seed "$SEED" --speed "$SPEED" \
+        --checkpoint-every "$CHECKPOINT_EVERY" \
+        --steps "$STEPS" --envs "$ENVS" --arch "$ARCH" \
+        --selfplay-every "$SELFPLAY_EVERY" \
+        "${OPP_ARG[@]}" "${OPPB_ARG[@]}" "${NET_ARG[@]}" "${TEACHER_ARG[@]}" \
+        "${TIMEOUT_ARG[@]}" 2>&1 \
+        | tee "$RUN/logs/$key.log" \
+        | python3 -u "$REPO/tools/dh_trainfmt.py" --key "$key" \
+            --generations "$GENERATIONS" --pop "$POP" \
+        || dh_err "$key tournament failed — see logs/$key.log"
+  done
 else
   OPP_ARG=(); [ -z "$OPPONENTS" ] || OPP_ARG=(--opponents "$OPPONENTS")
   RESUME_ARG=(); [ -z "$RESUME_RUN" ] || RESUME_ARG=(--resume)

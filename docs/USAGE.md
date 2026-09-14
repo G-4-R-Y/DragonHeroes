@@ -262,12 +262,27 @@ cloud GPU (canon §12.38).
 tools/train_run.sh --all                                   # every creature build, isolated
 tools/train_run.sh --key fen_boar --build core.arena.fen_boar_alpha --label sweep
 GENERATIONS=200 POP=10 EPISODES=6 tools/train_run.sh --all  # the real budget
+tools/train_run.sh --tournament --all                       # the METHOD BRACKET per creature
+METHODS=es,ppo BEST_OF=9 tools/train_run.sh --tournament --all
 tools/train_run.sh --ppo --key cinder_drake --build core.arena.cinder_drake \
     --opp-build core.arena.fen_boar_alpha                   # GPU PPO in the same shape
 tools/train_run.sh --resume ml/runs/<run>                   # continue a killed run
 tools/train_run.sh --list                                   # every run, oldest first
 tools/train_run.sh --promote ml/runs/<run>                  # copy PASSING nets into ml/serving
 ```
+
+`--tournament` is the sweep's other gear. Without it every creature is trained
+ONE way (ES, or PPO with `--ppo`) and that way is assumed to have been the right
+one. With it, each creature goes through `ml/training/tournament.py`: every
+method in `METHODS` trains that key in its own subprocess, each is gated against
+the same pre-tournament pin, then the candidates fight best-of-`BEST_OF` and
+only the winner takes the pin. Bracket knobs: `METHODS` (es,ppo) `BEST_OF` (5)
+`BRACKET_EPISODES` (1) `GATE_EPISODES` (= `EPISODES`, 0 skips the gate)
+`METHOD_TIMEOUT` (0 = none) `TEACHER` (for the `distill` entrant). The ES and PPO
+knobs above feed the bracket's es and ppo entrants. `--resume` is refused on a
+tournament run: a method is a whole subprocess and the fight only means anything
+once every entrant finished, so there is no per-generation checkpoint to
+continue from.
 
 Each run gets `ml/runs/<date>__<keys>__<config>/` holding `config.json`,
 its own `registry.json` (seeded from the deployed one, so runs are cumulative;

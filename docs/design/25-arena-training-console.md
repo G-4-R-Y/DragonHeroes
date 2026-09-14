@@ -118,7 +118,7 @@ became a `TabContainer`.
 | NETS | the registry: every key's versions, which one is the DEPLOYED pin, its gate checks. DEPLOY moves the pin (clearing the old one — one pin per key), RETIRE clears it, SET A / SET B arm the bench | writes `ml/serving/registry.json` directly |
 | VERSUS | best-of-N between any two sides — a registry net, a weights file, or the native/scripted baselines. Verdicts accumulate in `ml/data/benchmarks/` and the history list never clears | `league versus` |
 
-Two switches in the roster panel decide what TRAIN does:
+Three switches in the roster panel decide what TRAIN and TRAIN ALL do:
 
 - **isolated run** (on by default) routes TRAIN through `tools/train_run.sh
   --run-dir ml/runs/<date>__<key>-console__<knobs>`. The run gets its own
@@ -129,13 +129,24 @@ Two switches in the roster panel decide what TRAIN does:
 - **GPU (PPO)** swaps the ES league for `ml/training/ppo.py` on CUDA
   (`tools/train_run.sh --ppo`), which needs `ml/.venv`. The first selected
   opponent becomes `--opp-build`.
+- **bracket** (TRAIN ALL only) is the sweep's second gear
+  (`tools/train_run.sh --tournament --all`). Unticked, the sweep trains every
+  creature one way and assumes that was the right one; ticked, every method
+  trains each creature and the candidates fight best-of-5 for that creature's
+  pin — the TOURNAMENT button's bracket applied across the whole roster. The
+  button reads `TRAIN ALL ⚔` while it is armed. PPO is one of the entrants, so
+  the GPU tick does not apply. A single-creature TRAIN never brackets: that is
+  the TOURNAMENT button, and it needs a chosen matchup.
 
 `--selftest` covers all of it against fixtures under `user://console_selftest/`:
 the gate never reads or writes the real registry, run folders or benchmarks.
 It asserts the registry ordering, that DEPLOY moves the single pin and RETIRE
 clears it, that a run folder's own feed is tailable, that PROMOTE is refused
 while a run has no `summary.txt`, that both versus sides arm and a verdict
-reads back, and that the isolated/GPU run-folder names come out right.
+reads back, that the isolated/GPU run-folder names come out right, and that
+TRAIN ALL's two gears dispatch correctly — unticked the sweep's command line is
+byte-for-byte what it was before the bracket existed, ticked it carries
+`--tournament` plus the bracket knobs, and a single-creature run never brackets.
 
 ## 4. Out of scope (v1)
 
