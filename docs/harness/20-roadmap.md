@@ -695,8 +695,71 @@ Rebuild after the packaging commit for clean provenance; archives remain in
   sha256 does not match the prompt that made it, and refuses a bundle with
   missing clips. The bellwether v2 entry below is the worked example of exactly
   this loop for ONE boss, and it is still open.
-  STATUS: needs Ricardo's answers on (1) and (2) before it can start; (3) needs
-  his sweep finished or the GPU freed. Raised with him 2026-09-14.
+  **READ-ONLY INVESTIGATION DONE 2026-09-14.** Nothing was generated; these are
+  findings, and they move (1) from open to answered and make (2) and (3) worse,
+  not better.
+  (1) **ANSWERED — the philosophy IS written.** It is `docs/design/26-living-
+      pixel-world.md`, section *"Art direction: rich pixels, clear action"*: six
+      numbered rules (form before detail; materials have different cluster
+      shapes; light belongs to the renderer, albedo and emission separate; animate
+      intent; one camera/anchor/scale; build for a busy frame), the 48-128 px
+      canon band, and the six REQUIRED production clips — idle, movement,
+      anticipation, attack, hit, death. `docs/design/17-art-direction.md` carries
+      a 2026-09-12 header saying design/26 + canon §12.45 SUPERSEDE its
+      console-generation/retro metaphor while its camera, palette, readability and
+      performance rules still apply. The pipeline is `docs/tech/34`. So no new
+      spec has to be written to start — good news, and the only good news here.
+  (2) **WORSE THAN ASSUMED — the new pipeline covers ONE asset class, not six.**
+      Across all of `genforge/releases/*.json` there is exactly ONE art entry:
+      `fen_bells.art.bellwether`, grid 4x2, with a SINGLE clip `idle` — against
+      design/26's own six required clips. `genforge/prompts/` contains exactly one
+      template, `creature.md`. There is no recipe kind, no prompt family and no
+      gate for tiles, player, skill animations or bosses. Worse, two items on
+      Ricardo's list are not images at all:
+        * **particles** — `DHE1` (tech/34) is a GAMEPLAY effect program (trigger /
+          tag mask / action / magnitude / cooldown), not art; the visual particles
+          are GPU/VFX work in `game/`. Nothing in genforge generates them.
+        * **tiles** — there are no tile assets to regenerate. The world is drawn
+          procedurally (`world_gen.gd`); nothing in `game/` is named tile/terrain.
+      And what actually ships today came from the OLD path, not this one:
+      `genforge/pipeline/actor_art.py` + `bestiary_art.py` draw parts sheets
+      PROGRAMMATICALLY in Python (hand-authored code, no model), baked by
+      `bake_game_art.py` into `game/prototype/art/` — 10 actors, 96 PNGs, authored
+      against design/17, the SUPERSEDED direction. That is the real regeneration
+      surface, and the new pipeline cannot currently reproduce it.
+  (3) **HARDER THAN ASSUMED — the only backend is a cloud general model.**
+      `genforge/pipeline/image_backend.py` registers exactly one provider:
+      `_BACKENDS = {"openai": OpenAIImageBackend}`, `gpt-image-1`, over HTTPS,
+      requiring `OPENAI_API_KEY`. So "regenerate everything with the new pipeline"
+      today means sending every asset prompt to an off-the-shelf cloud model —
+      which collides head-on with BOTH standing rules: Ricardo's local-GPU
+      directive (§12.38), and design/17 §5, which says production generation uses
+      *"models fine-tuned on our own approved art only — no off-the-shelf general
+      models in a shipping path"*, with the acceptance bar *"No raw AI output ever
+      ships"* and a blind-review test. A LOCAL backend has to be registered behind
+      the existing `ImageBackend` seam before a single shipping asset is made.
+      The seam is the easy part — it is one class and one `_BACKENDS` entry.
+  Design/17 §9 also still stands as a written GATE: the hand-drawn vs Spine vs
+  3D-bake vs AI-assisted art test on the quadruped archetype, *"scheduled before
+  any pipeline tooling is built"*, decided with Ricardo. It has not run.
+  Every generated asset also has to clear the EXISTING gate, which is the part
+  that makes this tractable at all: `tools/genforge.py check` refuses art whose
+  sha256 does not match the prompt that made it, and refuses a bundle with missing
+  clips; `genforge/living/generate.py` is explicitly *"never used by builds, tests
+  or CI automatically"* and there is deliberately no `--approve` shortcut.
+  **RECOMMENDED ORDER (for Ricardo to confirm or overrule), smallest real step
+  first:** (a) register a LOCAL image backend behind the existing seam; (b) finish
+  ONE asset end to end under design/26 — the bellwether, from its single `idle` to
+  all six clips — because that is the only way to learn what the six-clip contract
+  actually costs; (c) then the other 9 baked actors, which share its rig and gate;
+  (d) player and bosses after that, since design/17 §5 reserves hero assets for
+  full hand finish; (e) tiles and particles LAST and separately — they are new
+  asset classes and new gates, not a regeneration.
+  STATUS: (1) answered from the docs. (2) and (3) are now concrete engineering
+  blockers rather than open questions, and both need Ricardo's call on the
+  recommended order above before anything is generated. The GPU is free (his
+  sweep finished) but `docker imagesvc-imagesvc-1` still holds ~3 GB of the 6 GB
+  card. Raised with him 2026-09-14.
 
 - **The genforge cockpit is unusable, both consoles overflow, and a sweep shows
   no total — Ricardo, 2026-09-14 (latest+11):** *"assets generation console not
@@ -808,7 +871,55 @@ Rebuild after the packaging commit for clean provenance; archives remain in
   `2026-09-14_004512...__all-creatures-console__g100_p13_e7_j16`, it reported
   `SWEEP 7/7 keys · 100% · elapsed 1h40m · ETA done` — correct, that sweep had
   just finished (no trainers, no workers, gloam_wisp registered v2 and gated).
-  STATUS: item 4 (rebuild the packages) queued; the box is now free for it.
+  **ITEM 4 RUN 2026-09-14 — BUILT CLEAN, THEN STOPPED BY A RED GATE THAT IS NOT
+  MINE.** Two failures, in order; the first is fixed, the second is the other
+  session's live work and was deliberately left alone.
+
+  1. **The Windows cross build stopped compiling** (it last succeeded 09-13
+     02:38). `godot-cpp/src/godot.cpp` calls `realloc()`/`free()` but includes
+     only `<stdio.h>`. glibc's libstdc++ drags `<stdlib.h>` in transitively, so
+     the Linux build never noticed; llvm-mingw's libc++ does not, so the cross
+     build died with *use of undeclared identifier 'realloc'*. It appeared now
+     because the checkout was re-vendored 09-13 20:00, AFTER the last good
+     package. FIXED in `tools/vendor_godot_cpp.sh`, not in the checkout: the
+     vendored tree is untracked and re-clonable, so a working-tree-only patch is
+     lost on the next vendor. The script grew an idempotent `patch_godot_cpp()`
+     that runs on BOTH paths (fresh clone and already-vendored) and is the place
+     every future upstream carry-patch goes. Verified: re-running it twice leaves
+     exactly one `#include <stdlib.h>`, and `sim/build-codex-windows` now reaches
+     100% with 0 errors (dh-server.exe, dh-effect-lab.exe, libdhgodot...dll).
+
+  2. **Then the exported Linux smoke failed:** *"exported R press did not heal
+     immediately"*. This is the OTHER SESSION'S in-flight Flask work (this
+     roadmap's own R34/R35 checkpoint: *"Replace it with real R/mouse events,
+     exact total healing, full/empty/dead/recharge cases... 20% immediately and
+     20% over two seconds"*). Their feature is GREEN — `flask_probe.tscn` prints
+     *FLASK OK - real R/click, 20% now + 20% over 2s, exact budget, recharge
+     never heals*. What is red is only their new gate in `game/tools/
+     package_smoke.gd`: the new R-press block (lines ~66-79) was added BELOW the
+     pre-existing line 52 `hunt.process_mode = Node.PROCESS_MODE_DISABLED`, and
+     R is routed by `main.gd::_unhandled_input` -> `_use_flask()`. A disabled
+     node gets no input callbacks, so `drink_flask()` is never reached.
+     PROVEN, not guessed — a throwaway headless probe (written, run, deleted)
+     sent the same synthetic R at both process modes:
+         process_mode=0 (INHERIT)   _unhandled_input fired=true
+         process_mode=4 (DISABLED)  _unhandled_input fired=false
+     The rest of their chain already agrees with the new `player.gd`
+     (0.4 + FLASK_IMMEDIATE 0.2 = 0.6; `_process_flask(5.0)` clamps elapsed to
+     the 2 s burn for 0.8; 6 kills = FLASK_KILLS_PER_CHARGE restores charge 2 at
+     unchanged HP), so this one line is the whole blocker.
+     THE ONE-LINE FIX IS THEIRS TO MAKE, NOT MINE: the smoke already disables
+     physics per node at lines 67-69, so line 52's blanket disable can move below
+     the input assertions (or become `PROCESS_MODE_INHERIT` for that window).
+     NOT APPLIED HERE — `package_smoke.gd` is shared-dirty and the other session
+     is editing it right now; stomping a file mid-edit is the concurrent-session
+     rule this repo already learned the hard way.
+  EVERYTHING ELSE IN THE PIPELINE PASSED: app icon, content validation, Linux
+  sim build + full ctest, the Windows cross build (after fix 1), the `game/`
+  import pass, and the Linux export itself (the smoke runs INSIDE the exported
+  PCK, so the export is sound). `builds/codex/*.zip` therefore still date from
+  09-13 02:38 — no new zips were written, and none were claimed. The build tree
+  is warm, so the rerun after that one line moves is minutes, not an hour.
 
 - **Training console: the graph, TRAIN ALL tournaments, a benchmark browser, and
   a global rank — Ricardo, 2026-09-14 (latest+10):** *"to the trianing onsole:
