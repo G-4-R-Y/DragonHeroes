@@ -197,6 +197,37 @@ interface, filtered by creature"*):
 Selecting a row puts that verdict in the panel above the list. Parsing is
 incremental (name + mtime), so a filter click re-reads nothing.
 
+### The whole sweep, not just the key on the chart
+
+TRAIN ALL and `--tournament --all` walk the roster into one run folder, but the
+chart, the status block and the ETA are all one key's — they read `_run`, which
+is one feed. Ricardo, 2026-09-14: *"in tournament viz i can't see the total
+progress, only current key progress! Nor estimated time to conclude the full
+run"*. A cyan line under the per-key status now answers both:
+
+```
+SWEEP 3/7 keys · [######----------] 41% · elapsed 1h12m · ETA 1h44m · now gloam_wisp g87/100
+```
+
+- The **denominator is the planned roster**, read from the run's `config.json`
+  (the same list that makes `--resume` work), not a listing of the progress
+  folder. Keys that have not started have no feed; averaging over the files on
+  disk would report 100% while six creatures had not been touched.
+- **Per-key completion knows both sweep shapes.** An ES key is
+  `generation / generations`, finished at its gate verdict. A bracket key is
+  `methods done / methods seen`, with the running entrant counted as a half so
+  the bar does not freeze for the length of a PPO run, and finished at
+  `tournament_done`.
+- The **run ETA is elapsed scaled by what is left** — no per-key cost model, and
+  it self-corrects as the slower creatures pull the average.
+- Feeds are read **incrementally by byte offset**, one file per creature, every
+  poll. (`FileAccess.get_as_text()` ignores the cursor and re-reads the whole
+  file — that bug made the second poll double-count every event, and the
+  selftest now re-scans and asserts the number does not move.)
+
+Opening a multi-key folder in RUNS arms the same line, so a finished or resumed
+sweep reads exactly like a live one.
+
 ### Fitting the window, and not overflowing it
 
 Both cockpits size themselves through one shared rule, `game/tools/console_fit.gd`

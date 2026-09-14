@@ -780,7 +780,35 @@ Rebuild after the packaging commit for clean provenance; archives remain in
   Gates: `GENFORGE LAYOUT OK` (7 canvases x 1204 controls), `GENFORGE CONSOLE
   SELFTEST OK`, `CONSOLE LAYOUT OK` (7 x 2471), `CONSOLE SELFTEST OK`. A/B'd the
   new gate by flipping the wrap default back off — it fails, so it bites.
-  STATUS: items 3 (sweep total + ETA) and 4 (rebuild the packages) queued.
+  **Item 3 DONE 2026-09-14.** The console's chart, status and ETA all read
+  `_run`, which is ONE key's feed — so during a sweep the two numbers that matter
+  ("how far through the whole thing" and "when does it finish") were nowhere on
+  screen. They are not derivable from the focused feed. The run folder has them:
+  `config.json` records the PLANNED key list (that is what makes `--resume` work)
+  and `progress/<key>.jsonl` is each key's feed. New `_sweep_scan()` walks every
+  feed INCREMENTALLY (a byte offset per file, like `_poll_progress`) and
+  `_sweep_status()` renders one cyan line under the per-key status:
+      SWEEP 3/7 keys · [######----------] 41% · elapsed 1h12m · ETA 1h44m
+                                               · now gloam_wisp g87/100
+  Per-key completion understands BOTH sweep shapes: an ES key is `g/generations`
+  and is done at its gate verdict; a bracket key is `methods done / methods seen`
+  with the running entrant counted as half, so the bar is not frozen for a whole
+  PPO run, and is done at `tournament_done`. The denominator is the PLANNED
+  roster, so keys that have not started yet count as the zeroes they are —
+  averaging over the files on disk would read 100% while six creatures had not
+  been touched. The run ETA is elapsed scaled by what is left: no per-key model,
+  and it self-corrects as slower creatures pull the average. Opening a multi-key
+  folder in RUNS arms the same line, so a finished or resumed sweep reads like a
+  live one.
+  BUG CAUGHT BY THE TEST: `FileAccess.get_as_text()` ignores the cursor and
+  re-reads the WHOLE file, so the second poll double-counted every event and a
+  2-method bracket read as 2 of 3 methods done. It reads the new BYTES now. The
+  selftest re-scans and asserts the number does not move.
+  VERIFIED ON REAL DATA as well as fixtures: pointed at Ricardo's live
+  `2026-09-14_004512...__all-creatures-console__g100_p13_e7_j16`, it reported
+  `SWEEP 7/7 keys · 100% · elapsed 1h40m · ETA done` — correct, that sweep had
+  just finished (no trainers, no workers, gloam_wisp registered v2 and gated).
+  STATUS: item 4 (rebuild the packages) queued; the box is now free for it.
 
 - **Training console: the graph, TRAIN ALL tournaments, a benchmark browser, and
   a global rank — Ricardo, 2026-09-14 (latest+10):** *"to the trianing onsole:

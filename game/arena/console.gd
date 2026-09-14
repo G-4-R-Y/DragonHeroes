@@ -94,6 +94,14 @@ var _ai_info: Label
 var _ai_stamp := ""          # trainee + config/registry mtimes; see _refresh_ai_default
 var _previous_canvas := Vector2i.ZERO
 var _sweep_progress := ""
+# THE WHOLE RUN, not just the key on the chart. Ricardo, 2026-09-14: "in
+# tournament viz i can't see the total progress, only current key progress! Nor
+# estimated time to conclude the full run". _run is ONE key's feed; a sweep walks
+# the roster, so its totals have to be read across every feed in the run folder.
+var _sweep := {}                 # key -> {off, total, g, methods, mdone, done, t0, t1}
+var _sweep_keys: Array = []      # the PLANNED roster, from the run's config.json
+var _sweep_root := ""            # the run folder itself, so config.json can be re-read
+var _sweep_label: Label
 var _stop_btn: Button
 var _gate_btn: Button
 var _watch_btn: Button
@@ -194,6 +202,7 @@ func _process(delta: float) -> void:
 		_pid = -1
 		_pid_kind = ""
 	_poll_progress()
+	_sweep_scan()
 	_follow_sweep()
 	_poll_versus()
 	_refresh_ui()
@@ -406,6 +415,10 @@ func _build_ui() -> void:
 	_status = _label("", PALE)
 	_status.custom_minimum_size = Vector2(0, 46)
 	right.add_child(_status)
+	# the WHOLE run, above the one key the chart is drawing
+	_sweep_label = _label("", CYAN)
+	_sweep_label.custom_minimum_size = Vector2(1, 0)
+	right.add_child(_sweep_label)
 	_note = _label("", DIM)
 	_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_note.custom_minimum_size = Vector2(0, 22)
@@ -1323,6 +1336,10 @@ func _refresh_ui() -> void:
 				int(lm.get("wins_a", 0)), int(lm.get("wins_b", 0)), int(lm.get("draws", 0)),
 				float(lm.get("score", 0.0)), float(lm.get("duration_s", 0.0))])
 	_status.text = "\n".join(lines)
+	if _sweep_label != null:
+		var sweep_line := _sweep_status()
+		_sweep_label.text = sweep_line
+		_sweep_label.visible = sweep_line != ""
 	var hint: Array = _parallelism_hint()
 	_hint.text = str(hint[0])
 	_hint.add_theme_color_override("font_color", EMBER if bool(hint[1]) else DIM)
@@ -1669,6 +1686,16 @@ func _runs_open() -> void:
 		_refresh_ui()
 		return
 	_attach(path, 0)
+	# Opening a MULTI-KEY run folder arms the sweep totals too, so a finished or
+	# resumed sweep reads the same as a live one instead of showing one creature
+	# and no idea how much of the run it was.
+	var run_dir := _runs_root.path_join(run)
+	var cfg := _read_json(run_dir.path_join("config.json"))
+	if (cfg.get("keys", []) as Array).size() > 1:
+		_sweep_arm(run_dir)
+		_sweep_scan()
+	else:
+		_sweep_arm("")
 	_proc_note = "showing %s · %s" % [run, key]
 	_refresh_ui()
 
@@ -2078,7 +2105,7 @@ func _console_run_dir(key: String, all_creatures := false) -> String:
 
 func _spawn_train_run(key: String, build: String, all_creatures := false) -> void:
 	var run_dir := _console_run_dir(key, all_creatures)
-	_sweep_progress = _repo.path_join(run_dir).path_join("progress") if all_creatures else ""
+	_sweep_arm(_repo.path_join(run_dir) if all_creatures else "")
 	var log_path := _repo.path_join(_log_rel(key))
 	DirAccess.make_dir_recursive_absolute(_repo.path_join(LOG_DIR))
 	var env := ""
@@ -2136,6 +2163,181 @@ func _sweep_flags(all_creatures: bool) -> Dictionary:
 func _launch_training(command: String) -> int:
 	return OS.create_process("bash", ["-lc", command])
 
+# ---- the whole sweep ----------------------------------------------------------------
+#
+# A sweep (TRAIN ALL, or --tournament --all) trains the WHOLE roster, one key at
+# a time, into one run folder. The chart and the ETA above it are one key's — so
+# the two numbers Ricardo actually wants while a sweep is running, "how far
+# through the whole thing am I" and "when does it finish", were nowhere on the
+# screen. They are not derivable from the focused feed: they need every key's.
+#
+# The run folder has them. config.json records the PLANNED key list (that is what
+# makes --resume work), and progress/<key>.jsonl is each key's feed. Keys that
+# have not started yet have no file, which is exactly why the planned list has to
+# come from config.json and not from a directory listing.
+
+func _sweep_arm(run_dir: String) -> void:
+	_sweep = {}
+	_sweep_keys = []
+	_sweep_root = run_dir
+	_sweep_progress = "" if run_dir == "" else run_dir.path_join("progress")
+	_sweep_load_keys()
+
+# The console names the run folder and spawns train_run.sh, which writes
+# config.json a moment later — so the planned roster is NOT there at arm time.
+# Keep asking until it is: a denominator that grows as keys start would report
+# 100% for the whole sweep.
+func _sweep_load_keys() -> void:
+	if _sweep_root == "" or not _sweep_keys.is_empty():
+		return
+	var cfg := _read_json(_sweep_root.path_join("config.json"))
+	for pair in cfg.get("keys", []):
+		if pair is Array and (pair as Array).size() > 0:
+			_sweep_keys.append(str((pair as Array)[0]))
+
+# Incremental: each feed keeps a byte offset and only the new lines are parsed.
+# A sweep folder holds one file per creature and this runs every poll.
+func _sweep_scan() -> void:
+	if _sweep_progress == "":
+		return
+	_sweep_load_keys()
+	var directory := DirAccess.open(_sweep_progress)
+	if directory == null:
+		return
+	for file in directory.get_files():
+		if not file.ends_with(".jsonl"):
+			continue
+		var key := file.get_basename()
+		var row: Dictionary = _sweep.get(key, {"off": 0, "total": 0, "g": 0,
+				"methods": 0, "mdone": 0, "done": false, "t0": 0.0, "t1": 0.0})
+		var f := FileAccess.open(_sweep_progress.path_join(file), FileAccess.READ)
+		if f == null:
+			continue
+		var size := f.get_length()
+		if size < int(row.off):        # rewritten (a fresh run in the same folder)
+			row = {"off": 0, "total": 0, "g": 0, "methods": 0, "mdone": 0,
+					"done": false, "t0": 0.0, "t1": 0.0}
+		if size == int(row.off):
+			f.close()
+			_sweep[key] = row
+			continue
+		# get_as_text() ignores the cursor and re-reads the WHOLE file, which
+		# double-counts every event on the second poll (a 2-method bracket read
+		# as 2 of 3 methods done). Read the new BYTES, like _poll_progress does.
+		f.seek(int(row.off))
+		var bytes := f.get_buffer(size - int(row.off))
+		f.close()
+		var chunk := bytes.get_string_from_utf8()
+		var cut := chunk.rfind("\n")
+		if cut < 0:
+			_sweep[key] = row          # a partial line: wait for the newline
+			continue
+		row.off = int(row.off) + chunk.substr(0, cut + 1).to_utf8_buffer().size()
+		for line in chunk.substr(0, cut).split("\n"):
+			if line.strip_edges() == "":
+				continue
+			var ev: Variant = JSON.parse_string(line)
+			if not (ev is Dictionary):
+				continue
+			_sweep_apply(row, ev as Dictionary)
+		_sweep[key] = row
+	if not _sweep_keys.is_empty():
+		return
+	# a run folder that predates recorded keys: fall back to what is on disk, and
+	# say so rather than pretending the denominator is the roster
+	for key in _sweep.keys():
+		if not _sweep_keys.has(key):
+			_sweep_keys.append(str(key))
+
+func _sweep_apply(row: Dictionary, ev: Dictionary) -> void:
+	var t := float(ev.get("t", 0.0))
+	if t > 0.0:
+		if float(row.t0) <= 0.0:
+			row.t0 = t
+		row.t1 = t
+	match str(ev.get("ev", "")):
+		"start":
+			row.total = int(ev.get("generations", int(row.total)))
+		"generation":
+			row.g = maxi(int(row.g), int(ev.get("g", 0)) + 1)
+		"method_start":
+			row.methods = maxi(int(row.methods), int(row.mdone) + 1)
+		"method_done":
+			row.mdone = int(row.mdone) + 1
+			row.methods = maxi(int(row.methods), int(row.mdone))
+		"tournament_done":
+			row.done = true
+		"gate":
+			# the ES sweep gates a key right after training it, so a gate verdict
+			# is this key's last event — a bracket gates per METHOD, and only
+			# tournament_done ends it
+			if int(row.methods) == 0:
+				row.done = true
+		"error":
+			row.done = true          # it will not get further on its own
+
+func _sweep_frac(key: String) -> float:
+	var row: Dictionary = _sweep.get(key, {})
+	if row.is_empty():
+		return 0.0
+	if bool(row.done):
+		return 1.0
+	if int(row.methods) > 0:
+		# a bracket: entrants finished out of entrants seen, and the running one
+		# counts as half so the bar is not frozen for a whole PPO run
+		return clampf((float(row.mdone) + 0.5) / maxf(float(row.methods), 1.0), 0.0, 0.99)
+	if int(row.total) > 0:
+		return clampf(float(row.g) / float(row.total), 0.0, 0.99)
+	return 0.0
+
+# Progress over the PLANNED roster, so keys that have not started yet count as
+# the zeroes they are. An average over only the files on disk would read 100%
+# while six creatures had not been touched.
+func _sweep_status() -> String:
+	if _sweep_progress == "" or _sweep_keys.is_empty():
+		return ""
+	var frac := 0.0
+	var done := 0
+	var current := ""
+	for key in _sweep_keys:
+		var k := str(key)
+		var f := _sweep_frac(k)
+		frac += f
+		if f >= 1.0:
+			done += 1
+		elif f > 0.0 and current == "":
+			current = k
+	frac /= float(_sweep_keys.size())
+	var t0 := 0.0
+	var t1 := 0.0
+	for key in _sweep.keys():
+		var row: Dictionary = _sweep[key]
+		if float(row.t0) > 0.0 and (t0 <= 0.0 or float(row.t0) < t0):
+			t0 = float(row.t0)
+		t1 = maxf(t1, float(row.t1))
+	var now := Time.get_unix_time_from_system() if _pid > 0 else t1
+	# ETA for the WHOLE run: elapsed so far, scaled by how much is left. It needs
+	# no per-key model, and it self-corrects as slower creatures pull the average.
+	var eta := "ETA —"
+	if t0 > 0.0 and frac > 0.02 and frac < 1.0:
+		eta = "ETA %s" % _fmt_s((now - t0) * (1.0 - frac) / frac)
+	elif frac >= 1.0:
+		eta = "ETA done"
+	var elapsed := "elapsed %s" % _fmt_s(now - t0) if t0 > 0.0 else "elapsed —"
+	var detail := ""
+	if current != "":
+		var row: Dictionary = _sweep.get(current, {})
+		detail = " · now %s %s" % [current,
+				("method %d/%d" % [int(row.mdone) + 1, int(row.methods)]) if int(row.methods) > 0
+						else ("g%d/%d" % [int(row.g), int(row.total)])]
+	return "SWEEP %d/%d keys · %s %.0f%% · %s · %s%s" % [
+			done, _sweep_keys.size(), _sweep_bar(frac), frac * 100.0, elapsed, eta, detail]
+
+static func _sweep_bar(frac: float) -> String:
+	var cells := 16
+	var lit := clampi(int(roundf(frac * cells)), 0, cells)
+	return "[" + "#".repeat(lit) + "-".repeat(cells - lit) + "]"
+
 func _follow_sweep() -> void:
 	if _sweep_progress == "": return
 	var directory := DirAccess.open(_sweep_progress)
@@ -2150,6 +2352,23 @@ func _follow_sweep() -> void:
 			modified = stamp
 			latest = path
 	if latest != "" and latest != _tail_path: _attach(latest, 0)
+
+# user:// persists between runs, so a fixture an older selftest left behind can
+# fail a later one. Small and deliberate: one level of files, then the folder.
+static func _rm_rf(path: String) -> void:
+	var d := DirAccess.open(path)
+	if d == null:
+		return
+	d.list_dir_begin()
+	var n := d.get_next()
+	while n != "":
+		if d.current_is_dir():
+			_rm_rf(path.path_join(n))
+		else:
+			d.remove(n)
+		n = d.get_next()
+	d.list_dir_end()
+	DirAccess.remove_absolute(path)
 
 func _run_selftest() -> void:
 	var path := ProjectSettings.globalize_path("user://console_fixture.jsonl")
@@ -2223,6 +2442,10 @@ func _selftest_cockpit() -> bool:
 	var ok := true
 	var root := ProjectSettings.globalize_path("user://console_selftest")
 	DirAccess.make_dir_recursive_absolute(root.path_join("runs"))
+	# an earlier version of this selftest wrote its sweep fixture here; user://
+	# persists, so leaving it behind would fail the "one run folder" assertion
+	_rm_rf(root.path_join("runs").path_join(
+			"2026-09-14_0200__all-creatures-console__g10_p2_e1_j4"))
 	DirAccess.make_dir_recursive_absolute(root.path_join("bench"))
 	_registry_path = root.path_join("registry.json")
 	_runs_root = root.path_join("runs")
@@ -2490,6 +2713,80 @@ func _selftest_cockpit() -> bool:
 	for i in _net.get_item_count():
 		if str(_net.get_item_metadata(i)) == "default":
 			_net.select(i)
+
+	# --- the WHOLE sweep: total progress and an ETA for the run ---------------
+	# Ricardo, 2026-09-14: "in tournament viz i can't see the total progress,
+	# only current key progress! Nor estimated time to conclude the full run".
+	# Four PLANNED keys; one finished the ES way, one is mid-bracket, two have
+	# not started and therefore have no feed at all. That last part is the whole
+	# point: averaging over the files on disk would read 87% while half the
+	# roster had not been touched.
+	# NOT under _runs_root: user:// survives between selftest runs, and a second
+	# folder there would break the RUNS assertions above on the next run.
+	var sweep_run := root.path_join("sweep").path_join(
+			"2026-09-14_0200__all-creatures-console__g10_p2_e1_j4")
+	DirAccess.make_dir_recursive_absolute(sweep_run.path_join("progress"))
+	f = FileAccess.open(sweep_run.path_join("config.json"), FileAccess.WRITE)
+	f.store_string(JSON.stringify({"started": "2026-09-14T02:00:00", "mode": "tournament",
+			"keys_label": "all-creatures", "knobs": "g10_p2_e1_j4",
+			"keys": [["fen_boar", "core.arena.fen_boar_alpha"],
+				["bog_golem", "core.arena.bog_golem"],
+				["mire_serpent", "core.arena.mire_serpent"],
+				["gloam_wisp", "core.arena.gloam_wisp"]],
+			"es": {"generations": 10, "pop": 2, "episodes": 1, "jobs": 4},
+			"env": {"godot": "4.6", "git_head": "abc1234"}}, " "))
+	f.close()
+	f = FileAccess.open(sweep_run.path_join("progress").path_join("fen_boar.jsonl"),
+			FileAccess.WRITE)
+	f.store_line(JSON.stringify({"t": 1000.0, "ev": "start", "key": "fen_boar",
+			"generations": 10, "pop": 2}))
+	f.store_line(JSON.stringify({"t": 1600.0, "ev": "generation", "g": 9, "best": 0.4}))
+	f.store_line(JSON.stringify({"t": 1610.0, "ev": "gate", "key": "fen_boar", "pass": true}))
+	f.close()
+	f = FileAccess.open(sweep_run.path_join("progress").path_join("bog_golem.jsonl"),
+			FileAccess.WRITE)
+	f.store_line(JSON.stringify({"t": 1620.0, "ev": "method_start", "method": "es"}))
+	f.store_line(JSON.stringify({"t": 1900.0, "ev": "method_done", "method": "es",
+			"status": "ok"}))
+	f.store_line(JSON.stringify({"t": 1905.0, "ev": "method_start", "method": "ppo"}))
+	f.close()
+	_sweep_arm(sweep_run)
+	_sweep_scan()
+	if _sweep_keys.size() != 4:
+		ok = false
+		push_error("CONSOLE SELFTEST: the sweep planned %d key(s), want 4 from config.json"
+				% _sweep_keys.size())
+	if absf(_sweep_frac("fen_boar") - 1.0) > 0.001:
+		ok = false
+		push_error("CONSOLE SELFTEST: a gated ES key is not done (%.2f)" % _sweep_frac("fen_boar"))
+	if absf(_sweep_frac("bog_golem") - 0.75) > 0.001:
+		ok = false
+		push_error("CONSOLE SELFTEST: a key 1.5 methods into a 2-method bracket reads %.2f, want 0.75"
+				% _sweep_frac("bog_golem"))
+	if _sweep_frac("mire_serpent") != 0.0:
+		ok = false
+		push_error("CONSOLE SELFTEST: a key that never started is not 0")
+	var sweep_line := _sweep_status()
+	if sweep_line.find("SWEEP 1/4 keys") < 0 or sweep_line.find("44%") < 0:
+		ok = false
+		push_error("CONSOLE SELFTEST: sweep line '%s' — want 1/4 keys at 44%%" % sweep_line)
+	if sweep_line.find("ETA") < 0 or sweep_line.find("ETA —") >= 0:
+		ok = false
+		push_error("CONSOLE SELFTEST: the sweep has no ETA for the full run: '%s'" % sweep_line)
+	if sweep_line.find("now bog_golem method 2/2") < 0:
+		ok = false
+		push_error("CONSOLE SELFTEST: the sweep line does not say which key is live: '%s'" % sweep_line)
+	# a second scan must be a no-op: the feeds are read incrementally by offset,
+	# and a double-counted method_done would push the bracket past its own total
+	_sweep_scan()
+	if absf(_sweep_frac("bog_golem") - 0.75) > 0.001:
+		ok = false
+		push_error("CONSOLE SELFTEST: re-scanning double-counted events (%.2f)"
+				% _sweep_frac("bog_golem"))
+	_sweep_arm("")
+	if _sweep_status() != "":
+		ok = false
+		push_error("CONSOLE SELFTEST: a single-key run still shows a sweep line")
 
 	# --- TRAIN ALL's two gears (Ricardo: "tournament mode for the train all") --
 	# Unticked, the sweep's command line must be byte-for-byte what it was before
