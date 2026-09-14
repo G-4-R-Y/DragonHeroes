@@ -118,6 +118,12 @@ var _nets: ItemList
 var _nets_info: Label
 var _vs_a := {}                  # {label, spec, build} — spec: native|scripted|abs path
 var _vs_b := {}
+# the benchmark browser: every verdict under ml/data/benchmarks/, parsed once
+var _bench: Array = []           # [{name, verdict, kind, keys, when}] newest first
+var _bench_stamp := {}           # name -> modified time, so a re-filter re-reads nothing
+var _vs_filter: OptionButton     # creature
+var _vs_kind: OptionButton       # versus | tournament | everything
+var _vs_count: Label
 var _vs_a_label: Label
 var _vs_b_label: Label
 var _vs_eps: SpinBox
@@ -653,8 +659,36 @@ func _build_versus_tab(tabs: TabContainer) -> void:
 	_vs_result.custom_minimum_size = Vector2(0, 66)
 	v.add_child(_vs_result)
 	v.add_child(_label("HISTORY — every verdict, newest first", EMBER))
+	# Ricardo, 2026-09-14: "a better benchmark interface, filtered by creature".
+	# ml/data/benchmarks/ accumulates forever and holds TWO schemas; one flat
+	# undifferentiated list was unreadable the moment the roster grew.
+	var filt := HBoxContainer.new()
+	filt.add_theme_constant_override("separation", 4)
+	filt.add_child(_label("creature", DIM))
+	_vs_filter = OptionButton.new()
+	_vs_filter.focus_mode = Control.FOCUS_NONE
+	_vs_filter.tooltip_text = "Only verdicts that involve this creature — either side, or the bracket's key."
+	_vs_filter.item_selected.connect(func(_i: int) -> void: _refresh_history())
+	filt.add_child(_vs_filter)
+	filt.add_child(_label("kind", DIM))
+	_vs_kind = OptionButton.new()
+	_vs_kind.focus_mode = Control.FOCUS_NONE
+	for row in [["everything", ""], ["head to head", "versus"], ["brackets", "tournament"]]:
+		_vs_kind.add_item(str(row[0]))
+		_vs_kind.set_item_metadata(_vs_kind.item_count - 1, str(row[1]))
+	_vs_kind.item_selected.connect(func(_i: int) -> void: _refresh_history())
+	filt.add_child(_vs_kind)
+	_vs_count = _label("", DIM)
+	filt.add_child(_vs_count)
+	v.add_child(filt)
 	_vs_history = _list(0, false)
 	_vs_history.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	# a row is a verdict: selecting one puts it in the panel above
+	_vs_history.item_selected.connect(func(i: int) -> void:
+		var picked := _bench_entry(str(_vs_history.get_item_metadata(i)))
+		if not picked.is_empty():
+			_last_verdict = picked.verdict
+			_refresh_ui())
 	v.add_child(_vs_history)
 
 func _label(text: String, color: Color, size := ProtoTheme.SIZE_BODY) -> Label:
@@ -1280,17 +1314,7 @@ func _refresh_tabs() -> void:
 		_vs_b_label.text = "B — %s" % (str(_vs_b.get("label", "")) if not _vs_b.is_empty() else "(unset)")
 		_vs_btn.disabled = _vs_a.is_empty() or _vs_b.is_empty() or _pid > 0
 	if _vs_result != null and not _last_verdict.is_empty():
-		var v := _last_verdict
-		var a: Dictionary = v.get("a", {})
-		var b: Dictionary = v.get("b", {})
-		var clinch: Variant = v.get("clinched_round", null)
-		_vs_result.text = "%s  %d-%d  %s\nbest of %d · %d episodes/round · %ss\n%s" % [
-				"%s vs %s" % [str(a.get("label", "?")), str(b.get("label", "?"))],
-				int(v.get("rounds_a", 0)), int(v.get("rounds_b", 0)),
-				"WINNER: " + str(v.get("winner", "?")).to_upper(),
-				int(v.get("best_of", 0)), int(v.get("episodes_per_round", 0)),
-				str(v.get("wall_s", "?")),
-				("clinched in round %s" % str(clinch)) if clinch != null else "no clinch — split decision"]
+		_vs_result.text = _verdict_detail(_last_verdict)
 
 func _on_chart_draw() -> void:
 	_chart_draws += 1
@@ -1717,33 +1741,188 @@ func _poll_versus() -> void:
 	_refresh_history()
 	_refresh_ui()
 
-func _refresh_history() -> void:
-	if _vs_history == null:
-		return
-	_vs_history.clear()
-	var names: Array[String] = []
+# ---- the benchmark browser (ml/data/benchmarks/) ------------------------------------
+#
+# Two schemas live in that folder and they answer different questions:
+#   arena.versus.v1      one net against one other, best-of-N   (`league versus`)
+#   arena.tournament.v1  a whole bracket for ONE creature       (`tournament.py`)
+# The old list rendered both through the versus fields, so every bracket read
+# "? vs ?  0-0  ?". Now each schema gets its own row, and the folder is filtered
+# by creature — Ricardo, 2026-09-14: "a better benchmark interface, filtered by
+# creature".
+
+# Which creature(s) a verdict is ABOUT. A bracket says so outright; a head to
+# head has to be read off both sides — the registry spec ("bog_golem@v2") when
+# there is one, and the arena build either side played otherwise, which is what
+# makes a baseline row (native/scripted) filterable at all.
+func _verdict_keys(v: Dictionary) -> Array:
+	var keys: Array = []
+	var add := func(k: String) -> void:
+		if k != "" and not keys.has(k):
+			keys.append(k)
+	if str(v.get("key", "")) != "":
+		add.call(str(v.get("key", "")))
+	for side in ["a", "b"]:
+		var s: Dictionary = v.get(side, {})
+		if s.is_empty():
+			continue
+		var spec := str(s.get("spec", ""))
+		if spec.contains("@"):
+			add.call(spec.get_slice("@", 0))
+		add.call(str(s.get("build", "")).get_slice(".", 2))
+	add.call(str(v.get("build", "")).get_slice(".", 2))
+	return keys
+
+func _verdict_kind(v: Dictionary) -> String:
+	var schema := str(v.get("schema", ""))
+	if schema.begins_with("arena.tournament"):
+		return "tournament"
+	if schema.begins_with("arena.versus"):
+		return "versus"
+	return "other"
+
+# "2026-09-14_004448__tournament__bog_golem.json" -> "09-14 00:44". The name is
+# DATE FIRST by construction (league.versus/tournament both stamp it), so the
+# folder sorts chronologically and this only has to make it readable.
+func _verdict_when(name: String) -> String:
+	if name.length() < 17 or name[10] != "_":
+		return ""
+	return "%s %s:%s" % [name.substr(5, 5), name.substr(11, 2), name.substr(13, 2)]
+
+func _verdict_row(e: Dictionary) -> String:
+	var v: Dictionary = e.verdict
+	if str(e.kind) == "tournament":
+		var pinned := "v%s pinned" % str(v.get("winner_version", "?")) if bool(v.get("deployed", false)) \
+				else "no pin moved"
+		return "%s  ⚔ %s  %s  champion %s · %s" % [
+				str(e.when), str(v.get("key", "?")),
+				"[" + ",".join(_as_strings(v.get("methods", []))) + "]",
+				str(v.get("champion", "?")), pinned]
+	var a: Dictionary = v.get("a", {})
+	var b: Dictionary = v.get("b", {})
+	return "%s  %s vs %s  %d-%d  %s" % [
+			str(e.when), str(a.get("label", "?")), str(b.get("label", "?")),
+			int(v.get("rounds_a", 0)), int(v.get("rounds_b", 0)),
+			str(v.get("winner", "?")).to_upper()]
+
+func _as_strings(raw: Variant) -> Array:
+	var out: Array = []
+	if raw is Array:
+		for x in (raw as Array):
+			out.append(str(x))
+	return out
+
+# Re-read only what changed: the folder grows for the life of the project and a
+# filter click must not cost a full re-parse of it.
+func _scan_bench() -> void:
+	var seen := {}
 	var d := DirAccess.open(_bench_root)
 	if d != null:
 		d.list_dir_begin()
 		var n := d.get_next()
 		while n != "":
 			if not d.current_is_dir() and n.ends_with(".json"):
-				names.append(n)
+				seen[n] = FileAccess.get_modified_time(_bench_root.path_join(n))
 			n = d.get_next()
 		d.list_dir_end()
-	names.sort()
-	names.reverse()
-	for name in names:
-		var v := _read_json(_bench_root.path_join(name))
+	var kept: Array = []
+	for e in _bench:
+		if seen.has(str(e.name)) and _bench_stamp.get(str(e.name), -1) == seen[str(e.name)]:
+			kept.append(e)
+			seen.erase(str(e.name))
+	for name in seen.keys():
+		var v := _read_json(_bench_root.path_join(str(name)))
 		if v.is_empty():
+			continue                        # still being written — it will appear next poll
+		var entry := {"name": str(name), "verdict": v, "kind": _verdict_kind(v),
+				"keys": _verdict_keys(v), "when": _verdict_when(str(name))}
+		entry["text"] = _verdict_row(entry)
+		kept.append(entry)
+		_bench_stamp[str(name)] = seen[name]
+	kept.sort_custom(func(x, y) -> bool: return str(x.name) > str(y.name))
+	_bench = kept
+
+func _bench_entry(name: String) -> Dictionary:
+	for e in _bench:
+		if str(e.name) == name:
+			return e
+	return {}
+
+func _refresh_history() -> void:
+	if _vs_history == null:
+		return
+	_scan_bench()
+	# the creature dropdown is built FROM the folder: a key nothing was ever
+	# benchmarked against must not be offered as a filter that shows nothing
+	var counts := {}
+	for e in _bench:
+		for k in (e.keys as Array):
+			counts[k] = int(counts.get(k, 0)) + 1
+	var names: Array = counts.keys()
+	names.sort()
+	var want := _filter_key()
+	if _vs_filter != null:
+		_vs_filter.clear()
+		_vs_filter.add_item("all creatures (%d)" % _bench.size())
+		_vs_filter.set_item_metadata(0, "")
+		for k in names:
+			_vs_filter.add_item("%s (%d)" % [str(k), int(counts[k])])
+			_vs_filter.set_item_metadata(_vs_filter.item_count - 1, str(k))
+			if str(k) == want:
+				_vs_filter.select(_vs_filter.item_count - 1)
+		if want == "" or not names.has(want):
+			_vs_filter.select(0)
+	want = _filter_key()
+	var kind := str(_vs_kind.get_item_metadata(_vs_kind.selected)) if _vs_kind != null \
+			and _vs_kind.selected >= 0 else ""
+	_vs_history.clear()
+	for e in _bench:
+		if want != "" and not (e.keys as Array).has(want):
 			continue
-		var a: Dictionary = v.get("a", {})
-		var b: Dictionary = v.get("b", {})
-		_vs_history.add_item("%s  %d-%d  %s" % [
-				"%s vs %s" % [str(a.get("label", "?")), str(b.get("label", "?"))],
-				int(v.get("rounds_a", 0)), int(v.get("rounds_b", 0)),
-				str(v.get("winner", "?")).to_upper()])
-		_vs_history.set_item_metadata(_vs_history.item_count - 1, name)
+		if kind != "" and str(e.kind) != kind:
+			continue
+		_vs_history.add_item(str(e.text))
+		_vs_history.set_item_metadata(_vs_history.item_count - 1, str(e.name))
+	if _vs_count != null:
+		_vs_count.text = "%d of %d" % [_vs_history.item_count, _bench.size()]
+
+# The panel above the list: whatever verdict is in focus, run just now or picked
+# out of the history. A bracket is not a head to head and must not be rendered
+# as one — it has entrants, a champion, and a pin that may or may not have moved.
+func _verdict_detail(v: Dictionary) -> String:
+	if _verdict_kind(v) == "tournament":
+		var lines: PackedStringArray = []
+		lines.append("⚔ %s — %s · champion %s · %s" % [
+				str(v.get("key", "?")), "[" + ",".join(_as_strings(v.get("methods", []))) + "]",
+				str(v.get("champion", "?")),
+				("v%s took the pin" % str(v.get("winner_version", "?"))) if bool(v.get("deployed", false))
+						else "no pin moved — nobody passed the gate"])
+		lines.append("best of %d · %d episode(s)/round · gate %d · %ss" % [
+				int(v.get("best_of", 0)), int(v.get("bracket_episodes", 0)),
+				int(v.get("gate_episodes", 0)), str(v.get("wall_s", "?"))])
+		for row in (v.get("table", []) if v.get("table", []) is Array else []):
+			var r: Dictionary = row
+			lines.append("   %-7s %-9s pts %s · rounds %s · ep win %s · %s" % [
+					str(r.get("method", "?")), str(r.get("label", "")),
+					str(r.get("points", "?")), str(r.get("rounds_won", "?")),
+					str(r.get("episode_win_rate", "?")),
+					"gate PASS" if bool(r.get("gate_pass", false)) else "gate fail"])
+		return "\n".join(lines)
+	var a: Dictionary = v.get("a", {})
+	var b: Dictionary = v.get("b", {})
+	var clinch: Variant = v.get("clinched_round", null)
+	return "%s  %d-%d  %s\nbest of %d · %d episodes/round · %ss\n%s" % [
+			"%s vs %s" % [str(a.get("label", "?")), str(b.get("label", "?"))],
+			int(v.get("rounds_a", 0)), int(v.get("rounds_b", 0)),
+			"WINNER: " + str(v.get("winner", "?")).to_upper(),
+			int(v.get("best_of", 0)), int(v.get("episodes_per_round", 0)),
+			str(v.get("wall_s", "?")),
+			("clinched in round %s" % str(clinch)) if clinch != null else "no clinch — split decision"]
+
+func _filter_key() -> String:
+	if _vs_filter == null or _vs_filter.selected < 0:
+		return ""
+	return str(_vs_filter.get_item_metadata(_vs_filter.selected))
 
 # ---- isolated / GPU training (tools/train_run.sh) -----------------------------------------
 
@@ -1998,14 +2177,86 @@ func _selftest_cockpit() -> bool:
 	var verdict := {"schema": "arena.versus.v1", "best_of": 5, "episodes_per_round": 3,
 			"wall_s": 12.5, "rounds_a": 3, "rounds_b": 2, "rounds_drawn": 0,
 			"clinched_round": 5, "winner": "a",
-			"a": {"label": "fen_boar v2 (candidate)"}, "b": {"label": "native"}}
+			"a": {"label": "fen_boar v2 (candidate)", "spec": "fen_boar@v2",
+				"build": "core.arena.fen_boar_alpha"},
+			"b": {"label": "native", "spec": "native", "build": "core.arena.fen_boar_alpha"}}
 	f = FileAccess.open(_bench_root.path_join("2026-09-13_070000__a_vs_b.json"), FileAccess.WRITE)
 	f.store_string(JSON.stringify(verdict, " "))
 	f.close()
+	# --- the benchmark browser: two schemas, filtered by creature -----------
+	# A bracket is not a head to head. Rendered through the versus fields it read
+	# "? vs ?  0-0  ?" — which is what this asserts can never come back.
+	var bench_fixtures := {
+		"2026-09-13_081500__bog_vs_bog.json": {
+			"schema": "arena.versus.v1", "best_of": 5, "episodes_per_round": 1,
+			"wall_s": 1.0, "rounds_a": 5, "rounds_b": 0, "winner": "a",
+			"a": {"label": "bog_golem v2", "spec": "bog_golem@v2", "build": "core.arena.bog_golem"},
+			"b": {"label": "bog_golem v3", "spec": "bog_golem@v3", "build": "core.arena.bog_golem"}},
+		"2026-09-14_004448__tournament__bog_golem.json": {
+			"schema": "arena.tournament.v1", "key": "bog_golem",
+			"build": "core.arena.bog_golem", "methods": ["es", "ppo"],
+			"best_of": 5, "bracket_episodes": 1, "gate_episodes": 4, "wall_s": 19.3,
+			"champion": "es", "winner": null, "winner_version": null, "deployed": false,
+			"table": [{"method": "es", "label": "es v2", "version": 2, "points": 3,
+					"rounds_won": 5, "episode_win_rate": 1.0, "gate_pass": false},
+				{"method": "ppo", "label": "ppo v3", "version": 3, "points": 0,
+					"rounds_won": 0, "episode_win_rate": 0.0, "gate_pass": false}]},
+		# no spec, no build: an old or hand-made verdict must still be listed
+		# under "all creatures" instead of silently vanishing from the history
+		"2026-09-12_120000__scripted_vs_native.json": {
+			"schema": "arena.versus.v1", "best_of": 3, "rounds_a": 3, "rounds_b": 0,
+			"winner": "a", "a": {"label": "scripted"}, "b": {"label": "native"}}}
+	for fixture_name in bench_fixtures.keys():
+		f = FileAccess.open(_bench_root.path_join(str(fixture_name)), FileAccess.WRITE)
+		f.store_string(JSON.stringify(bench_fixtures[fixture_name], " "))
+		f.close()
 	_refresh_history()
-	if _vs_history.item_count != 1 or _vs_history.get_item_text(0).find("3-2") < 0:
+	if _vs_history.item_count != 4 or _vs_count.text != "4 of 4":
 		ok = false
-		push_error("CONSOLE SELFTEST: benchmark history shows %d rows" % _vs_history.item_count)
+		push_error("CONSOLE SELFTEST: history shows %d rows ('%s'), want 4" % [
+				_vs_history.item_count, _vs_count.text])
+	if _vs_history.get_item_text(0).find("⚔ bog_golem") < 0 \
+			or _vs_history.get_item_text(0).find("champion es") < 0:
+		ok = false
+		push_error("CONSOLE SELFTEST: newest row is not the bracket: '%s'" % _vs_history.get_item_text(0))
+	for row_i in _vs_history.item_count:
+		if _vs_history.get_item_text(row_i).find("? vs ?") >= 0:
+			ok = false
+			push_error("CONSOLE SELFTEST: a verdict rendered through the wrong schema: '%s'"
+					% _vs_history.get_item_text(row_i))
+	if _vs_history.get_item_text(2).find("3-2") < 0:
+		ok = false
+		push_error("CONSOLE SELFTEST: the head-to-head row lost its score: '%s'"
+				% _vs_history.get_item_text(2))
+	var filtered := func(key: String, kind: String) -> int:
+		for fi in _vs_filter.item_count:
+			if str(_vs_filter.get_item_metadata(fi)) == key:
+				_vs_filter.select(fi)
+		for ki in _vs_kind.item_count:
+			if str(_vs_kind.get_item_metadata(ki)) == kind:
+				_vs_kind.select(ki)
+		_refresh_history()
+		return _vs_history.item_count
+	# bog_golem appears in a head to head AND a bracket; fen_boar in one verdict
+	if filtered.call("bog_golem", "") != 2 or filtered.call("fen_boar", "") != 1:
+		ok = false
+		push_error("CONSOLE SELFTEST: the creature filter does not select by creature")
+	if filtered.call("", "tournament") != 1 or filtered.call("", "versus") != 3:
+		ok = false
+		push_error("CONSOLE SELFTEST: the kind filter does not split the two schemas")
+	if filtered.call("bog_golem", "tournament") != 1:
+		ok = false
+		push_error("CONSOLE SELFTEST: the two filters do not compose")
+	var fk := _verdict_keys(bench_fixtures["2026-09-12_120000__scripted_vs_native.json"])
+	if not fk.is_empty() or filtered.call("", "") != 4:
+		ok = false
+		push_error("CONSOLE SELFTEST: a verdict with no creature was dropped from the history")
+	# a bracket's detail panel must show the bracket, not a made-up head to head
+	var detail := _verdict_detail(bench_fixtures["2026-09-14_004448__tournament__bog_golem.json"])
+	if detail.find("champion es") < 0 or detail.find("no pin moved") < 0 \
+			or detail.find("es v2") < 0 or detail.find("vs") >= 0:
+		ok = false
+		push_error("CONSOLE SELFTEST: bracket detail reads '%s'" % detail)
 	_last_verdict = verdict
 	_refresh_ui()
 	if _vs_result.text.find("WINNER: A") < 0 or _vs_result.text.find("clinched in round 5") < 0:

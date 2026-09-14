@@ -749,7 +749,23 @@ Rebuild after the packaging commit for clean provenance; archives remain in
   Verified: `--tournament --key bog_golem` end to end into a throwaway run dir —
   bracket ran, pin moved, `summary.txt` and the verdict JSON written, `ml/serving`
   untouched. Gates: `CONSOLE SELFTEST OK`, `CONSOLE LAYOUT OK`.
-  STATUS: items 3-4 queued in order.
+  **Item 3 DONE 2026-09-14.** `ml/data/benchmarks/` holds TWO schemas and the
+  history rendered both through the versus fields, so every bracket verdict read
+  `? vs ?  0-0  ?` — the filter was the ask, but the wrong-schema rendering was
+  the bigger bug. Now: `arena.versus.v1` and `arena.tournament.v1` each get their
+  own row and their own detail panel (a bracket shows entrants, points, rounds,
+  episode win rate and gate result, and whether the pin moved); the list filters
+  by **creature** and by **kind** (everything / head to head / brackets), and the
+  two compose. The creature dropdown is built FROM the folder with counts, not
+  from the roster, so a key nothing was benchmarked against is never offered as a
+  filter that shows nothing. A verdict's creatures are its bracket `key` plus
+  either side's registry spec and arena build — that last part is what makes a
+  native/scripted row filterable. A verdict with NO creature (older or hand-made)
+  still appears under "all creatures" instead of vanishing, and the selftest
+  asserts exactly that. Parsing is incremental (name + mtime) so a filter click
+  re-reads nothing. Selecting a row puts that verdict in the panel above.
+  Gates: `CONSOLE SELFTEST OK`, `CONSOLE LAYOUT OK`.
+  STATUS: item 4 queued.
 
 - **Are the open branches finished enough to merge? — Ricardo, 2026-09-13
   (latest+9):** *"check whether current open branches are finished in their work

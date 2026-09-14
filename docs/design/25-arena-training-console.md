@@ -116,7 +116,7 @@ became a `TabContainer`.
 | PROGRESS | the original fitness chart, match strip, gate verdict — now also paints a best-of-N | — (tails the feed) |
 | RUNS | every folder under `ml/runs/`, newest first, with its `config.json`, gate verdicts and wall time. OPEN PROGRESS tails **that run's** feed; PROMOTE copies its gate-PASSING nets into `ml/serving` | `tools/train_run.sh --promote` |
 | NETS | the registry: every key's versions, which one is the DEPLOYED pin, its gate checks. DEPLOY moves the pin (clearing the old one — one pin per key), RETIRE clears it, SET A / SET B arm the bench | writes `ml/serving/registry.json` directly |
-| VERSUS | best-of-N between any two sides — a registry net, a weights file, or the native/scripted baselines. Verdicts accumulate in `ml/data/benchmarks/` and the history list never clears | `league versus` |
+| VERSUS | best-of-N between any two sides — a registry net, a weights file, or the native/scripted baselines — plus the BENCHMARK BROWSER over `ml/data/benchmarks/`, filtered by creature and by kind | `league versus` |
 
 Three switches in the roster panel decide what TRAIN and TRAIN ALL do:
 
@@ -138,15 +138,45 @@ Three switches in the roster panel decide what TRAIN and TRAIN ALL do:
   the GPU tick does not apply. A single-creature TRAIN never brackets: that is
   the TOURNAMENT button, and it needs a chosen matchup.
 
+### The benchmark browser
+
+`ml/data/benchmarks/` accumulates for the life of the project and holds **two
+schemas** that answer different questions:
+
+| schema | written by | what it is |
+|---|---|---|
+| `arena.versus.v1` | `league versus`, and the bracket's own fights | one net against one other, best-of-N |
+| `arena.tournament.v1` | `ml/training/tournament.py` | a whole bracket for ONE creature: entrants, table, champion, whether the pin moved |
+
+The history used to render both through the versus fields, so every bracket read
+`? vs ?  0-0  ?`. Each schema now has its own row and its own detail panel, and
+the list is filtered two ways (Ricardo, 2026-09-14: *"a better benchmark
+interface, filtered by creature"*):
+
+- **creature** — built from the folder, not from the roster, so a key nothing was
+  ever benchmarked against is never offered as a filter that shows nothing. Each
+  entry carries its count. A verdict's creatures are its bracket `key`, plus
+  either side's registry spec (`bog_golem@v2`) and the arena `build` it played —
+  which is what makes a `native`/`scripted` row filterable at all. A verdict with
+  no creature at all (an older or hand-made file) still appears under *all
+  creatures* rather than silently vanishing.
+- **kind** — everything / head to head / brackets.
+
+Selecting a row puts that verdict in the panel above the list. Parsing is
+incremental (name + mtime), so a filter click re-reads nothing.
+
 `--selftest` covers all of it against fixtures under `user://console_selftest/`:
 the gate never reads or writes the real registry, run folders or benchmarks.
 It asserts the registry ordering, that DEPLOY moves the single pin and RETIRE
 clears it, that a run folder's own feed is tailable, that PROMOTE is refused
 while a run has no `summary.txt`, that both versus sides arm and a verdict
-reads back, that the isolated/GPU run-folder names come out right, and that
+reads back, that the isolated/GPU run-folder names come out right, that
 TRAIN ALL's two gears dispatch correctly — unticked the sweep's command line is
 byte-for-byte what it was before the bracket existed, ticked it carries
-`--tournament` plus the bracket knobs, and a single-creature run never brackets.
+`--tournament` plus the bracket knobs, and a single-creature run never brackets
+— and that the benchmark browser renders both schemas (no row may ever read
+`? vs ?` again), filters by creature and by kind, composes the two filters, and
+keeps a creature-less verdict in the list.
 
 ## 4. Out of scope (v1)
 
