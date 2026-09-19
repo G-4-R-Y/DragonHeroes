@@ -1,5 +1,32 @@
 # Handoff — quota recovery ACTIVE, all pending requests preserved (2026-09-12)
 
+## 2026-09-19 — R50 BUILT (mask · greedy probes · reversible curriculum · reservoir · anneal · plateau); converged run launched
+
+Commit `545c78a` (+ the `--all/--ppo` guard fix that followed). The PPO trainer
+sampled πθ while every runtime argmaxed it (fen_boar v7.0: sampled 0.96 vs
+greedy 0.04 win rate vs native). Built in Ricardo's order: `arena.mask.v1` in
+all five runtimes pinned by one fixture (`ml/tests/test_action_mask.py`,
+`godot --headless --path game res://arena/tests/mask_parity_test.tscn`,
+`sim-tests`); `ppo.py` greedy probes (`--eval-envs 64`, `greedy=` in the log,
+excluded from the update), promotion on greedy and reversible
+(`--demote-wr 0.45`), scripts never dropped, `--reservoir 8` snapshots,
+β 0.01→0.001 / std 0.3→0.1 anneal, plateau stop. Knobs in
+`tools/train_run.sh` → `config.json`. Docs: root `TRAINING_HYPERPARAMETERS.md`
+(R53), `docs/tech/39-experiment-ledger.md` + `tools/experiment_ledger.py`
+(R54, standing), canon §9 + §12.52, tech/25 §5.1.5, tech/37, design/23.
+
+**RUNNING NOW (local GPU, do not kill):**
+`ml/runs/2026-09-19_1015__all-creatures__steps60000000_envs512_mlp_sp4_ev64_pl80/`
+— `STEPS=60000000 PLATEAU_UPDATES=80 PLATEAU_DELTA=0.02 PLATEAU_MIN_STEPS=20000000
+CLONE=heuristic tools/train_all.sh --ppo`, every creature as a mirror, ~179 k
+steps/s ≈ 5–6 min per creature at the full ceiling. Isolated registry; nothing
+in `ml/serving/` changes until `tools/train_run.sh --promote <run>`. When it
+finishes: `python3 tools/experiment_ledger.py --write`, read `summary.txt`,
+then the post-hoc sampled-vs-greedy measurement on the converged nets decides
+whether Option B (sample at serving) is ever built. Then R52 — the hi-fi
+dark-fantasy sprite generator; the brief is `sprites prompt.md` at the root
+(also recorded verbatim in roadmap R52).
+
 User authorizes finishing all queued 2D work, then Rebirth, committing/pushing
 master and regenerating Codex binaries. Do not stop at documentation alone.
 Remote fetch confirmed master/origin at e036a7c; the prior push succeeded. The

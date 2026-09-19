@@ -218,7 +218,10 @@ if [ -z "$RESUME_RUN" ]; then      # a resume reads all of this back from config
   [ $ALL -eq 1 ] || [ -n "$KEY" ] || { echo "need --all or --key KEY --build BUILD" >&2; exit 2; }
   [ $ALL -eq 1 ] || [ -n "$BUILD" ] || { echo "--key needs --build" >&2; exit 2; }
 fi
-[ "$MODE" != "ppo" ] || [ -n "$OPP_BUILD" ] || { echo "--ppo needs --opp-build" >&2; exit 2; }
+# --all trains every creature as a MIRROR (opp_build = build, below), so the
+# opponent flag is only required for a single --key run. This guard used to fire
+# on --all too, which made the documented `train_all.sh --ppo` exit 2 (R50, 2026-09-19).
+[ "$MODE" != "ppo" ] || [ $ALL -eq 1 ] || [ -n "$OPP_BUILD" ] || { echo "--ppo needs --opp-build (or --all)" >&2; exit 2; }
 [ "$MODE" != "ppo" ] || [ -x "$PYVENV" ] || { echo "PPO needs ml/.venv (torch)" >&2; exit 2; }
 # A bracket has no checkpoint to resume from: a method is a whole subprocess and
 # the fight only means anything once every entrant finished. Say so instead of
