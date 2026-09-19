@@ -163,14 +163,25 @@ func _act(_delta: float) -> void:
 			if enemy != null and not enemy.is_dead() \
 			else fighter.body.global_position + Vector2.RIGHT
 	fighter.cmd_aim(noisy_aim(foe_pos))
-	var pick := 0
-	var best := -INF
-	for i in ACTION_LOGITS:
-		if float(y[2 + i]) > best:
-			best = float(y[2 + i])
-			pick = i
+	# arena.mask.v1 (R50, 2026-09-19): the pick is the argmax over the actions
+	# the body can actually take right now, decided from the same delayed obs
+	# the net just read — see decode(). The unmasked argmax it replaces is kept
+	# below for the record: with it, a net whose top logit was a kit on an 8 s
+	# cooldown stood there re-picking a refused action for 480 ticks.
+	# var pick := 0
+	# var best := -INF
+	# for i in ACTION_LOGITS:
+	# 	if float(y[2 + i]) > best:
+	# 		best = float(y[2 + i])
+	# 		pick = i
+	# if rng.randf() < explore:
+	# 	pick = rng.randi_range(0, ACTION_LOGITS - 1)
+	var kit_n := fighter.kit_count()
+	var is_pl := fighter.is_player()
+	var dec := decode(y, obs, kit_n, is_pl)
+	var pick: int = dec[0]
 	if rng.randf() < explore:
-		pick = rng.randi_range(0, ACTION_LOGITS - 1)
+		pick = explore_pick(obs, kit_n, is_pl)
 	if not can_commit():
 		return
 	var ok := false
@@ -178,7 +189,53 @@ func _act(_delta: float) -> void:
 		1: ok = fighter.cmd_attack()
 		2: ok = fighter.cmd_special()
 		3, 4, 5, 6: ok = fighter.cmd_skill(pick - 3)
-	if float(y[2 + ACTION_LOGITS]) > 0.0 and not ok:
+	# if float(y[2 + ACTION_LOGITS]) > 0.0 and not ok:   (pre-mask: no charge check)
+	if bool(dec[1]) and not ok:
 		ok = fighter.cmd_dodge(Vector2(float(y[0]), float(y[1])))
 	if ok:
 		note_commit()
+
+# ---- arena.mask.v1 -------------------------------------------------------------------
+# ONE rule in five runtimes: this file, ml/training/policy_net.py::decode, the torch
+# trainer (ml/training/torch_policy.py::mask_heads), dh::sim::Arena::action_mask
+# (the frozen self-play opponent) and ml/eval/env_parity.py. It reads only the obs
+# the policy SEES plus two body constants, so every runtime computes the same bits.
+#   0 noop        always
+#   1 attack      o[5] <= 0            (attack cooldown fraction; EXACTLY 0.0 when ready)
+#   2 special     player: o[6] <= 0    creature: o[5] <= 0 (its "special" is a swing)
+#   3+k kit k     k < kit_count and o[7+k] <= 0
+#   dodge flag    y[9] > 0 and o[12] > 0  (a charge must be visible)
+# Ties: the FIRST max among the available logits — every runtime's loop is strict >.
+# Pinned by game/arena/tests/mask_parity_test.gd against the fixture Python writes.
+static func action_mask(obs: PackedFloat32Array, kit_count: int, is_player: bool) -> Array[bool]:
+	var m: Array[bool] = []
+	m.resize(ACTION_LOGITS)
+	var attack_ready := obs[5] <= 0.0
+	m[0] = true
+	m[1] = attack_ready
+	m[2] = (obs[6] <= 0.0) if is_player else attack_ready
+	for k in 4:
+		m[3 + k] = k < kit_count and obs[7 + k] <= 0.0
+	return m
+
+static func dodge_allowed(obs: PackedFloat32Array) -> bool:
+	return obs[12] > 0.0
+
+# -> [pick: int, dodge: bool]; the head y is [move2, logits7, dodge1]
+static func decode(y: PackedFloat64Array, obs: PackedFloat32Array, kit_count: int,
+		is_player: bool) -> Array:
+	var allowed := action_mask(obs, kit_count, is_player)
+	var pick := -1
+	for i in ACTION_LOGITS:
+		if allowed[i] and (pick < 0 or float(y[2 + i]) > float(y[2 + pick])):
+			pick = i
+	return [pick, float(y[2 + ACTION_LOGITS]) > 0.0 and dodge_allowed(obs)]
+
+# epsilon-exploration draws from the AVAILABLE actions, not from all seven
+func explore_pick(obs: PackedFloat32Array, kit_count: int, is_player: bool) -> int:
+	var allowed := action_mask(obs, kit_count, is_player)
+	var pool: Array[int] = []
+	for i in ACTION_LOGITS:
+		if allowed[i]:
+			pool.append(i)
+	return pool[rng.randi_range(0, pool.size() - 1)]

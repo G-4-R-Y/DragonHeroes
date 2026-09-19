@@ -123,6 +123,22 @@ func alive_radius() -> float:
 func is_player() -> bool:
 	return is_instance_valid(body) and body is ProtoPlayer
 
+# arena.mask.v1 body constant (neural_policy.gd::action_mask): how many of the
+# four kit slots EXIST. Creatures: the species kit list, capped at 4 like the
+# obs channels. Players: up to the last non-empty loadout slot — a hole in the
+# middle stays selectable (and refused, as before) rather than hiding the slots
+# after it. dh-env's twin is len(kits[:4]) (ml/env/dh_env.py::mask_args).
+func kit_count() -> int:
+	if is_player():
+		if build == null:
+			return 0
+		var n := 0
+		for i in mini(4, build.skill_loadout.size()):
+			if str(build.skill_loadout[i]) != "":
+				n = i + 1
+		return n
+	return mini(_kits.size(), 4)
+
 func note_damage_taken(dmg: float) -> void:
 	damage_taken += dmg
 

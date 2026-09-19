@@ -33,6 +33,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from ml.training.arch import Arch  # noqa: E402
+from ml.env.dh_env import MASK_NEG, MASK_SCHEMA  # noqa: E402
 
 OBS_DIM = 31
 EMB_DIM = 16
@@ -123,6 +124,26 @@ class TorchGRUPolicyNet(nn.Module):
 # against its own snapshot and 0.00 at the gate. One contract now: the head
 # emits a raw vector, whoever uses it clips. Gradient still flows everywhere,
 # which a clamp() here would not give.
+def mask_heads(logits: torch.Tensor, dodge: torch.Tensor, obs: torch.Tensor,
+               kit_count: int, is_player: bool) -> tuple[torch.Tensor, torch.Tensor]:
+    """arena.mask.v1 (ml.env.dh_env.action_mask), batched in torch: the action
+    logits of unavailable actions and the dodge logit without a charge go to
+    MASK_NEG. Applied to the logits the trainer SAMPLES from and to the ones the
+    UPDATE recomputes, so log pi_theta(a|s) and the entropy are those of the
+    masked policy — the one every serving runtime argmaxes."""
+    ready = obs[..., 5] <= 0.0
+    cols = [torch.ones_like(ready), ready,
+            (obs[..., 6] <= 0.0) if is_player else ready]
+    for k in range(4):
+        cols.append((obs[..., 7 + k] <= 0.0) if k < kit_count
+                    else torch.zeros_like(ready))
+    allowed = torch.stack(cols, dim=-1)
+    neg = torch.full_like(logits, MASK_NEG)
+    logits = torch.where(allowed, logits, neg)
+    dodge = torch.where(obs[..., 12] > 0.0, dodge, torch.full_like(dodge, MASK_NEG))
+    return logits, dodge
+
+
 class TorchPolicyNet(nn.Module):
     def __init__(self, keys: list[str] | None = None, obs_dim: int = OBS_DIM,
                  hidden: tuple[int, ...] | None = None, arch: Arch | None = None):
@@ -167,7 +188,10 @@ class TorchPolicyNet(nn.Module):
         return x
 
     def forward(self, obs: torch.Tensor, key: str = "*"):
-        """raw move[2], act logits[7], dodge logit[1], value[1] — batched."""
+        """raw move[2], act logits[7], dodge logit[1], value[1] — batched.
+        UNMASKED: the trainer applies mask_heads() to what it samples from and
+        what it computes the ratio on, so the policy it optimizes is the one
+        the serving runtimes execute."""
         h = self._trunk(obs, key)
         return (self.head_move(h), self.head_act(h),
                 self.head_dodge(h).squeeze(-1), self.head_value(h).squeeze(-1))
@@ -206,5 +230,9 @@ class TorchPolicyNet(nn.Module):
                    for k, i in self.key_to_idx.items()}
         json.dump({"schema": POLICY_SCHEMA, "obs_dim": OBS_DIM, "emb_dim": EMB_DIM,
                    "hidden": list(self.hidden), "arch": self.arch.to_dict(),
-                   "layers": layers, "embeddings": emb, "explore": explore},
+                   "layers": layers, "embeddings": emb, "explore": explore,
+                   # provenance only — every runtime applies arena.mask.v1
+                   # unconditionally; this records that the net was TRAINED
+                   # under it (nets exported before 2026-09-19 were not)
+                   "action_mask": MASK_SCHEMA},
                   open(path, "w"))

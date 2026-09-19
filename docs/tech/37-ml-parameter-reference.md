@@ -55,6 +55,14 @@ net from any of them can be gated and deployed by the same path.
 | `--curriculum` / `--no-curriculum` | on | Scripts first, self-play on promotion (tech/25 §5.1.2). `--no-curriculum` restores the old fixed native/scripted/mlp thirds, which put a third of every rollout on self-play from step 0 |
 | `--promote-wr` | 0.60 | Win rate **against the script envs only** that unlocks self-play. Pooling in the self-play envs would let a policy promote on its own reflection |
 | `--promote-hold` | 3 | Consecutive updates the win rate must HOLD — "reliably winning", not "won once". Resets to 0 on any update below the bar; no promotion before 40 script episodes have finished |
+| `--eval-envs` | 64 | **Greedy probes** (R50, 2026-09-19): the last N envs decode argmax exactly as the serving runtimes do, ride in the same `step_many`, are EXCLUDED from the PPO update (their actions are not samples of πθ) and print as `greedy=` — the number that ships. Promotion reads it. 0 falls back to the sampled script rate |
+| `--demote-wr` | 0.45 | Greedy win rate vs scripts BELOW which a promoted run sends its self-play slots back to scripts (held `--promote-hold` updates; hysteresis under `--promote-wr`). 0 disables. Scripts are never dropped: ⅓ scripted / ⅓ native / ⅓ self-play after promotion |
+| `--reservoir` | 8 | Past snapshots kept for self-play; each self-play env gets one round-robin, so the opponent is a spread of the learner's history, not only the latest self. Newest also written to `ml/data/ppo_snapshots/<key>_itNNNNN.json` |
+| `--entropy-final` | 0.001 | Entropy bonus at the END of the run; linear from `ENTROPY` in `done_steps`. Pass 0.01 for constant |
+| `--move-std-final` | 0.1 | Move-head Gaussian std at the END; linear from `MOVE_STD`. Pass 0.3 for constant |
+| `--plateau-updates` | 0 | Stop early when `greedy=` has not improved by `--plateau-delta` for this many updates (0 = run the full budget). Never before `MIN_UPDATES` |
+| `--plateau-delta` | 0.02 | The improvement that resets the plateau counter |
+| `--plateau-min-steps` | 0 | Never plateau-stop before this many steps (arms the stop only once a cold start is over) |
 | `round-robin` | `--episodes` | 2 | Deployed policies fight each other; prints the table |
 
 ### 2.2 `league.py` — internal constants
@@ -96,6 +104,9 @@ opponent slot is a stateless MLP.
 | `LAM` | 0.95 | GAE λ |
 | `CLIP` | 0.2 | PPO ratio clip |
 | `ENTROPY` | 0.01 | Entropy bonus — the exploration knob `evolve.py` searches |
+| `ENTROPY_FINAL` | 0.001 | Default for `--entropy-final` — the value the anneal ends on (R50). With the head at ln 7 nats the argmax was one action forever; annealing makes the mode the policy |
+| `MOVE_STD_FINAL` | 0.1 | Default for `--move-std-final` — the move std the anneal ends on |
+| `MASK_NEG` (`ml/env/dh_env.py`) | −1e9 | What a masked logit becomes before the softmax. Finite on purpose: exp underflows to exactly 0 in float32 and it cannot make inf·0 = nan in an entropy or BCE term. `arena.mask.v1`: noop always; attack `o[5]<=0`; special `o[6]<=0` (player) / `o[5]<=0` (creature); kit k `k<kit_count && o[7+k]<=0`; dodge flag `o[12]>0` |
 | `LR` | 3e-4 | Adam learning rate |
 | `EPOCHS` | 4 | Passes per rollout |
 | `MINIBATCHES` | 8 | Minibatches per epoch |
@@ -281,6 +292,11 @@ run is identifiable without opening it.
 
 ### 4.1 Weights JSON — `arena.policy.v1`
 
+`"action_mask": "arena.mask.v1"` is written by the PPO exporter since 2026-09-19 —
+provenance only (the net was TRAINED under the mask); every runtime applies the mask
+unconditionally, so a net exported before that date decodes slightly differently today
+and must be re-gated.
+
 `{schema, obs_dim: 31, emb_dim: 16, explore: 0.05, hidden: [...], arch: {...},
 embeddings: {key: [16 floats]}, layers: [{w, b, act}]}`
 where each layer's `act` is one of `tanh`, `relu`, `leaky_relu`, `linear` (§2.6b).
@@ -346,6 +362,9 @@ One entry per trained net:
 | `deployed` | The pin. A failed gate leaves the previous pin alone, by design |
 | `eval` | The gate report (§5) or, for PPO, `{trainer, arch, steps, selfplay}` |
 | `promoted_from` | Set by `train_run.sh --promote` — which run folder it came from |
+| `eval.greedy_wr` / `eval.sampled_script_wr` | Final `greedy=` / `scripts=` windows (last 200 episodes) at the end of a PPO run; `null` when the window never filled |
+| `eval.promotions` / `eval.demotions` | How many times the curriculum promoted / demoted (R50 reversible promotion) |
+| `eval.eval_envs`, `eval.reservoir`, `eval.entropy_final`, `eval.move_std_final`, `eval.plateau_stop` | The R50 knobs the run used, and the plateau-stop reason (or `null`) — so tech/39 can be rebuilt from the registry alone |
 
 Weights are served on game servers only and never ship to clients (canon §9).
 

@@ -48,6 +48,10 @@
 # generation, reusing the same run folder (and therefore the same registry,
 # weights and progress feed).
 # Env knobs (PPO): STEPS (2000000) ENVS (512) ARCH (mlp) SELFPLAY_EVERY (4)
+#                  CLONE ('' | heuristic) PROMOTE_WR (0.60) PROMOTE_HOLD (3)
+#                  EVAL_ENVS (64) DEMOTE_WR (0.45) RESERVOIR (8)           # R50, 2026-09-19
+#                  ENTROPY_FINAL (0.001) MOVE_STD_FINAL (0.1)             # annealing
+#                  PLATEAU_UPDATES (0=off) PLATEAU_DELTA (0.02) PLATEAU_MIN_STEPS (0)
 #
 # --tournament is TRAIN ALL's other gear. The plain sweep trains every creature
 # ONE way (ES, or PPO with --ppo) and assumes that was the right way; the
@@ -92,6 +96,17 @@ fi
 JOBS="${JOBS:-$TRAIN_DEFAULT_JOBS}"; SEED="${SEED:-2026}"; SPEED="${SPEED:-max}"
 OPPONENTS="${OPPONENTS:-}"; CHECKPOINT_EVERY="${CHECKPOINT_EVERY:-25}"
 STEPS="${STEPS:-2000000}"; ENVS="${ENVS:-512}"; ARCH="${ARCH:-mlp}"  # ENVS was 32 pre-batching
+# The opponent curriculum (tech/25 5.1.2). CLONE=heuristic prepends the
+# behaviour-cloning stage; PROMOTE_* decide when scripts give way to self-play.
+PROMOTE_WR="${PROMOTE_WR:-0.60}"; PROMOTE_HOLD="${PROMOTE_HOLD:-3}"
+# R50 (2026-09-19): greedy probes (the number that SHIPS), reversible promotion,
+# snapshot reservoir, entropy/move-std annealing and the plateau stop. Each is
+# explained in ml/training/ppo.py --help and TRAINING_HYPERPARAMETERS.md (root).
+EVAL_ENVS="${EVAL_ENVS:-64}"; DEMOTE_WR="${DEMOTE_WR:-0.45}"; RESERVOIR="${RESERVOIR:-8}"
+ENTROPY_FINAL="${ENTROPY_FINAL:-0.001}"; MOVE_STD_FINAL="${MOVE_STD_FINAL:-0.1}"
+PLATEAU_UPDATES="${PLATEAU_UPDATES:-0}"; PLATEAU_DELTA="${PLATEAU_DELTA:-0.02}"
+PLATEAU_MIN_STEPS="${PLATEAU_MIN_STEPS:-0}"
+CLONE="${CLONE:-}"
 # NET is the SHAPE (architectures.json); ARCH above is the older mlp-vs-gru axis.
 NET="${NET:-}"; NET_ARG=(); [ -z "$NET" ] || NET_ARG=(--net "$NET")
 SELFPLAY_EVERY="${SELFPLAY_EVERY:-4}"
@@ -215,7 +230,8 @@ fi
 if [ $ALL -eq 1 ]; then KEYS_LABEL="all-creatures"; else KEYS_LABEL="$KEY"; fi
 if [ -n "$LABEL" ]; then KEYS_LABEL="${KEYS_LABEL}-${LABEL}"; fi
 if [ "$MODE" = "ppo" ]; then
-  KNOBS="steps${STEPS}_envs${ENVS}_${ARCH}_sp${SELFPLAY_EVERY}"
+  KNOBS="steps${STEPS}_envs${ENVS}_${ARCH}_sp${SELFPLAY_EVERY}_ev${EVAL_ENVS}"
+  [ "$PLATEAU_UPDATES" = 0 ] || KNOBS="${KNOBS}_pl${PLATEAU_UPDATES}"
 elif [ "$MODE" = "tournament" ]; then
   KNOBS="bracket-$(echo "$METHODS" | tr ',' '-')_bo${BEST_OF}_g${GENERATIONS}_p${POP}_e${EPISODES}"
 else
@@ -312,7 +328,12 @@ json.dump({
   "es": {"generations": $GENERATIONS, "pop": $POP, "episodes": $EPISODES,
          "jobs": $JOBS, "seed": $SEED, "speed": "$SPEED", "opponents": "$OPPONENTS"},
   "ppo": {"steps": $STEPS, "envs": $ENVS, "arch": "$ARCH",
-          "selfplay_every": $SELFPLAY_EVERY, "build": "$BUILD", "opp_build": "$OPP_BUILD"},
+          "selfplay_every": $SELFPLAY_EVERY, "build": "$BUILD", "opp_build": "$OPP_BUILD",
+          "promote_wr": $PROMOTE_WR, "promote_hold": $PROMOTE_HOLD, "clone": "$CLONE",
+          "eval_envs": $EVAL_ENVS, "demote_wr": $DEMOTE_WR, "reservoir": $RESERVOIR,
+          "entropy_final": $ENTROPY_FINAL, "move_std_final": $MOVE_STD_FINAL,
+          "plateau_updates": $PLATEAU_UPDATES, "plateau_delta": $PLATEAU_DELTA,
+          "plateau_min_steps": $PLATEAU_MIN_STEPS, "action_mask": "arena.mask.v1"},
   "tournament": {"methods": "$METHODS", "best_of": $BEST_OF,
                  "bracket_episodes": $BRACKET_EPISODES, "gate_episodes": $GATE_EPISODES,
                  "method_timeout": $METHOD_TIMEOUT, "teacher": "$TEACHER"},
@@ -360,7 +381,10 @@ if [ "$MODE" = "ppo" ]; then
     dh_rule "$I_KEY/$N_KEYS  ppo $key"
     dh_kv build "$build  vs  $opp_build"
     dh_kv budget "$STEPS steps · $ENVS envs · $ARCH · self-play every $SELFPLAY_EVERY"
-    dh_kv curriculum "scripts first, self-play at win rate $PROMOTE_WR held $PROMOTE_HOLD updates"
+    dh_kv curriculum "scripts first, self-play at GREEDY win rate $PROMOTE_WR held $PROMOTE_HOLD updates; demote below $DEMOTE_WR; reservoir $RESERVOIR"
+    dh_kv greedy "$EVAL_ENVS argmax probes ride the batch (never trained on) — greedy= is the number that ships"
+    dh_kv anneal "entropy 0.01 -> $ENTROPY_FINAL, move std 0.3 -> $MOVE_STD_FINAL over the budget"
+    [ "$PLATEAU_UPDATES" = 0 ] || dh_kv plateau "stop when greedy= gains < $PLATEAU_DELTA for $PLATEAU_UPDATES updates (armed after $PLATEAU_MIN_STEPS steps)"
     # STAGE 0 - clone the heuristic first (tech/25 5.1.2). OFF by default,
     # because it changes where the policy starts: CLONE=heuristic warm-starts
     # PPO from a net that already walks at the enemy instead of one whose move
@@ -391,6 +415,10 @@ if [ "$MODE" = "ppo" ]; then
         --selfplay-every "$SELFPLAY_EVERY" --seed "$SEED" \
         --promote-wr "$PROMOTE_WR" --promote-hold "$PROMOTE_HOLD" \
         "${WARM_ARG[@]}" "${NET_ARG[@]}" 2>&1 \
+        --eval-envs "$EVAL_ENVS" --demote-wr "$DEMOTE_WR" --reservoir "$RESERVOIR" \
+        --entropy-final "$ENTROPY_FINAL" --move-std-final "$MOVE_STD_FINAL" \
+        --plateau-updates "$PLATEAU_UPDATES" --plateau-delta "$PLATEAU_DELTA" \
+        --plateau-min-steps "$PLATEAU_MIN_STEPS" \
         | tee "$RUN/logs/$key.log" \
         | python3 -u "$REPO/tools/dh_trainfmt.py" --key "$key" || dh_err "ppo $key failed - see logs/$key.log"
     "$PYVENV" -u -m ml.training.league gate --key "$key" --build "$build" \

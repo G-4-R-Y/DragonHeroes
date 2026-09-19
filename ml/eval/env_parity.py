@@ -44,10 +44,10 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
 from ml.env.dh_env import (ACT_DODGE, DhEnv, balance_specs,   # noqa: E402
-                          make_spec, supports_dodge_flag, tick_hz)
+                          make_spec, supports_dodge_flag, tick_hz, mask_args)
 from ml.training import league                       # noqa: E402
 from ml.training.distill import TeacherNet           # noqa: E402
-from ml.training.policy_net import ACTION_LOGITS     # noqa: E402
+from ml.training.policy_net import ACTION_LOGITS, decode  # noqa: E402
 
 BASELINES = ("native", "scripted")
 
@@ -62,10 +62,12 @@ def deployed_json(key: str) -> str:
                      f"Pass --policy <path|native|scripted> explicitly.")
 
 
-def act_from(y: np.ndarray) -> tuple[tuple[float, float], int]:
-    """The runtime's decode, verbatim: clip the move, argmax the kit, dodge is
-    the last logit. Mirrors policy_net.act — if this drifts, the probe measures
-    its own bug instead of the environments'.
+def act_from(y: np.ndarray, obs: np.ndarray, kit_count: int,
+             is_player: bool) -> tuple[tuple[float, float], int]:
+    """The runtime's decode, verbatim: clip the move, MASKED argmax the kit
+    (arena.mask.v1), dodge is the last logit gated on a visible charge. It IS
+    policy_net.decode — if this drifts, the probe measures its own bug instead
+    of the environments'.
 
     The dodge logit is OR'd in as a flag rather than replacing the pick. It used
     to replace it (`7 if dodge else pick`), which is what the single-int C
@@ -73,9 +75,7 @@ def act_from(y: np.ndarray) -> tuple[tuple[float, float], int]:
     game/arena/neural_policy.gd attempts the pick and dodges only if the pick
     was refused. The difference was the bulk of this probe's own headline gap.
     """
-    move = np.clip(y[0:2], -1.0, 1.0)
-    pick = int(np.argmax(y[2:2 + ACTION_LOGITS]))
-    dodge = bool(y[2 + ACTION_LOGITS] > 0.0)
+    move, pick, dodge = decode(np.asarray(y), np.asarray(obs), kit_count, is_player)
     return (float(move[0]), float(move[1])), (pick + ACT_DODGE * int(dodge))
 
 
@@ -99,6 +99,7 @@ def run_dh_env(build: str, policy: str, opp: str, episodes: int,
     # the pool the env actually fought with.
     sa, sb = balance_specs(make_spec(build), make_spec(build))
     bar_a, bar_b = max(float(sa.max_hp), 1.0), max(float(sb.max_hp), 1.0)
+    kit_count, is_player = mask_args(build)
     wins = hp_self = hp_foe = ticks = dmg_self = dmg_foe = 0.0
     try:
         for e in range(episodes):
@@ -106,7 +107,7 @@ def run_dh_env(build: str, policy: str, opp: str, episodes: int,
             done = False
             for _ in range(max_ticks):
                 y = net.forward(np.concatenate([obs, emb])[None, :])[0]
-                move, act = act_from(y)
+                move, act = act_from(y, obs, kit_count, is_player)
                 done, obs = env.step(move, act)
                 if done:
                     break

@@ -51,7 +51,7 @@ from ml.training import arch as arch_mod                     # noqa: E402
 from ml.training import reward as reward_model               # noqa: E402
 from ml.training.arch import ACT_CODE, normalize_act         # noqa: E402
 from ml.training.gpu_guard import apply as gpu_apply, clamp_batch  # noqa: E402
-from ml.training.torch_policy import TorchPolicyNet, TorchGRUPolicyNet  # noqa: E402
+from ml.training.torch_policy import TorchPolicyNet, TorchGRUPolicyNet, mask_heads  # noqa: E402
 
 
 def policy_hidden_default() -> tuple[int, ...]:
@@ -111,6 +111,18 @@ GAMMA, LAM, CLIP, ENTROPY, LR, EPOCHS, MINIBATCHES = 0.99, 0.95, 0.2, 0.01, 3e-4
 # stands still). That is why PPO gated at win_rate 0.00 against scripted at
 # every budget while ES, which perturbs the whole parameter vector, passed.
 MOVE_STD = 0.3
+# ANNEALING (R50 decision, 2026-09-19). The trainer SAMPLES pi_theta; every
+# serving runtime (policy_net.act, neural_policy.gd, Arena::mlp_act,
+# env_parity) executes argmax pi_theta — a different policy from the same
+# weights. Measured on fen_boar v7.0: the sampled policy won 0.96 of episodes
+# against native, the greedy one 0.04, because at entropy ~1.94 nats the
+# argmax is "act 3 forever". Annealing the entropy bonus and the move std
+# towards zero over the run shrinks that gap by construction: as pi_theta
+# sharpens, sample and argmax converge. The FINAL values are what the run
+# ends on; the schedule is linear in done_steps. The greedy-eval envs below
+# report the number that actually ships, at every update.
+ENTROPY_FINAL = 0.001
+MOVE_STD_FINAL = 0.1
 SNAPSHOTS = REPO / "ml" / "data" / "ppo_snapshots"
 
 
@@ -199,6 +211,48 @@ def main() -> None:
                          "'reliably winning', not 'won once'")
     ap.add_argument("--selfplay-every", type=int, default=4,
                     help="refresh the frozen self-play opponent every K iterations")
+    # R50 (2026-09-19): the promotion gate used to read the SAMPLED win rate,
+    # which is a policy that never ships. These envs decode argmax exactly as
+    # policy_net.act / neural_policy.gd / Arena::mlp_act do, ride in the same
+    # step_many, and are EXCLUDED from the PPO update (their actions are not
+    # samples from pi_theta, so their log-probabilities mean nothing to the
+    # ratio). Their win rate is J(pi_theta^greedy) — the shipped number.
+    # 64 of 512 (12.5%): measured in the 2026-09-19 smoke, 32 probes needed
+    # ~56 updates (3.7M steps) to finish the 40 episodes the window requires;
+    # 64 needed ~28. The update loses 12.5% of its samples for a number that
+    # arrives twice as fast.
+    ap.add_argument("--eval-envs", type=int, default=64,
+                    help="envs that execute argmax (the serving decode); "
+                         "reported as greedy=, drive promotion, never trained on")
+    # Ricardo's curriculum fixes (2026-09-19): "interchange scripted vs
+    # self-play until we are constantly winning scripted, as to not exploit
+    # some strategy". Promotion is REVERSIBLE — fall below the floor and the
+    # self-play third goes back to scripts — and scripts are never dropped.
+    ap.add_argument("--demote-wr", type=float, default=0.45,
+                    help="greedy win rate vs scripts BELOW which a promoted "
+                         "run demotes back to scripts-only (hysteresis with "
+                         "--promote-wr; 0 disables)")
+    ap.add_argument("--reservoir", type=int, default=8,
+                    help="past snapshots kept for self-play; the opponent is "
+                         "drawn from this pool, not only the latest self, so "
+                         "the learner cannot overfit to one reflection")
+    ap.add_argument("--entropy-final", type=float, default=ENTROPY_FINAL,
+                    help=f"entropy bonus at the END of the run (linear from "
+                         f"{ENTROPY}; pass {ENTROPY} for constant)")
+    ap.add_argument("--move-std-final", type=float, default=MOVE_STD_FINAL,
+                    help=f"move-head Gaussian std at the END of the run "
+                         f"(linear from {MOVE_STD}; pass {MOVE_STD} for constant)")
+    # PLATEAU STOP: the 60M budget is a ceiling, not a target. Stop when the
+    # greedy win rate vs the scripts has not improved by --plateau-delta over
+    # the last --plateau-updates updates (0 disables). Only armed after
+    # --plateau-min-steps so a cold start is not mistaken for convergence.
+    ap.add_argument("--plateau-updates", type=int, default=0,
+                    help="stop early when greedy= has not improved for this "
+                         "many updates (0 = run the full --steps)")
+    ap.add_argument("--plateau-delta", type=float, default=0.02,
+                    help="the improvement that resets the plateau counter")
+    ap.add_argument("--plateau-min-steps", type=int, default=0,
+                    help="never plateau-stop before this many steps")
     ap.add_argument("--warm-start", default="", help="registry JSON/npz to init from")
     ap.add_argument("--exploit", default="",
                     help="policy_v1 JSON of a MAIN agent: train a dedicated "
@@ -222,6 +276,9 @@ def main() -> None:
                          "self-play snapshots disabled (C++ opponent is "
                          "stateless MLP) — opponents are native+scripted")
     args = ap.parse_args()
+    if args.eval_envs < 0 or args.eval_envs >= args.envs // 2:
+        raise SystemExit(f"--eval-envs {args.eval_envs} must be in "
+                         f"[0, {args.envs // 2}) for --envs {args.envs}")
 
     budget = gpu_apply()
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -311,6 +368,14 @@ def main() -> None:
     TICK_HZ = tick_hz()
     print(f"[ppo:{args.key}] reward model {reward_model.active_model()} "
           f"weights={reward_weights} terminal x{R_TERMINAL}")
+    # arena.mask.v1 (ml/env/dh_env.py): the body constants the mask needs.
+    # The rollout samples from the MASKED heads and the update recomputes the
+    # MASKED heads, so pi_theta is the policy the serving runtimes execute.
+    from ml.env.dh_env import mask_args
+    kit_count, is_player = mask_args(args.build)
+    print(f"[ppo:{args.key}] action mask arena.mask.v1: kit_count={kit_count} "
+          f"is_player={is_player} (unavailable actions -> -1e9 before softmax)",
+          flush=True)
     if not supports_dodge_flag():
         raise SystemExit(
             f"[ppo:{args.key}] REFUSING to start: libdh-env.so predates the "
@@ -330,7 +395,8 @@ def main() -> None:
     elif args.curriculum:
         # PHASE 1 — scripts only. Both of them: the gate requires beating
         # `scripted` AND `native`, so training against one and gating on two is
-        # how a net passes half a gate.
+        # how a net passes half a gate. Slot i%3==2 is the one that will flip
+        # to self-play on promotion; it starts as a script too.
         envs = [DhEnv(args.build, args.opp_build,
                       opp=("scripted" if i % 2 == 0 else "native"),
                       seed=args.seed + i, squad=squad)
@@ -348,8 +414,24 @@ def main() -> None:
             f"the curriculum could never leave its script phase and would look "
             f"exactly like a run that simply never self-played. Rebuild: "
             f"cmake --build sim/build -j   (or pass --no-curriculum)")
+    # The LAST eval_envs envs are the greedy probes. They are never handed to
+    # self-play (they measure the shipped policy against the SCRIPTS, the same
+    # opponents the gate uses) and never enter the update. The learner slots
+    # are the first N_train envs.
+    N_eval = args.eval_envs if (args.arch != "gru" and not squad) else 0
+    N_train = args.envs - N_eval
+    is_eval = np.zeros(args.envs, dtype=bool)
+    is_eval[N_train:] = True
+    if N_eval:
+        # the greedy probes alternate scripted/native regardless of mode, so
+        # greedy= is always "vs the gate's opponents"
+        for j, i in enumerate(range(N_train, args.envs)):
+            if envs[i].opp != ("scripted" if j % 2 == 0 else "native"):
+                envs[i].set_opp("scripted" if j % 2 == 0 else "native")
+    selfplay_slots = [i for i in range(2, N_train, 3)]
     mlp_envs = envs if args.exploit else \
-        ([] if (args.arch == "gru" or squad or curriculum) else envs[2::3])
+        ([] if (args.arch == "gru" or squad or curriculum)
+         else [envs[i] for i in selfplay_slots])
     # ONE ctypes crossing per tick instead of four per env per tick
     # (Ricardo, 2026-09-13: "do it!"). Measured on the dev box while it was
     # fully loaded: 32 envs 56.6k -> 352.6k steps/s (6.2x), 128 envs 55.0k ->
@@ -360,18 +442,39 @@ def main() -> None:
     prev_self = np.ones(args.envs, dtype=np.float32)
     prev_foe = np.ones(args.envs, dtype=np.float32)
 
+    # RESERVOIR (Ricardo, 2026-09-19). Self-play used to mean "the latest
+    # frozen self, on every self-play env" — a single opponent the learner can
+    # overfit to, and one that moves every K updates, so what it learned to
+    # beat last time is gone. The reservoir keeps the last --reservoir
+    # snapshots and hands each self-play env one of them, round-robin, so at
+    # any moment the learner faces a SPREAD of its own history. Every packed
+    # tuple stays referenced here: the C side borrows the pointers.
+    reservoir: list[tuple] = []
+
     def refresh_selfplay() -> None:
-        params, li, lo, emb, acts = pack_for_cpp(net)
+        packed = pack_for_cpp(net)
+        reservoir.append(packed)
+        del reservoir[:-max(1, args.reservoir)]
+        if args.reservoir > 1 and (args.exploit or not curriculum or promoted):
+            # keep the newest one on disk too, for post-mortems and env_parity
+            try:
+                SNAPSHOTS.mkdir(parents=True, exist_ok=True)
+                net.export_policy_v1(str(SNAPSHOTS / f"{args.key}_it{iteration:05d}.json"))
+                olds = sorted(SNAPSHOTS.glob(f"{args.key}_it*.json"))
+                for f in olds[:-args.reservoir]:
+                    f.unlink()
+            except OSError as exc:   # a full disk must not kill the run
+                print(f"[ppo:{args.key}] snapshot not written: {exc}", flush=True)
         exact = True
-        for e in mlp_envs:   # only the self-play third gets the fresh snapshot
-            exact = set_opp_weights(e._handle, params, li, lo, emb, acts)
+        for k, e in enumerate(mlp_envs):   # only the self-play slots
+            params, li, lo, emb, acts = reservoir[k % len(reservoir)]
+            exact = set_opp_weights(e._handle, params, li, lo, emb, acts) and exact
         if not exact and not refresh_selfplay.warned:
             refresh_selfplay.warned = True
             print(f"[ppo:{args.key}] WARNING libdh-env.so predates per-layer "
                   f"activations — the self-play opponent will run "
                   f"tanh/linear, not {net.arch.activation}. Rebuild: "
                   f"cmake --build sim/build -j", flush=True)
-        refresh_selfplay.keepalive = (params, li, lo, emb, acts)  # borrowed pointers!
     refresh_selfplay.warned = False
 
     iteration = 0
@@ -382,26 +485,54 @@ def main() -> None:
     # so pooling would let a policy promote on its own reflection.
     env_is_script = [True] * args.envs if curriculum else [False] * args.envs
     script_results: list[int] = []
+    # J(pi_theta^greedy) vs the scripts: outcomes of the eval envs only. This
+    # is the number promotion reads and the number the gate will see.
+    eval_results: list[int] = []
     promoted = not curriculum
     holding = 0
+    sinking = 0
+    promotions = 0
+    demotions = 0
 
     def promote() -> None:
-        """Phase 2: a third of the envs start fighting the learner's own frozen
-        snapshot. Weights FIRST — set_opp_policy refuses kMlp on an env that has
-        never been handed a net, which is the whole point of that refusal."""
-        nonlocal promoted, mlp_envs
-        mlp_envs = envs[2::3]
+        """Phase 2: a third of the TRAIN envs start fighting the learner's own
+        frozen snapshots. Weights FIRST — set_opp_policy refuses kMlp on an env
+        that has never been handed a net, which is the whole point of that
+        refusal. The eval envs never move: greedy= stays "vs scripts"."""
+        nonlocal promoted, mlp_envs, promotions, sinking
+        mlp_envs = [envs[i] for i in selfplay_slots]
+        promoted = True     # refresh_selfplay writes snapshots once promoted
         refresh_selfplay()
         switched = 0
-        for i in range(2, args.envs, 3):
+        for i in selfplay_slots:
             if envs[i].set_opp("mlp"):
                 env_is_script[i] = False
                 switched += 1
-        promoted = True
+        promotions += 1
+        sinking = 0
         print(f"[ppo:{args.key}] CURRICULUM phase 2/2 — PROMOTED at "
               f"iteration {iteration}, {done_steps:,} steps: {switched} of "
-              f"{args.envs} envs now fight past selves, the rest stay on "
-              f"scripts.", flush=True)
+              f"{N_train} train envs now fight past selves, the rest stay on "
+              f"scripts; {N_eval} greedy probes stay on scripts.", flush=True)
+
+    def demote(greedy_wr: float) -> None:
+        """Ricardo (2026-09-19): "interchange scripted vs self-play until we
+        are constantly winning scripted". The self-play slots go back to the
+        scripts when the SHIPPED policy stops beating them — self-play that
+        drifts away from what the gate measures is not progress."""
+        nonlocal promoted, mlp_envs, demotions, holding
+        for i in selfplay_slots:
+            envs[i].set_opp("scripted" if (i // 3) % 2 == 0 else "native")
+            env_is_script[i] = True
+        mlp_envs = []
+        promoted = False
+        holding = 0
+        demotions += 1
+        print(f"[ppo:{args.key}] CURRICULUM DEMOTED at iteration {iteration}, "
+              f"{done_steps:,} steps: greedy vs scripts {greedy_wr:.2f} < "
+              f"--demote-wr {args.demote_wr:.2f}; self-play slots are scripts "
+              f"again until it holds {args.promote_wr:.2f} for "
+              f"{args.promote_hold} updates.", flush=True)
     t0 = time.time()
     if args.exploit:
         # EXPLOITER MODE (AlphaStar league shape): the opponent is a FIXED
@@ -430,11 +561,22 @@ def main() -> None:
     # reward is the behaviour you want anyway, since a corpse is a corpse.
     ep_dealt = np.zeros(args.envs, dtype=np.float64)
     ep_absorbed = np.zeros(args.envs, dtype=np.float64)
+    # plateau tracking on greedy= (the shipped number)
+    best_greedy = -1.0
+    flat_updates = 0
+    stopped_early = ""
+    t_is_eval = torch.from_numpy(is_eval)
     while done_steps < args.steps:
         iteration += 1
         if not args.exploit and args.arch != "gru" and not squad \
                 and promoted and iteration % args.selfplay_every == 0:
-            refresh_selfplay()   # past-self becomes the opponent
+            refresh_selfplay()   # a past self becomes the opponent
+        # linear schedules in done_steps (R50): both reach their FINAL value on
+        # the last update of the nominal budget; a plateau stop leaves them
+        # part-way, which is what the run's log line records
+        frac = min(1.0, done_steps / max(1, args.steps))
+        move_std = MOVE_STD + (args.move_std_final - MOVE_STD) * frac
+        entropy_coef = ENTROPY + (args.entropy_final - ENTROPY) * frac
         # ---- rollout --------------------------------------------------------
         t_roll = time.time()
         T, N = t_horizon, args.envs
@@ -454,15 +596,24 @@ def main() -> None:
                     move, logits, dodge, value, h = net(t_obs, "*", h)
                 else:
                     move, logits, dodge, value = net(t_obs)
+                logits, dodge = mask_heads(logits, dodge, t_obs, kit_count, is_player)
                 act_dist = torch.distributions.Categorical(logits=logits)
                 dodge_dist = torch.distributions.Bernoulli(logits=dodge)
-                move_dist = torch.distributions.Normal(move, MOVE_STD)
+                move_dist = torch.distributions.Normal(move, move_std)
                 a = act_dist.sample()
                 d = dodge_dist.sample()
                 # the RAW sample is what the log-probability refers to; the env
                 # gets the clamped one. Storing the clamped sample instead would
                 # make the ratio disagree with the action that was actually taken.
                 m_raw = move_dist.sample()
+                if N_eval:
+                    # the greedy probes execute the SERVING decode: argmax
+                    # pick, dodge = logit > 0, move = the mean. Same weights,
+                    # the policy the four runtimes actually run.
+                    ev = t_is_eval.to(a.device)
+                    a = torch.where(ev, logits.argmax(-1), a)
+                    d = torch.where(ev, (dodge > 0).to(d.dtype), d)
+                    m_raw = torch.where(ev.unsqueeze(-1), move, m_raw)
                 m = m_raw.clamp(-1.0, 1.0)
                 logp = (move_dist.log_prob(m_raw).sum(-1)
                         + act_dist.log_prob(a) + dodge_dist.log_prob(d))
@@ -534,11 +685,18 @@ def main() -> None:
                             "seconds": float(tick_count[e]) / TICK_HZ,
                         }, reward_weights)
                         r[e] += R_TERMINAL * (ep_score - 0.5)
-                    results.extend(int(x) for x in w)
-                    if curriculum and not promoted:
-                        script_results.extend(
-                            int(w[j]) for j, e in enumerate(fin)
-                            if env_is_script[int(e)])
+                    # results: the TRAIN envs' sampled outcomes; eval_results:
+                    # the greedy probes'; script_results: sampled outcomes on
+                    # script envs — collected in EVERY phase now, so the
+                    # script number never goes dark after promotion
+                    for j, e in enumerate(fin):
+                        e = int(e)
+                        if is_eval[e]:
+                            eval_results.append(int(w[j]))
+                        else:
+                            results.append(int(w[j]))
+                            if env_is_script[e]:
+                                script_results.append(int(w[j]))
                     vec.reset_done(fin, rng.integers(1, 2**31, size=fin.size)
                                    .astype(np.uint64))
                     prev_self[fin] = 1.0
@@ -583,8 +741,10 @@ def main() -> None:
                     h_up = b_h0[mb].to(device)
                     logps, vals, ents = [], [], []
                     for t in range(T):
-                        move, logits, dodge, value, h_up = net(
-                            b_obs[t, mb].to(device), "*", h_up)
+                        o_t = b_obs[t, mb].to(device)
+                        move, logits, dodge, value, h_up = net(o_t, "*", h_up)
+                        logits, dodge = mask_heads(logits, dodge, o_t,
+                                                   kit_count, is_player)
                         stored = b_act[t, mb].to(device)
                         is_dodge = stored >= ACT_DODGE
                         a = stored % ACT_DODGE      # exact inverse of the encode
@@ -608,20 +768,26 @@ def main() -> None:
                     torch.nn.utils.clip_grad_norm_(net.parameters(), 0.5)
                     opt.step()
         else:
-            f_obs = b_obs.reshape(T * N, -1).to(device)
-            f_act = b_act.reshape(T * N).to(device)
-            f_logp = b_logp.reshape(T * N).to(device)
-            f_move = b_move.reshape(T * N, 2).to(device)
-            f_adv = adv.reshape(T * N).to(device)
-            f_ret = ret.reshape(T * N).to(device)
+            # the greedy probes are dropped here: their actions are argmax, not
+            # samples, so their stored log-probabilities are not log pi_theta(a|s)
+            # and the ratio would be meaningless for them
+            NT = N_train
+            f_obs = b_obs[:, :NT].reshape(T * NT, -1).to(device)
+            f_act = b_act[:, :NT].reshape(T * NT).to(device)
+            f_logp = b_logp[:, :NT].reshape(T * NT).to(device)
+            f_move = b_move[:, :NT].reshape(T * NT, 2).to(device)
+            f_adv = adv[:, :NT].reshape(T * NT).to(device)
+            f_ret = ret[:, :NT].reshape(T * NT).to(device)
             f_adv = (f_adv - f_adv.mean()) / (f_adv.std() + 1e-8)
             for _ in range(EPOCHS):
-                idx = torch.randperm(T * N, device=device)
-                for mb in idx.split((T * N) // MINIBATCHES):
+                idx = torch.randperm(T * NT, device=device)
+                for mb in idx.split((T * NT) // MINIBATCHES):
                     move, logits, dodge, value = net(f_obs[mb])
+                    logits, dodge = mask_heads(logits, dodge, f_obs[mb],
+                                               kit_count, is_player)
                     is_dodge = f_act[mb] >= ACT_DODGE
                     a = f_act[mb] % ACT_DODGE       # exact inverse of the encode
-                    logp = (torch.distributions.Normal(move, MOVE_STD)
+                    logp = (torch.distributions.Normal(move, move_std)
                             .log_prob(f_move[mb]).sum(-1)
                             + torch.distributions.Categorical(logits=logits).log_prob(a)
                             + torch.distributions.Bernoulli(logits=dodge).log_prob(
@@ -631,7 +797,7 @@ def main() -> None:
                     s2 = ratio.clamp(1 - CLIP, 1 + CLIP) * f_adv[mb]
                     loss = (-torch.min(s1, s2).mean()
                             + 0.5 * (value - f_ret[mb]).pow(2).mean()
-                            - ENTROPY * torch.distributions.Categorical(
+                            - entropy_coef * torch.distributions.Categorical(
                                 logits=logits).entropy().mean())
                     opt.zero_grad()
                     loss.backward()
@@ -643,31 +809,72 @@ def main() -> None:
         upd_s = time.time() - t_upd
         recent = results[-200:]
         wr = sum(1 for w in recent if w == 0) / max(1, len(recent))
+        # J(pi_theta) on the script envs — sampled, i.e. what the update sees
+        window = script_results[-200:]
+        script_wr = (sum(1 for w in window if w == 0) / len(window)
+                     if len(window) >= 40 else float("nan"))
+        # J(pi_theta^greedy) — the probes, argmax, vs scripts: what SHIPS
+        gwindow = eval_results[-200:]
+        greedy_wr = (sum(1 for w in gwindow if w == 0) / len(gwindow)
+                     if len(gwindow) >= 40 else float("nan"))
         # "once reliably wiining against it" — HELD, not touched. A win rate
         # that crosses the line for one update and falls back has not learned
-        # to beat the scripts, it has had a good batch.
-        script_wr = float("nan")
-        if curriculum and not promoted:
-            window = script_results[-200:]
-            # A promotion decided on a handful of episodes is noise wearing a
-            # threshold. Require a real sample before the counter can move.
-            if len(window) >= 40:
-                script_wr = sum(1 for w in window if w == 0) / len(window)
-                holding = holding + 1 if script_wr >= args.promote_wr else 0
+        # to beat the scripts, it has had a good batch. The gate number is the
+        # GREEDY one (R50); with --eval-envs 0 it falls back to the sampled
+        # script rate, which is the pre-2026-09-19 behaviour.
+        gate_wr = greedy_wr if N_eval else script_wr
+        if curriculum and gate_wr == gate_wr:      # not nan
+            if not promoted:
+                holding = holding + 1 if gate_wr >= args.promote_wr else 0
                 if holding >= args.promote_hold:
                     promote()
+            elif args.demote_wr > 0:
+                sinking = sinking + 1 if gate_wr < args.demote_wr else 0
+                if sinking >= args.promote_hold:
+                    demote(gate_wr)
+        # plateau on the shipped number, only once it exists and the floor is past
+        if args.plateau_updates and gate_wr == gate_wr \
+                and done_steps >= args.plateau_min_steps:
+            if gate_wr >= best_greedy + args.plateau_delta:
+                best_greedy = gate_wr
+                flat_updates = 0
+            else:
+                flat_updates += 1
         sps = done_steps / (time.time() - t0)
         shown = min(done_steps, args.steps)
         eta = max(0.0, (args.steps - done_steps)) / max(sps, 1.0)
+        phase_tag = ("" if not curriculum else
+                     (f"sp={len(mlp_envs)}({sinking}/{args.promote_hold}) "
+                      if promoted else f"hold={holding}/{args.promote_hold} "))
         # roll/upd split: after the batched dh_env_step_many landed, the
         # rollout is no longer the expensive half — the PPO update is.
         print(f"[ppo:{args.key}] it={iteration} steps={shown:,}/{args.steps:,} "
               f"sps={sps:,.0f} roll={roll_s:.1f}s({T * N / max(roll_s, 1e-6):,.0f}/s) "
               f"upd={upd_s:.1f}s win_rate(last {len(recent)})={wr:.2f} "
-              + (f"scripts={script_wr:.2f}({holding}/{args.promote_hold}) "
-                 if (curriculum and not promoted and script_wr == script_wr)
-                 else ("scripts=n/a " if (curriculum and not promoted) else ""))
+              + (f"scripts={script_wr:.2f} " if script_wr == script_wr
+                 else f"scripts=n/a({len(window)}) ")
+              + ("" if not N_eval else
+                 (f"greedy={greedy_wr:.2f} " if greedy_wr == greedy_wr
+                  else f"greedy=n/a({len(gwindow)}/40) "))
+              + phase_tag
+              + f"ent={entropy_coef:.4f} std={move_std:.3f} "
+              + (f"flat={flat_updates}/{args.plateau_updates} "
+                 if args.plateau_updates else "")
               + f"eta={int(eta) // 60:d}m{int(eta) % 60:02d}s", flush=True)
+        if args.plateau_updates and flat_updates >= args.plateau_updates \
+                and iteration >= MIN_UPDATES:
+            stopped_early = (f"greedy {gate_wr:.2f} flat within "
+                             f"{args.plateau_delta:.2f} of best {best_greedy:.2f} "
+                             f"for {flat_updates} updates")
+            print(f"[ppo:{args.key}] PLATEAU STOP at it={iteration}, "
+                  f"{done_steps:,}/{args.steps:,} steps: {stopped_early}",
+                  flush=True)
+            break
+    print(f"[ppo:{args.key}] final: win_rate={wr:.2f} scripts={script_wr:.2f} "
+          + (f"greedy={greedy_wr:.2f} " if N_eval else "")
+          + f"promotions={promotions} demotions={demotions} "
+          f"ent={entropy_coef:.4f} std={move_std:.3f} steps={done_steps:,}",
+          flush=True)
     # ---- export: the same JSON the Godot arena gates ------------------------
     WEIGHTS_DIR.mkdir(parents=True, exist_ok=True)
     reg = json.load(open(REGISTRY)) if REGISTRY.exists() else \
@@ -693,7 +900,18 @@ def main() -> None:
         "npz": None, "game_json": game_json, "deployed": False,
         "eval": {"build": args.build, "trainer": "ppo", "arch": args.arch,
                  "steps": done_steps, "selfplay": not args.exploit
-                 and args.arch != "gru"},
+                 and args.arch != "gru",
+                 # R50/R54: what the trainer measured, so the experiment ledger
+                 # can be rebuilt from the registry alone
+                 "greedy_wr": None if not N_eval or greedy_wr != greedy_wr
+                 else round(greedy_wr, 3),
+                 "sampled_script_wr": None if script_wr != script_wr
+                 else round(script_wr, 3),
+                 "promotions": promotions, "demotions": demotions,
+                 "eval_envs": N_eval, "reservoir": args.reservoir,
+                 "entropy_final": args.entropy_final,
+                 "move_std_final": args.move_std_final,
+                 "plateau_stop": stopped_early or None},
     })
     json.dump(reg, open(REGISTRY, "w"), indent=1)
     print(f"[ppo:{args.key}] registered v{version} (candidate) — gate it: "

@@ -80,6 +80,15 @@ for probes and replay traces only. **Observation schema `arena.obs.v1`** (31
 floats, fixed and versioned — header of `policy.gd`) + 16-dim embedding slot;
 `ml/training/policy_net.py` is the byte-exact numpy twin.
 
+The decode is part of the policy contract too (`arena.mask.v1`, 2026-09-19): a
+policy may only pick an action its body can take right now — attack/special/kit
+off cooldown, dodge with a charge — decided from the same delayed observation it
+reads, so the trainer, the numpy twin, this arena, the C++ frozen opponent and the
+parity probe all turn one head into one action. `neural_policy.gd::decode` is the
+arena's copy; `tests/mask_parity_test.tscn` pins it to the Python fixture. The
+number that promotes a net to self-play and gates it is the GREEDY (argmax) win
+rate against the scripts — what the arena actually runs — never the sampled one.
+
 ## Training loop (ml/)
 
 ```

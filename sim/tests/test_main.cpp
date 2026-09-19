@@ -3,6 +3,7 @@
 // adopting a framework. Every test here guards a canon contract.
 #include <cmath>
 #include <cstdio>
+#include <vector>
 #include <cstdlib>
 
 #include <dh/math/geom.hpp>
@@ -130,6 +131,80 @@ static void test_arena_action_budget_binds_both_sides() {
     const int capped = commits(6), uncapped = commits(0);
     CHECK(capped <= 6 * 10 + 1);            // 6 a second over 10 s, plus edge
     CHECK(uncapped > capped * 2);           // and the cap is what did it
+}
+
+static void test_arena_action_mask_is_one_rule() {
+    // arena.mask.v1 — hand-mirrors ml/tests/test_action_mask.py::fixture_cases,
+    // the fixture game/arena/tests/mask_parity_test.gd reads. If this and that
+    // ever disagree, the frozen self-play opponent is a different policy from
+    // the one the trainer optimizes and the arena ships.
+    using dh::sim::Arena;
+    constexpr int L = dh::sim::kActionLogits;
+    const float q = 1.0f / 16.0f;
+    float o[dh::sim::kObsDim] = {};
+    bool m[L];
+    Arena::action_mask(o, 4, false, m);
+    for (int i = 0; i < L; ++i) CHECK(m[i]);            // all ready: nothing hidden
+    o[7] = 1.0f;                                         // kit 0 cooling
+    Arena::action_mask(o, 4, false, m);
+    CHECK(m[0] && m[1] && m[2] && !m[3] && m[4] && m[5] && m[6]);
+    o[7] = q;                                            // one sixteenth still masks
+    Arena::action_mask(o, 4, false, m);
+    CHECK(!m[3] && m[4]);
+    o[7] = 0.0f; o[5] = 0.5f;                            // attack cooling
+    Arena::action_mask(o, 4, false, m);
+    CHECK(!m[1] && !m[2]);                               // creature special = a swing
+    Arena::action_mask(o, 4, true, m);
+    CHECK(!m[1] && m[2]);                                // player special has its own cd
+    o[5] = 0.0f; o[6] = q;
+    Arena::action_mask(o, 4, true, m);  CHECK(!m[2]);
+    Arena::action_mask(o, 4, false, m); CHECK(m[2]);     // o[6] means nothing to a creature
+    o[6] = 0.0f;
+    Arena::action_mask(o, 2, false, m);
+    CHECK(m[3] && m[4] && !m[5] && !m[6]);               // slots that do not exist
+    Arena::action_mask(o, 0, false, m);
+    CHECK(m[1] && !m[3] && !m[4] && !m[5] && !m[6]);
+    o[5] = 1.0f; for (int k = 0; k < 4; ++k) o[7 + k] = 1.0f;
+    Arena::action_mask(o, 4, false, m);
+    CHECK(m[0]); for (int i = 1; i < L; ++i) CHECK(!m[i]);   // only noop left
+    CHECK(!Arena::dodge_allowed(o));
+    o[12] = 0.25f;
+    CHECK(Arena::dodge_allowed(o));
+}
+
+static void test_arena_frozen_opponent_decodes_through_the_mask() {
+    // The self-play opponent is the ONE runtime that never goes through
+    // Python or GDScript, so it is the one that drifts unnoticed. A frozen
+    // head that wants kit 0 above all (logit 9), attack second (5), dodge
+    // negative: the unmasked argmax was "act 3 forever" — refused on every
+    // tick the kit cooled, no fallback, so the opponent committed NOTHING for
+    // 4 s after each cast. Through arena.mask.v1 the cooling kit is unavailable
+    // and the pick falls to the attack. exec_kit sets kit_cd unconditionally,
+    // so the sequence "3, then 1s until 3 again" is what must show up.
+    auto a = make_test_arena(21, dh::sim::OppPolicy::kScripted);   // opp = drake, 2 kits
+    constexpr int n_in = dh::sim::kObsDim + 16;
+    constexpr int n_out = 2 + dh::sim::kActionLogits + 1;
+    std::vector<float> params(static_cast<std::size_t>(n_in) * n_out + n_out, 0.0f);
+    float* b = params.data() + n_in * n_out;
+    b[2 + 3] = 9.0f;                                // kit 0
+    b[2 + 1] = 5.0f;                                // attack
+    b[2 + dh::sim::kActionLogits] = -1.0f;          // never dodge
+    const int li[1] = {n_in}, lo[1] = {n_out};
+    const int acts[1] = {dh::sim::Arena::kActLinear};
+    const float emb[16] = {};
+    a.set_opp_mlp(params.data(), li, lo, 1, emb, acts);
+    CHECK(a.set_opp_policy(dh::sim::OppPolicy::kMlp));
+    a.reset(21);
+    int kits = 0, attacks = 0, others = 0;
+    for (int t = 0; t < 1800 && !a.step({0.0f, 0.0f, 0}); ++t) {
+        const int c = a.last_commit(1);
+        if (c == 3) ++kits;
+        else if (c == 1) ++attacks;
+        else if (c >= 0) ++others;
+    }
+    CHECK(kits >= 1);        // the kit it wants fires whenever it is available
+    CHECK(attacks >= 3);     // and while it cools the mask hands it the attack
+    CHECK(others == 0);      // nothing else was ever picked
 }
 
 static void test_arena_minds_read_the_delayed_world() {
@@ -545,6 +620,8 @@ int main() {
     test_arena_obs_schema();
     test_arena_obs_is_delayed_for_fairness();
     test_arena_action_budget_binds_both_sides();
+    test_arena_action_mask_is_one_rule();
+    test_arena_frozen_opponent_decodes_through_the_mask();
     test_arena_minds_read_the_delayed_world();
     test_arena_swing_is_a_cone_not_a_circle();
     test_arena_conduct_combo();

@@ -180,6 +180,20 @@ class Arena {
     // that single action on 100.000% of ticks (measured 2026-09-14,
     // cinder_drake v6.0). Pay for effect, never for intent.
     int last_commit(int who) const { return last_commit_[who & 1]; }
+
+    // arena.mask.v1 (R50, 2026-09-19; ml/env/dh_env.py::action_mask). Which of
+    // the kActionLogits a policy may pick, from the obs it SEES plus two body
+    // constants. ONE rule in five runtimes — the torch trainer, the numpy twin,
+    // game/arena/neural_policy.gd, ml/eval/env_parity.py and mlp_act() below —
+    // so "argmax of the head" means the same action everywhere. Static and
+    // pure on purpose: it must not read live fighter state, only the (delayed)
+    // observation, or the frozen opponent would decode on information its
+    // Godot twin does not have.
+    //   0 always | 1 o[5]<=0 | 2 player: o[6]<=0, creature: o[5]<=0 |
+    //   3+k k<kit_count && o[7+k]<=0 | dodge flag: o[12]>0
+    static void action_mask(const float* o, int kit_count, bool is_player,
+                            bool allowed[kActionLogits]);
+    static bool dodge_allowed(const float* o) { return o[12] > 0.0f; }
     std::uint64_t tick() const { return tick_; }
     std::uint64_t state_hash() const;    // determinism fingerprint (tests)
 

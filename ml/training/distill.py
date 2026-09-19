@@ -256,9 +256,10 @@ def collect(teacher: TeacherNet, student: Student | None, emb: np.ndarray,
     """One DAgger round. `student is None` -> the TEACHER drives (round 0);
     otherwise the STUDENT drives and the teacher only labels, so the samples come
     from the distribution the student will actually be in."""
-    from ml.env.dh_env import DhEnv, VecDhEnv
+    from ml.env.dh_env import DhEnv, VecDhEnv, action_mask, dodge_allowed, mask_args
     vec = VecDhEnv([DhEnv(build, opp_build, opp=opp, seed=seed + i)
                     for i in range(envs)], threads=threads)
+    kit_count, is_player = mask_args(build)
     rng = np.random.default_rng(seed)
     obs = vec.reset(np.arange(envs, dtype=np.uint64) + seed)
     xs = np.empty((steps, OBS_DIM + EMB_DIM))
@@ -280,8 +281,13 @@ def collect(teacher: TeacherNet, student: Student | None, emb: np.ndarray,
             # dropped it, so every DAgger state came from a driver that could
             # never dodge — the exact divergence the dodge-contract commit fixed
             # in the other three runtimes.
-            acts = np.argmax(drive[:, 2:2 + ACTION_LOGITS], axis=1).astype(np.int32)
-            acts |= (drive[:, 2 + ACTION_LOGITS] > 0.0).astype(np.int32) * ACT_DODGE
+            # arena.mask.v1: the driver decodes like every serving runtime —
+            # argmax over the AVAILABLE actions, dodge only with a charge
+            allowed = action_mask(obs, kit_count, is_player)
+            acts = np.argmax(np.where(allowed, drive[:, 2:2 + ACTION_LOGITS], -np.inf),
+                             axis=1).astype(np.int32)
+            acts |= ((drive[:, 2 + ACTION_LOGITS] > 0.0) & dodge_allowed(obs)
+                     ).astype(np.int32) * ACT_DODGE
             obs, done, _hp, winner = vec.step(moves, acts)
             idx = np.flatnonzero(done)
             if idx.size:

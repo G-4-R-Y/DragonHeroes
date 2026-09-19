@@ -250,6 +250,18 @@ installed locally for the Codex desktop exports; no touch controls; no mobile pe
 helpers, bundles the offline review, records source/file hashes and verifies
 archives. Windows uses `sim/build-codex-windows` to avoid upstream's tracked
 build cache. `tools/build_app_icon.py` derives PNG + six-size ICO from a curated
+**2026-09-19 (R50 built):** `arena.mask.v1` action mask in all five runtimes
+(`ml/env/dh_env.py` rule; `torch_policy.mask_heads`, `policy_net.decode`,
+`neural_policy.gd::decode`, `Arena::action_mask`/`mlp_act`, `env_parity.act_from`)
+pinned by `game/arena/tests/fixtures/action_mask_v1.json` — gates:
+`ml/tests/test_action_mask.py`, `godot --headless --path game
+res://arena/tests/mask_parity_test.tscn` (MASK PARITY OK), `sim-tests`. PPO:
+greedy probes (`--eval-envs`), promotion on `greedy=` and reversible
+(`--demote-wr`), snapshot reservoir, β/std annealing, plateau stop; knobs
+plumbed through `tools/train_run.sh` and recorded in each run's `config.json`.
+Ledger: `docs/tech/39-experiment-ledger.md` via `tools/experiment_ledger.py`.
+Status: smoke-verified (fen_boar mirror: env_parity OK, greedy wins 1.00 vs
+native in both runtimes); converged 60 M run is the next gate.
 original; `tools/verify_package.py` checks actual Windows PE icon bytes and
 Linux executable formats. Actual release-PCK smoke verifies a streaming Hunt;
 fixed the exported helper capability check that silently selected an island. Source: `genforge/art_sources/app_icon/`; outputs:

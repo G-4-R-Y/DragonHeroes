@@ -43,6 +43,7 @@ if str(ROOT) not in sys.path:
 
 from ml.training.arch import (Arch, activation_grad,  # noqa: E402
                               apply_activation, resolve)
+from ml.env.dh_env import action_mask, dodge_allowed   # noqa: E402
 
 OBS_DIM = 31
 EMB_DIM = 16
@@ -129,13 +130,13 @@ class PolicyNet:
             x = apply_activation(w @ x + b, a)
         return x
 
-    def act(self, obs: np.ndarray, key: str = "*") -> tuple[np.ndarray, int, bool]:
-        """Mirror of the GDScript _act: move vector, argmax action, dodge flag."""
-        y = self.forward(obs, key)
-        move = np.clip(y[0:2], -1.0, 1.0)
-        pick = int(np.argmax(y[2 : 2 + ACTION_LOGITS]))
-        dodge = bool(y[2 + ACTION_LOGITS] > 0.0)
-        return move, pick, dodge
+    def act(self, obs: np.ndarray, key: str = "*", kit_count: int = 4,
+            is_player: bool = False) -> tuple[np.ndarray, int, bool]:
+        """Mirror of the GDScript _act: move vector, MASKED argmax action,
+        masked dodge flag. kit_count/is_player are the body constants the mask
+        needs (ml.env.dh_env.mask_args); the defaults mean "a creature whose
+        four kit slots all exist", i.e. only the cooldown channels mask."""
+        return decode(self.forward(obs, key), obs, kit_count, is_player)
 
     # ---- flat parameter vector (ES / evolution) -------------------------------
 
@@ -219,3 +220,19 @@ class PolicyNet:
             ],
         }
         Path(path).write_text(json.dumps(doc))
+
+
+def decode(y: np.ndarray, obs: np.ndarray, kit_count: int,
+           is_player: bool) -> tuple[np.ndarray, int, bool]:
+    """THE serving decode, arena.mask.v1 (ml/env/dh_env.py): clip the move,
+    argmax over the AVAILABLE action logits (first max wins a tie, as in every
+    runtime), dodge = logit > 0 AND a charge is visible. game/arena/
+    neural_policy.gd::decode, dh::sim::Arena::mlp_act and ml/eval/env_parity.py
+    ::act_from are this function; game/arena/tests/fixtures/action_mask_v1.json
+    pins all of them to the same cases."""
+    move = np.clip(y[0:2], -1.0, 1.0)
+    logits = np.where(action_mask(obs, kit_count, is_player),
+                      y[2 : 2 + ACTION_LOGITS], -np.inf)
+    pick = int(np.argmax(logits))
+    dodge = bool(y[2 + ACTION_LOGITS] > 0.0) and bool(dodge_allowed(obs))
+    return move, pick, dodge

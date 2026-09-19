@@ -823,6 +823,145 @@ Rebuild after the packaging commit for clean provenance; archives remain in
        which is what `pre_tick` actually uses).
     8. **THE MOVE MAGNITUDE WAS NEVER READ BY THE GAME.** `fighter.gd::pre_tick`
        spends a move command two different ways: a player body gets
+  **INTERRUPTION 2026-09-19 — R52/R53/R54 + the R50 decision, recorded VERBATIM
+  before work.**
+  *"do it!"* — on the plan "curriculum + greedy eval (ppo.py only), masking in
+  all five runtimes with a parity test, annealing, then the 60M run with plateau
+  stop", after two turns of explanation (see the train/deploy block below).
+  *"and /goal on all remaining roadmap itens! We want a new asset generator with
+  hifi dark fantasy pixel art sprites! I'll give further details in the
+  following prompt. Make sure to give it your best, as you'll be put against
+  astra"*
+  *"also, give me a brief explanation of those hyperparameter changes in a .md
+  file in the root, please! and make sure to properly document all our
+  experiments, with different hyperparameters!"*
+
+  | R52 | NOW / details RECEIVED 2026-09-19 (block below) | A NEW asset generator: hi-fi dark-fantasy pixel-art SPRITES in the Dead Cells / Phantom Tower register — master prompt + mandatory negative prompt + five rendering pillars, recorded verbatim below. Benchmarked against "astra". | genforge; art/ style bible; Godot CanvasTexture normal/emissive channels; queued AFTER the R50 build order (Ricardo's stated order) |
+  | R53 | NOW | A brief `.md` in the REPO ROOT explaining the hyperparameter changes (masking, greedy eval/promotion, β + move-std annealing, reversible promotion, snapshot reservoir, plateau stop). | `TRAINING_HYPERPARAMETERS.md` at the root |
+  | R54 | NOW / standing | Properly document EVERY experiment with its hyperparameters — a ledger, not prose: run id, knobs, result, verdict, kept or not. Every past run that can still be reconstructed goes in too. | `docs/tech/39-experiment-ledger.md`; `tools/train_run.sh` already records `config.json` per run — the ledger indexes them |
+
+  **R50 DECISION (2026-09-19): Option A with masking, measured against B at the
+  end.** In RL terms, the same πθ trained the same way; the choice was the
+  EXECUTION rule (mode vs sample). Ricardo's own additions, adopted verbatim:
+  interleave scripts and self-play rather than a one-way promotion ("until we
+  are constantly winning scripted, as to not exploit some strategy"), and more
+  stochasticity in training where there is no counterpoint (opponents and
+  environment — not the policy, which is the gap itself). Build order:
+    1. `ppo.py` only: greedy-eval envs riding in the batch (excluded from the
+       update), dual reporting J(πθ) / J(πθ^greedy), promotion driven by the
+       GREEDY number, promotion REVERSIBLE (demote below a floor), scripts
+       never dropped to zero, self-play opponent drawn from a RESERVOIR of past
+       snapshots rather than only the latest.
+    2. Action MASKING in all five runtimes (torch trainer, numpy twin, GDScript,
+       C++ `mlp_act`, `env_parity`) — unavailable actions to −∞ before the
+       softmax, derived from the observation alone so it is bit-identical
+       everywhere — plus a parity test that pins it.
+    3. Anneal β 0.01 → 0.001 and move std 0.3 → 0.1 over the run.
+    4. The converged run: 60 M steps per creature as the BUDGET, stopped early on
+       a plateau of the greedy eval win rate vs scripted+native. Then a post-hoc
+       sampled-vs-greedy measurement on the converged nets decides whether B's
+       runtime change is ever built.
+
+  **R52 DETAILS ARRIVED (2026-09-19, mid-turn, while step 1 of R50 was being
+  written) — recorded VERBATIM in substance before continuing; the spec is
+  Ricardo's, the generator is to be built against it.** The brief is a
+  conversation (Portuguese) on "the technical pillars of Dead Cells and
+  Phantom Tower", using a moss-covered guardian stag boss as the worked
+  example. It fixes FIVE rendering pillars, a style matrix, a vocabulary, a
+  MASTER PROMPT and a MANDATORY NEGATIVE PROMPT:
+  1. **Real-time 2D normal-map lighting** — every sprite ships a hidden normal
+     map (XYZ of each surface plane in RGB); dungeon lights (torches, elemental
+     spells, blades) cast specular + dynamic shadow on the sprite at 60 FPS
+     with the pixel texture intact.
+  2. **Emissive channel + HDR bloom stacking** — the glowing core (the stag's
+     turquoise chest) is an EMISSION channel, not a light colour; the engine
+     blooms it and it lights floor and enemies as it moves in the dark.
+  3. **3D→2D / bone-rig animation pipeline** — models built and animated in 3D
+     at 60 FPS (cloth/weapon physics), rendered to native low resolution
+     through an INDEXED-PALETTE filter so the result reads as hand-drawn pixel
+     art: cinematic fluidity, anatomical weight, zero hand-drawn frames.
+  4. **GPU particles at 60 FPS over DISCRETE sprites** — the creature cycles
+     12–16 crisp heavy key poses per cycle (combat impact preserved); spores,
+     leaves, smoke, dust, magic rays are GPU particle systems at true 60 FPS.
+  5. **Solid fast-read outline (high-contrast dark ink)** — a continuous dark
+     perimeter line, 1–2 px, unbreakable; selective outlining or lineless edges
+     make a monster invisible among dozens of enemies + elemental VFX. It is a
+     GAMEPLAY requirement (hitbox + posture read in a tenth of a second).
+  **Style matrix (retro 90s → Dead Cells/Phantom Tower):** lighting static
+  hand-drawn → dynamic 2D via normal maps + point lights; bioluminescence
+  static light pixels → active emissive channel + HDR bloom; edges soft
+  sel-out/irregular black → solid unbreakable 1–2 px dark outline; animation
+  pure frame-by-frame 8–12 FPS → hybrid discrete key poses + 60 FPS VFX/lights;
+  depth flat/simple parallax → directional volumetric shading, normal-shader
+  ready.
+  **Vocabulary to specify the style:** *Normal-Map Ready Geometry* (faceted
+  surfaces at clear angles), *Emissive Channel Mask* (eyes/runes/crystals
+  separated for dynamic light), *Volumetric Cluster Shading* (dense anatomical
+  masses as big colour blocks with rich tonal transitions, no point noise),
+  *Ink-Hold Perimeter* (continuous dark outer contour anchoring the silhouette
+  regardless of room lighting), *Sub-Pixel Lighting Modulation* (inner glow
+  varying smoothly — breathing, magic flow).
+  **MASTER PROMPT (verbatim):** `[Creature/boss description, e.g.: Ancient
+  moss-covered guardian stag boss with massive petrified wood antlers carrying
+  a hanging bronze bell, shelf mushrooms on back, glowing crystal core in
+  chest], hi-bit modern dark fantasy pixel art sprite, Dead Cells and Phantom
+  Tower visual benchmark. 256x256 pixel grid, profile combat stance. Thick
+  continuous solid dark-ink perimeter outline, strictly zero selective
+  outlining (sel-out), zero lineless edges. Volumetric cluster shading with
+  deep 8-shade color ramps, pronounced directional hue-shifting, and
+  normal-map-ready planar depth. Dedicated high-contrast emissive core with
+  sharp unshaded glow highlights ready for engine HDR bloom. Crisp native 1:1
+  pixel grid, strictly zero mixels, no algorithmic interpolation blur, no
+  noisy dithering, no pillow shading, isolated game asset on a clean
+  transparent background.`
+  **MANDATORY NEGATIVE PROMPT (verbatim):** `selective outline, sel-out,
+  lineless, 90s low-res arcade, flat retro colors, blurry anti-aliasing, soft
+  airbrush, 3D smooth mesh render, vector art, mixels, pillow shading, noisy
+  dithering, faint edges, washed-out colors, compression artifacts.`
+  **What this implies for the generator (strategy, not yet built):** prompt
+  assembly from a creature description + this fixed style block + the fixed
+  negative; post-processing that ENFORCES the pillars the model cannot be
+  trusted on — 1:1 pixel-grid snap (no mixels), indexed palette with 8-shade
+  ramps, perimeter-outline verification/repair, emissive mask extraction as a
+  separate channel, normal-map derivation from the shaded sprite (for Godot
+  `CanvasTexture` normal + specular), transparent-background enforcement — plus
+  a gate that measures each of those and refuses assets that fail. It plugs
+  into genforge next to the existing curated pipeline (canon §3 gen-AI is
+  "style-locked, palette-enforced, human-directed"). Benchmark opponent:
+  "astra". Ricardo may add more details; keep recording them here.
+  **2026-09-19, minutes later:** Ricardo: *"keep working and just add consider
+  this. I've just added it to sprites prompt.md in the project's root
+  directory."* — the brief is ALSO the file **`sprites prompt.md`** at the repo
+  root (Ricardo's file; read it in full when R52 starts, treat it as the
+  source, this block as the index).
+
+  **R50 BUILT — status at 2026-09-19 (steps 1–3 of Ricardo's order done and
+  gated; step 4 launching).** (1) `ppo.py`: `--eval-envs 64` greedy probes in
+  the same `step_many`, excluded from the update, `greedy=` beside `scripts=`;
+  promotion on the greedy number, reversible (`--demote-wr 0.45`), scripts never
+  dropped (⅓/⅓/⅓ after promotion, probes always on scripts), `--reservoir 8`
+  snapshot pool round-robin (+ `ml/data/ppo_snapshots/`). (2) `arena.mask.v1`
+  in all five runtimes — `ml/env/dh_env.py` rule, `torch_policy.mask_heads`,
+  `policy_net.decode`, `neural_policy.gd::decode`, `Arena::action_mask` in
+  `mlp_act`, `env_parity.act_from`, plus `distill.py`'s driver — pinned by one
+  18-case fixture: `ml/tests/test_action_mask.py` (7 tests), `godot --headless
+  res://arena/tests/mask_parity_test.tscn` → MASK PARITY OK, `sim-tests` (rule
+  + frozen-opponent integration) all green. (3) β 0.01→0.001, move std
+  0.3→0.1 linear (`--entropy-final/--move-std-final`). Plateau stop
+  (`--plateau-updates/-delta/-min-steps`). Knobs plumbed through
+  `tools/train_run.sh` into each run's `config.json`. SMOKES (fen_boar mirror):
+  step-2 (3.28 M, mask on) promoted at it=40 on greedy, plateau-stopped at
+  it=50, `greedy=` 0.32 vs sampled 0.59; `env_parity` on the exported net:
+  PARITY OK, **win 1.00 in dh-env and the arena** vs native. 165–175 k sps →
+  60 M ≈ 6 min/creature. **R53 DONE**: `TRAINING_HYPERPARAMETERS.md` at the
+  root. **R54 DONE + standing**: `docs/tech/39-experiment-ledger.md`, table
+  generated by `tools/experiment_ledger.py --write` from `ml/runs/*/config.json`
+  (9 past runs indexed with context; scratch smokes by hand). NEXT: step 4 —
+  `STEPS=60000000 PLATEAU_UPDATES=80 PLATEAU_DELTA=0.02 PLATEAU_MIN_STEPS=20000000
+  CLONE=heuristic tools/train_all.sh --ppo` (all creatures, from scratch, local
+  GPU), then the post-hoc sampled-vs-greedy on the converged nets decides
+  whether Option B is ever built; then R52 (spec in `sprites prompt.md`).
+
        `_move_dir.limit_length(1.0) * speed`, but a CREATURE body gets
        `if len > 0.05: _move_dir.NORMALIZED() * _speed()` — the magnitude is
        thrown away, so any command longer than 0.05 moves at FULL speed. The sim
@@ -975,6 +1114,48 @@ Rebuild after the packaging commit for clean provenance; archives remain in
      ceiling. `ml/training/distill.py` already has the machinery.
   2. **The gate must refuse a net that loses to a statue.** *"Add the
      statue/heuristic controls to the gate"* — the statue is a hard floor
+  **AND WITH THE ENVIRONMENT CLOSED, A SECOND DIVERGENCE IS NOW VISIBLE — PPO
+  DOES NOT OPTIMIZE THE POLICY THE GAME DEPLOYS (2026-09-14, R50 BLOCKER).**
+  First: with a net that actually plays, **`env_parity` PASSES for the first
+  time** — every term, absolute and rate, inside tolerance (the 1 M-step smoke
+  candidate, 16 episodes vs scripted). The residual gaps in the table above
+  were the degenerate deployed pin, not the sim. So the environment question is
+  settled.
+  What that made visible: a 1 M-step smoke printed `win_rate 0.94` while its
+  gate read `suite_scripted 0.00` and `suite_native 0.00`. Same weights, same
+  build, same opponent. The cause is not the environment:
+    * `ml/training/ppo.py` rolls out and scores a STOCHASTIC policy —
+      `Categorical(logits).sample()`, `Normal(move, MOVE_STD=0.3).sample()`,
+      `Bernoulli(dodge).sample()`.
+    * EVERY serving runtime is GREEDY — `np.argmax` in `policy_net.py::act` and
+      `ml/eval/env_parity.py`, the max loop in `game/arena/neural_policy.gd`,
+      and `Arena::mlp_act` in C++. Move is the raw mean; dodge is a threshold.
+  MEASURED, same weights, 16-24 episodes, two independent nets:
+
+  | net | vs scripted | vs native |
+  |---|---|---|
+  | smoke v7.0, GREEDY (what the gate runs) | 0.00 | **0.04** |
+  | smoke v7.0, SAMPLED (what PPO reports) | 0.21 | **0.96** |
+  | deployed v6.0, GREEDY | 0.00 | 0.50 |
+  | deployed v6.0, SAMPLED | 0.25 | 0.88 |
+
+  So PPO's objective, its printed win rate, AND the R50 curriculum's promotion
+  gate all describe a policy that never ships. The argmax of a high-entropy
+  categorical is close to arbitrary — the entropy bonus is actively keeping the
+  distribution broad, and the deployed policy reads one number off it.
+  **This blocks the converged run**: 20 M steps per creature would promote on a
+  sampled win rate and be graded on a greedy one, which is the same class of
+  mistake as training in the wrong environment. Two coherent fixes, and they
+  are materially different work — Ricardo's call:
+    (A) DEPLOY WHAT YOU TRAIN — make the four runtimes SAMPLE (seeded, so the
+        arena stays reproducible). Faithful to the objective; bots become
+        non-deterministic and harder to exploit; touches all four runtimes and
+        the "four runtimes must agree" contract.
+    (B) TRAIN WHAT YOU DEPLOY — keep greedy serving; make PPO's reported win
+        rate and its promotion gate GREEDY, and anneal entropy/MOVE_STD so the
+        greedy policy converges to the stochastic one. Standard practice,
+        smaller blast radius, but throws away the sampled policy's edge.
+
      (refuse deployment below it) and the heuristic is a reported yardstick.
      This is deliberately independent of decision 1: it stops this class of
      regression shipping again whatever produces the nets.

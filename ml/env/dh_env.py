@@ -31,6 +31,55 @@ OPP = {"native": 0, "scripted": 1, "mlp": 2}
 _ACT_NAMES = ["noop", "attack", "special", "skill1", "skill2", "skill3",
               "skill4", "dodge"]
 ACT_NOOP, ACT_ATTACK, ACT_SPECIAL, ACT_DODGE = 0, 1, 2, 7
+ACTION_LOGITS = 7          # noop, attack, special, skill1..4 — the categorical
+
+# ---- arena.mask.v1: ACTION MASKING (R50, 2026-09-19) -------------------------
+# Which of the seven action logits are AVAILABLE, computed from what the policy
+# can see plus two body constants (kit_count, is_player) every runtime knows
+# about its own fighter. Unavailable logits go to MASK_NEG before the softmax
+# (trainer) or are skipped by the argmax (serving), so pi_theta never puts
+# probability on an action the sim would refuse. Why this matters for the KITS
+# specifically: a kit on an 8 s cooldown is a no-op on ~299 of every 300 ticks
+# it is selectable, so without the mask the credit for "cast a kit" is spread
+# across 300 refused picks and one real cast — the gradient towards using the
+# kit at all is 1/300 of what it should be, and the measured result was nets
+# that argmax to "act 3 forever" (fen_boar v7.0) or never fire a kit (v6.0).
+#
+# The rule reads the obs the net sees — the DELAYED one (canon §9 §6) — so it
+# is bit-identical in ml/training/policy_net.py, ml/training/torch_policy.py,
+# game/arena/neural_policy.gd, dh::sim::Arena::action_mask and
+# ml/eval/env_parity.py. It is a property of the obs contract, which is why it
+# lives here and not in a trainer. Channels: o[5] attack cd fraction, o[6]
+# special cd fraction (players; a creature's "special" is one more basic swing
+# and shares o[5]), o[7+k] kit k cd fraction, o[12] dodge charges (0 for every
+# body without dodges). A cooldown fraction is EXACTLY 0.0 when ready.
+MASK_SCHEMA = "arena.mask.v1"
+# Finite on purpose: exp(MASK_NEG - lse) underflows to exactly 0.0 in float32,
+# and unlike -inf it cannot produce inf*0 = nan in an entropy or a BCE term.
+MASK_NEG = -1.0e9
+
+
+def action_mask(obs, kit_count: int, is_player: bool) -> np.ndarray:
+    """arena.mask.v1 -> bool[..., ACTION_LOGITS], True = available. `obs` is
+    [..., >=13] (v1 or v2 layout; the channels used are shared)."""
+    o = np.asarray(obs, dtype=np.float32)
+    m = np.ones(o.shape[:-1] + (ACTION_LOGITS,), dtype=bool)
+    m[..., 1] = o[..., 5] <= 0.0
+    m[..., 2] = (o[..., 6] <= 0.0) if is_player else (o[..., 5] <= 0.0)
+    for k in range(4):
+        m[..., 3 + k] = (o[..., 7 + k] <= 0.0) if k < kit_count else False
+    return m
+
+
+def dodge_allowed(obs) -> np.ndarray:
+    """The dodge FLAG's mask: a charge must be visible. bool[...]."""
+    return np.asarray(obs, dtype=np.float32)[..., 12] > 0.0
+
+
+def mask_args(build_id: str) -> tuple[int, bool]:
+    """(kit_count, is_player) of a build, as the sim sees them (make_spec)."""
+    s = specs()[build_id]
+    return min(len(s.get("kits", [])), 4), bool(s.get("is_player", False))
 
 
 class _FighterSpec(ctypes.Structure):
@@ -269,6 +318,9 @@ class DhEnv:
         # interpreter cleanup that hides the one you actually need to read.
         self._handle = None
         self.build_a, self.build_b = build_a, build_b
+        # what the opponent's MIND is right now ("native"/"scripted"/"mlp");
+        # set_opp keeps it current so a trainer can read back its own curriculum
+        self.opp = opp
         sa, sb = make_spec(build_a), make_spec(build_b)
         if balance:
             sa, sb = balance_specs(sa, sb)
@@ -312,7 +364,10 @@ class DhEnv:
                 "libdh-env predates dh_env_set_opp_policy: the opponent "
                 "curriculum cannot switch and every phase would silently stay "
                 "on the first one. Rebuild: cmake --build sim/build -j")
-        return bool(fn(self._handle, OPP[opp]))
+        ok = bool(fn(self._handle, OPP[opp]))
+        if ok:
+            self.opp = opp
+        return ok
 
     @property
     def winner(self) -> int:

@@ -59,6 +59,7 @@
 | [36-official-content-and-trust](tech/36-official-content-and-trust.md) | Official/modded provenance, promotion/anti-cheat gates, bot rating and 100v100 capacity proof |
 | [37-ml-parameter-reference](tech/37-ml-parameter-reference.md) | Every ML parameter and hyperparameter, every artifact produced, who consumes it, and how nets are benchmarked |
 | [38-reward-model-history](tech/38-reward-model-history.md) | Every version of the reward model, what each one scored, why it was replaced, and the measurement that proved it |
+| [39-experiment-ledger](tech/39-experiment-ledger.md) | Every training run with its hyperparameters and verdict — generated from `ml/runs/*/config.json` by `tools/experiment_ledger.py`; scratch experiments by hand |
 | **business/** | |
 | [30-legal-payments-compliance](business/30-legal-payments-compliance.md) | Brazilian gambling/minors law, PSPs, tax, AML, LGPD — **read before launch decisions** |
 | [31-roadmap](business/31-roadmap.md) | M0→M6 milestones, exit gates, parallel tracks, risk register |

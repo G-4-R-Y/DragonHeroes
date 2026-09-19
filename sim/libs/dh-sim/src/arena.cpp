@@ -349,6 +349,20 @@ Action Arena::scripted_act(int who, float dt) {
     return act;
 }
 
+void Arena::action_mask(const float* o, int kit_count, bool is_player,
+                        bool allowed[kActionLogits]) {
+    // A cooldown fraction is EXACTLY 0.0f when ready (build_obs clamps
+    // cd / spec_cd at 0), so <= 0 is the test in every runtime.
+    const bool attack_ready = o[5] <= 0.0f;
+    allowed[0] = true;
+    allowed[1] = attack_ready;
+    // fighter.gd::cmd_special sends a creature's "special" to bot_attack — one
+    // more basic swing on the basic cooldown; only a geared player has o[6].
+    allowed[2] = is_player ? (o[6] <= 0.0f) : attack_ready;
+    for (int k = 0; k < 4; ++k)
+        allowed[3 + k] = k < kit_count && o[7 + k] <= 0.0f;
+}
+
 Action Arena::mlp_act(int who) {
     Action act{};
     if (mlp_params_ == nullptr || mlp_layers_ <= 0 || squad_)
@@ -366,6 +380,11 @@ Action Arena::mlp_act(int who) {
         build_obs(f_[who], f_[1 - who], buf_a);
     }
     std::memcpy(buf_a + kObsDim, mlp_emb_, sizeof(mlp_emb_));
+    // arena.mask.v1, decided on the obs the net SEES — before the forward pass
+    // below reuses buf_a as an activation buffer and overwrites it.
+    bool allowed[kActionLogits];
+    action_mask(buf_a, f_[who].spec.kit_count, f_[who].spec.is_player, allowed);
+    const bool dodge_ok = dodge_allowed(buf_a);
     // forward: per-layer activation from mlp_acts_, head [move2, logits7, dodge1].
     // Param packing (dh_env.cpp contract): per layer [W row-major out×in][b out].
     // This is float32 where the Godot arena runs float64, so it was never a
@@ -396,15 +415,25 @@ Action Arena::mlp_act(int who) {
     }
     act.move_x = clampf(src[0], -1.0f, 1.0f);
     act.move_y = clampf(src[1], -1.0f, 1.0f);
-    int best = 0;
-    for (int i = 1; i < kActionLogits; ++i)
-        if (src[2 + i] > src[2 + best]) best = i;
+    // pre-mask decode, kept for the record (2026-09-14 .. 2026-09-19):
+    // int best = 0;
+    // for (int i = 1; i < kActionLogits; ++i)
+    //     if (src[2 + i] > src[2 + best]) best = i;
+    // act.act = best;
+    // act.dodge = src[2 + kActionLogits] > 0.0f;
+    //
+    // MASKED argmax: first max among the AVAILABLE logits (strict >, like the
+    // numpy, torch and GDScript loops). allowed[0] is always true, so best >= 0.
+    int best = -1;
+    for (int i = 0; i < kActionLogits; ++i)
+        if (allowed[i] && (best < 0 || src[2 + i] > src[2 + best])) best = i;
     act.act = best;
     // The head is [move2, logits7, dodge1] and this used to read only the
     // first two blocks, so the frozen self-play opponent silently played a
     // policy that could never dodge — a different policy than the same weights
-    // in game/arena/neural_policy.gd. Same fallback rule as the arena.
-    act.dodge = src[2 + kActionLogits] > 0.0f;
+    // in game/arena/neural_policy.gd. Same fallback rule as the arena, now
+    // gated on a visible charge like every other runtime.
+    act.dodge = dodge_ok && src[2 + kActionLogits] > 0.0f;
     return act;
 }
 

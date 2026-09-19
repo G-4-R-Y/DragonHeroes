@@ -445,6 +445,83 @@ different game from the one that grades it.** That is the most likely reason
 nothing trained so far beats a statue, and it means the converged `train_all`
 run must start from here, not from those weights.
 
+### 5.1.5 The policy that trains is not the policy that ships (2026-09-19)
+
+With §5.1.4 closed, the first honest measurement of a PPO net was of the SAME
+weights under two decodes. `fen_boar v7.0` (1 M steps, post-fairness): the
+trainer's policy — a sample from Categorical(logits), Bernoulli(dodge),
+Normal(move, 0.3) — won **0.96** of episodes against native; the serving
+policy — argmax, dodge = logit > 0, move = mean — won **0.04**. Head entropy
+was 1.940/1.946 nats, i.e. ln 7: the categorical was flat, and its argmax was
+"act 3 forever". The older `v6.0` showed the other face of the same thing:
+argmax fired a kit on 13 of 8 315 ticks, the sample on 643. The promotion gate
+(§5.1.2) read the SAMPLED win rate, so it could promote a policy that never
+ships. Nothing here is a bug in PPO; it is the standard gap between a
+stochastic policy and its mode, and every runtime in this repo executes the
+mode.
+
+**The two options, stated as what they are.** Same πθ, same training; the
+choice is the EXECUTION RULE at serving. **(A)** keep executing πθ^greedy =
+argmax, and train so that the mode becomes the policy: anneal the entropy bonus
+and the move std towards zero, evaluate the greedy policy inside the loop, and
+promote/gate on THAT number. **(B)** execute πθ itself at serving — a seeded
+sample per tick in every runtime. B keeps the policy that was actually
+optimized (no gap by definition) at the cost of a per-tick RNG in GDScript,
+C++ and numpy that must agree bit-for-bit, and of a creature that is
+stochastic to the player. Ricardo: A, with masking, and B only if a post-hoc
+sampled-vs-greedy measurement on the CONVERGED nets still shows a gap.
+
+**Masking is orthogonal to A/B and both need it.** A kit on an 8 s cooldown is
+selectable on 480 ticks per cast and executable on one. The categorical put
+mass on it every tick; the sim refused 479 of 480; the credit for the one real
+cast was diluted across all of them. `arena.mask.v1` (ml/env/dh_env.py) sends
+the logits of actions the body cannot take *right now* to −1e9 before the
+softmax (trainer) and skips them in the argmax (serving), from the observation
+alone plus `kit_count`/`is_player`: noop always; attack `o[5] <= 0`; special
+`o[6] <= 0` for a player, `o[5] <= 0` for a creature (fighter.gd routes its
+"special" to the basic swing); kit k `k < kit_count and o[7+k] <= 0`; the
+dodge flag needs `o[12] > 0`. It reads the DELAYED obs, so it is the same bits
+in all five runtimes: `torch_policy.mask_heads` (sample AND update — log πθ(a|s)
+and the entropy are those of the masked distribution), `policy_net.decode`,
+`neural_policy.gd::decode`, `Arena::action_mask` inside `mlp_act` (decided
+before the forward pass reuses the obs buffer), `env_parity.act_from`. One
+fixture, `game/arena/tests/fixtures/action_mask_v1.json` (18 cases, written by
+`ml/tests/test_action_mask.py`), is read by the GDScript test and hand-mirrored
+in `sim-tests`, which also proves the frozen opponent commits attacks while
+its favourite kit cools instead of committing nothing.
+
+**The curriculum, corrected the way Ricardo asked.** "Interchange scripted vs
+self-play until we are constantly winning scripted, as to not exploit some
+strategy" became: the promotion number is the GREEDY win rate against the
+scripts (`--eval-envs 64` argmax probes ride in the same `step_many`, are
+excluded from the update because their actions are not samples, and print as
+`greedy=` next to the sampled `scripts=`); promotion is REVERSIBLE
+(`--demote-wr 0.45` under `--promote-wr 0.60`, both held `--promote-hold 3`
+updates); scripts are never dropped to zero (after promotion the train envs
+are ⅓ scripted, ⅓ native, ⅓ self-play; the probes stay on scripts); and the
+self-play opponent is drawn round-robin from a `--reservoir 8` of past
+snapshots, so the learner faces a spread of its own history rather than one
+moving target. The extra stochasticity lives in the OPPONENTS: the policy's
+own stochasticity is the gap being closed. Then β 0.01 → 0.001 and move std
+0.3 → 0.1, linear in steps over the budget, and a plateau stop on `greedy=`
+(`--plateau-updates 80 --plateau-delta 0.02 --plateau-min-steps 20M` for the
+converged run) so the 60 M/creature budget is a ceiling.
+
+**Measured (fen_boar mirror, 2026-09-19).** Step-2 smoke, 3.28 M steps / 50
+updates, mask on (`kit_count=2`): sampled `scripts=` swung 0.25 → 0.94 → 0.28
+→ 0.94 → 0.59 while `greedy=` went 0.19 → 0.34 → 0.32; promotion fired at
+it=40 on the greedy number, 149 of 448 train envs moved to a 3-snapshot
+reservoir, the pooled `win_rate` dropped to 0.40 as self-play entered, and the
+plateau stop fired at it=50. `env_parity` on the exported net against native
+(12 episodes, seed 7777): **PARITY OK on every term, win 1.00 in dh-env and
+1.00 in the arena** — the first net whose SHIPPED decode wins in both
+runtimes. Throughput 165–175 k steps/s on the laptop GPU: 60 M steps is ~6
+minutes per creature. The gap at 3 M steps is expected — the anneal only
+reaches its final values at the end of the nominal budget — and the converged
+run's `greedy=` trace is the experiment that settles whether B is ever built.
+Knobs and reasons in one page: `TRAINING_HYPERPARAMETERS.md` at the repo root;
+every run's knobs and verdict: tech/39.
+
 ### 5.2.4 The heuristic is not one policy, and the qualifying gate is right to say so
 
 `distill --teacher heuristic` refuses to clone a teacher that does not beat both baselines — Ricardo's own condition, *"once they surpass the default script/engine behaviour"*. Measured against `scripted` in dh-env, 8 episodes per cell:
