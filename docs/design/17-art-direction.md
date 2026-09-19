@@ -260,6 +260,13 @@ alongside the marketplace parecer ([legal](../business/30-legal-payments-complia
 matters more for us than for most studios, because items wearing this art are sold for real
 money.
 
+**Implementation (2026-09-19):** the curated pipeline's "palette enforcement in post" row is
+now a tool — `genforge.hifi` ([tech/40](../tech/40-hifi-sprite-generator.md)) enforces the
+pixel grid, indexed 8-shade ramps, a continuous dark-ink perimeter, a separated emissive
+channel and a transparent background on any generated image, derives the normal map, and
+refuses what still fails with a measured scorecard. The brief it implements is
+`sprites prompt.md` (repo root). The human pass above remains the last gate.
+
 ## 6. Animation principles
 
 1. **Silhouette first.** Every creature must be identifiable from its black silhouette alone at

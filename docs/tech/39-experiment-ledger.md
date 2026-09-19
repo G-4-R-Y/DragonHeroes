@@ -32,6 +32,7 @@ on, `*` = dirty tree (two sessions share this checkout, so nearly always).
 | `2026-09-14_075729-31447609__cinder_drake-console__steps2000000_envs512` | 2026-09-14T07:57 | ppo · cinder_drake | steps 2,000,000, envs 512, arch mlp, sp 4 | 0h00m23s · `f7b8f06*` | cinder_drake v6.0 **FAIL** |
 | `2026-09-14_1725__fen_boar-fairsmoke__steps1000000_envs512_mlp_sp4` | 2026-09-14T17:25 | ppo · fen_boar-fairsmoke | steps 1,000,000, envs 512, arch mlp, sp 4 | 0h00m12s · `1ba50ef*` | fen_boar v7.0 **FAIL** |
 | `2026-09-15_041457-140919896__all-creatures-console__g999_p6_e7_j16` | 2026-09-15T04:14 | es · all-creatures | gens 999, pop 6, eps 7, jobs 16, seed 2026, speed max | — · `1ba50ef*` | no verdict recorded |
+| `2026-09-19_1015__all-creatures__steps60000000_envs512_mlp_sp4_ev64_pl80` | 2026-09-19T10:15 | ppo · all-creatures | steps 60,000,000, envs 512, arch mlp, sp 4, promote 0.6, hold 3, probes 64, demote 0.45, reservoir 8, β→ 0.001, std→ 0.1, plateau 80, clone heuristic, mask arena.mask.v1 | 0h31m20s · `545c78a*` | fen_boar_alpha v2.0 **FAIL**; gloamfen_stalker v2.0 **FAIL**; cinder_drake v6.0 **FAIL**; bog_golem v4.0 **FAIL**; mire_serpent v2.0 **FAIL** — R50 converged run (2026-09-19): 60M ceiling per creature, plateau stop on greedy= (80 upd / 0.02 / armed at 20M), arena.mask.v1 + 64 greedy probes + reversible curriculum + reservoir 8 + beta/std anneal; from scratch (CLONE=heuristic only where it qualifies); local GPU |
 <!-- ledger:auto:end -->
 
 **Context the table cannot carry (by run):**
@@ -64,6 +65,30 @@ on, `*` = dirty tree (two sessions share this checkout, so nearly always).
   `fen_boar_alpha` g438 (best 0.531, mean 0.516); checkpoint in `weights/`;
   no gate ran. Not resumed — every net trained before the 2026-09-19 decode
   contract would need re-gating anyway.
+- `2026-09-19_1015 all-creatures PPO 60M/512 ev64 pl80` — **the R50 converged
+  run** (`arena.mask.v1`, 64 greedy probes, reversible curriculum, reservoir 8,
+  β/std anneal, plateau stop 80 upd / 0.02 armed at 20 M; from scratch, clone
+  of the heuristic where it qualified). Wall 31 min for 7 creatures; every
+  creature plateau-stopped between 25.3 M and 38.1 M steps. Training-time
+  **`greedy=` vs scripts at stop / best**: fen_boar_alpha 0.40 / 0.55 (never
+  promoted), gloamfen_stalker 0.57 / 0.83 (promoted ×2, demoted ×1),
+  cinder_drake 0.94, bog_golem 0.86, mire_serpent 0.96, grave_shade 0.83,
+  gloam_wisp 0.91 (all promoted; cinder_drake and mire_serpent demoted once
+  and re-promoted). **Gate (4 episodes in the Godot arena, mirror build,
+  `scripted` then `native` policy):** PASS grave_shade (0.75 / 1.0) and
+  gloam_wisp (1.0 / 1.0), both deployed; FAIL the other five — cinder_drake
+  suite_scripted **0.25** against a training greedy of **0.94**, bog_golem
+  0.25 vs 0.86, mire_serpent 0.75 scripted but native 0.25, gloamfen_stalker
+  0.25 / 0.0, fen_boar_alpha 0.0 / 1.0. TWO FINDINGS: (1) with p = 0.94,
+  1 win in 4 has probability 0.004 — this is not sampling noise but a
+  **dh-env → arena outcome gap** on the greedy decode that the R50 parity
+  work (identical decode, PARITY OK on one fen_boar net) did not close for
+  these creatures; measure it per creature with ≥ 32 episodes before touching
+  the trainer again (roadmap R55). (2) The gate's 4 episodes are too few to
+  separate 0.6 from 0.9 either way. Also noted: the plateau stop counts a
+  regression as flat and exports the final weights, not the best-greedy
+  checkpoint (gloamfen_stalker best 0.83, exported at 0.57) — best-greedy
+  export is the queued trainer change.
 
 ## 2. Scratch experiments (outside `ml/runs/`, by hand)
 

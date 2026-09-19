@@ -250,6 +250,32 @@ installed locally for the Codex desktop exports; no touch controls; no mobile pe
 helpers, bundles the offline review, records source/file hashes and verifies
 archives. Windows uses `sim/build-codex-windows` to avoid upstream's tracked
 build cache. `tools/build_app_icon.py` derives PNG + six-size ICO from a curated
+**2026-09-19 (R52 built — the hi-fi sprite generator):** `genforge/hifi/`
+turns `sprites prompt.md` into a generator with a gate: verbatim prompt
+assembly (pinned to the file), six enforcement stages (transparent background
++ fringe, native 1:1 grid snap, 8-shade hue-shifted ramps, emissive channel,
+dedither, Ink-Hold perimeter, ramp-relief normal map with the emissive packed
+in B<128), a 13-check scorecard that grades ANY image the same way (the
+astra benchmark harness: `bench`), Godot bundles on the `bundle_art.gd`
+contract, provenance `dragon-heroes.art-source.v1`. `sprite_lit.gdshader`
+lights packed-emissive pixels flat and pushes them into HDR. Gate: `python3 -m
+pytest genforge/tests/test_hifi.py` + `python3 -m genforge.hifi selftest`
+(offline). No API called; model id is a knob awaiting Ricardo. Doc: tech/40.
+The R50 converged run finished the same day (tech/39 bullet): 2/7 deployed,
+and a dh-env→arena OUTCOME gap on the greedy decode is now roadmap R55.
+
+**2026-09-19 (R50 built):** `arena.mask.v1` action mask in all five runtimes
+(`ml/env/dh_env.py` rule; `torch_policy.mask_heads`, `policy_net.decode`,
+`neural_policy.gd::decode`, `Arena::action_mask`/`mlp_act`, `env_parity.act_from`)
+pinned by `game/arena/tests/fixtures/action_mask_v1.json` — gates:
+`ml/tests/test_action_mask.py`, `godot --headless --path game
+res://arena/tests/mask_parity_test.tscn` (MASK PARITY OK), `sim-tests`. PPO:
+greedy probes (`--eval-envs`), promotion on `greedy=` and reversible
+(`--demote-wr`), snapshot reservoir, β/std annealing, plateau stop; knobs
+plumbed through `tools/train_run.sh` and recorded in each run's `config.json`.
+Ledger: `docs/tech/39-experiment-ledger.md` via `tools/experiment_ledger.py`.
+Status: smoke-verified (fen_boar mirror: env_parity OK, greedy wins 1.00 vs
+native in both runtimes); converged 60 M run is the next gate.
 **2026-09-19 (R50 built):** `arena.mask.v1` action mask in all five runtimes
 (`ml/env/dh_env.py` rule; `torch_policy.mask_heads`, `policy_net.decode`,
 `neural_policy.gd::decode`, `Arena::action_mask`/`mlp_act`, `env_parity.act_from`)

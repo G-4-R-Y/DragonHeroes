@@ -164,6 +164,24 @@ POST /generate/creature  {archetype, family, tier, palette_hints, theme_tags} �
 POST /generate/item      {slot, tags, rarity_band, season, theme_tags}        → bundle   (planned)
 POST /generate/skill     {behavior, damage_type, family?, season}             → bundle   (planned)
 POST /generate/batch     {drop_manifest}                                      → bundles  (planned)
+## The hi-fi sprite generator (`genforge.hifi`, 2026-09-19)
+
+Ricardo's `sprites prompt.md` (repo root) as a tool: the master prompt and the
+mandatory negative prompt verbatim (pinned by a test), a creature registry
+with each creature's glow hue, six post-processing stages that ENFORCE what a
+model cannot be trusted with (transparent background, native 1:1 grid, 8-shade
+hue-shifted ramps, emissive channel, no dithering, continuous ink perimeter),
+a normal map with the emissive packed in its blue channel, and a scorecard
+gate that grades any PNG the same way — ours, a raw model output, or another
+generator's. Offline except `generate`, which goes through the `ImageBackend`
+seam. See `docs/tech/40-hifi-sprite-generator.md`.
+
+```
+python3 -m genforge.hifi selftest                      # synthetic candidate: FAIL delivered -> PASS shipped
+python3 -m genforge.hifi process IN.png --creature orun --out DIR
+python3 -m genforge.hifi bench --label ours A/ --label astra B/ --creature orun
+```
+
 ```
 
 Stack: Python FastAPI; models are open proposals (style-locked image model

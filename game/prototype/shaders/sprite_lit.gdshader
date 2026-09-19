@@ -14,6 +14,14 @@ uniform float bands = 3.0;             // cel steps on the N·L response
 uniform float light_gain = 1.15;
 uniform float ambient_floor = 0.74;    // unlit sprite brightness (the darkness
                                        // quad above still grades the scene)
+// Emissive Channel Mask (genforge.hifi, sprites prompt.md pillar 2): hifi
+// bundles pack the emissive mask into the normal map's BLUE channel low range
+// — B < 0.5 never occurs in a valid tangent normal (nz > 0 -> B >= 0.5; the
+// flat default is 1.0), so every existing sheet_n.png reads as "no emission".
+// Emissive pixels are lit flat ("sharp unshaded glow") and pushed above 1.0 so
+// the Vulkan WorldEnvironment glow blooms them; under gl_compatibility the
+// push just clamps and ProtoGlow's additive sprites carry the halo as before.
+uniform float emissive_gain = 1.5;
 global uniform sampler2D dh_light_tex;
 global uniform int dh_light_count;
 
@@ -25,7 +33,9 @@ void vertex() {
 
 void fragment() {
 	vec4 base = COLOR;                 // albedo * modulate — keep both
-	vec3 n = normalize(NORMAL);
+	float nb = texture(NORMAL_TEXTURE, UV).b;
+	float emis = nb < 0.5 ? (1.0 - nb * 2.0) : 0.0;   // packed intensity 0..1
+	vec3 n = emis > 0.0 ? vec3(0.0, 0.0, 1.0) : normalize(NORMAL);
 	vec3 acc = vec3(0.0);
 	int cnt = min(dh_light_count, 16);
 	for (int i = 0; i < cnt; i++) {
@@ -42,5 +52,8 @@ void fragment() {
 		ndl = floor(ndl * bands + 0.5) / bands;              // cel quantize
 		acc += M.rgb * (att * ndl);
 	}
-	COLOR = vec4(base.rgb * (ambient_floor + acc * light_gain), base.a);
+	vec3 lit = base.rgb * (ambient_floor + acc * light_gain);
+	// previous (pre-hifi) output, kept for reference:
+	// COLOR = vec4(base.rgb * (ambient_floor + acc * light_gain), base.a);
+	COLOR = vec4(mix(lit, base.rgb * (1.0 + emis * emissive_gain), emis), base.a);
 }

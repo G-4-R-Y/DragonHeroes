@@ -122,10 +122,18 @@ def generate_normal_map(
     bevel_width: float = BEVEL_WIDTH,
     detail_weight: float = DETAIL_WEIGHT,
     strength: float = STRENGTH,
+    height_bias: Optional[np.ndarray] = None,
 ) -> Image.Image:
-    """RGBA sprite -> tangent-space normal map (RGBA, alpha follows source)."""
+    """RGBA sprite -> tangent-space normal map (RGBA, alpha follows source).
+
+    height_bias: optional (H, W) float field added to the height inside the
+    silhouette before the gradient — genforge.hifi feeds the sprite's own
+    ramp shading in here so painted planes become real slopes.
+    """
     rgba = np.asarray(image.convert("RGBA"), dtype=np.uint8)
     height, mask = _height_field(rgba, bevel_width, detail_weight)
+    if height_bias is not None:
+        height = height + np.where(mask, np.asarray(height_bias, dtype=np.float64), 0.0)
 
     # Sobel gradients (replicate edges); /8 normalizes to per-pixel slope
     p = np.pad(height, 1, mode="edge")

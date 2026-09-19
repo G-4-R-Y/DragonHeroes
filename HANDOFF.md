@@ -1,4 +1,33 @@
-# Handoff — quota recovery ACTIVE, all pending requests preserved (2026-09-12)
+# Urgent playtest recovery — 2026-09-13
+
+## 2026-09-19 (later) — R52 hifi sprite generator BUILT; R50 converged run DONE (2/7); R55 found
+
+- **R52 built, offline, no API called.** `genforge/hifi/` — verbatim prompt
+  contract pinned to `sprites prompt.md`; `process` = alpha → grid → palette
+  → emissive → dedither → Ink-Hold outline → normal (emissive packed in
+  B<128); `scorecard` gate grades ANY image (9 hard / 4 advisory checks);
+  `write_bundle` on the `bundle_art.gd` contract + provenance; `generate`
+  best-of-n behind `ImageBackend` (model knob `GENFORGE_HIFI_IMAGE_MODEL`);
+  CLI `prompt process generate score bench selftest creatures`.
+  `sprite_lit.gdshader` lights packed-emissive pixels flat + HDR push
+  (headless parse OK). Gates: `python3 -m pytest genforge/tests/test_hifi.py`
+  (23) and `python3 -m genforge.hifi selftest` → delivered FAIL 53.6 → shipped
+  PASS 100, silhouette IoU 0.9999 vs the original. Doc: tech/40.
+- **Ricardo mid-turn (verbatim in roadmap R52):** "we aren't generating
+  through any api, are we? if so, use gpt luna instead of any other / as it's
+  cheap". Answer: nothing called an API. GPT-5.6 Luna is OpenAI's cheap TEXT
+  model (no image output) → cannot be the sprite model; it is the standing
+  default for any future TEXT call. Image model id = his decision (knob ready).
+- **R50 converged run finished** (31 min, 7 creatures, all plateau-stopped
+  25–38 M): gate PASS grave_shade + gloam_wisp (deployed), FAIL 5. Finding →
+  **R55**: greedy 0.94 in dh-env vs 0.25 in the 4-episode arena gate for
+  cinder_drake (p≈0.004 if it were noise) — a dh-env→arena OUTCOME gap on the
+  same decode; measure per creature with ≥32 episodes before changing the
+  trainer; raise gate episodes. Best-greedy checkpoint export still queued.
+  Ledger row + context bullet in tech/39.
+- **Next:** R55 measurement harness; then best-greedy export + second run;
+  R52 real generation once the image model is confirmed; bench vs astra when
+  astra's files arrive; R44/R45/R49/R51/R46 remain.
 
 ## 2026-09-19 — R50 BUILT (mask · greedy probes · reversible curriculum · reservoir · anneal · plateau); converged run launched
 

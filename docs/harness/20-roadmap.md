@@ -838,6 +838,7 @@ Rebuild after the packaging commit for clean provenance; archives remain in
 
   | R52 | NOW / details RECEIVED 2026-09-19 (block below) | A NEW asset generator: hi-fi dark-fantasy pixel-art SPRITES in the Dead Cells / Phantom Tower register — master prompt + mandatory negative prompt + five rendering pillars, recorded verbatim below. Benchmarked against "astra". | genforge; art/ style bible; Godot CanvasTexture normal/emissive channels; queued AFTER the R50 build order (Ricardo's stated order) |
   | R53 | NOW | A brief `.md` in the REPO ROOT explaining the hyperparameter changes (masking, greedy eval/promotion, β + move-std annealing, reversible promotion, snapshot reservoir, plateau stop). | `TRAINING_HYPERPARAMETERS.md` at the root |
+  | R55 | NOW / next RL step (found 2026-09-19 by the R50 run) | The converged nets win in dh-env and lose in the arena on the SAME greedy decode (cinder_drake greedy 0.94 in training vs 0.25 in the 4-episode arena gate; bog_golem 0.86 vs 0.25). Measure the dh-env→arena outcome gap per creature with ≥32 episodes (an `env_parity`-style harness over OUTCOMES, not policy terms), find the divergence, then best-greedy checkpoint export and a second documented run. Also raise the gate's episode count — 4 cannot separate 0.6 from 0.9. | tech/39 (2026-09-19_1015 bullet), tech/25 §5.1.5, `ml/eval/env_parity.py`, `ml/eval/gate.py --episodes` |
   | R54 | NOW / standing | Properly document EVERY experiment with its hyperparameters — a ledger, not prose: run id, knobs, result, verdict, kept or not. Every past run that can still be reconstructed goes in too. | `docs/tech/39-experiment-ledger.md`; `tools/train_run.sh` already records `config.json` per run — the ledger indexes them |
 
   **R50 DECISION (2026-09-19): Option A with masking, measured against B at the
@@ -934,6 +935,48 @@ Rebuild after the packaging commit for clean provenance; archives remain in
   directory."* — the brief is ALSO the file **`sprites prompt.md`** at the repo
   root (Ricardo's file; read it in full when R52 starts, treat it as the
   source, this block as the index).
+
+  **2026-09-19, later, while R52 was being built (two mid-turn messages,
+  VERBATIM):** *"how does the asset pipeline rework works? we aren't
+  generating thorugh any api, are we? if so, use gpt luna instead of any
+  other"* — *"as it's cheap"*. ANSWER + STATE: nothing in R52 has called any
+  API; the generator is provider-independent up to the `ImageBackend` seam
+  and a `generate` command only reaches a provider when a key is exported and
+  the command is run by hand. FINDING (web, 2026-09-19): "GPT-5.6 Luna" is
+  OpenAI's cheap TEXT tier (launched 2026-07-09; $0.20/M in, $1.20/M out
+  after the 2026-07-30 cut; 1.05M context) and **does not support image
+  generation** (vision input only). So Luna cannot be the sprite model; the
+  hifi generator's image model is a knob (`GENFORGE_HIFI_IMAGE_MODEL`,
+  default the seam's `GENFORGE_OPENAI_MODEL`, i.e. gpt-image-1), to be set to
+  whatever cheap image tier Ricardo confirms. If GenForge ever makes a TEXT
+  call (lore/metadata drafting), Luna is the model to use — recorded as the
+  standing default for text. DECISION OWED BY RICARDO: which image model id
+  (OpenAI mini image tier vs the local repo of 13b).
+
+  **R52 BUILT — 2026-09-19.** `genforge/hifi/` (13 modules): `spec.py` (master
+  + negative prompt VERBATIM, pinned to `sprites prompt.md` by a test),
+  `creatures.py` (Orun + the arena roster, each with its glow hue),
+  `pipeline.process` = alpha (checkerboard/solid backdrop flood + matte-fringe
+  eat + binary alpha + specks) → grid (lattice estimate by difference-mass
+  concentration, harmonics by recursion, requested grid as prior; median snap;
+  integer-only fit) → palette (hue-family ramps × 8 shades, cool-shadow /
+  warm-highlight hue shift, shared ink, OKLab quantise) → emissive channel
+  (declared hue, intensity) → dedither → Ink-Hold repair (never over the core)
+  → normal map (`normal_gen` + ramp relief via new `height_bias`, emissive
+  PACKED in B<128) ; `scorecard.py` gate (9 hard + 4 advisory checks, 0–100
+  score, before/after) ; `write_bundle` (bundle_art.gd contract + `sheet_n`,
+  `sheet_e`, palette/scorecard/provenance `dragon-heroes.art-source.v1`,
+  review.html) ; `generate` best-of-n through the `ImageBackend` seam (model
+  knob `GENFORGE_HIFI_IMAGE_MODEL`; negative folded when the backend has no
+  slot) ; CLI `prompt · process · generate · score · bench · selftest ·
+  creatures`. `sprite_lit.gdshader` reads the packed emissive (flat-lit, HDR
+  push; parse-checked headless). Tests: `genforge/tests/test_hifi.py`
+  (offline; synthetic model-like candidate: delivered FAIL → shipped PASS,
+  silhouette IoU > 0.99). Docs: `docs/tech/40-hifi-sprite-generator.md`.
+  NOT done: a real generation (no API called, per Ricardo's question — the
+  model id is his call), pose-by-pose animation (KEY_POSES planned), the
+  bench against astra (harness ready: `bench --label ours DIR --label astra
+  DIR`), a lit capture of a hifi bundle in the prototype.
 
   **R50 BUILT — status at 2026-09-19 (steps 1–3 of Ricardo's order done and
   gated; step 4 launching).** (1) `ppo.py`: `--eval-envs 64` greedy probes in
@@ -1088,7 +1131,7 @@ Rebuild after the packaging commit for clean provenance; archives remain in
   | R47 | NOW | Document the reward function fully, INCLUDING every version with its rationale — trace the whole story up to the current one. | tech/25 §5.2, tech/37; a versioned changelog, not a snapshot of the current weights |
   | R48 | NOW | GenForge console cannot return to the main menu. | genforge console scene; real Back navigation evidence (same class as R38's arena Back) |
   | R49 | NOW | Arena interface needs polishing to fit everything in. | design/23/17; COLLISION RISK — the other session owns game/arena/console.gd, check before editing |
-  | R50 | NOW / the big one | Tune arena training to learn from SCRIPTS first, then self-play once reliably winning; then run a train_all experiment (PPO is fine alone) with enough steps that the model actually converges. | tech/25 §4.2, tools/train_all.sh; a real curriculum + a converged run, not a smoke run |
+  | R50 | BUILT + RUN 2026-09-19 (2/7 PASS the gate; the run exposed R55) | Tune arena training to learn from SCRIPTS first, then self-play once reliably winning; then run a train_all experiment (PPO is fine alone) with enough steps that the model actually converges. | tech/25 §4.2, tools/train_all.sh; a real curriculum + a converged run, not a smoke run |
 
   **R50 IS ALREADY HALF UNDER WAY and his instruction sharpens it.** 15e's
   decision (clone the heuristic, then PPO) is the same shape as his curriculum

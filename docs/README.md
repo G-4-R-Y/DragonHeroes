@@ -60,6 +60,7 @@
 | [37-ml-parameter-reference](tech/37-ml-parameter-reference.md) | Every ML parameter and hyperparameter, every artifact produced, who consumes it, and how nets are benchmarked |
 | [38-reward-model-history](tech/38-reward-model-history.md) | Every version of the reward model, what each one scored, why it was replaced, and the measurement that proved it |
 | [39-experiment-ledger](tech/39-experiment-ledger.md) | Every training run with its hyperparameters and verdict — generated from `ml/runs/*/config.json` by `tools/experiment_ledger.py`; scratch experiments by hand |
+| [40-hifi-sprite-generator](tech/40-hifi-sprite-generator.md) | The Dead Cells / Phantom Tower sprite generator: verbatim prompt contract, the six pillar-enforcing stages, the scorecard gate that grades any image, the Godot bundle with packed emissive, and the benchmark harness |
 | **business/** | |
 | [30-legal-payments-compliance](business/30-legal-payments-compliance.md) | Brazilian gambling/minors law, PSPs, tax, AML, LGPD — **read before launch decisions** |
 | [31-roadmap](business/31-roadmap.md) | M0→M6 milestones, exit gates, parallel tracks, risk register |
