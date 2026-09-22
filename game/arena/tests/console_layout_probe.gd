@@ -34,6 +34,11 @@ extends Control
 # nobody chooses and the only one that used to overflow vertically.
 var CANVASES: Array = DhConsoleFit.every_canvas()
 
+# Narrower than this and a caption is a sliver, not a word: the cockpit's
+# shortest caption is "net", and even one glyph of the pixel body font is wider
+# than 8 px. Nothing legitimate in the console is a 1-8 px wide Label.
+const MIN_LABEL_W := 8.0
+
 var _last_canvas_h := 0
 var _last_chart_h := 0.0
 
@@ -71,7 +76,7 @@ func _ready() -> void:
 			measured += rows.size()
 			over += rows.filter(func(r: Dictionary) -> bool: return r.over > 0.5)
 		walked += 1
-		print("canvas %dx%d — %d control(s) overflow across %s" % [
+		print("canvas %dx%d — %d control(s) overflow/collapse across %s" % [
 				canvas.x, canvas.y, over.size(), str(names)])
 		for r in over:
 			print("    [%s] %-40s %.0f > %.0f  (over by %.0f)" % [
@@ -96,10 +101,10 @@ func _ready() -> void:
 		return
 	if bad.is_empty():
 		print("CONSOLE LAYOUT OK — %d canvases x %d controls, nothing leaves the canvas "
-				% [walked, measured] + "on EITHER axis")
+				% [walked, measured] + "on EITHER axis and no caption collapsed")
 		get_tree().quit(0)
 	else:
-		push_error("CONSOLE LAYOUT FAILED — overflows at %s" % str(bad))
+		push_error("CONSOLE LAYOUT FAILED — overflow/collapse at %s" % str(bad))
 		get_tree().quit(1)
 
 # Every VISIBLE Control that ends below the canvas. Two things are not overflow
@@ -145,9 +150,43 @@ func _walk(node: Node, canvas: Vector2i, path := "") -> Array:
 			out.append({"path": label.substr(maxi(0, label.length() - 40)), "axis": "c",
 					"bottom": text_w, "limit": maxf(c.size.x, 1.0),
 					"over": text_w - maxf(c.size.x, 1.0)})
+		# R60 (Ricardo, 2026-09-21): "the arena console lost its value labels".
+		# Every check above asks whether a control draws too BIG. None of them
+		# noticed that half the cockpit's captions had collapsed to nothing:
+		# `clip_text` on an autowrapping Label makes get_minimum_size() return
+		# (1, 1), and a wrapping caption in an HBox/Grid is handed its minimum
+		# width of 1 — so "key", "speed", "net" and gens/pop/eps/jobs drew as
+		# one-letter columns or 1 px slivers while this probe printed OK. A
+		# Label with text is supposed to be at least one line tall and wider
+		# than a single glyph; anything less is invisible, which is a layout
+		# failure exactly like an overflow is.
+		var need := _line_height(c)
+		if need > 0.0:
+			if c.size.y < need - 1.0:
+				out.append({"path": label.substr(maxi(0, label.length() - 40)), "axis": "h",
+						"bottom": c.size.y, "limit": need, "over": need - c.size.y})
+			if c.size.x < MIN_LABEL_W:
+				out.append({"path": label.substr(maxi(0, label.length() - 40)), "axis": "w",
+						"bottom": c.size.x, "limit": MIN_LABEL_W,
+						"over": MIN_LABEL_W - c.size.x})
 		if not (c is ScrollContainer):
 			out += _walk(c, canvas, label)
 	return out
+
+
+# One line of this Label's own font, or 0 for anything that is not a Label with
+# text in it. The floor a caption has to clear to be readable at all.
+func _line_height(c: Control) -> float:
+	if not (c is Label):
+		return 0.0
+	var l: Label = c
+	if l.text == "":
+		return 0.0
+	var size := ProtoTheme.SIZE_BODY
+	if l.has_theme_font_size_override("font_size"):
+		size = l.get_theme_font_size("font_size")
+	var font := ThemeDB.fallback_font
+	return font.get_ascent(size) + font.get_descent(size)
 
 
 # What the PROGRESS column actually got, and what the chart's own draw routine

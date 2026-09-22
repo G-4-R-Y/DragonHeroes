@@ -3366,3 +3366,134 @@ exhausted. Retry a harmless read/check first, then resume fresh validation.
 Next: audit build receipts/provenance enforcement, fix Orun's coverage honestly,
 add skill-ready cues, validate integrated recovery code, commit/push and rebuild.
 All R01–R40 remain tracked; written plans/candidates are not marked shipped.
+
+### R73 — the Dead Cells / Phantom Tower brief, re-sent 2026-09-22 (comparison)
+
+Ricardo re-sent the whole asset-generation brief with *"perhaps you already
+improved, than let's compare stuff"*. It is the same brief, not a new one:
+
+    MASTER identical  : True   sha256 731f520061aa054e…  (sent == genforge.hifi.spec.MASTER_STYLE)
+    NEGATIVE identical: True
+    spec.verify_against_source() -> verified: True   (sprites prompt.md still pins it)
+
+So the comparison is pipeline-vs-brief, pillar by pillar. What `genforge/hifi/`
+(ab2cd93, R52) already enforces — the model is never trusted with any of it,
+`pipeline.process` re-imposes it on whatever comes back:
+
+| Brief demands | Where it is enforced | How it is proven |
+| --- | --- | --- |
+| Ink-Hold perimeter, zero sel-out, zero lineless | `outline.measure` → `repair` (step 5), width knob, emissive protected from the ring | hard check `ink_hold_perimeter` (coverage + ≥1 closed ink loop) |
+| Volumetric cluster shading, 8-shade ramps, directional hue-shift | `palette.build/quantize` in OKLab (step 3), per-material ramps + shared ink | hard `deep_ramps` + `indexed_palette`; advisory `rich_ramps`, `hue_shift`, `directional_shading`, `no_pillow_shading` |
+| Emissive channel mask for HDR bloom | `emissive.extract` by declared hue (step 4), re-read from the SHIPPED pixels after outline repair | hard `emissive_core`; engine side `sprite_lit.gdshader` reads B<0.5 and pushes above 1.0 |
+| Normal-map-ready planar depth | `hifi_normal` (step 6) — ramp relief, emissive packed into B<128 | every legacy `sheet_n.png` still decodes as no emission |
+| Crisp native 1:1 grid, zero mixels | `grid.estimate/snap/fit_canvas` (step 2), integer-only fit | hard `native_grid` |
+| No noisy dithering | `palette.dedither` (step 4b), emissive protected | hard `no_dithering` (before/after dither score) |
+| Isolated asset, clean transparent background | `alpha.enforce` (step 1) — flood + matte-fringe eat + binary alpha | hard `transparent_bg`, `binary_alpha`, `isolated_fill` |
+| 12–16 discrete key poses per cycle (pillar 4's sprite half) | `spec.KEY_POSES` fills the stance slot, one generation per pose | clip names match design/26 rule 4 |
+
+Nine hard checks decide the verdict, four advisory ones score it; `scorecard`
+grades ANY RGBA the same way, so a hand-drawn or externally-bought sprite is
+judged on the identical bar. Bundles carry palette + scorecard + provenance
+(`dragon-heroes.art-source.v1`) and a `review.html`.
+
+**The three gaps — all engine-side, none in the generator.** The brief's pillars
+1, 3 and 4 describe *runtime* behaviour, and only their asset halves are built:
+
+1. **Pillar 1, real-time 2D normal-mapped lighting.** The normal maps exist and
+   `sprite_lit.gdshader` consumes the emissive channel, but the only Light2D in
+   the game is in `game/prototype/main.gd` — creatures are not yet lit by torches
+   and spell lights through their normal maps. That is the visual program's job
+   (see SCHEDULED — visual program), not the pipeline's.
+2. **Pillar 3, the 3D→2D render path.** Dead Cells' animation fluidity comes from
+   rigging in 3D and rendering down to an indexed palette. We generate stills.
+   This is exactly R72(b): Meshy → Blender → render → `hifi.process` as the
+   palette-indexing back half, tested on a boss fight. `blender_clean` in
+   `rebirth/assets/tools/gen_assets.py` is the first step and Blender is not
+   installed yet.
+3. **Pillar 4, GPU particles at 60 FPS over discrete sprite poses.** The particle
+   half exists (`fx.gd`, `motes.gd`, `ribbons.gd`, MultiMesh paths); the pairing
+   rule — sprites step at 12–16 poses/cycle while VFX run at 60 — is not written
+   down as a budget anywhere. Belongs with the visual program.
+
+No code changed for R73. The brief was already law.
+
+
+## R60 — the console's captions, and the three bugs behind one complaint (2026-09-22)
+
+> "the arena console lost its value labels (generation etc. render without
+> captions), and the interface must be legible at 20 M-step values"
+
+One sentence, three unrelated defects. None was guessable; each was measured.
+
+**1. Captions 1 px tall.** `_label()` set `clip_text = true` on labels that also
+autowrap. In Godot 4.6 that combination makes `get_combined_minimum_size()`
+return `(1, 1)` — the *height* collapses too, not just the width — and a
+`VBoxContainer` hands a non-expanding child exactly its minimum. So every
+wrapping caption drew as a 1 px line: present in the tree, invisible on screen,
+which is precisely "renders without captions". `clip_text` is commented out
+(never deleted) with the measured before/after table beside it.
+
+**2. Captions one letter wide.** The same wrapping Label inside an
+`HBoxContainer` / `GridContainer` / `HFlowContainer` is handed minimum width 1
+and renders as a vertical column of single letters. Fixed with `wrap = false`
+opt-outs where the caption sits in a horizontal row: `key`, `speed`, `net`,
+`_spin()`, `_vs_count`.
+
+**3. Legibility at 20 M.** `_grouped()` and `_si()` static formatters; `20M` in
+the TOURNAMENT tooltip instead of `20000000`; grouped digits in the progress
+header and in `_architectures()`; the magic numbers named as `GPU_PPO_STEPS` /
+`GPU_PPO_ENVS`; strip and chart legends laid out on a *measured* stride with a
+`+N` overflow marker instead of a guessed one.
+
+**Then the capture disagreed with me.** Fixing the captions made the HISTORY
+list readable for the first time — and it read as garbage:
+
+    arity fe:n_   ? vs ?  0-0  ?
+
+Three more causes, all separate. `_verdict_kind()` knew `versus`, `tournament`
+and `ladder`, returned `"other"` for everything else, and `"other"` falls
+through to the head-to-head renderer: every `arena.distill` and
+`arena.env_parity` record on disk — **9 of 31** — claimed to be a match between
+two nets that did not exist. `_verdict_when()` sliced a timestamp out of
+character positions 5..15 of the filename, so a name that is not `DATE_TIME__*`
+produced `arity fe:n_` (from `env_parity_fen_boar_scripted.json`) or an empty
+stamp. And `_verdict_keys()` only harvested a top-level `key`, while distill and
+parity records name their creature in `build` — so those rows vanished the
+moment any creature filter was applied.
+
+Fixed: two new kinds with their own row renderers and detail panels (a distill
+is a teacher against the student it trained; a parity run is one policy measured
+in two runtimes, where only the gaps matter), a shared `_arch_label()` so the
+row and the detail cannot drift, a three-tier `_verdict_when()` (filename stamp
+→ the record's own `started`/`finished` → the file's mtime → `?`, never an
+invented one), `build` harvested as a filter key, and the two kinds added to the
+kind dropdown.
+
+**And the header was lying.** `_scan_bench` sorted on the *filename*, which is
+chronological only while every writer stamps a date first. The two undated files
+sorted above every `2026-*` name, so "every verdict, newest first" put 09-14
+rows above 09-19 rows. Now that every record resolves a real time, `_verdict_at`
+gives the same three-tier answer as an epoch and the list sorts on that.
+
+**Both gates had holes, and both were proven shut.** The layout probe checked
+overflow but not collapse, so a 1 px caption passed it — it now fails on either
+axis (`MIN_LABEL_W`, plus a `_line_height` floor). The console selftest already
+had a `? vs ?` check, but no fixture that could trigger it — it now ships a
+distill, a parity run, and an undated record whose name sorts first while its
+time is oldest. Every new assertion was verified by reverting the fix and
+watching the gate fail: reverting `_verdict_kind` reproduced
+`'09-11 09:30  ? vs ?  0-0  ?'` — the exact string from Ricardo's screen — and
+reverting the sort put `09-10 08:00` at the top of a newest-first list. The
+first version of the sort assertion passed *vacuously* (every fixture sorted the
+same way under both keys); that is why the undated fixture exists.
+
+`ui_capture.gd` gained `UI_TAB=<title>`, which walks to the first `TabContainer`
+holding a tab with that title and selects it before the shot. The console keeps
+five tabs and only the front one had ever been captured, so a caption that
+collapsed on RUNS or VERSUS could not have shown up in a screenshot at all. Any
+tabbed screen gets this for free.
+
+Final state: `CONSOLE LAYOUT OK — 7 canvases x 2996 controls, nothing leaves the
+canvas on EITHER axis and no caption collapsed` (640x360 → 1440x810, all five
+tabs); `CONSOLE SELFTEST OK` over 8 fixtures covering all four verdict kinds;
+`ui_console_versus.png` at 1600x900, 56 FPS, 122 draw calls.

@@ -4,6 +4,7 @@
 #   UI_SCENE=res://prototype/ui/main_menu.tscn  (default)
 #   UI_TAG=menu                                  (capture filename)
 #   UI_WAIT=40                                   (frames before the shot)
+#   UI_TAB=VERSUS                                (select a tab before shooting)
 # Reusable for any Control-rooted screen; scenes needing session state can be
 # pre-seeded here per-tag as they come up.
 extends Node
@@ -33,7 +34,26 @@ func _ready() -> void:
 	var wait := 40
 	if OS.get_environment("UI_WAIT") != "":
 		wait = int(OS.get_environment("UI_WAIT"))
+	# UI_TAB picks a tab by its title before the shot. Added for R60: the arena
+	# console keeps five tabs and only the front one was ever captured, so a
+	# caption that collapsed on RUNS or VERSUS could never show up in a
+	# screenshot. Any tabbed screen gets this for free.
+	if OS.get_environment("UI_TAB") != "":
+		_select_tab(screen, OS.get_environment("UI_TAB"))
 	_run(tag, wait)
+
+# Depth-first for the first TabContainer holding a tab with this title.
+func _select_tab(root: Node, title: String) -> bool:
+	if root is TabContainer:
+		var tc: TabContainer = root
+		for i in tc.get_tab_count():
+			if tc.get_tab_title(i) == title:
+				tc.current_tab = i
+				return true
+	for child in root.get_children():
+		if _select_tab(child, title):
+			return true
+	return false
 
 func _run(tag: String, wait: int) -> void:
 	for i in wait:

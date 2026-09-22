@@ -58,6 +58,12 @@ const DEFAULTS := {"generations": 3, "pop": 6, "episodes": 4}   # league.py's; j
 # default — a tournament launched from a button should finish in an evening.
 const TOURNEY_BEST_OF := 5
 const TOURNEY_PPO_STEPS := 500000
+# The GPU tier's own budget, previously two bare literals inside the run-dir
+# name. Named so the tooltip can state them (R60: the interface has to be
+# legible at 20 M-step values) and so the folder name and the label can never
+# drift apart. The folder keeps the raw digits — it is parsed, not read.
+const GPU_PPO_STEPS := 2000000
+const GPU_PPO_ENVS := 512
 const AI_DEFAULTS := "game/arena/data/ai_defaults.json"
 # --speed choices: [arena spec, label]. "max" = CPU-bound (league.py adds --fixed-fps
 # 60); numbers are wall-locked multipliers (4 = the original fast mode).
@@ -288,7 +294,11 @@ func _build_ui() -> void:
 
 	var key_row := HBoxContainer.new()
 	key_row.add_theme_constant_override("separation", 4)
-	key_row.add_child(_label("key", DIM))
+	# R60: no wrap for a caption that sits beside its control. A wrapping Label
+	# reports a minimum width of 1, and an HBox/Grid hands it exactly that — the
+	# 2026-09-22 capture shows "key" drawn as a one-letter vertical column at the
+	# left edge. The VERSUS/RANK rows already opt out; these four never did.
+	key_row.add_child(_label("key", DIM, ProtoTheme.SIZE_BODY, false))
 	_key_edit = LineEdit.new()
 	_key_edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_key_edit.placeholder_text = "registry key (--key)"
@@ -317,7 +327,7 @@ func _build_ui() -> void:
 
 	var speed_row := HBoxContainer.new()
 	speed_row.add_theme_constant_override("separation", 4)
-	speed_row.add_child(_label("speed", DIM))
+	speed_row.add_child(_label("speed", DIM, ProtoTheme.SIZE_BODY, false))
 	_speed = OptionButton.new()
 	_speed.focus_mode = Control.FOCUS_NONE
 	_speed.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -335,7 +345,7 @@ func _build_ui() -> void:
 	# is all it takes to try it from here.
 	var net_row := HBoxContainer.new()
 	net_row.add_theme_constant_override("separation", 4)
-	net_row.add_child(_label("net", DIM))
+	net_row.add_child(_label("net", DIM, ProtoTheme.SIZE_BODY, false))
 	_net = OptionButton.new()
 	_net.focus_mode = Control.FOCUS_NONE
 	_net.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -371,7 +381,8 @@ func _build_ui() -> void:
 	_gpu = CheckBox.new()
 	_gpu.text = "GPU (PPO)"
 	_gpu.focus_mode = Control.FOCUS_NONE
-	_gpu.tooltip_text = "ml/training/ppo.py on CUDA instead of the ES league"
+	_gpu.tooltip_text = "ml/training/ppo.py on CUDA instead of the ES league\n%s steps over %s parallel envs" % [
+			_si(GPU_PPO_STEPS), _si(GPU_PPO_ENVS)]
 	_gpu.toggled.connect(func(_on: bool) -> void: _refresh_ui())
 	mode_row.add_child(_gpu)
 	# TRAIN ALL's second gear (Ricardo, 2026-09-14: "Add tournament mode for the
@@ -400,7 +411,7 @@ func _build_ui() -> void:
 	_tourney_btn.tooltip_text = ("Every training method trains this creature, then the candidates FIGHT "
 			+ "(best-of-%d) and the winner takes the deployed pin. ES uses the knobs above; PPO runs %s steps "
 			+ "and is skipped if ml/.venv is missing. No trainee selected = every creature.") % [
-			TOURNEY_BEST_OF, TOURNEY_PPO_STEPS]
+			TOURNEY_BEST_OF, _si(TOURNEY_PPO_STEPS)]
 	_stop_btn = _button(btns, "STOP", _stop)
 	_gate_btn = _button(btns, "GATE", _gate)
 	_watch_btn = _button(btns, "WATCH", _watch)
@@ -672,7 +683,17 @@ func _build_versus_tab(tabs: TabContainer) -> void:
 
 	_vs_result = _label("", PALE)
 	_vs_result.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_vs_result.custom_minimum_size = Vector2(0, 66)
+	# R60: this floor used to be a flat 66 px of EMPTY panel — reserved so the
+	# layout would not jump when a verdict arrives. Once the captions above it
+	# came back (they had been drawing 1 px tall), VERSUS wanted 342 px of a
+	# 360 px canvas and the history list below was squeezed to ZERO rows at
+	# MIN_CANVAS. The label autowraps, so it grows to whatever the verdict
+	# needs anyway; two lines is enough of a reservation to stop the jump, and
+	# the 42 px it gives back are what the history list is for.
+	# PREVIOUS: _vs_result.custom_minimum_size = Vector2(0, 66)
+	var line_h := ThemeDB.fallback_font.get_ascent(ProtoTheme.SIZE_BODY) \
+			+ ThemeDB.fallback_font.get_descent(ProtoTheme.SIZE_BODY)
+	_vs_result.custom_minimum_size = Vector2(0, line_h * 2.0)
 	v.add_child(_vs_result)
 	v.add_child(_label("HISTORY — every verdict, newest first", EMBER))
 	# Ricardo, 2026-09-14: "a better benchmark interface, filtered by creature".
@@ -689,13 +710,19 @@ func _build_versus_tab(tabs: TabContainer) -> void:
 	filt.add_child(_label("kind", DIM, ProtoTheme.SIZE_BODY, false))
 	_vs_kind = OptionButton.new()
 	_vs_kind.focus_mode = Control.FOCUS_NONE
+	# R60: "distill" and "parity" were rendering as head-to-heads AND were
+	# unreachable here — 9 of the 31 records on disk could not be filtered to.
 	for row in [["everything", ""], ["head to head", "versus"], ["brackets", "tournament"],
-			["global ranks", "ladder"]]:
+			["global ranks", "ladder"], ["distills", "distill"], ["env parity", "parity"]]:
 		_vs_kind.add_item(str(row[0]))
 		_vs_kind.set_item_metadata(_vs_kind.item_count - 1, str(row[1]))
 	_vs_kind.item_selected.connect(func(_i: int) -> void: _refresh_history())
 	filt.add_child(_vs_kind)
-	_vs_count = _label("", DIM)
+	# R60: this one is filled by _refresh_history() ("12 verdicts"), and it sits
+	# in a flow row — wrapping would hand it a minimum width of 1 and the count
+	# would read as a vertical letter column. The new collapse check in
+	# console_layout_probe.gd caught it on all seven canvases.
+	_vs_count = _label("", DIM, ProtoTheme.SIZE_BODY, false)
 	filt.add_child(_vs_count)
 	_button(filt, "WATCH THIS", _verdict_watch).tooltip_text = \
 			"Replay the selected verdict in a spectated arena window."
@@ -831,7 +858,19 @@ func _label(text: String, color: Color, size := ProtoTheme.SIZE_BODY,
 		# a wrapping Label still reports its longest WORD as a minimum width;
 		# without this a long path or build id would push the column open again
 		l.custom_minimum_size = Vector2(1, 0)
-		l.clip_text = true
+		# R60 (2026-09-22): clip_text is NOT how you hold that width, and it cost
+		# us every caption in the cockpit. Measured on 4.6 with a 236 px column:
+		#     autowrap + clip_text  -> minimum (1, 1)    rect 264x1   INVISIBLE
+		#     autowrap, no clip     -> minimum (1, 23)   rect 264x23  correct
+		#     no autowrap           -> minimum (264, 23)
+		# Label::get_minimum_size collapses the HEIGHT to 1 as well when the text
+		# is clipped, and a VBoxContainer hands a non-expanding child exactly its
+		# minimum — so "trainee", "key", "opponents", gens/pop/eps/jobs, "speed",
+		# "net" and both chart headings were all drawn 1 px tall. Ricardo:
+		# "the arena console lost its value labels". Autowrap ALONE already
+		# reports a minimum width of 1, which is the whole reason clip_text was
+		# reached for, so dropping it keeps the 2026-09-14 overflow fix intact.
+		# PREVIOUS: l.clip_text = true
 	l.add_theme_font_size_override("font_size", size)
 	l.add_theme_color_override("font_color", color)
 	return l
@@ -868,7 +907,7 @@ func _architectures() -> Array:
 			macs += int(sizes[i]) * int(sizes[i + 1])
 		out.append({"name": str(name), "hidden": hidden,
 				"activation": str(spec.get("activation", "tanh")),
-				"macs": String.num_uint64(macs), "note": str(spec.get("note", ""))})
+				"macs": _grouped(macs), "note": str(spec.get("note", ""))})
 	return fallback if out.is_empty() else out
 
 # "" for the deployed shape — train_run.sh then passes no --net at all, so a
@@ -880,7 +919,9 @@ func _net_spec() -> String:
 	return "" if name == "default" else name
 
 func _spin(parent: Container, text: String, lo: int, hi: int, val: int) -> SpinBox:
-	parent.add_child(_label(text, DIM))
+	# gens/pop/eps/jobs live in a 4-column grid: no wrap, or the caption column
+	# collapses to a single letter per row (R60).
+	parent.add_child(_label(text, DIM, ProtoTheme.SIZE_BODY, false))
 	var s := SpinBox.new()
 	s.min_value = lo
 	s.max_value = hi
@@ -1434,6 +1475,46 @@ static func _fmt_s(sec: float) -> String:
 		return "%dh%02dm" % [floori(s / 3600.0), floori(fmod(s, 3600.0) / 60.0)]
 	return "%d:%02d" % [floori(s / 60.0), s % 60]
 
+# R60 (Ricardo, 2026-09-21): "the interface must be legible at 20 M-step values."
+# Two formats, because the two kinds of number want different things:
+#
+#   _grouped  exact counts you COMPARE — match 512,488/1,022,976, 7,744 MACs.
+#             Every digit is kept; the separator only breaks up the run.
+#   _si       budgets you SET — 500k steps, 20M steps. Three significant digits
+#             is all anyone reads off a knob, and "20M" fits where "20000000"
+#             wrecks a tooltip's line breaks.
+#
+# Neither ever touches a command line: --steps takes the integer, and a run-dir
+# name stays machine-parseable. These are for human eyes only.
+static func _grouped(n: int) -> String:
+	var neg := n < 0
+	var digits := str(absi(n))
+	var out := ""
+	var c := 0
+	for i in range(digits.length() - 1, -1, -1):
+		out = digits[i] + out
+		c += 1
+		if c % 3 == 0 and i > 0:
+			out = "," + out
+	return ("-" + out) if neg else out
+
+static func _si(n: int) -> String:
+	var a := absi(n)
+	if a < 1000:
+		return str(n)
+	var sign := "-" if n < 0 else ""
+	for step in [[1000000000, "G"], [1000000, "M"], [1000, "k"]]:
+		var unit := int(step[0])
+		if a >= unit:
+			var v := float(a) / float(unit)
+			# 3 significant digits: 20M, 1.5M, 999k — never "20.0M"
+			var text := ("%.0f" % v) if v >= 100.0 else \
+					(("%.1f" % v) if v >= 10.0 else ("%.2f" % v))
+			if text.contains("."):
+				text = text.rstrip("0").rstrip(".")
+			return "%s%s%s" % [sign, text, str(step[1])]
+	return str(n)
+
 # ---- status text --------------------------------------------------------------------------
 
 func _refresh_ui() -> void:
@@ -1464,8 +1545,10 @@ func _refresh_ui() -> void:
 	else:
 		lines.append("IDLE · %s · key %s · speed %s" % [build, key, speed])
 	var g_disp := maxi(int(_run.cur_g) + 1, (_run.gens as Array).size())
-	lines.append("gen %d/%d · cand %d/%d · match %d/%d" % [
-			g_disp, gtot, int(_run.cur_cand) + 1, pop, done, total])
+	# R60: at 999 gens x 256 pop x 4 opponents this line reads "match 512488/1022976";
+	# grouped it is a number a human can check against the ETA.
+	lines.append("gen %d/%d · cand %d/%d · match %s/%s" % [
+			g_disp, gtot, int(_run.cur_cand) + 1, pop, _grouped(done), _grouped(total)])
 	var eta := "ETA —"
 	if done >= total and total > 0:
 		eta = "ETA done"
@@ -1704,12 +1787,19 @@ func _on_chart_draw() -> void:
 			c.draw_rect(Rect2(floorf(p.x) - 1, floorf(p.y) - 1, 3, 3), col)
 			prev = p
 	# legend
+	# measured stride, not a flat 34 px: a theme font change must not push "cand"
+	# off the plot the way the strip's flat 120 px pushed an opponent off (R60).
 	var lx := l + 6.0
 	for entry in [["best", EMBER], ["mean", CYAN], ["cand", Color(CYAN.r, CYAN.g, CYAN.b, 0.45)]]:
+		var text := str(entry[0])
+		var w := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1,
+				ProtoTheme.SIZE_BODY).x + 7.0
+		if lx + w > r:
+			break
 		c.draw_rect(Rect2(lx, t + 2, 4, 4), entry[1])
-		c.draw_string(font, Vector2(lx + 7, t + 8), str(entry[0]), HORIZONTAL_ALIGNMENT_LEFT,
+		c.draw_string(font, Vector2(lx + 7, t + 8), text, HORIZONTAL_ALIGNMENT_LEFT,
 				-1, ProtoTheme.SIZE_BODY, DIM)
-		lx += 34.0
+		lx += w + 10.0
 
 # ---- match-score strip ----------------------------------------------------------------------
 
@@ -1753,13 +1843,31 @@ func _on_strip_draw() -> void:
 		var x := floorf(l + (float(i) + 0.5) / float(total) * (r - l))
 		var y := floorf(b - float(m.score) * (b - t))
 		c.draw_rect(Rect2(x - 1, y - 1, 2, 2), cols[opp])
+	# R60 (2026-09-22): the legend used to step a flat 120 px per opponent and
+	# draw whatever came next, so a four-opponent run ran off the right edge —
+	# Ricardo's capture ends mid-word on "round 4 1.". Measure each entry, stop
+	# at the edge, and say how many did not fit instead of half-drawing one.
 	var lx := l + 6.0
-	for opp in cols:
+	var drawn := 0
+	var entries: Array = cols.keys()
+	for opp in entries:
+		var text := "%s %.2f" % [opp, float(sums[opp]) / float(maxi(int(counts[opp]), 1))]
+		var w := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1,
+				ProtoTheme.SIZE_BODY).x + 7.0
+		var left_over := entries.size() - drawn
+		# reserve room for "+N" whenever anything would be left behind
+		var reserve := 0.0 if left_over <= 1 else font.get_string_size(
+				"+%d" % (left_over - 1), HORIZONTAL_ALIGNMENT_LEFT, -1,
+				ProtoTheme.SIZE_BODY).x + 8.0
+		if lx + w + reserve > r and drawn > 0:
+			c.draw_string(font, Vector2(lx, 8), "+%d" % left_over,
+					HORIZONTAL_ALIGNMENT_LEFT, -1, ProtoTheme.SIZE_BODY, DIM)
+			break
 		c.draw_rect(Rect2(lx, 2, 4, 4), cols[opp])
-		c.draw_string(font, Vector2(lx + 7, 8), "%s %.2f" % [
-				opp, float(sums[opp]) / float(maxi(int(counts[opp]), 1))],
-				HORIZONTAL_ALIGNMENT_LEFT, -1, ProtoTheme.SIZE_BODY, DIM)
-		lx += 120.0
+		c.draw_string(font, Vector2(lx + 7, 8), text, HORIZONTAL_ALIGNMENT_LEFT,
+				int(maxf(r - lx - 7.0, 1.0)), ProtoTheme.SIZE_BODY, DIM)
+		lx += w + 10.0
+		drawn += 1
 
 # ---- selftest ------------------------------------------------------------------------------
 
@@ -2067,6 +2175,11 @@ func _verdict_keys(v: Dictionary) -> Array:
 			keys.append(k)
 	if str(v.get("key", "")) != "":
 		add.call(str(v.get("key", "")))
+	# R60: a distill/parity record names its creature in `build`, never in a
+	# top-level `key` shaped like the versus records — without this they were
+	# reachable only under "all creatures" and vanished the moment you filtered.
+	if str(v.get("build", "")) != "":
+		add.call(str(v.get("build", "")).get_slice(".", 2))
 	for e in (v.get("entrants", []) if v.get("entrants", []) is Array else []):
 		add.call(str((e as Dictionary).get("key", "")))   # a ladder: every entrant's creature
 	for a in (v.get("arenas", []) if v.get("arenas", []) is Array else []):
@@ -2090,15 +2203,54 @@ func _verdict_kind(v: Dictionary) -> String:
 		return "versus"
 	if schema.begins_with("arena.ladder"):
 		return "ladder"
+	# R60 (2026-09-22): these two used to fall through to "other", and "other"
+	# is rendered by the head-to-head branch below — so every distill and every
+	# env-parity run in the folder drew as "? vs ?  0-0  ?" in the HISTORY list.
+	# 9 of the 31 records on disk were unreadable that way.
+	if schema.begins_with("arena.distill"):
+		return "distill"
+	if schema.begins_with("arena.env_parity"):
+		return "parity"
 	return "other"
 
 # "2026-09-14_004448__tournament__bog_golem.json" -> "09-14 00:44". The name is
 # DATE FIRST by construction (league.versus/tournament both stamp it), so the
 # folder sorts chronologically and this only has to make it readable.
-func _verdict_when(name: String) -> String:
-	if name.length() < 17 or name[10] != "_":
-		return ""
-	return "%s %s:%s" % [name.substr(5, 5), name.substr(11, 2), name.substr(13, 2)]
+func _verdict_when(name: String, v: Dictionary, mtime: int) -> String:
+	# R60: this used to slice blindly and return "" when it could not. Both
+	# failures were on screen: "env_parity_fen_boar_scripted.json" produced the
+	# nonsense stamp "arity fe:n_", and "console_20260914_044035.json" produced
+	# an empty one, so its row began with two stray spaces. A name that is not
+	# DATE_TIME__* is not a bug in the file — league.versus stamps its own, but
+	# a hand-run parity check or an older console write need not. Fall back to
+	# what the record says about itself, then to the file's mtime; there is
+	# always a real time available, so no row has to invent one.
+	if name.length() >= 17 and name[10] == "_" and name.substr(0, 4).is_valid_int():
+		return "%s %s:%s" % [name.substr(5, 5), name.substr(11, 2), name.substr(13, 2)]
+	var iso := str(v.get("started", v.get("finished", "")))
+	if iso.length() >= 16 and iso[10] == "T":
+		return "%s %s" % [iso.substr(5, 5), iso.substr(11, 5)]
+	if mtime > 0:
+		var d := Time.get_datetime_dict_from_unix_time(mtime)
+		return "%02d-%02d %02d:%02d" % [int(d.month), int(d.day), int(d.hour), int(d.minute)]
+	return "  ?  "
+
+# The same resolution as _verdict_when, as an epoch, so HISTORY can sort by it.
+# It used to sort on the FILENAME, which is only chronological while every
+# writer stamps a date first — "env_parity_fen_boar_scripted.json" and
+# "console_20260914_044035.json" both sorted above every 2026-* record and the
+# list's own header ("newest first") was untrue (R60).
+func _verdict_at(name: String, v: Dictionary, mtime: int) -> int:
+	if name.length() >= 17 and name[10] == "_" and name.substr(0, 4).is_valid_int():
+		var stamp := "%sT%s:%s:%s" % [name.substr(0, 10), name.substr(11, 2),
+				name.substr(13, 2), name.substr(15, 2)]
+		var at := int(Time.get_unix_time_from_datetime_string(stamp))
+		if at > 0:
+			return at
+	var iso := str(v.get("started", v.get("finished", "")))
+	if iso.length() >= 16 and iso[10] == "T":
+		return int(Time.get_unix_time_from_datetime_string(iso))
+	return mtime
 
 func _verdict_row(e: Dictionary) -> String:
 	var v: Dictionary = e.verdict
@@ -2113,12 +2265,46 @@ func _verdict_row(e: Dictionary) -> String:
 				str(e.when), str(v.get("key", "?")),
 				"[" + ",".join(_as_strings(v.get("methods", []))) + "]",
 				str(v.get("champion", "?")), pinned]
+	if str(e.kind) == "distill":
+		var q: Dictionary = v.get("qualify", {})
+		var checks: Dictionary = q.get("checks", {})
+		var scores: PackedStringArray = []
+		for side in ["native", "scripted"]:
+			if checks.has(side):
+				scores.append("%s %s" % [side, str((checks[side] as Dictionary).get("rounds", "?"))])
+		return "%s  ⚗ %s  %s → %s  %s%s" % [
+				str(e.when), str(v.get("key", "?")),
+				str((v.get("teacher", {}) as Dictionary).get("label", "?")),
+				_arch_label(v.get("student", {})),
+				"GATE PASS" if bool(q.get("passed", false)) else "gate fail",
+				("  ·  " + " · ".join(scores)) if not scores.is_empty() else ""]
+	if str(e.kind) == "parity":
+		return "%s  ⇄ parity  %s vs %s  worst gap %.2f (tol %.2f)  %s" % [
+				str(e.when), str(v.get("build", "?")).get_slice(".", 2),
+				str(v.get("opponent", "?")), float(v.get("worst", 0.0)),
+				float(v.get("tolerance", 0.0)),
+				"AGREE" if bool(v.get("agree", false)) else "DISAGREE"]
 	var a: Dictionary = v.get("a", {})
 	var b: Dictionary = v.get("b", {})
 	return "%s  %s vs %s  %d-%d  %s" % [
 			str(e.when), str(a.get("label", "?")), str(b.get("label", "?")),
 			int(v.get("rounds_a", 0)), int(v.get("rounds_b", 0)),
 			str(v.get("winner", "?")).to_upper()]
+
+# "[64, 64] tanh" for a net that records its shape, "heuristic" for one that has
+# none. Shared by the distill row and the distill detail so they cannot drift.
+func _arch_label(raw: Variant) -> String:
+	if not (raw is Dictionary):
+		return "?"
+	var d: Dictionary = raw
+	var hidden: Array = d.get("hidden", [])
+	if hidden.is_empty():
+		return str(d.get("label", d.get("spec", "scripted")))
+	var dims: PackedStringArray = []
+	for h in hidden:
+		dims.append(str(int(h)))
+	var act := str((d.get("arch", {}) as Dictionary).get("activation", ""))
+	return "[%s]%s" % [",".join(dims), (" " + act) if act != "" else ""]
 
 func _as_strings(raw: Variant) -> Array:
 	var out: Array = []
@@ -2150,11 +2336,15 @@ func _scan_bench() -> void:
 		if v.is_empty():
 			continue                        # still being written — it will appear next poll
 		var entry := {"name": str(name), "verdict": v, "kind": _verdict_kind(v),
-				"keys": _verdict_keys(v), "when": _verdict_when(str(name))}
+				"keys": _verdict_keys(v), "when": _verdict_when(str(name), v, int(seen[name])),
+				"at": _verdict_at(str(name), v, int(seen[name]))}
 		entry["text"] = _verdict_row(entry)
 		kept.append(entry)
 		_bench_stamp[str(name)] = seen[name]
-	kept.sort_custom(func(x, y) -> bool: return str(x.name) > str(y.name))
+	kept.sort_custom(func(x, y) -> bool:
+		if int(x.at) != int(y.at):
+			return int(x.at) > int(y.at)
+		return str(x.name) > str(y.name))     # same second: keep it deterministic
 	_bench = kept
 
 func _bench_entry(name: String) -> Dictionary:
@@ -2242,6 +2432,45 @@ func _verdict_detail(v: Dictionary) -> String:
 					str(r.get("episode_win_rate", "?")),
 					"gate PASS" if bool(r.get("gate_pass", false)) else "gate fail"])
 		return "\n".join(lines)
+	# R60: same blind spot as _verdict_row had — clicking a distill or a parity
+	# row in HISTORY fell into the head-to-head branch below and filled the
+	# panel with "? vs ?  0-0  WINNER: ?". Neither record is a head to head:
+	# a distill is a teacher against the student it trained, a parity run is the
+	# SAME policy measured in two runtimes and only the gaps matter.
+	if _verdict_kind(v) == "distill":
+		var q: Dictionary = v.get("qualify", {})
+		var out: PackedStringArray = ["⚗ distill %s — %s → %s · %s" % [
+				str(v.get("key", "?")),
+				str((v.get("teacher", {}) as Dictionary).get("label", "?")),
+				_arch_label(v.get("student", {})),
+				("QUALIFIED (margin %s)" % str(q.get("margin", "?"))) if bool(q.get("passed", false))
+						else ("did not qualify — margin %s" % str(q.get("margin", "?")))]]
+		out.append("arena %s · %d round(s) recorded" % [
+				str(v.get("build", "?")).get_slice(".", 2),
+				(v.get("rounds", []) as Array).size()])
+		var checks: Dictionary = q.get("checks", {})
+		for side in checks.keys():
+			var c: Dictionary = checks[side]
+			out.append("   vs %-9s rounds %s · ep win %s · %s" % [
+					str(side), str(c.get("rounds", "?")), str(c.get("episode_win_rate", "?")),
+					"PASS" if bool(c.get("passed", false)) else "fail"])
+		return "\n".join(out)
+	if _verdict_kind(v) == "parity":
+		var gaps: Dictionary = v.get("gaps", {})
+		var pv: PackedStringArray = ["⇄ env parity %s vs %s — %d episodes, seed %s" % [
+				str(v.get("build", "?")).get_slice(".", 2), str(v.get("opponent", "?")),
+				int(v.get("episodes", 0)), str(v.get("seed", "?"))]]
+		pv.append("worst gap %s against a tolerance of %s — %s" % [
+				str(v.get("worst", "?")), str(v.get("tolerance", "?")),
+				"the runtimes AGREE" if bool(v.get("agree", false))
+						else "the runtimes DISAGREE — dh-env and the arena are not the same game"])
+		var de: Dictionary = v.get("dh_env", {})
+		var ar: Dictionary = v.get("arena", {})
+		for metric in ["win_rate", "hp_self", "hp_foe"]:
+			pv.append("   %-8s dh-env %6.3f · arena %6.3f · gap %s" % [
+					metric, float(de.get(metric, 0.0)), float(ar.get(metric, 0.0)),
+					str(gaps.get(metric, "?"))])
+		return "\n".join(pv)
 	var a: Dictionary = v.get("a", {})
 	var b: Dictionary = v.get("b", {})
 	var clinch: Variant = v.get("clinched_round", null)
@@ -2265,7 +2494,7 @@ func _filter_key() -> String:
 func _console_run_dir(key: String, all_creatures := false) -> String:
 	var t := Time.get_datetime_dict_from_system()
 	var stamp := "%04d-%02d-%02d_%02d%02d" % [t.year, t.month, t.day, t.hour, t.minute]
-	var knobs := ("steps%d_envs%d" % [2000000, 512]) if _gpu.button_pressed and not all_creatures \
+	var knobs := ("steps%d_envs%d" % [GPU_PPO_STEPS, GPU_PPO_ENVS]) if _gpu.button_pressed and not all_creatures \
 			else ("g%d_p%d_e%d_j%d" % [int(_gens.value), int(_pop.value),
 					int(_eps.value), int(_jobs.value)])
 	# Distinct directories even for two clicks in the same minute: never silently
@@ -2797,15 +3026,44 @@ func _selftest_cockpit() -> bool:
 		# under "all creatures" instead of silently vanishing from the history
 		"2026-09-12_120000__scripted_vs_native.json": {
 			"schema": "arena.versus.v1", "best_of": 3, "rounds_a": 3, "rounds_b": 0,
-			"winner": "a", "a": {"label": "scripted"}, "b": {"label": "native"}}}
+			"winner": "a", "a": {"label": "scripted"}, "b": {"label": "native"}},
+		# R60: neither of these is a head to head, and before 2026-09-22 both
+		# rendered as one ("? vs ?  0-0  ?"). They also name their creature in
+		# `build` instead of `key`, so the creature filter could not reach them.
+		# Dated 09-11 so they land at the END of the list and the row indices
+		# the assertions above depend on do not move.
+		"2026-09-11_093001__env_parity__mire_serpent.json": {
+			"schema": "arena.env_parity.v1", "build": "core.arena.mire_serpent",
+			"opponent": "scripted", "episodes": 12, "seed": 2026, "tolerance": 0.15,
+			"dh_env": {"win_rate": 0.0, "hp_self": 0.0, "hp_foe": 0.913},
+			"arena": {"win_rate": 0.0, "hp_self": 0.054, "hp_foe": 0.184},
+			"gaps": {"win_rate": 0.0, "hp_self": 0.054, "hp_foe": 0.729},
+			"worst": 0.729, "agree": false},
+		"2026-09-11_093000__distill__mire_serpent_clone.json": {
+			"schema": "arena.distill.v1", "key": "mire_serpent_clone",
+			"build": "core.arena.mire_serpent", "started": "2026-09-11T09:30:00",
+			"teacher": {"label": "heuristic", "hidden": []},
+			"student": {"hidden": [64, 64], "arch": {"activation": "tanh"}},
+			"rounds": [], "qualify": {"passed": false, "margin": 0.55, "checks": {
+				"native": {"rounds": "5-0", "episode_win_rate": 1.0, "passed": true},
+				"scripted": {"rounds": "1-4", "episode_win_rate": 0.25, "passed": false}}}},
+		# R60: the one that made the "newest first" header a lie. Its name has no
+		# date, so it sorts ABOVE every 2026-* file, but it is the OLDEST record
+		# here — the list has to read the time out of the record, not the name.
+		# Two real files on disk are shaped exactly like this.
+		"env_parity_gloam_wisp_scripted.json": {
+			"schema": "arena.versus.v1", "started": "2026-09-10T08:00:00",
+			"best_of": 3, "rounds_a": 0, "rounds_b": 3, "winner": "b",
+			"a": {"label": "gloam_wisp v1", "build": "core.arena.gloam_wisp"},
+			"b": {"label": "scripted"}}}
 	for fixture_name in bench_fixtures.keys():
 		f = FileAccess.open(_bench_root.path_join(str(fixture_name)), FileAccess.WRITE)
 		f.store_string(JSON.stringify(bench_fixtures[fixture_name], " "))
 		f.close()
 	_refresh_history()
-	if _vs_history.item_count != 5 or _vs_count.text != "5 of 5":
+	if _vs_history.item_count != 8 or _vs_count.text != "8 of 8":
 		ok = false
-		push_error("CONSOLE SELFTEST: history shows %d rows ('%s'), want 5" % [
+		push_error("CONSOLE SELFTEST: history shows %d rows ('%s'), want 7" % [
 				_vs_history.item_count, _vs_count.text])
 	if _vs_history.get_item_text(0).find("★ global rank") < 0 \
 			or _vs_history.get_item_text(0).find("champion scripted") < 0:
@@ -2838,15 +3096,67 @@ func _selftest_cockpit() -> bool:
 	if filtered.call("bog_golem", "") != 3 or filtered.call("fen_boar", "") != 1:
 		ok = false
 		push_error("CONSOLE SELFTEST: the creature filter does not select by creature")
-	if filtered.call("", "tournament") != 1 or filtered.call("", "versus") != 3 \
+	if filtered.call("", "tournament") != 1 or filtered.call("", "versus") != 4 \
 			or filtered.call("", "ladder") != 1:
 		ok = false
 		push_error("CONSOLE SELFTEST: the kind filter does not split the three schemas")
+	# R60: a distill and a parity run are their own kinds, reachable and legible
+	if filtered.call("", "distill") != 1 or filtered.call("", "parity") != 1:
+		ok = false
+		push_error("CONSOLE SELFTEST: distill/parity verdicts are not filterable")
+	if filtered.call("mire_serpent", "") != 2:
+		ok = false
+		push_error("CONSOLE SELFTEST: a record naming its creature in `build` is "
+				+ "missing from the creature filter")
+	filtered.call("", "")
+	var distill_row := _vs_history.get_item_text(6)
+	if distill_row.find("⚗ mire_serpent_clone") < 0 or distill_row.find("heuristic → [64,64] tanh") < 0 \
+			or distill_row.find("gate fail") < 0 or distill_row.find("native 5-0") < 0:
+		ok = false
+		push_error("CONSOLE SELFTEST: the distill row reads '%s'" % distill_row)
+	var parity_row := _vs_history.get_item_text(5)
+	if parity_row.find("⇄ parity") < 0 or parity_row.find("mire_serpent vs scripted") < 0 \
+			or parity_row.find("worst gap 0.73") < 0 or parity_row.find("DISAGREE") < 0:
+		ok = false
+		push_error("CONSOLE SELFTEST: the parity row reads '%s'" % parity_row)
+	var pd := _verdict_detail(bench_fixtures["2026-09-11_093001__env_parity__mire_serpent.json"])
+	if pd.find("runtimes DISAGREE") < 0 or pd.find("dh-env  0.913") < 0:
+		ok = false
+		push_error("CONSOLE SELFTEST: parity detail reads '%s'" % pd)
+	# HISTORY says "newest first" — it has to be true even for a record whose
+	# name sorts above every dated one (R60)
+	var undated := _verdict_at("env_parity_fen_boar_scripted.json", {}, 1757000000)
+	var dated := _verdict_at("2026-09-19_104326__distill__x.json", {}, 0)
+	if undated != 1757000000 or dated <= 0 or dated < undated:
+		ok = false
+		push_error("CONSOLE SELFTEST: history sort keys are wrong (undated %d, dated %d)" % [
+				undated, dated])
+	# _bench is the source of the list and the filter only ever drops rows from
+	# it, so the whole promise lives in this one ordering
+	var prev_at := 1 << 62
+	for row_i in _bench.size():
+		var at_i := int((_bench[row_i] as Dictionary).at)
+		if at_i > prev_at:
+			ok = false
+			push_error("CONSOLE SELFTEST: HISTORY is not newest-first at row %d (%s)" % [
+					row_i, str((_bench[row_i] as Dictionary).name)])
+			break
+		prev_at = at_i
+	# and a name that is NOT date-stamped must still produce a real timestamp
+	# instead of slicing one out of the letters (the "arity fe:n_" bug)
+	var iso_when := _verdict_when("env_parity_fen_boar_scripted.json",
+			{"started": "2026-09-19T10:43:25"}, 0)
+	if iso_when != "09-19 10:43":
+		ok = false
+		push_error("CONSOLE SELFTEST: an undated name stamps '%s', want '09-19 10:43'" % iso_when)
+	if _verdict_when("console_20260914_044035.json", {}, 0).strip_edges() != "?":
+		ok = false
+		push_error("CONSOLE SELFTEST: a name with no time anywhere must not invent one")
 	if filtered.call("bog_golem", "tournament") != 1:
 		ok = false
 		push_error("CONSOLE SELFTEST: the two filters do not compose")
 	var fk := _verdict_keys(bench_fixtures["2026-09-12_120000__scripted_vs_native.json"])
-	if not fk.is_empty() or filtered.call("", "") != 5:
+	if not fk.is_empty() or filtered.call("", "") != 8:
 		ok = false
 		push_error("CONSOLE SELFTEST: a verdict with no creature was dropped from the history")
 	# a bracket's detail panel must show the bracket, not a made-up head to head
