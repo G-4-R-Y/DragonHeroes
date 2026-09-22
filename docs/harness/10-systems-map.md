@@ -1,45 +1,87 @@
-# Recovery work in flight — 2026-09-12
+# Urgent playtest recovery — 2026-09-13
 
-All quota-outage requests and new continuity/community directions are tracked
-as R01–R26 in 20-roadmap.md. Full recovered prompts: requests/2026-09-12-recovery.md.
-Canon §12.47; design/27, tech/36 and business/33 distinguish decisions,
-proposals and official-server gates. Original publication e036a7c succeeded.
+Latest request and quota follow-up are saved in full; roadmap R01–R40 is the
+single ledger. R34 performance and R35 Flask are Ricardo's current priority,
+followed by skills/runes, Arena navigation/Train All and boss/dungeon/art work.
+The approval service's credits rejection cleared on the read-only retry after
+reset; account balance and the original cause cannot be verified here.
 
-In-flight 2D slice: authored hero cast/heavy/spin/dodge clips + 8-frame walk,
-finite fallback actions, slash orientation and recycled shader parameters;
-shared companion portraits/nicknames, save isolation on character switches,
-Haven main-menu return, wrapped six-tab navigation, visible Flask and saved
-world-visibility slider. R03/R04/R07 are gated complete; broader UI/art remains.
-115 Python tests pass; renewal_probe and click/flask/level-up pass. GL captures
-in prototype/tests/captures/renewal show remaining floor/hero/HUD art work;
-performance sample must be warmed/settled before claiming 60 FPS. Linux
-launcher installer now also associates the executable PNG using GIO, creates
-an in-folder .desktop shortcut and handles relocation; native desktop proof and
-rebuilt packages remain pending. Rebirth still waits for 2D; "plebs" means
-local CPU/6 GB GPU 3D generation. No public backend/economy deployment implied.
+Current integrated HEAD is 4eb811f, preserving the other session's checkpoint/
+resume work. The old all-creatures sweep predates checkpoints: DO NOT kill it.
+All functional recovery gates passed, Python 127 passed, native CTest 4/4 passed;
+the streaming hard 4 ms gate STILL FAILS while the existing 20-job training sweep
+runs. Transition-row caching preserves terrain, but spikes moved to base painting;
+profile contention before claiming 60 FPS. A bounded, reversible CPU reservation
+for measurement is planned; no training affinity has been changed yet.
 
-Stream recovery: obsolete loads discarded, nearby ground prioritized, unfinished
-movement fence closed, failed helper retries, unload reversal reconciliation,
-49-chunk peak and bounded 7×7 worker SDF. stream_recovery passes far negative
-travel, stationary retry and deterministic revisit (worst apply 1.07 ms; ordinary
-stream 1.10 ms). Actual biomes and encounter hibernation still pending R08/R09.
+Completed residency/loot/projectile/story/quit-cleanup/icon changes remain
+uncommitted; builds/codex still contains b622aa6. Finish the urgent fixes and shared
+gates, then commit/push the integrated work and regenerate clean Codex packages.
+All-creature/player art, native five-biome exploration and the larger roadmap are
+still pending; do not confuse source candidates or written plans with shipped work.
 
-Warmed actual GL receipt: 300 gameplay frames at reported 60 FPS; frame median
-16.668 ms / p95 16.911 ms, CPU process median 3.813 ms / p95 4.218 ms. PNG readback stalls
-are excluded. Full captures and reproduction: docs/art/ui-renewal/README.md.
-This is a short desktop sample, not a sustained/mobile guarantee. First playable
-recovery milestone is being committed/pushed and packaged; all remaining R-items
-stay scheduled/in progress.
+# Recovery continuation — 2026-09-13 (loot, shots and connected stories)
 
-Publication checkpoint 2026-09-13: recovery milestone 3f52b35 pushed to GitHub.
-Both initial Codex exports pass ZIP/hash/icon checks; Linux passes real menu,
-Hunt/resource refill, practice effects and saved lair→Hunt→rush journey. Windows
-has verified PE icons but no native Windows gameplay test. Staging changed only
-chapter.json's decoded texture count 7573376→8049280 for the larger hero sheet;
-initial manifests correctly flag dirty source. Commit this generated metadata
-and rebuild with new --require-clean so both final manifests identify one clean
-revision. Linux GIO/file-manager association still to verify, then resume R08/R09
-and the larger 2D backlog. New "resume work" prompt archived verbatim.
+Latest full user prompt preserved verbatim; R27–R32 added before work, canon §12.48
+and design/28 added. Existing R01–R26 remain, 2D before Rebirth. Other session's
+0d075a8/ab14e32 are already on local master; origin/master was b622aa6 at fetch,
+no divergent upstream commits. Preserve the other session's benchmark receipt.
+
+Current uncommitted slice extends R08 to original ground-loot records and exactly-once
+collection (even full bag/creature cap). Projectiles continue finite flight offscreen,
+including after caster removal; live reachable targets stay awake. R27 ground_state
+probe passes. R32 water leak diagnosed as pending OFF-TREE water MMIs at quit; explicit
+cleanup passes forced-staging test plus 12/12 verbose real Hunt exits. Script/file
+notes in docs/reference/files; commands in USAGE. All earlier residency receipts
+below remain valid; updated integrated Godot/Python/native suite is running now.
+
+R28 authoring seam implemented: mandatory narrative schema with named visual
+archetypes, connected threads, factions, prospective event branches and meaningful
+cross-release links; original Fen Bells enriched. New drafts pin prior release
+SHA-256 and retain a marked continuation link. Local briefs include real prior
+stories; build hashes include pinned transitive sources. 35 narrative/living tests
+pass. Limit: dependency depth eight / 32 visits; reviewed history-anchor compaction
+still pending for long release chains. No world-event gameplay or official authority
+claimed. stage_living_preview already refreshed chapter.json/generated C++ stamp;
+native helpers rebuilt. Full suite still needed before commit/publication.
+
+Next: finish suite, commit/push ALL completed recovery work together with retained
+training commits/benchmark receipt, build clean-source Codex clients, verify final
+Linux executable icon after export. Then continue native five-biome exploration,
+modern player/ALL-creature local art, Haven and weekly enchanting/cosmetic XP;
+Rebirth remains after 2D. Do not stop at this documentation/persistence milestone.
+
+# Recovery status — 2026-09-13
+
+All prompts (including latest recovery reminders) preserved verbatim in
+requests/2026-09-12-recovery.md; R01–R26 in 20-roadmap.md is the single ledger.
+Canon §12.47; design/27, tech/36 and business/33 record continuity/community plans.
+3f52b35 and b622aa6 pushed. Current clean b622aa6 Codex packages pass exported
+Linux gameplay and Windows PE-icon/hash checks (native Windows play untested).
+
+Completed prototype slices: Haven→title save/isolation, companion sprites and
+nicknames, wrapped character tabs, visibility setting, visible Flask/HP/dodge,
+finite locally baked action clips and resilient bounded terrain streaming.
+R03/R04/R07/R15 done; broad UI/art/animation refinement still pending. Actual
+Linux executable icon association verified after fixing Snap IDE GIO/XDG issues;
+corrected installer still needs the next package.
+
+R08 residency now implemented and fully gated, uncommitted: bounded active nodes,
+primitive per-Hunt disk records, stable identity/HP/stats/statuses, paired bosses,
+no dead revival/reward duplication, every hunter considered, flying water wakes,
+120 active cap including summons, no unbounded visited RAM. Tech/29; files
+encounter_residency.gd/main.gd/world_gen.gd/hag.gd; residency_probe + real streamed
+GL return capture. All 20 Godot outcomes, 116 Python tests, CTest 4/4 and content
+validator pass. GL return 60 FPS; process median 4.573 / p95 9.167 ms, adapter 0.707 ms,
+stream 1.253 ms worst. Short desktop samples, not a mobile/slow-storage guarantee.
+
+Modern hunter source candidate saved with prompt/provenance; needs component/
+pivot ingest and a clipped-frame repair. Opaque checkerboard cleanup rejected.
+Haven courtyard source saved but not integrated. Next after residency commit/
+package: real hero/ALL-creature Orun art, native 5-biome terrain, Haven/crafting,
+weekly enchantments and cosmetic XP. Rebirth local CPU / 6 GB GPU follows 2D; UE is
+uncompiled. Old Codex branch has no unique commits; missing temp worktree and
+superseded stash are preserved without reapplying. See HANDOFF for exact paths.
 
 ---
 
@@ -215,48 +257,6 @@ requires `pgid == pid` before it ever signals `-PGID`. A crashed trainer's
 orphans are swept on the next poll too, not just on Stop. Issues: scripted baseline beats native AI — L1 data-driven AI profiles
 is the unlock; fen_boar candidates take 0 wins vs native every match (fitness
 moves on hp margin only) — opponent curriculum/shaping next (design/25 §5).
-
-## Multiplayer
-**P2P co-op v1 LANDED (v0.3.0); server-authoritative path = roadmap.**
-tech/33 (P2P), tech/22/26 (Nakama/dh-net), design/21 (M-A/M-B/M-C), canon
-§12.36. `game/mp/` (MpNet autoload ENet lobby+RPC, lobby.tscn, host_driver
-20 Hz snapshots, client_hunt on shared seed, puppet.gd, bolt.gd). Gate:
-`tools/mp_test.sh` (MP TEST OK — asserts input-driven displacement). Honest
-scope: friends/LAN; ranked/economy stays official-server-only.
-
-## 3D view (experiment)
-**LANDED (v0.2.1), parked as experiment.** design/22, canon §12.33.
-`game/prototype3d/{hunt3d.gd,hunt3d.tscn,world_data.gd}` — same chunks/art/
-bundles as billboards + extruded rock + real lights. Feeds from mesh_gen
-later. 2D stays canon.
-
-## Engine experiments — Rebirth (`rebirth/`, own git repo, parent-ignored)
-**Godot 3D + native C++ slices RUN and are GATED; UE 5.4 scaffold complete,
-UNCOMPILED (no engine on the box); Unity parked by decision.** Plan
-`rebirth/docs/01-plan.md`, execution log + open picks `rebirth/docs/02-status.md`,
-canon §12.44. One combat table (five-skill dragon, enrage → retreat leap →
-meteors → pounce, hunter i-frames/buffer/combo, pet howl) implemented in
-`rebirth/godot3d/scripts/`, `rebirth/native/src/sim.cpp`,
-`rebirth/unreal/Source/Rebirth/Combat/RebirthCombat.h`. Shared asset staging
-`rebirth/assets/tools/gen_assets.py` (GenForge mesh_gen → GLB/.dhm/UE manifest).
-Gates: `REBIRTH_SELFTEST=1 godot --headless --fixed-fps 60 --path rebirth/godot3d`
-→ `REBIRTH3D OK`; `rebirth/native/build/rebirth-native --sim-only --verify` →
-`REBIRTH-NATIVE OK` (+ ctest determinism). Captures: `rebirth/{godot3d,native}/captures/`.
-OPEN (Ricardo): layout collision with the parallel session's root-level UE
-scaffold + `rebirth-native/`/`rebirth-unity/` siblings; Godot Forward+ flip;
-UE install (Epic account, ~45 GB).
-
-## Packaging & platforms
-**Desktop packaging LANDED; Android documented, not exported.** docs/USAGE.md,
-tech/30 (Android/LAN), business/32 (open source: MIT code, CC BY-NC art
-pending confirm). `game/export_presets.cfg`, `tools/package_game.sh`
-(binary + dh-server + LEIA-ME), `builds/`. Issues: export templates (~1 GB)
-installed locally for the Codex desktop exports; no touch controls; no mobile perf pass (60 FPS directive).
-
-**Codex review packaging:** `tools/package_codex.py` rebuilds both clients and
-helpers, bundles the offline review, records source/file hashes and verifies
-archives. Windows uses `sim/build-codex-windows` to avoid upstream's tracked
-build cache. `tools/build_app_icon.py` derives PNG + six-size ICO from a curated
 **2026-09-19 (R52 built — the hi-fi sprite generator):** `genforge/hifi/`
 turns `sprites prompt.md` into a generator with a gate: verbatim prompt
 assembly (pinned to the file), six enforcement stages (transparent background
@@ -307,6 +307,48 @@ plumbed through `tools/train_run.sh` and recorded in each run's `config.json`.
 Ledger: `docs/tech/39-experiment-ledger.md` via `tools/experiment_ledger.py`.
 Status: smoke-verified (fen_boar mirror: env_parity OK, greedy wins 1.00 vs
 native in both runtimes); converged 60 M run is the next gate.
+
+## Multiplayer
+**P2P co-op v1 LANDED (v0.3.0); server-authoritative path = roadmap.**
+tech/33 (P2P), tech/22/26 (Nakama/dh-net), design/21 (M-A/M-B/M-C), canon
+§12.36. `game/mp/` (MpNet autoload ENet lobby+RPC, lobby.tscn, host_driver
+20 Hz snapshots, client_hunt on shared seed, puppet.gd, bolt.gd). Gate:
+`tools/mp_test.sh` (MP TEST OK — asserts input-driven displacement). Honest
+scope: friends/LAN; ranked/economy stays official-server-only.
+
+## 3D view (experiment)
+**LANDED (v0.2.1), parked as experiment.** design/22, canon §12.33.
+`game/prototype3d/{hunt3d.gd,hunt3d.tscn,world_data.gd}` — same chunks/art/
+bundles as billboards + extruded rock + real lights. Feeds from mesh_gen
+later. 2D stays canon.
+
+## Engine experiments — Rebirth (`rebirth/`, own git repo, parent-ignored)
+**Godot 3D + native C++ slices RUN and are GATED; UE 5.4 scaffold complete,
+UNCOMPILED (no engine on the box); Unity parked by decision.** Plan
+`rebirth/docs/01-plan.md`, execution log + open picks `rebirth/docs/02-status.md`,
+canon §12.44. One combat table (five-skill dragon, enrage → retreat leap →
+meteors → pounce, hunter i-frames/buffer/combo, pet howl) implemented in
+`rebirth/godot3d/scripts/`, `rebirth/native/src/sim.cpp`,
+`rebirth/unreal/Source/Rebirth/Combat/RebirthCombat.h`. Shared asset staging
+`rebirth/assets/tools/gen_assets.py` (GenForge mesh_gen → GLB/.dhm/UE manifest).
+Gates: `REBIRTH_SELFTEST=1 godot --headless --fixed-fps 60 --path rebirth/godot3d`
+→ `REBIRTH3D OK`; `rebirth/native/build/rebirth-native --sim-only --verify` →
+`REBIRTH-NATIVE OK` (+ ctest determinism). Captures: `rebirth/{godot3d,native}/captures/`.
+OPEN (Ricardo): layout collision with the parallel session's root-level UE
+scaffold + `rebirth-native/`/`rebirth-unity/` siblings; Godot Forward+ flip;
+UE install (Epic account, ~45 GB).
+
+## Packaging & platforms
+**Desktop packaging LANDED; Android documented, not exported.** docs/USAGE.md,
+tech/30 (Android/LAN), business/32 (open source: MIT code, CC BY-NC art
+pending confirm). `game/export_presets.cfg`, `tools/package_game.sh`
+(binary + dh-server + LEIA-ME), `builds/`. Issues: export templates (~1 GB)
+installed locally for the Codex desktop exports; no touch controls; no mobile perf pass (60 FPS directive).
+
+**Codex review packaging:** `tools/package_codex.py` rebuilds both clients and
+helpers, bundles the offline review, records source/file hashes and verifies
+archives. Windows uses `sim/build-codex-windows` to avoid upstream's tracked
+build cache. `tools/build_app_icon.py` derives PNG + six-size ICO from a curated
 original; `tools/verify_package.py` checks actual Windows PE icon bytes and
 Linux executable formats. Actual release-PCK smoke verifies a streaming Hunt;
 fixed the exported helper capability check that silently selected an island. Source: `genforge/art_sources/app_icon/`; outputs:

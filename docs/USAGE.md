@@ -617,7 +617,7 @@ tools/genforge.py check               # audit EVERYTHING; exit 1 if anything fai
 tools/genforge.py check fen_bells     # one pack
 ```
 
-Or as a cockpit — **main menu → GENFORGE**, or standalone:
+Or as a cockpit — **main menu → GENFORGE**, or standalone. **To get back out: `< BACK` beside the GENFORGE title, or `Esc`.**
 
 ```bash
 godot --path game res://genforge/console.tscn   # a SCENE, so godot runs it — not bash
@@ -747,6 +747,9 @@ python3 -m pytest ml/tests/ genforge/tests/ -q          # python suites
 Gameplay content is data (`content/`), validated in CI; IDs are
 `pack.type.name` and are never deleted, only deprecated. The arena roster lives
 in `content/core/arena/builds.json` and syncs to `game/arena/data/builds.json`.
+Deeper background: `genforge/README.md` (the generation service),
+`docs/tech/34-living-content-pipeline.md` (the weekly release workflow) and
+`docs/design/17-art-direction.md` §5 (the style lock).
 
 ## 8. Package and distribute (no Godot on their end)
 

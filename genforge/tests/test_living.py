@@ -31,7 +31,8 @@ def test_authored_release_has_valid_lore_kits_and_rarity(release):
 def test_next_week_namespace_is_fully_remapped(release):
     new=draft(release,"second_bell","The Second Bell")
     assert validate(new) == []
-    assert "fen_bells." not in json.dumps(new)
+    assert all(row["id"].startswith("second_bell.") for row in new["creatures"] + new["lore"])
+    assert new["narrative"]["links"][-1]["to"].startswith("fen_bells.thread.")
     assert new["review"]["status"]=="candidate"
     assert release["pack"]=="fen_bells"
 

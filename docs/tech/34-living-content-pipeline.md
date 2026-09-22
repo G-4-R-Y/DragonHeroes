@@ -254,3 +254,45 @@ visual captures and do not prove 60 FPS or desktop-shell appearance.
 
 Codex Windows cross-builds use the ignored `sim/build-codex-windows/` tree,
 isolated from upstream's tracked `sim/build-windows/` cache and artifacts.
+
+## Connected weekly lore and local-cost contract (2026-09-13)
+
+Every living release now requires `narrative`, separately shaped by
+`content/schemas/narrative.schema.json` and checked by `living/narrative.py`.
+It binds each creature to exactly one named visual/narrative archetype, connects
+all creatures/artifacts to story threads, grounds factions/events in lore and
+checks typed links. Political outcomes are candidate prose; this tool cannot
+apply world changes or award items. Canon §12.48 and design/28 own the direction.
+
+`fen_bells` is the genesis chapter grounded in the world bible. New chapters pin
+prior repository release JSON by SHA-256 and explain a connection to that release.
+Drafting retains this history while remapping new local IDs; inherited stories
+and pixels remain clearly marked authoring placeholders. Validation rejects
+broken/unused dependencies, changed hashes, namespace collisions, cycles and
+executable extra fields. It currently caps dependency depth at eight chapters
+and visits at 32 for bounded work. Reviewed history-anchor/compaction tooling is
+still needed for long release chains; do not claim it is already implemented.
+
+Builds recheck pinned bytes, hash transitive dependency JSON into their identity,
+and include actual earlier stories in the grounded art brief. Review HTML still
+keeps all existing art/runtime approval blockers. Current Fen Bells narrative
+adds the keeper/ferry-household bronze dispute and two prospective story outcomes;
+those quests/political choices are not yet playable.
+
+```bash
+python3 -m genforge.living.draft --from genforge/releases/bell_beneath_fen.json \
+  --pack bronze_caravan --title 'The bronze beyond the water' \
+  --out genforge/releases/bronze_caravan.json
+python3 -m genforge.living.build genforge/releases/bronze_caravan.json --brief-only
+python3 -m pytest genforge/tests/test_narrative.py genforge/tests/test_living.py -q
+```
+
+These commands run locally without network/model spending. CPU parts/pose baking,
+palette/emissive processing, source ingest, review generation and packaging also
+run offline. New model-created source art is a separate, explicit provider step;
+the current curated Orun/hunter/Haven sources used the built-in image tool.
+There is no claim that a local image model already recreates those source images.
+The existing 1,100-entry catalog still largely shares older small body artwork;
+ALL-creature visual rework and a complete animation coverage report remain R06/R30.
+
+Per-file implementation notes: `docs/reference/files/genforge/living/`.

@@ -449,5 +449,88 @@
   "review": {
     "status": "candidate",
     "notes": "Generated idle source only. Attack/move/hit/death, coherent directional animation, manual cleanup, class-resource mappings, live combat application and target-device capture remain review gates."
+  },
+  "narrative": {
+    "summary": "The drowned bell shrine preserves a rescue vow. Its recovery draws the Haven keepers and displaced ferrymen into a dispute over who may carry that vow into the next woven lands.",
+    "dependencies": [],
+    "archetypes": [
+      {
+        "id": "fen_bells.archetype.bellbound_cervid",
+        "name": "The bellbound marsh guardian",
+        "identity": "An antlered cervid with bronze bell, luminous rib-heart and mossy bark plates; the silhouette carries the rescue bell before any rarity tint. Wet chimes set up storm tolls, with deliberate pauses for hunters to answer.",
+        "lore": "fen_bells.lore.unrung",
+        "creatures": [
+          "fen_bells.creature.orun"
+        ]
+      }
+    ],
+    "threads": [
+      {
+        "id": "fen_bells.thread.the_returning_vow",
+        "title": "Who keeps the second stroke?",
+        "premise": "Ilyra and Orun called the living home. Each surviving object remembers another part of the rescue, and recovering them changes what the Havens know about the drowned settlement.",
+        "members": [
+          "fen_bells.creature.orun",
+          "fen_bells.item.widows_refrain",
+          "fen_bells.item.pilgrim_bell",
+          "fen_bells.item.storm_canticle",
+          "fen_bells.item.crown_of_return"
+        ],
+        "open_question": "Will the rescued bell remain at the old mooring, or travel with those rebuilding beyond the fen?"
+      }
+    ],
+    "factions": [
+      {
+        "id": "fen_bells.faction.well_keepers",
+        "name": "Keepers of the drowned well",
+        "principle": "A promise belongs to the place where it was made.",
+        "stake": "Preserve the bell shrine and keep its rescue account open to every returning hunter.",
+        "lore": "fen_bells.lore.unrung"
+      },
+      {
+        "id": "fen_bells.faction.ferry_remnant",
+        "name": "The scattered ferry households",
+        "principle": "A promise survives through people who carry it onward.",
+        "stake": "Recover the rail bronze to protect caravans that must cross newly woven water.",
+        "lore": "fen_bells.lore.widows_refrain"
+      }
+    ],
+    "events": [
+      {
+        "id": "fen_bells.event.the_bronze_petition",
+        "title": "The petition for the ferry bronze",
+        "lore": "fen_bells.lore.widows_refrain",
+        "factions": [
+          "fen_bells.faction.well_keepers",
+          "fen_bells.faction.ferry_remnant"
+        ],
+        "outcomes": [
+          {
+            "id": "fen_bells.outcome.keep_the_mooring",
+            "label": "Restore the shared mooring",
+            "consequence": "The old shrine becomes a meeting place; a later chapter can bring returning households and a guardian charged with its protection."
+          },
+          {
+            "id": "fen_bells.outcome.carry_the_warning",
+            "label": "Carry the warning onward",
+            "consequence": "A marked piece of bronze travels with a caravan; a later chapter can follow its new bearer and an enchantment that remembers the rescue."
+          }
+        ]
+      }
+    ],
+    "links": [
+      {
+        "from": "fen_bells.thread.the_returning_vow",
+        "to": "fen_bells.lore.unrung",
+        "relationship": "reveals",
+        "meaning": "The five keeper fragments turn the apparently predatory chime into evidence of the original rescue."
+      },
+      {
+        "from": "fen_bells.event.the_bronze_petition",
+        "to": "fen_bells.thread.the_returning_vow",
+        "relationship": "consequence",
+        "meaning": "Recovering the ferry account makes ownership of the surviving bronze a dispute among living people."
+      }
+    ]
   }
 }

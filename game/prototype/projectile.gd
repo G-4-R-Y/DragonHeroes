@@ -29,6 +29,7 @@ var _spr: Sprite2D
 var _t := 0.0
 var _trail_id := -1       # pooled ribbon trail (fx.trail_attach), -1 = none
 var _light_id := -1       # pooled ground glow (fx.light_attach), -1 = none
+var _finished := false
 
 func set_violet() -> void:
 	dmg_type = "umbral"
@@ -70,6 +71,9 @@ func set_steel() -> void:    # Veilblade knife
 	impact_ring = false
 
 func _ready() -> void:
+	# Camera visibility never owns a projectile's lifetime. Shots keep simulating
+	# offscreen, including after their shooter is removed, until impact or expiry.
+	add_to_group("projectiles")
 	_spr = Sprite2D.new()
 	_spr.texture = ProtoSprites.circle_tex(10, body_col, core_col, edge_col)
 	add_child(_spr)
@@ -91,6 +95,7 @@ func _ready() -> void:
 					"alpha": 0.34, "life": lifetime + 0.3})
 
 func _physics_process(delta: float) -> void:
+	if _finished or is_queued_for_deletion(): return
 	# in-flight juice: pure transform math, zero allocation (60 FPS hard rule)
 	_t += delta
 	if spin != 0.0:
@@ -101,6 +106,7 @@ func _physics_process(delta: float) -> void:
 	global_position += velocity * delta
 	lifetime -= delta
 	if lifetime <= 0.0:
+		_finished = true
 		_release_trail()
 		queue_free()
 		return
@@ -170,6 +176,8 @@ func _physics_process(delta: float) -> void:
 			return
 
 func _impact() -> void:
+	if _finished: return
+	_finished = true
 	var main := get_tree().get_first_node_in_group("main")
 	if main:
 		main.hit_spark(global_position, body_col)
@@ -192,3 +200,6 @@ func _release_trail() -> void:
 			main.fx.light_detach(_light_id)
 	_trail_id = -1
 	_light_id = -1
+
+func _exit_tree() -> void:
+	_release_trail()

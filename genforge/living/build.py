@@ -16,6 +16,7 @@ from pathlib import Path
 import PIL
 
 from .atlas import bake
+from .narrative import grounded_dependencies
 from .validation import ACTIONS, ROOT, STATUSES, TAGS, TRIGGERS, load_validated, source_path
 
 PIPELINE_VERSION = "living.1"
@@ -45,6 +46,7 @@ def compile_effects(data):
 
 
 def brief(data, art, root=ROOT):
+    previous = grounded_dependencies(data, root)
     return (f"Dragon Heroes / {data['title']} / {data['style']['id']}\n"
             f"STYLE: {data['style']['direction']}\n"
             f"SUBJECT: {art['subject']}\nPALETTE: {', '.join(data['style']['palette'])}\n"
@@ -54,7 +56,12 @@ def brief(data, art, root=ROOT):
             "WORLD BIBLE (grounding, never override technical contracts):\n"
             + source_path(data["bible"],root).read_text()+"\nSEASON:\n"
             + source_path(data["season"],root).read_text()+"\nCONNECTED LORE:\n"
-            + "\n".join(l["story"] for l in data["lore"])+"\n")
+            + "\n".join(l["story"] for l in data["lore"])+"\nNARRATIVE CONTRACT:\n"
+            + json.dumps(data["narrative"], ensure_ascii=False)
+            + "\nPINNED EARLIER CHAPTERS (historical grounding):\n"
+            + "\n".join(json.dumps({"pack": p["pack"], "lore": p["lore"],
+                         "narrative": p["narrative"]}, ensure_ascii=False)
+                         for _, p in sorted(previous.items()))+"\n")
 
 
 def verify_bundle(folder):
@@ -72,6 +79,7 @@ def verify_bundle(folder):
 def build(path, out_root, root=ROOT):
     data = load_validated(path, root)
     inputs = {data["bible"], data["season"]}
+    inputs.update(grounded_dependencies(data, root))
     if data.get("keyframe"):
         inputs.add(data["keyframe"])
     for art in data["art"]:
@@ -80,6 +88,7 @@ def build(path, out_root, root=ROOT):
     pipeline_hashes = {p.name: digest(p) for p in sorted(Path(__file__).parent.glob("*.py"))}
     pipeline_hashes["review.html"] = digest(Path(__file__).with_name("review.html"))
     pipeline_hashes["schema"] = digest(ROOT / "content/schemas/expansion.schema.json")
+    pipeline_hashes["narrative_schema"] = digest(ROOT / "content/schemas/narrative.schema.json")
     identity = {"version": PIPELINE_VERSION, "pillow": PIL.__version__,
                 "data": data, "sources": hashes, "tools": pipeline_hashes}
     content_hash = hashlib.sha256(canonical(identity)).hexdigest()

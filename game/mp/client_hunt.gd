@@ -32,6 +32,8 @@ var _toast: Label
 var _toast_t := 0.0
 var _my_hp := 1.0
 var _my_dc := 3
+var _my_flasks := 2
+var _flask_button: Button
 
 func _ready() -> void:
 	ProtoTheme.apply_doctrine()
@@ -91,6 +93,7 @@ func _on_snapshot(snap: Dictionary) -> void:
 		if id == _my_id:
 			_my_hp = float(row[3]) / maxf(float(row[4]), 1.0)
 			_my_dc = int(row[5])
+			if row.size() > 8: _my_flasks = int(row[8])
 	var seen := {}
 	for row in snap.get("cr", []):
 		var id := int(row[0])
@@ -138,7 +141,9 @@ func _on_server_closed() -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed:
-		if event.is_action_pressed("dodge"):
+		if event.is_action_pressed("flask"):
+			MpNet.request_flask()
+		elif event.is_action_pressed("dodge"):
 			_edges["d"] = true
 		elif event.is_action_pressed("skill2"):
 			_edges["e"] = true
@@ -184,6 +189,16 @@ func _build_hud() -> void:
 	var canvas := CanvasLayer.new()
 	canvas.layer = 10
 	add_child(canvas)
+	_flask_button = Button.new()
+	_flask_button.theme = ProtoTheme.get_theme()
+	_flask_button.position = Vector2(204, 8)
+	_flask_button.size = Vector2(76, 30)
+	_flask_button.icon = preload("res://prototype/ui/ember_flask.svg")
+	_flask_button.expand_icon = true
+	_flask_button.focus_mode = Control.FOCUS_NONE
+	_flask_button.tooltip_text = ProtoLang.t("hud_flask_tip")
+	_flask_button.pressed.connect(MpNet.request_flask)
+	canvas.add_child(_flask_button)
 	var bg := ColorRect.new()
 	bg.color = Color(0, 0, 0, 0.55)
 	bg.position = Vector2(8, 8)
@@ -218,6 +233,8 @@ func _build_hud() -> void:
 	canvas.add_child(hint)
 
 func _refresh_hud() -> void:
+	_flask_button.text = "R  %d/2" % _my_flasks
+	_flask_button.modulate = Color.WHITE if _my_flasks > 0 else Color("858784")
 	_hp_fill.size.x = 180.0 * clampf(_my_hp, 0, 1)
 	_hp_fill.color = Color("58c470") if _my_hp > 0.3 else Color("d84f4f")
 	for i in 3:

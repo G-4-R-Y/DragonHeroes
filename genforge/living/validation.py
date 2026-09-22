@@ -6,6 +6,8 @@ from pathlib import Path
 
 import jsonschema
 
+from .narrative import validate_narrative
+
 ROOT = Path(__file__).resolve().parents[2]
 TYPES = {"lore": "lore", "effects": "effect", "skills": "skill",
          "creatures": "creature", "artifacts": "item", "art": "art"}
@@ -26,12 +28,19 @@ def source_path(relative: str, root: Path = ROOT) -> Path:
     return path
 
 
-def validate(data: dict, root: Path = ROOT) -> list[str]:
+def validate(data: dict, root: Path = ROOT, *, _ancestors=(), _remaining=None) -> list[str]:
     schema = json.loads((ROOT / "content/schemas/expansion.schema.json").read_text())
     problems = [f"{'/'.join(map(str, e.path))}: {e.message}"
                 for e in jsonschema.Draft7Validator(schema).iter_errors(data)]
     if problems:
         return sorted(problems)
+    if data["pack"] in _ancestors:
+        return ["narrative dependency cycle: " + " -> ".join((*_ancestors, data["pack"]))]
+    if len(_ancestors) >= 8:
+        return ["narrative dependency depth exceeds eight chapters; pin a curated history anchor"]
+    if _remaining is None:
+        _remaining = [32]
+    problems += validate_narrative(data, root, validate, source_path, _ancestors, _remaining)
     if not data["style"]["id"].startswith(f"{data['pack']}.style."):
         problems.append("style id must use the release pack.style namespace")
     ids = {}

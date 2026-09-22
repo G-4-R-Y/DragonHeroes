@@ -13,6 +13,7 @@ signal connection_failed(reason: String)
 signal server_closed
 # in-game transport (host_driver / client_hunt consume these)
 signal input_received(peer_id: int, pkt: Dictionary)
+signal flask_requested(peer_id: int)
 signal snapshot_received(snap: Dictionary)
 signal event_received(ev: Dictionary)
 
@@ -128,6 +129,17 @@ func _connected() -> bool:
 func send_input(pkt: Dictionary) -> void:
 	if not is_host and in_game and _connected():
 		rpc_id(1, "_rpc_input", pkt)
+
+# A one-shot drink cannot be dropped with an unreliable movement packet.
+# The host receives intent only; HP, charges and eligibility remain host-owned.
+func request_flask() -> void:
+	if not is_host and in_game and _connected():
+		rpc_id(1, "_rpc_flask")
+
+@rpc("any_peer", "reliable")
+func _rpc_flask() -> void:
+	if is_host and in_game:
+		flask_requested.emit(multiplayer.get_remote_sender_id())
 
 func send_snapshot(snap: Dictionary) -> void:
 	if is_host and in_game and _connected():

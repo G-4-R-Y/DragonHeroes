@@ -28,3 +28,14 @@ without screenshot readbacks: 60 FPS reported, median frame 16.668 ms,
 95th percentile 16.911 ms, median process 3.813 ms / p95 4.218 ms on this Intel-GL
 desktop. PNG readbacks themselves stall and are excluded from those samples.
 This short desktop run is not proof of sustained performance or mobile support.
+
+
+Distant encounters: `residency_capture.tscn` performs a real streamed journey
+and returns to the same wounded actor. [Before](../../../game/prototype/tests/captures/residency/before.png),
+[away](../../../game/prototype/tests/captures/residency/away.png),
+[returned](../../../game/prototype/tests/captures/residency/returned.png).
+81 actors became dormant; return preserved the target HP. A 300-frame warmed
+return sample reports 60 FPS, process median 4.573 ms / p95 9.167 ms; worst residency
+step 0.707 ms / stream apply 1.253 ms. F3 counters expose active/dormant counts.
+The initial screenshot includes cold startup; only the separate warmed sample
+is used for the performance receipt. Terrain and creature art are still pending.

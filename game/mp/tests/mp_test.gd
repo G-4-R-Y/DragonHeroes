@@ -19,6 +19,8 @@ var _snaps := 0
 var _send_t := 0.0
 var _spawn_pos := {}
 var _host_ok_t := 0.0
+var _flask_sent := false
+var _flask_seen := false
 
 func _ready() -> void:
 	for a in OS.get_cmdline_user_args():
@@ -38,7 +40,12 @@ func _ready() -> void:
 			get_tree().quit(1)
 	else:
 		MpNet.game_started.connect(_on_client_started)
-		MpNet.snapshot_received.connect(func(_s: Dictionary) -> void: _snaps += 1)
+		MpNet.snapshot_received.connect(func(s: Dictionary) -> void:
+			_snaps += 1
+			for row in s.get("pl", []):
+				if int(row[0]) == multiplayer.get_unique_id() and row.size() > 8:
+					if int(row[8]) == 1 and float(row[3]) >= float(row[4]) * 0.59:
+						_flask_seen = true)
 		if not MpNet.join_game("127.0.0.1", TEST_PORT):
 			push_error("mp_test: join_game failed")
 			get_tree().quit(1)
@@ -54,6 +61,8 @@ func _on_started(payload: Dictionary) -> void:
 		return
 	_hunt = preload("res://prototype/main.tscn").instantiate()
 	add_child(_hunt)   # main.gd reads MpNet.pending_seed + attaches host_driver
+	for creature in get_tree().get_nodes_in_group("creatures"):
+		creature.set_physics_process(false)   # isolate transport/healing from attacks
 
 func _on_client_started(payload: Dictionary) -> void:
 	if int(payload.get("seed", 0)) != TEST_SEED:
@@ -77,9 +86,12 @@ func _process(delta: float) -> void:
 		if _send_t >= 1.0 / 30.0:
 			_send_t = 0.0
 			MpNet.send_input({"m": [1.0, 0.0], "aim": [200.0, 0.0], "atk": false})
-		if _snaps >= 10:
+		if _snaps >= 3 and not _flask_sent:
+			_flask_sent = true
+			MpNet.request_flask()
+		if _snaps >= 30 and _flask_seen:
 			_done = true
-			print("MP CLIENT OK — %d snapshots received" % _snaps)
+			print("MP CLIENT OK — %d snapshots; host-owned Flask HP and charge received" % _snaps)
 			get_tree().quit(0)
 		return
 	if _mode == "--host" and _hunt != null:
@@ -97,8 +109,10 @@ func _process(delta: float) -> void:
 				continue
 			if not _spawn_pos.has(peer_id):
 				_spawn_pos[peer_id] = body.global_position
+				body.hp = body.max_hp * 0.4
 			# the remote must MOVE from its spawn point — driven by client inputs
-			if body.global_position.distance_to(_spawn_pos[peer_id]) > 30.0:
+			if body.global_position.distance_to(_spawn_pos[peer_id]) > 30.0 \
+					and body.flask_charges == 1 and body.hp >= body.max_hp * 0.59:
 				_host_ok_t = _t
 				print("MP HOST OK — remote hunter moved %s -> %s on client inputs" \
 						% [str(_spawn_pos[peer_id].round()), str(body.global_position.round())])

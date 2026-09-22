@@ -6,7 +6,7 @@ import subprocess
 from PIL import Image
 
 from genforge.pipeline.bake_game_art import bake_actor
-from tools.install_linux_launcher import install
+from tools.install_linux_launcher import desktop_environment, install
 
 
 def test_action_bake_has_distinct_motion_and_matching_lighting(tmp_path):
@@ -48,3 +48,17 @@ def test_linux_icon_installs_a_valid_relocatable_launcher(tmp_path):
     desktop, _ = install(moved, data=data, metadata=False)
     assert str(moved) in desktop.read_text()
     assert str(package) not in desktop.read_text()
+
+
+def test_snap_ide_installs_for_host_desktop(monkeypatch, tmp_path):
+    monkeypatch.setenv("SNAP", "/snap/code/262")
+    monkeypatch.setenv("SNAP_REAL_HOME", str(tmp_path / "real_home"))
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "real_home/snap/code/262/.local/share"))
+    monkeypatch.setenv("GIO_MODULE_DIR", str(tmp_path / "real_home/snap/code/common/.cache/gio-modules"))
+    package = tmp_path / "package"
+    package.mkdir()
+    (package / "dragon-heroes-codex.x86_64").write_bytes(b"fixture")
+    (package / "dragon-heroes-codex.png").write_bytes(b"icon")
+    desktop, _ = install(package, metadata=False)
+    assert desktop == tmp_path / "real_home/.local/share/applications/dragon-heroes-codex.desktop"
+    assert "GIO_MODULE_DIR" not in desktop_environment()

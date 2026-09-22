@@ -1,0 +1,3 @@
+# game/prototype/tests/residency_capture.gd
+
+Actual windowed gl_compatibility Hunt travel/return receipt, fixed seed 42. Freezes hunter input and enemy AI while keeping streaming/residency active, travels six chunks east/three north, revisits a wounded target and asserts exact HP. Saves before/away/returned PNGs, then samples 300 warm process frames excluding screenshot readback. Reports worst streaming/residency step and FPS. It does not prove crowded combat, sustained mobile speed or slow-storage latency. Art/performance receipts in docs/art/ui-renewal; .tscn/.uid and captures/residency are owned artifacts.

@@ -1,0 +1,3 @@
+# tools/install_linux_launcher.py
+
+Installs the existing packaged PNG into host XDG icons, writes a validated desktop launcher/in-folder shortcut, and attempts GIO custom-icon/trust metadata for Linux file managers. desktop_environment removes Snap-path GIO/library overrides for system tools and maps Snap-redirected XDG data to SNAP_REAL_HOME host data; explicit caller data overrides remain respected. Main menu launches the installer asynchronously for normal Linux exports; tests use isolated data. Actual GIO association was verified on this host. test_renewal.py covers quoting/paths/Snap behavior; tech/34 owns distribution details.

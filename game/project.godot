@@ -46,6 +46,8 @@ LairJourneyProbe="*res://living/journey_probe.gd"
 
 CodexPackageProbe="*res://tools/package_smoke.gd"
 
+CodexPerformanceProbe="*res://tools/performance_probe.gd"
+
 Session="*res://prototype/ui/session.gd"
 MpNet="*res://mp/mp_net.gd"
 

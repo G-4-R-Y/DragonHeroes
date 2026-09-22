@@ -1,0 +1,9 @@
+{
+  "provider": "builtin-imagegen",
+  "prompt": "cleanup-prompt.txt",
+  "reference": "source-v1.png",
+  "output": "/home/ricz/.codex/generated_images/01a09445-0ed7-79b1-89ea-8280f42f2b8d/exec-464e48ad-95eb-4029-a20b-7eacfec0105c.png",
+  "status": "rejected",
+  "reason": "Baked opaque checkerboard; alpha min=max=255. Weapon positions still exceed uniform cells. Do not ingest or ship this edit.",
+  "next": "Keep transparent v1 source; support separate connected sprite components and authored pivots; repair clipped run frame15 separately."
+}

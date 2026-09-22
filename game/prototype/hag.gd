@@ -211,6 +211,8 @@ func _blink(player: Node2D, main: Node) -> void:
 func _summon(main: Node) -> void:
 	var world := get_tree().get_first_node_in_group("world")
 	while _wisplings.size() < 2:
+		if main != null and main.get("REPOP_CAP") != null and get_tree().get_nodes_in_group("creatures").size() >= main.REPOP_CAP:
+			break
 		var w := Wispling.new()
 		w.global_position = world.random_walkable_in_ring(
 				global_position, 1.0 * TILE, 2.0 * TILE) if world \

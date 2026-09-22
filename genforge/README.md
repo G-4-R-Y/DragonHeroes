@@ -2,10 +2,17 @@
 
 GenForge turns the weekly-content treadmill into a factory: grounded in the **world
 bible** (`lore/`) and the active **season theme** (`seasons/`), it generates *candidate*
-creatures, items, and skills — 64-bit-style sprite sheets + animation frames (image
+creatures, items, and skills — modern, richly clustered pixel sprite sheets + animation frames (image
 generation through the style-locked pipeline of [docs/design/17 §5](../docs/design/17-art-direction.md))
 and schema-conforming JSON metadata: stats, effects, descriptions, mechanics (text
 generation constrained by [content/schemas/](../content/schemas/)).
+
+Current connected weekly release workflow: [tech/34](../docs/tech/34-living-content-pipeline.md)
+and [design/28](../docs/design/28-living-world-and-weekly-lore.md). Living candidates
+require lore, visual/narrative archetypes, story threads and pinned links to earlier
+chapters. Briefs and deterministic bakes use local source files; only an explicitly
+selected generation provider makes model calls. Existing catalog art is still being
+upgraded: local reproducibility does not certify Orun-level visual quality.
 
 ```
 lore + season theme + request
@@ -157,13 +164,6 @@ bundles are never touched.
   counts (Elite ≥5, Legendary 5–10), the seven damage types, power-budget bounds,
   family skill-sharing that follows family lore (canon §3).
 
-## API sketch (internal only — see docs/tech/28)
-
-```
-POST /generate/creature  {archetype, family, tier, palette_hints, theme_tags} → bundle   ✅ v0 (stub provider)
-POST /generate/item      {slot, tags, rarity_band, season, theme_tags}        → bundle   (planned)
-POST /generate/skill     {behavior, damage_type, family?, season}             → bundle   (planned)
-POST /generate/batch     {drop_manifest}                                      → bundles  (planned)
 ## The hi-fi sprite generator (`genforge.hifi`, 2026-09-19)
 
 Ricardo's `sprites prompt.md` (repo root) as a tool: the master prompt and the
@@ -182,6 +182,13 @@ python3 -m genforge.hifi process IN.png --creature orun --out DIR
 python3 -m genforge.hifi bench --label ours A/ --label astra B/ --creature orun
 ```
 
+## API sketch (internal only — see docs/tech/28)
+
+```
+POST /generate/creature  {archetype, family, tier, palette_hints, theme_tags} → bundle   ✅ v0 (stub provider)
+POST /generate/item      {slot, tags, rarity_band, season, theme_tags}        → bundle   (planned)
+POST /generate/skill     {behavior, damage_type, family?, season}             → bundle   (planned)
+POST /generate/batch     {drop_manifest}                                      → bundles  (planned)
 ```
 
 Stack: Python FastAPI; models are open proposals (style-locked image model

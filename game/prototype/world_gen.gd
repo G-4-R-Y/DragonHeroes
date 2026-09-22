@@ -102,6 +102,7 @@ var _apply_phase := 0             # per-mode phase index (see _step_load / _step
 var _apply_row := 0
 var _wjobs := []                  # [ {key, self, cur, mmi?} ] budgeted water fill/refresh
 var _worst_apply_ms := 0.0        # stream_test reads this (§5 budget gate)
+var _worst_apply_detail := {}     # phase receipt for investigating budget spikes
 
 # SDF rebake (docs/tech/29 §2 step 5): pure chamfer math on a snapshot, worker
 # thread, debounced (one in flight; re-arm if the chunk set changed while baking).
@@ -459,12 +460,18 @@ func _process_apply() -> void:
 	var t0 := Time.get_ticks_usec()
 	if not _apply_active:
 		_begin_next_job()
+	var phase := _apply_phase
+	var mode := _apply_mode
 	if _apply_active:
 		if _apply_mode == "load":
 			_step_load()
 		else:
 			_step_unload()
-	_worst_apply_ms = maxf(_worst_apply_ms, (Time.get_ticks_usec() - t0) / 1000.0)
+	var elapsed := (Time.get_ticks_usec() - t0) / 1000.0
+	if elapsed > _worst_apply_ms:
+		_worst_apply_ms = elapsed
+		_worst_apply_detail = {"mode": mode, "phase": phase, "chunk": _apply_key,
+			"row": _apply_row, "water_jobs": _wjobs.size()}
 	if not _apply_active:
 		_on_crossing()
 		_sdf_dirty = true
@@ -645,12 +652,16 @@ func _repaint_transitions_span(tmin: Vector2i, tmax: Vector2i, gy0: int, gy1: in
 	const PAIR_RG := (1 << T_ROCK) | (1 << T_GRASS)
 	var x0 := tmin.x - 1
 	var x1 := tmax.x + 1
+	# Cache adjacent source rows. Previously every corner performed float floor,
+	# Vector2i allocation and dictionary lookup; that dominated the measured phase.
+	var top := _data_row(x0, gy0, x1 - x0 + 1)
 	for gy in range(gy0, gy1):
-		var tl := _data_tile(x0, gy)              # display cell corners = the
-		var bl := _data_tile(x0, gy + 1)          # 4 world tiles it straddles
+		var bottom := _data_row(x0, gy + 1, x1 - x0 + 1)
+		var tl := int(top[0])
+		var bl := int(bottom[0])
 		for gx in range(x0, x1):
-			var tr := _data_tile(gx + 1, gy)
-			var br := _data_tile(gx + 1, gy + 1)
+			var tr := int(top[gx - x0 + 1])
+			var br := int(bottom[gx - x0 + 1])
 			var bits := (1 << tl) | (1 << tr) | (1 << bl) | (1 << br)
 			# exactly {forest,grass} or {rock,grass} — anything else (uniform,
 			# touches water, forest meets rock) keeps the hard edge
@@ -664,6 +675,27 @@ func _repaint_transitions_span(tmin: Vector2i, tmax: Vector2i, gy0: int, gy1: in
 				_trans_layer.erase_cell(Vector2i(gx, gy))
 			tl = tr
 			bl = br
+		top = bottom
+
+func _data_row(x0: int, y: int, count: int) -> PackedByteArray:
+	var result := PackedByteArray()
+	result.resize(count)
+	result.fill(T_ROCK)
+	var cy := floori(float(y) / CHUNK)
+	var row := (y - cy * CHUNK) * CHUNK
+	var done := 0
+	while done < count:
+		var x := x0 + done
+		var cx := floori(float(x) / CHUNK)
+		var lx := x - cx * CHUNK
+		var take := mini(CHUNK - lx, count - done)
+		var key := Vector2i(cx, cy)
+		var tiles: PackedByteArray = chunks.get(key, PackedByteArray())
+		if tiles.is_empty() and _staged.has(key): tiles = _staged[key]["tiles"]
+		if not tiles.is_empty():
+			for i in take: result[done + i] = tiles[row + lx + i]
+		done += take
+	return result
 
 # Deterministic prop dressing for one chunk (rows [r0,r1)): trees on forest,
 # rocks on rock-adjacent grass, glowshrooms on grass/forest. One Y-sorted
@@ -1017,6 +1049,14 @@ func _exit_tree() -> void:
 	if _sdf_thread != null:
 		_sdf_thread.wait_to_finish()
 		_sdf_thread = null
+	# Streaming stages water OFF-TREE until all transforms are filled. SceneTree
+	# teardown owns attached children, but cannot free these pending nodes. A quit
+	# during WATER_FILL otherwise leaks their MultiMesh/mesh/material/shader RIDs.
+	for mmi in _water.values():
+		if is_instance_valid(mmi) and mmi.get_parent() == null:
+			mmi.free()
+	_water.clear()
+	_wjobs.clear()
 
 # --- streaming contract surface (docs/tech/29 §2) --------------------------
 
@@ -1088,11 +1128,16 @@ func is_walkable(world_pos: Vector2) -> bool:
 	var t := tile_at(world_pos)
 	return t == T_GRASS or t == T_FOREST
 
+func is_ready_at(world_pos: Vector2) -> bool:
+	var key := _world_to_chunk(world_pos)
+	return chunks.has(key) and not (_apply_active and _apply_key == key)
+
 # Finds a walkable point in a ring around `center` (meters converted by caller).
-func random_walkable_in_ring(center: Vector2, r_min_px: float, r_max_px: float) -> Vector2:
+func random_walkable_in_ring(center: Vector2, r_min_px: float, r_max_px: float,
+		rng: RandomNumberGenerator = null) -> Vector2:
 	for _i in 200:
-		var ang := randf() * TAU
-		var dist := randf_range(r_min_px, r_max_px)
+		var ang := (rng.randf() if rng != null else randf()) * TAU
+		var dist := rng.randf_range(r_min_px, r_max_px) if rng != null else randf_range(r_min_px, r_max_px)
 		var p := center + Vector2.from_angle(ang) * dist
 		if is_walkable(p):
 			return p

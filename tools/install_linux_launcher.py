@@ -12,12 +12,28 @@ import shutil
 import subprocess
 
 
+def desktop_environment():
+    """Standalone game integration must reach the host desktop from Snap IDEs."""
+    env = dict(os.environ)
+    if env.get("SNAP"):
+        for key in ("GIO_MODULE_DIR", "GIO_EXTRA_MODULES", "LD_LIBRARY_PATH"):
+            if "/snap/" in env.get(key, ""):
+                env.pop(key, None)
+    return env
+
+
 def install(package: Path, data: Path | None = None, metadata=True):
     package = package.resolve()
     executable = package / "dragon-heroes-codex.x86_64"
     if not executable.is_file():
         raise SystemExit("Run this installer from the extracted Dragon Heroes Codex package.")
-    data = data or Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local/share"))
+    env = desktop_environment()
+    if data is None:
+        data = Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local/share"))
+        # VS Code Snap redirects its own XDG directory. This standalone game
+        # belongs to the user's application menu, outside the IDE's namespace.
+        if env.get("SNAP") and "/snap/" in str(data):
+            data = Path(env.get("SNAP_REAL_HOME", Path.home())) / ".local/share"
     applications = data / "applications"
     icons = data / "icons/hicolor/512x512/apps"
     applications.mkdir(parents=True, exist_ok=True)
@@ -46,12 +62,12 @@ def install(package: Path, data: Path | None = None, metadata=True):
     if metadata and gio:
         associated = subprocess.run([gio, "set", "-t", "string", str(executable),
             "metadata::custom-icon", (icons / "dragon-heroes-codex.png").resolve().as_uri()],
-            capture_output=True, timeout=10).returncode == 0
+            capture_output=True, timeout=10, env=env).returncode == 0
         subprocess.run([gio, "set", "-t", "string", str(shortcut),
-            "metadata::trusted", "true"], capture_output=True, timeout=10)
+            "metadata::trusted", "true"], capture_output=True, timeout=10, env=env)
     refresh = shutil.which("update-desktop-database")
     if refresh:
-        subprocess.run([refresh, str(applications)], capture_output=True, timeout=10)
+        subprocess.run([refresh, str(applications)], capture_output=True, timeout=10, env=env)
     return desktop, associated
 
 

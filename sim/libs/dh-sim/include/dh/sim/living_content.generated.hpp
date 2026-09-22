@@ -4,7 +4,7 @@
 #include <dh/sim/effects.hpp>
 #include <dh/content/lairs.generated.hpp>
 namespace dh::sim::living_data {
-inline constexpr unsigned simulation_stamp = 2309054684u;
+inline constexpr unsigned simulation_stamp = 2429298649u;
 using Phase = dh::content::lairs::Phase;
 inline constexpr std::array<EffectDef,4> effects = {{
 {EffectTrigger::hit,1,1,1,EffectAction::chain,250,90,3,24},

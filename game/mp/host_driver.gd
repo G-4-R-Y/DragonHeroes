@@ -41,6 +41,7 @@ func _ready() -> void:
 	add_to_group("mp_host")
 	_main = get_parent() as Node2D
 	MpNet.input_received.connect(_on_input)
+	MpNet.flask_requested.connect(_on_flask_requested)
 	multiplayer.peer_disconnected.connect(_on_peer_left)
 	_level_seen = Session.level
 	for peer_id in MpNet.players:
@@ -90,6 +91,13 @@ func _on_input(peer_id: int, pkt: Dictionary) -> void:
 	if _remotes.has(peer_id):
 		_remotes[peer_id].prev_pkt = _remotes[peer_id].last_pkt
 		_remotes[peer_id].last_pkt = pkt
+
+func _on_flask_requested(peer_id: int) -> void:
+	if not _remotes.has(peer_id): return
+	var body: ProtoPlayer = _remotes[peer_id].body
+	if not is_instance_valid(body): return
+	if body.drink_flask():
+		_main.fx.aura(body, Color("9fefbc"), {"dur": 0.5})
 
 func _edge(r: Dictionary, key: String) -> bool:
 	return bool(r.last_pkt.get(key, false)) and not bool(r.prev_pkt.get(key, false))
@@ -156,14 +164,14 @@ func _send_snapshot() -> void:
 	var host: ProtoPlayer = _main.player
 	pl.append([1, snappedf(host.global_position.x, 0.1), snappedf(host.global_position.y, 0.1),
 			snappedf(host.hp, 0.1), snappedf(host.max_hp, 0.1), host.dodge_charges,
-			host.sprite.animation, host.sprite.flip_h])
+			host.sprite.animation, host.sprite.flip_h, host.flask_charges])
 	for peer_id in _remotes:
 		var body: ProtoPlayer = _remotes[peer_id].body
 		if is_instance_valid(body):
 			pl.append([peer_id, snappedf(body.global_position.x, 0.1),
 					snappedf(body.global_position.y, 0.1),
 					snappedf(body.hp, 0.1), snappedf(body.max_hp, 0.1),
-					body.dodge_charges, body.sprite.animation, body.sprite.flip_h])
+					body.dodge_charges, body.sprite.animation, body.sprite.flip_h, body.flask_charges])
 	var cr: Array = []
 	var sp := {}
 	for c in get_tree().get_nodes_in_group("creatures"):

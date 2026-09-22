@@ -17,6 +17,7 @@ extends Node2D
 
 const MAX_HOLES := 16
 const TEX_SIZE := 2.0
+const STATIC_CELL := 256.0
 
 var ambient := Color(0.40, 0.44, 0.62)  # multiply floor — tune via captures
 var enabled := true
@@ -29,6 +30,7 @@ var _mat: ShaderMaterial
 # other chunks' handles keep their slots. Record: [pos, radius, strength, phase,
 # rate, flicker] (unchanged shape — the gather below still indexes it positionally).
 var _statics := {}
+var _static_cells := {}   # presentation culling: only cells around the camera are gathered
 var _next_static := 0
 var _t := 0.0
 
@@ -82,11 +84,32 @@ func add_static(pos: Vector2, radius := 30.0, strength := 0.8,
 	_next_static += 1
 	_statics[handle] = [pos, radius, strength, randf() * TAU,
 			rate * (0.8 + randf() * 0.4), flicker]
+	var cell := Vector2i((pos / STATIC_CELL).floor())
+	if not _static_cells.has(cell): _static_cells[cell] = {}
+	_static_cells[cell][handle] = true
 	return handle
 
 # Retract a static source (chunk unload). Unknown/stale handles are a no-op.
 func remove_static(handle: int) -> void:
+	if not _statics.has(handle): return
+	var position: Vector2 = _statics[handle][0]
+	var cell := Vector2i((position / STATIC_CELL).floor())
+	_static_cells[cell].erase(handle)
+	if _static_cells[cell].is_empty(): _static_cells.erase(cell)
 	_statics.erase(handle)
+
+func visible_statics(center: Vector2, half: Vector2) -> Array:
+	var low := Vector2i(((center - half) / STATIC_CELL).floor())
+	var high := Vector2i(((center + half) / STATIC_CELL).floor())
+	var result: Array = []
+	for y in range(low.y, high.y + 1):
+		for x in range(low.x, high.x + 1):
+			for handle in _static_cells.get(Vector2i(x, y), {}):
+				var source: Array = _statics[handle]
+				var pos: Vector2 = source[0]
+				if absf(pos.x - center.x) <= half.x and absf(pos.y - center.y) <= half.y:
+					result.append(source)
+	return result
 
 func set_ambient(c: Color) -> void:
 	ambient = c
@@ -115,10 +138,8 @@ func _process(dt: float) -> void:
 	if m != null and m.get("fx") != null:
 		cand.append_array(m.fx.light_holes())
 	var half := vs * 0.62
-	for s in _statics.values():
+	for s in visible_statics(center, half):
 		var pos: Vector2 = s[0]
-		if absf(pos.x - center.x) > half.x or absf(pos.y - center.y) > half.y:
-			continue                        # cheap cull before the sort
 		var w1: float = sin(_t * s[4] + s[3]) * 0.6 + sin(_t * s[4] * 2.3 + s[3] * 1.7) * 0.4
 		var stg: float = s[2] * (1.0 + float(s[5]) * 0.3 * w1)
 		cand.append([pos, s[1], clampf(stg, 0.0, 1.0), Color(0.45, 0.95, 1.0), false])

@@ -1,0 +1,28 @@
+{
+  "schema": "dragon-heroes.art-source.v1",
+  "record_kind": "generation-witnessed",
+  "provider": "builtin-imagegen",
+  "model": "tool-managed; exact model identity not exposed",
+  "source": "source-v2.png",
+  "prompt": "prompt-v2.txt",
+  "sha256": "af7457aac5287c4b9d1c520b4a4d07e8c5e45c6cdc49f747586422d58bd86400",
+  "prompt_sha256": "c85e6f177a1588056e02cc83b2ebad290c7526d3cf756fa54bb2cccf36e1bee3",
+  "references": [
+    {
+      "source": "source.png",
+      "sha256": "5fcaff237841a7715b7defb28d40128d027b7308c7051e714f863e4dbfb08c23",
+      "role": "approved Orun identity reference; generation provenance is retrospective"
+    }
+  ],
+  "dimensions": [
+    1024,
+    1536
+  ],
+  "generation_verified": true,
+  "status": "rejected: RGB image contains a painted checkerboard instead of transparency",
+  "seed": null,
+  "limitations": [
+    "Exact generation cannot be replayed deterministically: model/seed not exposed.",
+    "Checksums verify retained bytes; human visual review and runtime gates remain required."
+  ]
+}

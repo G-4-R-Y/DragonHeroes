@@ -1,0 +1,13 @@
+Create a production animation sprite sheet for Dragon Heroes. Use the provided Orun sprite sheet ONLY as a creature identity/material/style reference. Preserve its beautiful dark fantasy pixel art: a tall ancient marsh stag, moss and bark armor, intricate branching antlers holding a bronze bell, ivory mushrooms, luminous cyan heart, four cervid legs, long face and hanging moss. This must be the SAME individual, not a redesign or a different species.
+
+Output a transparent RGBA sprite sheet: exactly FOUR columns and SIX rows, 24 full-body frames. Each cell has the SAME dimensions and a generous transparent margin (at least 12% on all edges). Every antler, hoof, bell and magical fragment stays INSIDE its own cell. No text, labels, grids, opaque backgrounds, ground tiles or checkerboard pixels. Fixed three-quarter top-down camera and consistent creature scale, facing down-left. Left/right anatomy and antler/bell design remain consistent. Crisp deliberate pixel clusters, material contrast and cyan emissive details. No photographic blur, baked bloom or camera changes.
+
+READABLE, DISTINCT ACTIONS, one row per action, in exact order:
+Row 1 IDLE: four sequential subtle breathing poses, standing proud, bell swaying gently, smooth loop.
+Row 2 MOVE: four actual walking/trotting key poses: diagonal legs alternate clearly, passing pose, opposite contact, opposite passing; body stays anchored while locomotion happens in-place.
+Row 3 ANTICIPATION: four progressing windup poses: knees flex, head lowers, antlers cock aside, deep braced crouch with charged cyan heart. End is an unmistakable warning before a sweep.
+Row 4 ATTACK: four sequential explosive antler-sweep poses: release from crouch, low powerful leftward sweeping strike, extended forward strike/contact, settling recovery. Broad readable silhouette changes and front hoof action, no duplicated idle poses. Do not add giant VFX that conceal anatomy.
+Row 5 HIT: four sequential damage reactions: body recoils away, head jolts and bell jerks, hind legs brace, recover toward upright; avoid interpreting this row as an attack.
+Row 6 DEATH: four sequential death poses: front knees buckle, body drops, antlers tilt to ground, final still collapsed stag with dim heart. Keep the complete body/antlers visible in every cell. These must be distinct collapsed poses, not four standing idle variants.
+
+Use a fixed reference point at the pelvis in each cell to avoid frame-to-frame sideways drift, with head/legs animating around it. The final output must visibly contain all six actions, especially the five currently missing clips. The supplied idle source is an identity guide, not the requested output choreography.

@@ -1,0 +1,3 @@
+# game/prototype/main.gd
+
+Local prototype Hunt orchestrator. Creates the residency child in _init_frontier, adopts authored encounters, and uses native world seed/chunk RNG for frontier placement. _despawn_far_creatures now requests hibernation rather than silently deleting actors. Nearby frontier rolls wait for terrain and cap headroom; rolled files distinguish old and virgin encounters. All spawn paths respect REPOP_CAP=120. Boss references are removed/restored by the adapter. No official award authority is implied. Gates: residency_probe, ground_state_probe, repop/spawn/stream/co-op and normal gameplay suite; law tech/29. Full file responsibilities also appear in its source header and systems map.

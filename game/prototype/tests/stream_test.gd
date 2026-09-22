@@ -140,7 +140,18 @@ func _run_asserts() -> void:
 		fails.append("no walkable tile in the loaded window (fence stuck closed)")
 
 	# (f) main-thread apply-step budget (worst over the whole sprint)
+	# Batched dressing reads must match the tile oracle across negative chunk
+	# seams and unfetched borders; optimizing the read must not alter geography.
+	for key in world.chunks:
+		var x0: int = key.x * CHUNK - 1
+		var y: int = key.y * CHUNK - 1
+		var row: PackedByteArray = world._data_row(x0, y, CHUNK + 2)
+		for i in row.size():
+			if row[i] != world._data_tile(x0 + i, y):
+				fails.append("batched transition row differs at chunk seam %s" % key)
+				break
 	var worst: float = world._worst_apply_ms
+	print("[stream_test] worst phase: ", world._worst_apply_detail)
 	if worst > 4.0:
 		fails.append("apply step %.2f ms exceeds the 4 ms hard budget" % worst)
 

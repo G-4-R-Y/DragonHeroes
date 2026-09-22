@@ -64,6 +64,9 @@ var _save_dirty := false
 var _save_t := 0.0
 
 func _ready() -> void:
+	# Cap the interactive client, while headless arena search keeps its explicit
+	# uncapped fixed-step clock. A cap alone does not establish a frame budget.
+	if DisplayServer.get_name() != "headless": Engine.max_fps = 60
 	setup_input()   # actions exist from frame one, in EVERY scene (menu/haven/hunt)
 
 # Throttled autosave: mutations mark dirty; at most one disk write per 2 s.

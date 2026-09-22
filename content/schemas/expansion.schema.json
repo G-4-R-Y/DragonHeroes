@@ -2,8 +2,9 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Living world release candidate v1 (not a live pack)",
   "type": "object", "additionalProperties": false,
-  "required": ["version", "pack", "title", "season", "bible", "style", "lore", "effects", "skills", "creatures", "artifacts", "art", "review"],
+  "required": ["version", "pack", "title", "season", "bible", "style", "lore", "effects", "skills", "creatures", "artifacts", "art", "review", "narrative"],
   "properties": {
+    "narrative": {"type": "object", "description": "Validated by narrative.schema.json and genforge.living.narrative."},
     "version": {"const": 1},
     "pack": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"},
     "title": {"$ref": "#/definitions/text"},

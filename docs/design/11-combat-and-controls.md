@@ -448,3 +448,24 @@ economy integrity ([security](../tech/27-security-anticheat-and-economy-integrit
 - [Godot docs — Optimization using servers (entity-count guidance underlying the simulation budget)](https://docs.godotengine.org/en/stable/tutorials/performance/using_servers.html)
 - [netfox — Godot netcode addon (reference for the snapshot-interpolation buffer and CSP behavior cited in §7.1)](https://github.com/foxssake/netfox)
 - Internal: engine/netcode research digest (July 2026 research pass — CCU targets, entity-budget caveats), summarized in [netcode and hosting](../tech/22-netcode-and-server-hosting.md).
+
+## Ember Flask — prototype playtest repair (2026-09-13)
+
+R or the visible bottle spends one of two charges, heals 20% of maximum HP
+immediately, then another 20% over two seconds. The existing 0.8-second movement
+slow remains (35% in the prototype). Total healing is bounded even across a long
+frame or a nearly completed burn. Reaching full HP ends the remainder; a dead
+hunter cannot drink or regenerate through this effect. Invalid presses preserve
+charges and explain full, empty, already healing or dead state.
+
+The HUD refreshes HP on acceptance, floats the immediate amount and shows a pale
+green burn strip on the bottle. Six subsequent party kills restore a charge,
+without healing; full bottles do not bank future kill credit. Genuine level-up
+refills HP/dodges/flasks separately (canon §12.46). The co-op client sends a reliable
+intent without an HP amount; the host decides eligibility, healing and charges,
+and replicates HP/charges back. Local saves are still prototype-only.
+
+Gate: `flask_probe` injects actual R and mouse events, checks exact immediate and
+remaining amounts, long/negative time, repeated inputs, full/empty/dead states,
+and kill recharge. `mp_test.sh` checks a real remote request and snapshot outcome.
+GL capture: `game/prototype/tests/captures/flask/healing.png`.

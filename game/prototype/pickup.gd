@@ -10,8 +10,10 @@ var item: Dictionary = {}   # ProtoItems instance when kind == "item"
 var _t := randf() * TAU
 var _base_y := 0.0
 var _warned := false
+var _collected := false
 
 func _ready() -> void:
+	add_to_group("ground_loot")
 	_base_y = position.y
 	var s := Sprite2D.new()
 	if kind == "item":   # rarity-tinted slot silhouette (sprites.gd icon factory)
@@ -35,6 +37,7 @@ func _ready() -> void:
 		add_child(ProtoGlow.make(glow_col, 13.0, 0.42, 4.0, 0.3))
 
 func _physics_process(delta: float) -> void:
+	if _collected or is_queued_for_deletion(): return
 	_t += delta * 4.0
 	position.y = _base_y + sin(_t) * 2.0
 	var player := get_tree().get_first_node_in_group("player")
@@ -56,5 +59,6 @@ func _physics_process(delta: float) -> void:
 		global_position = global_position.move_toward(player.global_position, delta * 160.0)
 		_base_y = position.y
 	if d < 10.0:
+		_collected = true  # commit once, even before queue_free drains this frame
 		main.collect(kind, amount, global_position, item)
 		queue_free()

@@ -1,0 +1,7 @@
+{
+  "source": "source-v2.png",
+  "sha256": "af7457aac5287c4b9d1c520b4a4d07e8c5e45c6cdc49f747586422d58bd86400",
+  "rejected": true,
+  "reason": "RGB image with painted checkerboard background; alpha channel absent. Do not publish as a transparent atlas.",
+  "visual_review": "Six distinct action rows received; identity broadly preserved, death row visibly collapses. Pivots/margins still need review after cleanup."
+}

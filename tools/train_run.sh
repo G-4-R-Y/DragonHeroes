@@ -353,6 +353,7 @@ dh_banner "DRAGON HEROES" "TRAINING FORGE · isolated, cumulative runs"
 dh_kv run "${RUN#"$REPO"/}"
 dh_kv mode "$MODE · $KEYS_LABEL · $KNOBS"
 [ -z "$NET" ] || dh_kv net "$NET (ml/training/architectures.json)"
+dh_kv resources "$TRAIN_PROFILE profile · $JOBS jobs (explicit JOBS overrides defaults)"
 dh_kv seeded "$SEEDED"
 if [ "$MODE" = "tournament" ]; then
   dh_kv bracket "$METHODS · best-of $BEST_OF · gate $GATE_EPISODES episodes — the methods compete, the winner takes the pin"
@@ -417,11 +418,11 @@ if [ "$MODE" = "ppo" ]; then
         --opp-build "$opp_build" --steps "$STEPS" --envs "$ENVS" --arch "$ARCH" \
         --selfplay-every "$SELFPLAY_EVERY" --seed "$SEED" \
         --promote-wr "$PROMOTE_WR" --promote-hold "$PROMOTE_HOLD" \
-        "${WARM_ARG[@]}" "${NET_ARG[@]}" 2>&1 \
         --eval-envs "$EVAL_ENVS" --demote-wr "$DEMOTE_WR" --reservoir "$RESERVOIR" \
         --entropy-final "$ENTROPY_FINAL" --move-std-final "$MOVE_STD_FINAL" \
         --plateau-updates "$PLATEAU_UPDATES" --plateau-delta "$PLATEAU_DELTA" \
         --plateau-min-steps "$PLATEAU_MIN_STEPS" \
+        "${WARM_ARG[@]}" "${NET_ARG[@]}" 2>&1 \
         | tee "$RUN/logs/$key.log" \
         | python3 -u "$REPO/tools/dh_trainfmt.py" --key "$key" || dh_err "ppo $key failed - see logs/$key.log"
     "$PYVENV" -u -m ml.training.league gate --key "$key" --build "$build" \

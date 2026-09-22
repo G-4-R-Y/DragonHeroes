@@ -1,0 +1,14 @@
+{
+  "provider": "builtin-imagegen",
+  "model": "tool-managed",
+  "request": "R01/R26 modern hunter animation sheet",
+  "source": "source-v1.png",
+  "prompt": "prompt.txt",
+  "sha256": "c20d8f9c7d6a43a31a242f0b88fe819c5d6929077b5aa5c3b6ca612177a1a384",
+  "prompt_sha256": "74c54df18a02885ccbb35bc0301c41610a0a4a4d82a92e1ae007860048c44da5",
+  "dimensions": [
+    1774,
+    887
+  ],
+  "status": "candidate; visually inspected; some weapon poses exceed uniform cell bounds; runtime integration pending"
+}

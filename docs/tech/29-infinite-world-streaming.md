@@ -150,3 +150,73 @@ restores it while stationary, and returns to the byte-identical original chunk.
 It asserts the unfinished-ground fence, 49-chunk peak, empty staging/unload state
 and deleted scratch dump. Initial receipt: 1.07 ms worst apply; ordinary eight-step
 stream test 1.10 ms. These desktop/headless samples are not a mobile guarantee.
+
+
+## Encounter residency (2026-09-13, roadmap R08)
+
+The older silent distance-despawn behavior above is superseded in the playable
+prototype. `ProtoEncounterResidency` frees distant ordinary and boss scene nodes,
+storing primitive snapshots in an owned per-Hunt directory keyed by chunk and
+stable encounter ID. Files contain original HP/max HP, final spawn-time stats,
+status/cooldown timers, species/art identity and boss role/linkage. No dormant
+node or unbounded world-sized visited dictionary survives in RAM. Per-chunk
+`rolled` markers distinguish visited space from new encounters; dead actors have
+no restorable file. This state lasts for the Hunt, not across new Hunt seeds.
+
+Sleep beyond 1152px from EVERY host-owned hunter; wake within 960px on fully drawn
+terrain. Flying enemies can return over water. One file/body drains per frame;
+a paired boss wake reserves two slots and preserves symmetric IDs even if the
+bodies were freed on separate frames. Timers pause while dormant; a wake starts
+with 0.5 s recovery rather than firing an invisible old telegraph. Original wounds
+and spawn numbers survive leveling while away. Pets and short-lived summons are
+not serialized; summons expire normally. Spawners and hag summons respect the
+120 active-creature cap. Chunk rolls wait for available capacity and approach.
+Frontier positional randomness now uses the same Hunt/chunk RNG as its roster.
+
+This is a local prototype presentation-lifetime adapter over the existing
+prototype gameplay harness, not an authoritative-server save protocol. It grants
+no reward when unloading/restoring, claims a file before reactivating its ID, and
+cleans only its owned files at normal Hunt exit. A process crash can leave an
+orphan scratch directory; unique Hunt paths never load that into a new world.
+The production implementation must use native authoritative entity/delta storage,
+async durable I/O and official award provenance (tech/36). Do not treat these
+editable local files as official item/stat evidence.
+
+Gate: `tests/residency_probe.tscn` tests actual node freeing, wounded ordinary/
+paired-boss return, final-stat preservation after leveling, paused status state,
+a flying wisp over water, co-op proximity, death/no repeated rewards, paired
+restoration against the 120 cap, capped boss summons and scratch cleanup. Initial
+headless samples: worst adapter 0.62–1.14 ms. `tests/residency_capture.tscn` adds a
+real streamed GL outward/return journey and reports a separate warmed CPU sample.
+Disk work is amortized but a blocking OS write can still stall; these desktop
+samples are not a guarantee for slow/mobile storage. F3 now shows awake/sleeping
+counts alongside FPS and memory.
+
+### Ground loot, active shots and exit cleanup (R27/R32)
+
+The same store now covers `ground_loot`: item UID, exact original dictionary
+(rarity/affixes/level/visuals), kind, amount and bobbing anchor/phase. No drop is
+rerolled after hunter level changes. Loot wakes even at the full 120-creature cap,
+and a full inventory leaves the original on the ground. Collection marks the
+pickup consumed before deferred deletion; revisiting cannot restore it again.
+This is per-Hunt persistence, not an added across-expedition ground-loot save.
+Extreme piles within the active radius still need a pooled loot-rendering path;
+the current change bounds distant retained nodes, not all possible nearby drops.
+
+Projectiles remain in the finite active simulation, independent of camera bounds.
+They continue moving and can hit after their caster disappears, and expire at
+their original lifetime. `_finished` prevents repeat impacts during deferred
+freeing, and every exit path releases pooled trail/light handles. A live shot's
+remaining reachable radius (including target movement) keeps potential targets
+from sleeping when hunters travel away. These small finite shots are not paused
+and replayed on return. Native authoritative dormant-world combat and wall CCD
+remain separate production work.
+
+`ground_state_probe` tests the real leave/return, full-cap/full-bag and exactly-once
+outcomes, offscreen movement/impact with a removed caster, normal expiry and
+owned-file cleanup. It also forces an unfinished off-tree water MultiMesh at exit.
+`world_gen._exit_tree` explicitly frees such staged nodes after joining workers;
+SceneTree still owns attached children. Twelve verbose real Hunt boot/quits pass
+`tools/check_hunt_exit.py` with no RID/ObjectDB/resource-in-use warnings, matching
+the deterministic forced-staging gate. This resolves the previously reported
+roughly one-in-four exit flake; it is not a universal engine leak guarantee.

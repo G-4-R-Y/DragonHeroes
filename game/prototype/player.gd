@@ -43,11 +43,14 @@ var leech_pct := 0.0             # blood_price keystone: heal % of melee damage 
 var whirl_cd_s := 4.0            # Whirlwind (E): full-circle strike (proposal)
 
 # Ember Flask (design/11: "dodge, heal, or reverse" — healing is a verb):
-# 2 charges, each a 40%-max HoT over 2 s with a 0.8 s drink commitment (30%
+# 2 charges, each 20% max HP now + 20% over 2 s, with a 0.8 s commitment (35%
 # slow); every 6 kills rekindles one charge; Haven/respawn/level-up refill all. Feeds
 # the same aggression loop as leech — the answer to "ultra-mogged early".
 const FLASK_MAX := 2
 const FLASK_KILLS_PER_CHARGE := 6
+const FLASK_BURN_S := 2.0
+const FLASK_IMMEDIATE := 0.2
+const FLASK_REGEN := 0.2
 var flask_charges := FLASK_MAX
 var flask_kills := 0
 var _flask_hot := 0.0            # seconds of heal-over-time remaining
@@ -1263,12 +1266,16 @@ func drink_flask() -> bool:
 	if dead or flask_charges <= 0 or _flask_hot > 0.0 or hp >= max_hp:
 		return false
 	flask_charges -= 1
-	_flask_hot = 2.0
-	_flask_rate = max_hp * 0.4 / 2.0   # 40% of max over the burn
+	hp = minf(hp + max_hp * FLASK_IMMEDIATE, max_hp)
+	_flask_hot = FLASK_BURN_S if hp < max_hp else 0.0
+	_flask_rate = max_hp * FLASK_REGEN / FLASK_BURN_S
 	_slow_t = maxf(_slow_t, 0.8)       # the drink is a commitment
 	return true
 
 func note_kill() -> bool:   # true when a charge rekindles (main gives feedback)
+	if flask_charges >= FLASK_MAX:
+		flask_kills = 0
+		return false
 	flask_kills += 1
 	if flask_kills >= FLASK_KILLS_PER_CHARGE and flask_charges < FLASK_MAX:
 		flask_kills = 0
@@ -1283,10 +1290,14 @@ func refill_flask() -> void:
 	_flask_rate = 0.0
 
 func _process_flask(delta: float) -> void:
-	if _flask_hot <= 0.0:
+	if dead:
+		_flask_hot = 0.0
 		return
-	_flask_hot = maxf(_flask_hot - delta, 0.0)
-	hp = minf(hp + _flask_rate * delta, max_hp)
+	if _flask_hot <= 0.0 or delta <= 0.0:
+		return
+	var elapsed := minf(delta, _flask_hot)
+	_flask_hot = maxf(_flask_hot - elapsed, 0.0)
+	hp = minf(hp + _flask_rate * elapsed, max_hp)
 	if hp >= max_hp:
 		_flask_hot = 0.0
 

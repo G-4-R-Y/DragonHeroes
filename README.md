@@ -4,15 +4,14 @@
 
 As a kid I started programming to create anything. What fueled me at first were fantastic worlds like the lord of rings, narnia and all those cartoon and videogame universes. I started off programming to create anything, at the time specifically something to play with my friends, and RPG or TCG we would create together (we were a bunch of creatives).
 
-After years programming, I realized I ended up never actually building that game we would like to play together. With coding agents, the enormous amount of time demanded to create a game like this, with all the learning curves on different tools and whole research areas, is drastically reduced. 
+After years programming, I realized I ended up never actually building that game we would like to play together. With coding agents, the enormous amount of time demanded to create a game like this, with all the learning curves on different tools and whole research areas, is drastically reduced.
 
 I can finally create some of the things that kid once dreamed of - for pure joy, as he portrayed it to be.
 
-=================================================================================================
+---
 
 Fast-paced dark-fantasy pixel-art multiplayer ARPG by IntelliGames: an infinite
-procedurally generated world of creature hunts (a real adventure with friends),
-weekly content drops, skill-based PvP and tournaments, and a real-money
+procedurally generated world of creature hunts, weekly content drops, skill-based PvP and tournaments, as well as item markets, with real-money.
 player-to-player item marketplace settled via Pix.
 
 **Start here:** [docs/00-canon.md](docs/00-canon.md) — the single source of truth for

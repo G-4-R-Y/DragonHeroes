@@ -1,0 +1,18 @@
+{
+  "schema": "dragon-heroes.art-source.v1",
+  "record_kind": "retrospective-integrity-record",
+  "source": "source.png",
+  "prompt": "prompt.txt",
+  "sha256": "5fcaff237841a7715b7defb28d40128d027b7308c7051e714f863e4dbfb08c23",
+  "prompt_sha256": "a4ee8508bc006476f0d7c137c46a4c2290863c1498bfa2da958a4326cee87279",
+  "provider": "built-in image_gen; model identity not exposed",
+  "generation_verified": false,
+  "seed": null,
+  "request_id": null,
+  "status": "legacy idle-only reference; missing action clips; not production-approved",
+  "limitations": [
+    "Recorded after generation. Hashes attest to current bytes only.",
+    "Original provider request receipt and exact model/seed are unavailable.",
+    "Prompt-to-image origin cannot be independently authenticated or reproduced from this record."
+  ]
+}
