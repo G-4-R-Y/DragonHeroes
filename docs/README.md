@@ -105,7 +105,8 @@ most work (see also canon §12):
 |---|---|
 | [README](harness/README.md) | Start-here for any harness: read order, invariants, gate suite, gotchas, Ricardo's doctrine, environment facts |
 | [10-systems-map](harness/10-systems-map.md) | Every system: status · law doc · key files · gate · known issues |
-| [20-roadmap](harness/20-roadmap.md) | The one consolidated roadmap: NOW / PICK / SCHEDULED / BUDGET / polish |
+| [20-roadmap](harness/20-roadmap.md) | The one demand ledger: every ask R01–R71 as one row, NOW / NEXT / ON RICARDO / PICK / SCHEDULED / BUDGET / polish |
+| [21-work-journal](harness/21-work-journal.md) | The roadmap's evidence trail: verbatim prompts, interruption checkpoints, investigation write-ups, closed-item detail |
 
 - [35 — Playable living-content trial](tech/35-playable-living-trial.md): controls, artifact comparisons, C++ host and export gates.
 - [37 — ML parameter reference](tech/37-ml-parameter-reference.md): league/PPO/evolve knobs, registry and weights schemas, the deploy gate, measured throughput.

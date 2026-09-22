@@ -45,10 +45,12 @@ background agents/workflows unless Ricardo asks for them in the moment: two
 workflows exhausted the session quota on 2026-09-11 and their work was lost
 mid-flight (canon §12.39). Work inline; keep context lean with `/compact`.
 
-**The roadmap rule (2026-09-12):** `docs/harness/20-roadmap.md` is the single
+**The roadmap rule (2026-09-12; split 2026-09-21):** `docs/harness/20-roadmap.md` is the single
 demand ledger. Add EVERY new demand to it the moment it arrives; work it item
 by item; at interruptions, append the new demands/details plus the current
-strategy/plan state BEFORE continuing. Nothing asked is ever forgotten.
+strategy/plan state BEFORE continuing. Nothing asked is ever forgotten. Keep it
+a LEDGER: one row per demand. The narrative — verbatim prompts, checkpoints,
+investigation write-ups — goes to `docs/harness/21-work-journal.md`.
 
 ## Layout
 
@@ -58,6 +60,7 @@ Monorepo layout and coupling rules: canon §10. Document set index: `docs/README
 
 Start at **`docs/harness/README.md`** — the durable harness memory (invariants,
 gates, doctrine, environment), then `docs/harness/10-systems-map.md` (every
-system's status/files/gate) and `docs/harness/20-roadmap.md` (the one roadmap).
+system's status/files/gate) and `docs/harness/20-roadmap.md` (the one demand
+ledger; its evidence trail is `docs/harness/21-work-journal.md`).
 `HANDOFF.md` is the volatile delta from the last session. Update all three in
 the same change as the work they describe.

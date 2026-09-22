@@ -11,7 +11,11 @@ through item 38). Nothing here duplicates a law doc — it points at it.
 1. `CLAUDE.md` — standing directives + hard rules (legal/architectural).
 2. This file — invariants, gates, doctrine, environment.
 3. `docs/harness/10-systems-map.md` — every system: status, law doc, files, gate.
-4. `docs/harness/20-roadmap.md` — the one consolidated roadmap.
+4. `docs/harness/20-roadmap.md` — the one demand ledger (~280 lines: every
+   ask as one row, plus NOW / NEXT / ON RICARDO). Read this one.
+4b. `docs/harness/21-work-journal.md` — the ledger's evidence trail (the full
+   narrative the roadmap used to carry inline). Read it per demand id when
+   you need the *why*; never front to back.
 5. `HANDOFF.md` — the last session's exact stopping point + watch items.
 6. `docs/00-canon.md` §12 items 27→38 — why things are the way they are.
 7. `docs/USAGE.md` — every runnable command (play/co-op/arena/train/gates).

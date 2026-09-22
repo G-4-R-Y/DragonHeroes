@@ -6,7 +6,11 @@ resume procedure via `docs/harness/`).
 
 ## The roadmap rule (Ricardo, 2026-09-12)
 
-**`docs/harness/20-roadmap.md` is the single demand ledger.** Always:
+**`docs/harness/20-roadmap.md` is the single demand ledger.** Since
+2026-09-21 it carries ONLY the ledger — the narrative behind each row lives
+in `docs/harness/21-work-journal.md`, moved verbatim, nothing summarized
+away. New demands still land in the roadmap; long write-ups go to the
+journal so the ledger stays readable. Always:
 
 1. **Add every new demand to the roadmap the moment it arrives** — feature,
    bug, tweak, question-to-investigate — with status and a pointer to its law

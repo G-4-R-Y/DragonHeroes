@@ -822,7 +822,12 @@ Still open:
    harness can continue your work") — README = start-here, 10-systems-map =
    current-state spec per system with file pointers and gates,
    20-roadmap = one consolidated roadmap pointing at each law doc. HANDOFF.md
-   stays the volatile delta; docs/harness/ is the durable layer.
+   stays the volatile delta; docs/harness/ is the durable layer. **Split
+   2026-09-21** (Ricardo: "perhaps refactor our roadmap.md"): the roadmap had
+   reached 3,352 lines because every investigation wrote its narrative inline,
+   burying the live surface. 20-roadmap is now the LEDGER (~280 lines, one row
+   per demand R01-R71 + NOW/NEXT/ON RICARDO); 21-work-journal holds the former
+   contents verbatim as the evidence trail. Nothing was summarized away.
 
 39. **Training speed: CPU-bound `--speed max`, and no GPU in this loop
    (2026-09-11, Ricardo: "is the arena training script using my gpu? as i
