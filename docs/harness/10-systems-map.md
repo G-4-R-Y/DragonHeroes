@@ -264,18 +264,30 @@ pytest genforge/tests/test_hifi.py` + `python3 -m genforge.hifi selftest`
 The R50 converged run finished the same day (tech/39 bullet): 2/7 deployed,
 and a dh-env→arena OUTCOME gap on the greedy decode is now roadmap R55.
 
-**2026-09-19 (R50 built):** `arena.mask.v1` action mask in all five runtimes
-(`ml/env/dh_env.py` rule; `torch_policy.mask_heads`, `policy_net.decode`,
-`neural_policy.gd::decode`, `Arena::action_mask`/`mlp_act`, `env_parity.act_from`)
-pinned by `game/arena/tests/fixtures/action_mask_v1.json` — gates:
-`ml/tests/test_action_mask.py`, `godot --headless --path game
-res://arena/tests/mask_parity_test.tscn` (MASK PARITY OK), `sim-tests`. PPO:
-greedy probes (`--eval-envs`), promotion on `greedy=` and reversible
-(`--demote-wr`), snapshot reservoir, β/std annealing, plateau stop; knobs
-plumbed through `tools/train_run.sh` and recorded in each run's `config.json`.
-Ledger: `docs/tech/39-experiment-ledger.md` via `tools/experiment_ledger.py`.
-Status: smoke-verified (fen_boar mirror: env_parity OK, greedy wins 1.00 vs
-native in both runtimes); converged 60 M run is the next gate.
+**2026-09-21 (R55-b — four divergences, and one clock):** damage is now booked
+**by source** in every runtime — contact / bolt / field — through
+`Arena::damage_by_source`, `dh_env_damage_by_source`,
+`fighter.gd::note_damage_taken(dmg, source)` and the arena's
+`dmg_{contact,bolt,field}_{a,b}` episode columns, and `ml/eval/env_parity.py`
+reports `src_dealt`/`src_taken` beside the totals. Read over the FIRST 10 s only
+(so the retreat endgame cannot dominate the mean) that pair localized four
+things at once: the **Fiery elite affix** was absent from the sim (a second
+packet of half the swing, booked as bolt — `specs.json` gained `fiery`, crossing
+to dh-env by its own optional symbol `dh_env_set_body_affix`, never by resizing
+`DhFighterSpec`); the **native kit driver** competed with the swing for the one
+`act` slot instead of running on its own channel as `fighter.gd::pre_tick` does;
+the kit bolt fan carried **aim noise** `cmd_aim` never applies to a creature;
+**storm bolts were 3.0 px** where `projectile.gd` says 4.0. `env_parity` also ran
+the two runtimes on **different clocks** (arena 45 s, dh-env 68.3 s) — one
+`--time-limit` now drives both. Matrix worst ratio **3.17 → 1.93**, the
+ranged-kit natives closed (cinder_drake damage-taken/s 2.31 → **1.01**). Gates:
+`ctest -R sim-tests`, `ml/.venv/bin/python -m pytest ml/tests` (147 passed).
+Residual: vs a scripted opponent the totals agree and the CLOCK does not —
+`creature.gd::_separate(delta)` body separation exists in the arena and not in
+the sim, and is the next port (also roadmap **R59**, where the same gap is a
+gameplay bug: creatures stand on top of the player). Docs: tech/25 §5.3.1,
+tech/39 §2.
+
 **2026-09-19 (R50 built):** `arena.mask.v1` action mask in all five runtimes
 (`ml/env/dh_env.py` rule; `torch_policy.mask_heads`, `policy_net.decode`,
 `neural_policy.gd::decode`, `Arena::action_mask`/`mlp_act`, `env_parity.act_from`)

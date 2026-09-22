@@ -71,6 +71,7 @@ var _recorder := ArenaRecorder.new()
 var _rec_dir := ""
 var _rec_t := 0.0
 var _fields: Array = []
+var _field_clock := 0.0   # sim seconds; fields expire on THIS clock (see spawn_field)
 var _rotation: Array = []
 var _rotation_idx := 0
 var _rng := RandomNumberGenerator.new()
@@ -282,6 +283,13 @@ func _end_episode(winner: ArenaFighter) -> void:
 			"dmg_taken_b": snappedf(_fighters[1].damage_taken, 0.1),
 			"max_hp_a": snappedf(_fighters[0].max_hp_total(), 0.1),
 			"max_hp_b": snappedf(_fighters[1].max_hp_total(), 0.1)}
+	# damage TAKEN by source (R55): contact / bolt / field, per side — the
+	# columns ml/eval/env_parity.py compares against dh_env_damage_by_source
+	for side in 2:
+		var tag := "a" if side == 0 else "b"
+		for src in ["contact", "bolt", "field"]:
+			result["dmg_%s_%s" % [src, tag]] = snappedf(
+					float(_fighters[side].damage_by_source.get(src, 0.0)), 0.1)
 	_results.append(result)
 	_selftest_damage += _fighters[0].damage_taken + _fighters[1].damage_taken
 	if _selftest_stage == 0:   # player-vs-creature: the BUILD must deal damage
@@ -616,10 +624,20 @@ func spawn_field(at: Vector2, radius: float, duration: float, dps: float,
 				"alpha": 0.4, "life": duration, "flicker": 0.4})
 	_fields.append({"pos": at, "radius": radius, "dps": dps, "kind": kind,
 			"slow": float(k.slow), "owner": owner, "glow": glow,
-			"until": Time.get_ticks_msec() / 1000.0 + duration, "tick": 0.25})
+			# SIM time, not wall time (R55, 2026-09-19). This read
+			# Time.get_ticks_msec(), and under --speed max (`--fixed-fps 60`:
+			# one 1/60 s tick per frame, as fast as a core steps it) a frame is
+			# ~1-3 ms of wall clock, so a "6 s" field outlived the whole
+			# episode — every field a caster ever dropped stayed lit until the
+			# end. dh-env expires its fields in sim seconds; the gate and every
+			# env_parity run graded field casters against permanent fields.
+			# "until": Time.get_ticks_msec() / 1000.0 + duration, "tick": 0.25})
+			"until": _field_clock + duration, "tick": 0.25})
 
 func _tick_fields(delta: float) -> void:
-	var now := Time.get_ticks_msec() / 1000.0
+	# var now := Time.get_ticks_msec() / 1000.0   # wall clock: wrong at any speed but 1x
+	_field_clock += delta
+	var now := _field_clock
 	var dirty := false
 	for fd in _fields:
 		if now > fd.until:

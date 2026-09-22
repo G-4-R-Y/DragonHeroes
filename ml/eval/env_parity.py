@@ -101,6 +101,8 @@ def run_dh_env(build: str, policy: str, opp: str, episodes: int,
     bar_a, bar_b = max(float(sa.max_hp), 1.0), max(float(sb.max_hp), 1.0)
     kit_count, is_player = mask_args(build)
     wins = hp_self = hp_foe = ticks = dmg_self = dmg_foe = 0.0
+    src_self = {k: 0.0 for k in DhEnv.SOURCES}   # by-source, in bars (R55)
+    src_foe = {k: 0.0 for k in DhEnv.SOURCES}
     try:
         for e in range(episodes):
             obs = env.reset(seed + e)
@@ -118,6 +120,10 @@ def run_dh_env(build: str, policy: str, opp: str, episodes: int,
             # read BEFORE the next reset clears the tally
             dmg_self += env.damage_taken(0) / bar_a
             dmg_foe += env.damage_taken(1) / bar_b
+            for k, v in env.damage_by_source(0).items():
+                src_self[k] += v / bar_a
+            for k, v in env.damage_by_source(1).items():
+                src_foe[k] += v / bar_b
     finally:
         env.close()
     n = max(episodes, 1)
@@ -136,13 +142,25 @@ def run_dh_env(build: str, policy: str, opp: str, episodes: int,
             # hit points are two different units. Bars are one unit.
             "dmg_dealt": dmg_foe / n, "dmg_taken": dmg_self / n,
             "dps_dealt": (dmg_foe / n) / max(secs, 1e-6),
-            "dps_taken": (dmg_self / n) / max(secs, 1e-6)}
+            "dps_taken": (dmg_self / n) / max(secs, 1e-6),
+            # WHERE the bars came from (contact / bolt / field), per episode
+            "src_dealt": {k: v / n for k, v in src_foe.items()},
+            "src_taken": {k: v / n for k, v in src_self.items()}}
 
 
 def run_arena(build: str, policy: str, opp: str, episodes: int, seed: int,
-              speed: str) -> dict:
+              speed: str, time_limit: float) -> dict:
     """The same match set through the headless Godot arena — what the gate runs."""
-    row = league.run_match(build, build, policy, opp, episodes, seed, speed=speed)
+    # R55-b (2026-09-21): the time limit is PASSED, not defaulted. It used to be
+    # left to league.run_match's 45.0 s while dh-env ran to --max-ticks 4096 =
+    # 68.3 s, so the two runtimes were measuring episodes with a third more
+    # clock on one side. Every rate here is per SECOND, so a build whose fights
+    # reach the cap (fen_boar_alpha vs scripted: 38.9 s in the arena) had its
+    # dh-env mean stretched by episodes the arena had already truncated, and
+    # the seconds/dps ratios reported an environment divergence that was the
+    # harness's own asymmetry. Same wall clock both sides, always.
+    row = league.run_match(build, build, policy, opp, episodes, seed,
+                           time_limit=time_limit, speed=speed)
     eps = row.get("episodes", [])
     n = max(len(eps), 1)
     mean = lambda f: float(np.mean([e[f] for e in eps])) if eps else 0.0
@@ -164,7 +182,11 @@ def run_arena(build: str, policy: str, opp: str, episodes: int, seed: int,
             "seconds": secs,
             "dmg_dealt": dmg_dealt, "dmg_taken": dmg_taken,
             "dps_dealt": dmg_dealt / max(secs, 1e-6),
-            "dps_taken": dmg_taken / max(secs, 1e-6), "raw": row}
+            "dps_taken": dmg_taken / max(secs, 1e-6),
+            # by source; an arena predating the columns reports 0.0 for each
+            "src_dealt": {k: bars(f"dmg_{k}_b", "max_hp_b") for k in DhEnv.SOURCES},
+            "src_taken": {k: bars(f"dmg_{k}_a", "max_hp_a") for k in DhEnv.SOURCES},
+            "raw": row}
 
 
 # Terms compared as an absolute difference (all are fractions in [0, 1]) and
@@ -274,6 +296,16 @@ def print_report(dh: dict, ar: dict, verdict: dict, tolerance: float) -> None:
         print("  {:<12}{:>10}{:>10}{:>12}  {}".format(
             name, a, b, gap, "ok" if ok else "DIVERGES"))
     print("  " + "-" * 62)
+    if "src_dealt" in dh and "src_dealt" in ar:
+        # WHERE the bars came from — the column that says which mechanic the two
+        # runtimes disagree on, not only that they disagree (R55).
+        print("  {:<12}{:>10}{:>10}  {:<3}{:>10}{:>10}".format(
+            "by source", "dealt dh", "dealt ar", "", "taken dh", "taken ar"))
+        for k in DhEnv.SOURCES:
+            print("  {:<12}{:>10.3f}{:>10.3f}  {:<3}{:>10.3f}{:>10.3f}".format(
+                k, dh["src_dealt"].get(k, 0.0), ar["src_dealt"].get(k, 0.0), "",
+                dh["src_taken"].get(k, 0.0), ar["src_taken"].get(k, 0.0)))
+        print("  " + "-" * 62)
     print("  dmg/dps are HEALTH BARS (dealt to the foe / taken by the policy);")
     print("  seconds and the rates are compared as RATIOS, tolerance {:.2f}x."
           .format(RATE_TOL))
@@ -300,7 +332,14 @@ def build_parser(ap: argparse.ArgumentParser) -> argparse.ArgumentParser:
     ap.add_argument("--opp", default="scripted", choices=list(BASELINES))
     ap.add_argument("--episodes", type=int, default=12)
     ap.add_argument("--seed", type=int, default=2026)
-    ap.add_argument("--max-ticks", type=int, default=4096)
+    # One clock for both runtimes (R55-b). --max-ticks overrides the derived
+    # dh-env budget for a deliberately asymmetric probe; leave it at 0 and the
+    # two runtimes get the same wall time.
+    # ap.add_argument("--max-ticks", type=int, default=4096)   # was 68.3 s vs the arena's 45
+    ap.add_argument("--time-limit", type=float, default=45.0,
+                    help="episode wall clock, BOTH runtimes (seconds)")
+    ap.add_argument("--max-ticks", type=int, default=0,
+                    help="override the dh-env tick budget (0 = time-limit * 60)")
     ap.add_argument("--tolerance", type=float, default=0.15)
     ap.add_argument("--speed", default=league.DEFAULT_SPEED)
     ap.add_argument("--out", default="", help="write the verdict JSON here")
@@ -315,15 +354,17 @@ def run(args) -> int:
         raise SystemExit("env_parity: dh-env drives side A externally, so a "
                          "baseline on side A would not be the same experiment "
                          "in both runtimes. Pass a net JSON.")
+    max_ticks = args.max_ticks or int(round(args.time_limit * 60.0))
     dh = run_dh_env(args.build, policy, args.opp, args.episodes,
-                    args.seed, args.max_ticks)
+                    args.seed, max_ticks)
     ar = run_arena(args.build, policy, args.opp, args.episodes,
-                   args.seed, args.speed)
+                   args.seed, args.speed, args.time_limit)
     verdict = compare(dh, ar, args.tolerance)
     verdict["diagnosis"] = diagnose(dh, ar, args.tolerance)
     out = {"schema": "arena.env_parity.v1", "build": args.build,
            "policy": policy, "opponent": args.opp, "episodes": args.episodes,
            "seed": args.seed, "tolerance": args.tolerance,
+           "time_limit": args.time_limit, "max_ticks": max_ticks,
            "dh_env": dh, "arena": ar, **verdict}
     print_report(dh, ar, verdict, args.tolerance)
     if args.out:

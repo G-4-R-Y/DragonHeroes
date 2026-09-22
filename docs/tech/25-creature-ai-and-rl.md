@@ -608,6 +608,45 @@ python3 -m ml.eval.env_parity --key fen_boar --build core.arena.fen_boar_alpha -
 
 It compares `win_rate`, `hp_self`, `hp_foe` and — added 2026-09-14 — `dmg_dealt` / `dmg_taken`, in **health bars**, because `dh-env`'s stats come from `ml/env/specs.json` and the arena's from live content, so absolute hit points are two different units. The damage columns are what turn "they disagree" into "**this term** disagrees": health fraction alone cannot separate hits that land *rarely* (reach, cooldown, tracking) from hits that land *softly* (damage, scaling, mitigation), and those call for opposite fixes. Dividing episode length out — the `dps` column — separates them. `Arena::damage_taken()` and `dmg_taken_a`/`dmg_taken_b` + `max_hp_a`/`max_hp_b` on the arena's episode rows are the two ends of that measurement.
 
+#### 5.3.1 Damage BY SOURCE, and the first ten seconds (2026-09-21)
+
+Health-fraction-per-second separated *rarely* from *softly*. It could not say
+**which attack** — a body that swings, throws a bolt fan and drops a field
+reports one number for all three, and three different ports can trade against
+each other inside it. So every runtime now books damage into three buckets at
+the moment it is dealt: **contact** (a melee packet), **bolt** (a projectile or
+any element packet — `proxy.gd` routes a String `arg3` here) and **field**
+(ground effects and DoTs). `Arena::damage_by_source()`, `dh_env_damage_by_source`,
+`fighter.gd::note_damage_taken(dmg, source)` and the arena's
+`dmg_{contact,bolt,field}_{a,b}` episode columns are the same measurement in
+four places, and `env_parity` reports `src_dealt` / `src_taken` beside the totals.
+
+The second instrument is **the first N seconds only** (`$S/r55/first10.py`).
+Two runtimes that exchange the same damage at different speeds diverge in every
+per-second term at once, and the endgame — where a body below 0.25 hp retreats
+forever — dominates the mean. Truncating both sides at 10 s measures the
+ENGAGED phase on its own. Used together the pair is decisive: against a native
+opponent cinder_drake's contact bucket matched within 1% (54.0 vs 54.4 hp per
+10 s) while its bolt bucket was **1.88× low**, which pointed at the kit and the
+element packets and at nothing else. Four divergences came out of that one
+reading (tech/39 §2, the R55-b rows); the largest was an entire damage packet
+the sim did not have — the **Fiery** elite affix, which is behaviour, not stats,
+and therefore the only one of the four affixes `dump_specs.gd` could not read
+off the finished body.
+
+**One clock, both runtimes.** `env_parity` used to leave the arena at
+`league.run_match`'s default 45 s while dh-env ran to `--max-ticks 4096` =
+68.3 s. Every term in the verdict is per second, so for any build whose fights
+reach the cap the harness reported its own asymmetry as an environment
+divergence. `--time-limit` now drives both sides and `--max-ticks` is the
+override for a deliberately asymmetric probe.
+
+**Read the rate ratios, not `win_rate`.** The probe is a MIRROR matchup decoded
+greedily, so its outcome is near-deterministic: a hair of divergence flips every
+episode at once, and `win_rate` reads 0.00 against 0.44 while every rate in the
+same cell agrees within 20%. The absolute terms are a tripwire; the ratios are
+the measurement.
+
 ## 6. Fairness is baked into training, not patched at inference
 
 Canon §9 makes these training-time constraints, and the research history explains why post-hoc nerfs fail: OpenAI Five *had* a 217 ms average reaction time and still read as "programmable-mouse telepathy" because of coordination and precision; AlphaStar's APM caps were gamed by burst micro because they bound on averages ([AI Impacts analysis](https://aiimpacts.org/the-unexpected-difficulty-of-comparing-alphastar-to-humans/)). If the agent never experiences the constraints during training, it learns skills the constraints then break — or finds the gaps in them.

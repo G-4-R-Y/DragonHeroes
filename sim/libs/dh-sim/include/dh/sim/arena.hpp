@@ -22,13 +22,30 @@ inline constexpr int kObsV2Dim = 36;      // arena.obs.v2: v1 + ally block [31..
 inline constexpr int kActionLogits = 7;   // noop, attack, special, skill1..4
 inline constexpr float kArenaDt = 1.0f / 60.0f;
 inline constexpr float kArenaRadius = 26.0f * 16.0f;   // world_stub.gd ring (px)
-inline constexpr std::uint32_t kMaxTicks = 60 * 60;    // 60 s episode cap
+// Episode cap. game/arena/arena.gd fights to `time_limit`, default 90 s (the
+// league never overrides it), then decides on hp_frac; this was 60 s, so every
+// slow mirror fight (bog_golem vs scripted averaged exactly 60.0 s here against
+// 42 s there) ended on a different rule in the two runtimes (R55, 2026-09-19).
+// inline constexpr std::uint32_t kMaxTicks = 60 * 60;    // 60 s episode cap
+inline constexpr std::uint32_t kMaxTicks = 90 * 60;    // 90 s: arena.gd time_limit
 
 enum class KitId : int { kNone = 0, kBoltVolley, kRadialSlam, kPounce, kFieldCast, kEnrage };
 // kStorm is a PROJECTILE element, never a ground field: storm bolts detonate
 // mire fields (the conduct combo, canon §12.41).
 enum class FieldKind : int { kFire = 0, kEarth, kMire, kLava, kStorm };
 enum class OppPolicy : int { kNative = 0, kScripted, kMlp };
+// creature.gd::setup_archetype — the bestiary entry a build rides RESHAPES
+// the chassis (game/arena/fighter.gd::setup -> setup_from_entry). R55
+// (2026-09-19): the arena's marsh_drake and serpent are LUNGERS (0.22 s
+// windup, pounce from 2.5-5.5 tiles), fen_boar and golem are BRUTES (0.55 s
+// windup, 2.2-tile arc-free ground slam); the sim gave every body the stalker
+// swing. "wisp" is a chassis (ProtoWisp), not an archetype, and maps here to
+// kStalker exactly as setup_from_entry skips it.
+enum class Archetype : int { kStalker = 0, kLunger, kBrute };
+// Where a damage packet came from, for ml/eval/env_parity.py's by-source
+// columns (R55): the three buckets the Godot arena can tell apart through
+// proxy.gd — a contact hit (swing, slam, pounce), a projectile, a ground field.
+enum class DmgSource : int { kContact = 0, kBolt, kField, kSourceCount };
 
 struct KitSpec {
     KitId id = KitId::kNone;
@@ -60,6 +77,22 @@ struct FighterSpec {
     int dodge_max = 2;                 // 0 for creatures
     std::array<KitSpec, 4> kits{};
     int kit_count = 0;
+    // creature.gd::windup_time — the telegraph BEFORE a swing lands, per body:
+    // 0.35 default, 0.22 lunger, 0.55 brute, 0.3 wisp. Was the constant
+    // kWindup for every body until R55 (2026-09-19); reaches the sim through
+    // dh_env_set_body_traits (optional symbol), never through DhFighterSpec,
+    // which crosses the C API by value and must not be resized.
+    float windup_time = 0.35f;
+    Archetype archetype = Archetype::kStalker;
+    // creature.gd::setup_archetype elite affixes. Brutal (damage x1.5), Swift
+    // (speed x1.4, cd x0.75) and Bulwark (max_hp x1.8) are pure STAT edits, so
+    // dump_specs.gd already reads them off the finished body and they arrive
+    // here inside the numbers above. `Fiery` is the one that is BEHAVIOUR: it
+    // sets creature.gd's `fiery`, and _strike then lands a SECOND packet worth
+    // half the swing as a "fire" element string, which proxy.gd books as BOLT
+    // damage. Four of the six arena creatures wear an affix and one of them is
+    // Fiery (cinder_drake), so this rode entirely outside the sim until R55-b.
+    bool fiery = false;
 };
 
 // Learner command: move vector (clamped to unit length) + act id
@@ -104,6 +137,23 @@ class Arena {
         return true;
     }
     OppPolicy opp_policy() const { return opp_policy_; }
+
+    // R55 (2026-09-19): per-body swing shape, read off the Godot body by
+    // game/arena/tools/dump_specs.gd. Applies from the next reset() on (the
+    // spec is copied into the fighter there) and to the current episode's
+    // spec as well, so a caller that sets it right after construction, before
+    // the first reset, sees one consistent body throughout.
+    void set_body_traits(int who, Archetype archetype, float windup_time) {
+        FighterSpec& s = f_[who & 1].spec;
+        s.archetype = archetype;
+        if (windup_time > 0.0f) s.windup_time = windup_time;
+    }
+
+    // R55-b (2026-09-21): the Fiery elite affix (see FighterSpec::fiery). Its
+    // own entry point for the same reason set_body_traits has one — a widened
+    // signature would let a stale .so be called with the wrong arity, while a
+    // missing symbol fails loudly on the Python side.
+    void set_body_affix(int who, bool fiery) { f_[who & 1].spec.fiery = fiery; }
 
     // Frozen opponent net (OppPolicy::kMlp): flat row-major weights + biases,
     // layer row sizes [in0,out0,in1,out1,...], and the 16-float embedding row
@@ -169,6 +219,11 @@ class Arena {
     // term the two runtimes disagree on instead of only that they disagree:
     // hp_frac alone cannot separate "hits rarely land" from "hits land soft".
     float damage_taken(int who) const { return damage_taken_[who & 1]; }
+    // The same tally split by DmgSource (contact / bolt / field); the three
+    // sum to damage_taken. The twin of the arena row's dmg_{contact,bolt,field}.
+    float damage_by_source(int who, DmgSource src) const {
+        return damage_by_source_[who & 1][static_cast<int>(src)];
+    }
     // The action id that actually COMMITTED on the last step for this fighter,
     // or -1 if the chosen action was refused (on cooldown, no such kit slot,
     // act 0). The twin of game/arena/fighter.gd's `ok`.
@@ -215,6 +270,16 @@ class Arena {
         float dodge_regen = 0.0f;
         float kit_cd[4] = {0, 0, 0, 0};
         float kit_gate = 0.0f;           // native kit rate limit (0.4 s)
+        // creature.gd "recover": 0.4 s after a strike lands in which the
+        // built-in mind neither chases nor swings (_strike sets _timer = 0.4,
+        // the state machine only ticks it). bot_attack never reads it, so a
+        // policy-driven body is unaffected — its attack_cd is longer anyway.
+        float recover_t = 0.0f;
+        // Lunger pounce (creature.gd::_chase -> _strike): the swing committed
+        // from 2.5-5.5 tiles dashes up to 3 tiles onto WHERE THE TARGET WAS at
+        // the commit, then runs the ordinary reach + arc test from there.
+        bool pounce_pending = false;
+        math::Vec2 pounce_target{};
         // squad mode (arena.obs.v2): an optional second BODY — the buddy
         // (game/arena duo semantics: one fighter, two bodies, shared fate)
         bool has_buddy = false;
@@ -262,7 +327,8 @@ class Arena {
     // `from_dir` is the direction of the blow: creature.gd::take_damage nudges
     // the victim 6 px along it on EVERY landed packet, and the arena's proxy
     // passes it straight through. Zero means no nudge (fields, DoTs).
-    void hurt(const BodyRef& ref, float dmg, math::Vec2 from_dir = {});
+    void hurt(const BodyRef& ref, float dmg, math::Vec2 from_dir = {},
+              DmgSource src = DmgSource::kContact);
     math::Vec2 clamp_disc(math::Vec2 p, float margin) const;
     float gauss();                       // Box-Muller on the policy stream
 
@@ -275,6 +341,7 @@ class Arena {
     std::uint64_t tick_ = 0;
     int winner_ = -2;                    // -2 fighting, -1 draw, 0/1
     float damage_taken_[2] = {0.0f, 0.0f};   // per-episode, reset() clears it
+    float damage_by_source_[2][static_cast<int>(DmgSource::kSourceCount)] = {};
     int last_commit_[2] = {-1, -1};          // per-TICK, apply_action sets it
     math::Pcg32 combat_rng_;
     math::Pcg32 policy_rng_;

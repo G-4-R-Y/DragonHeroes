@@ -56,6 +56,11 @@ func _ready() -> void:
 			spec.dodge_max = ProtoPlayer.DODGE_CHARGES_MAX
 			spec.is_player = true
 			spec.is_ranged = str(b._kit) == "mage"
+			# R55: player.gd has no creature windup/recover state; the sim keeps
+			# its kWindup (0.35) for a melee player swing, stalker-shaped.
+			spec.windup_time = 0.35
+			spec.archetype = "stalker"
+			spec.fiery = false          # elite affixes are a creature-only concept
 		else:
 			spec.max_hp = b.max_hp
 			spec.damage = b.damage
@@ -67,6 +72,20 @@ func _ready() -> void:
 			spec.dodge_max = 0
 			spec.is_player = false
 			spec.is_ranged = b is ProtoWisp
+			# R55 (2026-09-19): creature.gd::setup_from_entry reshapes the chassis
+			# by the bestiary archetype the build's bundle resolves to — lunger
+			# (0.22 s windup, pounce), brute (0.55 s windup, ground slam) or the
+			# stalker default. The sim swung every body the same way until the
+			# converged nets measured 2-3x less damage taken in dh-env than in the
+			# arena from exactly the lunger/brute natives (tech/39 §2).
+			spec.windup_time = float(b.windup_time)
+			spec.archetype = str(b.archetype)
+			# R55-b (2026-09-21): the ELITE AFFIX. Brutal/Swift/Bulwark are stat
+			# multipliers setup_archetype already folded into the numbers above,
+			# so they need nothing here. Fiery is behaviour — _strike lands a
+			# second packet of damage*0.5 as a "fire" element string, which
+			# proxy.gd books as BOLT — and it has to cross to the sim as a flag.
+			spec.fiery = bool(b.fiery)
 		var kits: Array = []
 		for k in def.get("skills", []):
 			kits.append({"id": str(k.get("id", "")), "cd": float(k.get("cd", 6.0)),

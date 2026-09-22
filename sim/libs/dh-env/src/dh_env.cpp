@@ -162,6 +162,23 @@ int32_t dh_env_set_opp_policy(DhEnv* env, int32_t opp_policy) {
         static_cast<dh::sim::OppPolicy>(opp_policy)) ? 1 : 0;
 }
 
+int32_t dh_env_set_body_traits(DhEnv* env, int32_t who, int32_t archetype,
+                               float windup_time) {
+    if (env == nullptr) return 0;
+    if (who < 0 || who > 1) return 0;
+    if (archetype < DH_ARCH_STALKER || archetype > DH_ARCH_BRUTE) return 0;
+    env->arena.set_body_traits(who, static_cast<dh::sim::Archetype>(archetype),
+                               windup_time);
+    return 1;
+}
+
+int32_t dh_env_set_body_affix(DhEnv* env, int32_t who, int32_t fiery) {
+    if (env == nullptr) return 0;
+    if (who < 0 || who > 1) return 0;
+    env->arena.set_body_affix(who, fiery != 0);
+    return 1;
+}
+
 void dh_env_set_opp_weights(DhEnv* env, const float* params,
                             const int32_t* layer_in, const int32_t* layer_out,
                             int32_t n_layers, const float* emb16) {
@@ -271,6 +288,12 @@ int32_t dh_env_action_dodge_bit(void) { return DH_ENV_ACT_DODGE; }
 
 float dh_env_damage_taken(const DhEnv* env, int32_t who) {
     return env->arena.damage_taken(who != 0 ? 1 : 0);
+}
+
+float dh_env_damage_by_source(const DhEnv* env, int32_t who, int32_t src) {
+    if (src < 0 || src >= static_cast<int32_t>(dh::sim::DmgSource::kSourceCount)) return 0.0f;
+    return env->arena.damage_by_source(who != 0 ? 1 : 0,
+                                       static_cast<dh::sim::DmgSource>(src));
 }
 
 uint64_t dh_env_tick(const DhEnv* env) { return env->arena.tick(); }

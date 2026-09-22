@@ -38,6 +38,8 @@ enum DhKitId { DH_KIT_NONE = 0, DH_KIT_BOLT_VOLLEY, DH_KIT_RADIAL_SLAM,
 enum DhFieldKind { DH_FIELD_FIRE = 0, DH_FIELD_EARTH, DH_FIELD_MIRE, DH_FIELD_LAVA,
                    DH_FIELD_STORM /* projectile element: detonates mire fields */ };
 enum DhOppPolicy { DH_OPP_NATIVE = 0, DH_OPP_SCRIPTED, DH_OPP_MLP };
+/* creature.gd archetype (R55): the bestiary entry reshapes the chassis. */
+enum DhArchetype { DH_ARCH_STALKER = 0, DH_ARCH_LUNGER, DH_ARCH_BRUTE };
 
 typedef struct {
     float max_hp, damage, move_speed, attack_reach, attack_cd, body_radius;
@@ -68,6 +70,23 @@ DH_API int32_t dh_env_obs_dim(const DhEnv* env);
  * Determinism is untouched: the opponent's policy is not arena state, and
  * state_hash is a function of the seed and the actions taken. */
 DH_API int32_t dh_env_set_opp_policy(DhEnv* env, int32_t opp_policy);
+
+/* R55 (2026-09-19): the swing shape creature.gd gives a body through its
+ * bestiary archetype — game/arena/tools/dump_specs.gd reads both off the live
+ * body. archetype: DhArchetype (stalker = the default swing; lunger = 0.22 s
+ * windup, pounce from 2.5-5.5 tiles; brute = 0.55 s windup, 2.2-tile arc-free
+ * slam). windup_time <= 0 keeps the body's current value. Deliberately NOT new
+ * DhFighterSpec fields: that struct crosses by value, so a stale .so would read
+ * a resized one as garbage; an optional symbol fails loudly instead (the
+ * Python side refuses a library without it). Returns 1 on success. */
+DH_API int32_t dh_env_set_body_traits(DhEnv* env, int32_t who, int32_t archetype,
+                                      float windup_time);
+/* The Fiery elite affix (creature.gd::setup_archetype). A fiery body's landed
+ * bite lands a SECOND packet of half the swing as a "fire" element string, which
+ * proxy.gd books as bolt damage; the other three affixes are stat edits and
+ * arrive inside DhFighterSpec's numbers. Its own symbol, not a wider
+ * dh_env_set_body_traits, for the arity reason above. Returns 1 on success. */
+DH_API int32_t dh_env_set_body_affix(DhEnv* env, int32_t who, int32_t fiery);
 /* Frozen opponent net (DH_OPP_MLP). Packing: per layer [W row-major out x in]
  * then [b out], layers concatenated; layer_in/out arrays, n_layers <= 8;
  * emb16 = the content embedding row (policy_net.py layout). `params` must
@@ -157,6 +176,11 @@ DH_API float dh_env_hp_frac(const DhEnv* env, int32_t who);
  * hp_frac says the two runtimes disagree, this says whether the disagreement is
  * in how OFTEN hits land or in how HARD they land. */
 DH_API float dh_env_damage_taken(const DhEnv* env, int32_t who);
+/* dh_env_damage_taken split by where the packet came from (R55): src 0 contact
+ * (swing / slam / pounce), 1 projectile, 2 ground field — the three the Godot
+ * arena tells apart (proxy.gd) and reports as dmg_{contact,bolt,field}_{a,b}.
+ * The three sum to dh_env_damage_taken. Optional symbol, like the tally. */
+DH_API float dh_env_damage_by_source(const DhEnv* env, int32_t who, int32_t src);
 /* Returns DH_ENV_ACT_DODGE. Absent in a library built before 2026-09-14, which
  * is how a caller tells that the dodge bit would be silently dropped. */
 DH_API int32_t dh_env_action_dodge_bit(void);

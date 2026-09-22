@@ -1,6 +1,7 @@
 // Minimal dependency-free test runner for the sim workspace. Grows with the crates;
 // once the suite gets serious (golden replays, fuzzing — docs/tech/21 §8) we revisit
 // adopting a framework. Every test here guards a canon contract.
+#include <utility>
 #include <cmath>
 #include <cstdio>
 #include <vector>
@@ -543,6 +544,115 @@ static void test_arena_damage_accounting() {
     CHECK(duel.damage_taken(1) == 0.0f);
 }
 
+static void test_arena_archetypes_shape_the_swing() {
+    // R55 (2026-09-19). creature.gd::setup_from_entry reshapes the chassis by
+    // the bestiary archetype a build's bundle resolves to (fighter.gd::setup):
+    // a LUNGER winds up 0.22 s and pounces from 2.5-5.5 tiles, a BRUTE winds
+    // up 0.55 s and lands an arc-free 2.2-tile ground slam, the stalker default
+    // winds up 0.35 s and bites in a 90 deg cone. The sim gave every body the
+    // stalker swing; measured on the converged nets, the arena's lunger and
+    // brute natives dealt 2-3x the damage dh-env's did (tech/39 §2).
+    dh::sim::FighterSpec statue;      // an opponent that only stands there
+    statue.max_hp = 100000.0f; statue.damage = 0.0f; statue.move_speed = 0.0f;
+    statue.attack_reach = 28.8f; statue.attack_cd = 1000.0f; statue.body_radius = 8.0f;
+    statue.dodge_max = 0; statue.kit_count = 0;
+    // Walk the learner straight at the statue to `stand_off` px centre to
+    // centre, commit ONE swing, and return the ticks until it lands (-1 = whiff).
+    auto swing = [&](dh::sim::Archetype arch, float windup, float stand_off) {
+        dh::sim::FighterSpec me;
+        me.max_hp = 100.0f; me.damage = 10.0f; me.move_speed = 60.0f;
+        me.attack_reach = 28.8f; me.attack_cd = 1.2f; me.body_radius = 8.0f;
+        me.dodge_max = 0; me.kit_count = 0;
+        me.archetype = arch; me.windup_time = windup;
+        dh::sim::Arena a(me, statue, dh::sim::OppPolicy::kScripted, 4);
+        a.reset(4);
+        float o[dh::sim::kObsDim];
+        int t = 0;
+        for (; t < 1200; ++t) {
+            a.obs_now(o);
+            if (o[18] * 512.0f <= stand_off) break;
+            a.step({o[16], o[17], 0});
+        }
+        CHECK(t < 1200);
+        a.step({0.0f, 0.0f, 1});                    // the commit tick
+        for (int k = 1; k <= 120; ++k) {
+            if (a.damage_taken(1) > 0.0f) return k - 1;
+            a.step({0.0f, 0.0f, 0});
+        }
+        return -1;
+    };
+    // (1) the telegraph is the body's own windup_time, not one constant:
+    //     0.22 s = 13.2 ticks, 0.35 s = 21, 0.55 s = 33 (one decrement lands
+    //     on the commit tick itself).
+    const int lunger = swing(dh::sim::Archetype::kLunger, 0.22f, 30.0f);
+    const int stalker = swing(dh::sim::Archetype::kStalker, 0.35f, 30.0f);
+    const int brute = swing(dh::sim::Archetype::kBrute, 0.55f, 30.0f);
+    CHECK(lunger >= 12 && lunger <= 15);
+    CHECK(stalker >= 19 && stalker <= 23);
+    CHECK(brute >= 31 && brute <= 35);
+    CHECK(lunger < stalker && stalker < brute);
+    // (2) the brute's strike is a radial slam of 2.2 tiles + target radius
+    //     (43.2 px here) where the stalker bite reaches attack_reach + radius
+    //     (36.8 px): at 40 px one lands and the other whiffs.
+    CHECK(swing(dh::sim::Archetype::kStalker, 0.35f, 40.0f) == -1);
+    CHECK(swing(dh::sim::Archetype::kBrute, 0.55f, 40.0f) > 0);
+    // (3) a NATIVE lunger pounces: the largest single-tick closing of the
+    //     centre distance is the 3-tile leap, where a stalker only walks
+    //     (60 px/s = 1 px per tick).
+    auto max_jump = [&](dh::sim::Archetype arch) {
+        dh::sim::FighterSpec me = statue;          // the learner never acts
+        me.max_hp = 1000.0f;
+        dh::sim::FighterSpec foe;
+        foe.max_hp = 100.0f; foe.damage = 5.0f; foe.move_speed = 60.0f;
+        foe.attack_reach = 28.8f; foe.attack_cd = 0.9f; foe.body_radius = 8.0f;
+        foe.dodge_max = 0; foe.kit_count = 0;
+        foe.archetype = arch; foe.windup_time = 0.22f;
+        dh::sim::Arena a(me, foe, dh::sim::OppPolicy::kNative, 5);
+        a.reset(5);
+        float o[dh::sim::kObsDim];
+        a.obs_now(o);
+        float prev = o[18] * 512.0f, jump = 0.0f;
+        for (int t = 0; t < 600 && !a.step({0.0f, 0.0f, 0}); ++t) {
+            a.obs_now(o);
+            const float d = o[18] * 512.0f;
+            if (prev - d > jump) jump = prev - d;
+            prev = d;
+        }
+        return jump;
+    };
+    CHECK(max_jump(dh::sim::Archetype::kLunger) > 2.0f * 16.0f);
+    CHECK(max_jump(dh::sim::Archetype::kStalker) < 4.0f);
+    // (4) the traits reach a live arena through the setter dh-env uses, and
+    //     take effect for the current spec (not only after the next reset).
+    dh::sim::Arena a(statue, statue, dh::sim::OppPolicy::kScripted, 6);
+    a.set_body_traits(1, dh::sim::Archetype::kBrute, 0.55f);
+    a.set_body_traits(0, dh::sim::Archetype::kLunger, -1.0f);   // <= 0 keeps the windup
+    a.reset(6);
+    CHECK(a.state_hash() == a.state_hash());
+}
+
+static void test_arena_damage_by_source_sums_to_the_tally() {
+    // R55: the by-source split (contact / bolt / field) is the twin of the
+    // arena row's dmg_{contact,bolt,field}; it must partition damage_taken
+    // exactly, and a scripted caster that volleys and drops fields must show
+    // up in the bolt and field buckets of what the learner took.
+    auto a = make_test_arena(21, dh::sim::OppPolicy::kScripted);
+    a.reset(21);
+    float o[dh::sim::kObsDim];
+    for (int t = 0; t < 1800 && !a.step({0.0f, 0.0f, t % 90 == 0 ? 3 : 1}); ++t) {
+        a.obs_now(o);
+        (void)o;
+    }
+    for (int who = 0; who < 2; ++who) {
+        float sum = 0.0f;
+        for (int s = 0; s < static_cast<int>(dh::sim::DmgSource::kSourceCount); ++s)
+            sum += a.damage_by_source(who, static_cast<dh::sim::DmgSource>(s));
+        CHECK(std::fabs(sum - a.damage_taken(who)) < 1e-3f);
+    }
+    CHECK(a.damage_by_source(0, dh::sim::DmgSource::kBolt) > 0.0f);
+    CHECK(a.damage_by_source(0, dh::sim::DmgSource::kField) > 0.0f);
+}
+
 static void test_arena_squad_mode() {
     // 2v2 squad (arena.obs.v2): each side fields a buddy body; episodes end
     // only when BOTH of a fighter's bodies fall; obs carries the ally block.
@@ -608,6 +718,68 @@ static void test_effect_commands() {
     CHECK(!evaluate_effect(def,owner_a,e)); // tick overflow fails closed
 }
 
+static void test_arena_fiery_affix_rides_the_bite_as_bolt_damage() {
+    // R55-b (2026-09-21). creature.gd::setup_archetype gives an elite one of
+    // four affixes. Brutal/Swift/Bulwark multiply damage / speed+cd / max_hp,
+    // so dump_specs.gd reads them off the finished body and they reach the sim
+    // inside the spec's numbers. FIERY is the one that is behaviour: _strike
+    // follows the landed bite with `take_damage(damage * 0.5, dir, "fire")`,
+    // and proxy.gd routes a String arg3 through the element branch — raw
+    // damage on a creature body, booked as BOLT, not contact.
+    //
+    // It rode entirely outside the sim until now, and cinder_drake wears it:
+    // measured on the converged net, the arena's native drake landed 58.2 bolt
+    // damage per 10 s where dh-env landed 30.9, and 25 of those 27 missing
+    // points were this packet (tech/39 §2).
+    dh::sim::FighterSpec statue;      // an opponent that only stands there
+    statue.max_hp = 100000.0f; statue.damage = 0.0f; statue.move_speed = 0.0f;
+    statue.attack_reach = 28.8f; statue.attack_cd = 1000.0f; statue.body_radius = 8.0f;
+    statue.dodge_max = 0; statue.kit_count = 0;
+    // Walk in, commit ONE swing, and read the two buckets it filled.
+    auto swing = [&](bool fiery, dh::sim::Archetype arch) {
+        dh::sim::FighterSpec me;
+        me.max_hp = 100.0f; me.damage = 10.0f; me.move_speed = 60.0f;
+        me.attack_reach = 28.8f; me.attack_cd = 1.2f; me.body_radius = 8.0f;
+        me.dodge_max = 0; me.kit_count = 0;
+        me.archetype = arch; me.windup_time = 0.35f; me.fiery = fiery;
+        dh::sim::Arena a(me, statue, dh::sim::OppPolicy::kScripted, 4);
+        a.reset(4);
+        float o[dh::sim::kObsDim];
+        for (int t = 0; t < 1200; ++t) {
+            a.obs_now(o);
+            if (o[18] * 512.0f <= 30.0f) break;
+            a.step({o[16], o[17], 0});
+        }
+        a.step({0.0f, 0.0f, 1});
+        for (int k = 0; k < 120; ++k) a.step({0.0f, 0.0f, 0});
+        // damage_by_source is indexed by the VICTIM: the statue is fighter 1.
+        return std::pair<float, float>{
+            a.damage_by_source(1, dh::sim::DmgSource::kContact),
+            a.damage_by_source(1, dh::sim::DmgSource::kBolt)};
+    };
+    // A plain body books the whole swing as contact and fires no bolt at all.
+    const auto plain = swing(false, dh::sim::Archetype::kStalker);
+    CHECK(plain.first > 0.0f);
+    CHECK(plain.second == 0.0f);
+    // A FIERY body books the same contact plus exactly half of it as bolt.
+    const auto fiery = swing(true, dh::sim::Archetype::kStalker);
+    CHECK(std::fabs(fiery.first - plain.first) < 1e-4f);
+    CHECK(std::fabs(fiery.second - 0.5f * plain.first) < 1e-4f);
+    // The BRUTE slam returns before the rider, exactly as creature.gd::_strike
+    // does — a Fiery brute's ground slam is one packet, not one and a half.
+    const auto slam = swing(true, dh::sim::Archetype::kBrute);
+    CHECK(slam.first > 0.0f);
+    CHECK(slam.second == 0.0f);
+    // And the flag crosses the dh-env seam by its own setter (dh_env.h): the
+    // spec struct must not be resized, so set_body_affix is how it arrives.
+    dh::sim::FighterSpec plainspec;
+    dh::sim::Arena a(plainspec, statue, dh::sim::OppPolicy::kScripted, 4);
+    a.set_body_affix(0, true);
+    a.set_body_affix(1, false);
+    a.reset(4);
+    CHECK(true);   // reaching here means the setter is reset-stable
+}
+
 int main() {
     test_effect_commands();
     test_entity_generational_ids();
@@ -630,6 +802,9 @@ int main() {
     test_arena_dodge_is_a_fallback();
     test_arena_damage_accounting();
     test_arena_squad_mode();
+    test_arena_archetypes_shape_the_swing();
+    test_arena_damage_by_source_sums_to_the_tally();
+    test_arena_fiery_affix_rides_the_bite_as_bolt_damage();
     if (g_failures == 0) {
         std::printf("sim-tests: all checks passed\n");
         return EXIT_SUCCESS;

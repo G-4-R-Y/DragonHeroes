@@ -37,6 +37,11 @@ var _kit_fire_t := 0.0
 var _pending: Array = []        # [{t, cb: Callable}] scheduled kit resolutions
 
 var damage_taken := 0.0
+# The same tally by WHERE the packet came from — the three buckets proxy.gd can
+# tell apart: a contact hit (swing / slam / pounce kit), a projectile (element
+# packet), a ground field (dot_damage). Reported per episode as
+# dmg_{contact,bolt,field}_{a,b}; dh-env's twin is dh_env_damage_by_source (R55).
+var damage_by_source := {"contact": 0.0, "bolt": 0.0, "field": 0.0}
 # Last emitted action (recorder): move vector + committed act code
 # (0 none, 1 attack, 2 special, 3..6 skill slots, 7 dodge).
 var last_action := {"move": Vector2.ZERO, "act": 0}
@@ -139,8 +144,9 @@ func kit_count() -> int:
 		return n
 	return mini(_kits.size(), 4)
 
-func note_damage_taken(dmg: float) -> void:
+func note_damage_taken(dmg: float, source := "contact") -> void:
 	damage_taken += dmg
+	damage_by_source[source] = float(damage_by_source.get(source, 0.0)) + dmg
 
 func is_ranged() -> bool:
 	var b := alive_body()

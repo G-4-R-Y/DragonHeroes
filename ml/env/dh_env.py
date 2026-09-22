@@ -27,6 +27,9 @@ KIT_IDS = {"none": 0, "bolt_volley": 1, "radial_slam": 2, "pounce": 3,
            "field_cast": 4, "enrage": 5}
 FIELD_KIND_IDS = {"fire": 0, "earth": 1, "mire": 2, "lava": 3, "storm": 4}
 OPP = {"native": 0, "scripted": 1, "mlp": 2}
+# creature.gd archetype -> DhArchetype (R55). "wisp" is a chassis, not an
+# archetype, and setup_from_entry skips it: the stalker swing, like any unknown.
+ARCHETYPES = {"stalker": 0, "lunger": 1, "brute": 2}
 
 _ACT_NAMES = ["noop", "attack", "special", "skill1", "skill2", "skill3",
               "skill4", "dodge"]
@@ -112,6 +115,14 @@ def _load_lib() -> ctypes.CDLL:
     if hasattr(lib, "dh_env_set_opp_policy"):
         lib.dh_env_set_opp_policy.restype = ctypes.c_int32
         lib.dh_env_set_opp_policy.argtypes = [ctypes.c_void_p, ctypes.c_int32]
+    if hasattr(lib, "dh_env_set_body_traits"):
+        lib.dh_env_set_body_traits.restype = ctypes.c_int32
+        lib.dh_env_set_body_traits.argtypes = [ctypes.c_void_p, ctypes.c_int32,
+                                               ctypes.c_int32, ctypes.c_float]
+    if hasattr(lib, "dh_env_set_body_affix"):
+        lib.dh_env_set_body_affix.restype = ctypes.c_int32
+        lib.dh_env_set_body_affix.argtypes = [ctypes.c_void_p, ctypes.c_int32,
+                                              ctypes.c_int32]
     lib.dh_env_reset.argtypes = [ctypes.c_void_p, ctypes.c_uint64,
                                  ctypes.POINTER(ctypes.c_float)]
     lib.dh_env_step.restype = ctypes.c_int
@@ -128,6 +139,10 @@ def _load_lib() -> ctypes.CDLL:
     if hasattr(lib, "dh_env_damage_taken"):
         lib.dh_env_damage_taken.restype = ctypes.c_float
         lib.dh_env_damage_taken.argtypes = [ctypes.c_void_p, ctypes.c_int32]
+    if hasattr(lib, "dh_env_damage_by_source"):
+        lib.dh_env_damage_by_source.restype = ctypes.c_float
+        lib.dh_env_damage_by_source.argtypes = [ctypes.c_void_p, ctypes.c_int32,
+                                                ctypes.c_int32]
     # The dodge bit (2026-09-14). Same optional-symbol discipline: a library
     # that predates it would DROP the flag, and a dropped dodge is invisible in
     # every metric the trainer prints.
@@ -334,6 +349,31 @@ class DhEnv:
                                                      OPP[opp], seed)
         if not self._handle:
             raise RuntimeError("dh_env_create failed")
+        # R55 (2026-09-19): the swing shape creature.gd gives each body through
+        # its bestiary archetype (windup_time + pounce/slam), dumped next to the
+        # stats. An optional symbol on purpose (dh_env.h): a library too old to
+        # have it would fight every body with the stalker swing again — exactly
+        # the divergence R55 closed — so refuse loudly rather than train on it.
+        traits = getattr(lib(), "dh_env_set_body_traits", None)
+        if traits is None:
+            raise RuntimeError(
+                "libdh-env.so predates dh_env_set_body_traits — rebuild it: "
+                "cmake --build sim/build --target dh-env")
+        # R55-b: the Fiery elite affix rides the same optional-symbol seam. The
+        # other three affixes are stat edits dump_specs.gd already read off the
+        # body; Fiery is behaviour (half the swing again, as bolt damage), and
+        # cinder_drake wears it — 25 of the 58 bolt damage the arena's native
+        # drake dealt per 10 s was this packet, and dh-env had none of it.
+        affix = getattr(lib(), "dh_env_set_body_affix", None)
+        if affix is None:
+            raise RuntimeError(
+                "libdh-env.so predates dh_env_set_body_affix — rebuild it: "
+                "cmake --build sim/build --target dh-env")
+        for who, bid in ((0, build_a), (1, build_b)):
+            sp = specs()[bid]
+            arch = ARCHETYPES.get(str(sp.get("archetype", "stalker")), 0)
+            traits(self._handle, who, arch, float(sp.get("windup_time", 0.0)))
+            affix(self._handle, who, 1 if bool(sp.get("fiery", False)) else 0)
         self.obs_dim = lib().dh_env_obs_dim(self._handle)
         self._obs = (ctypes.c_float * self.obs_dim)()
 
@@ -389,6 +429,22 @@ class DhEnv:
                 "libdh-env.so predates dh_env_damage_taken — rebuild it: "
                 "cmake --build sim/build --target dh-env")
         return float(fn(self._handle, who))
+
+    SOURCES = ("contact", "bolt", "field")
+
+    def damage_by_source(self, who: int) -> dict[str, float]:
+        """damage_taken(who) split by where the packet came from (R55):
+        contact (swing / slam / pounce), bolt (projectile), field (ground). The
+        three sum to damage_taken. The twin of the arena row's
+        dmg_{contact,bolt,field}_{a,b}. Raises on a library without the symbol,
+        for the same reason damage_taken does."""
+        fn = getattr(lib(), "dh_env_damage_by_source", None)
+        if fn is None:
+            raise RuntimeError(
+                "libdh-env.so predates dh_env_damage_by_source — rebuild it: "
+                "cmake --build sim/build --target dh-env")
+        return {name: float(fn(self._handle, who, i))
+                for i, name in enumerate(self.SOURCES)}
 
     @property
     def tick(self) -> int:

@@ -22,6 +22,9 @@ constexpr float kFieldTick = 0.25f;
 // 100 ms shorter than the one the shipping game draws, which is 100 ms of
 // dodge window the learner never had to find.
 constexpr float kWindup = 0.35f;
+// creature.gd::_strike: `_state = "recover"; _timer = 0.4` — the built-in mind
+// neither chases nor swings until it runs out (R55, 2026-09-19).
+constexpr float kRecover = 0.4f;
 constexpr float kKnockback = 6.0f;    // creature.gd::take_damage nudge
 constexpr float kKitGate = 0.4f;
 constexpr float kDodgeTime = 0.25f;
@@ -80,7 +83,7 @@ Arena::BodyRef Arena::nearest_enemy_body(int who, math::Vec2 from) const {
     return best;
 }
 
-void Arena::hurt(const BodyRef& ref, float dmg, math::Vec2 from_dir) {
+void Arena::hurt(const BodyRef& ref, float dmg, math::Vec2 from_dir, DmgSource src) {
     Fighter& foe = f_[ref.fighter];
     // KNOCKBACK. creature.gd::take_damage ends with `_move(from_dir * 6.0)`,
     // so in the shipping game every landed hit shoves the victim 6 px away and
@@ -100,11 +103,12 @@ void Arena::hurt(const BodyRef& ref, float dmg, math::Vec2 from_dir) {
     // down is still applied (changing that would change the dynamics and the
     // determinism hash) but is not counted, matching game/arena/proxy.gd, which
     // returns early on `dead`.
+    const int si = static_cast<int>(src);
     if (ref.body == 0) {
-        if (foe.hp > 0.0f) damage_taken_[ref.fighter] += dmg;
+        if (foe.hp > 0.0f) { damage_taken_[ref.fighter] += dmg; damage_by_source_[ref.fighter][si] += dmg; }
         foe.hp -= dmg;
     } else {
-        if (foe.hp2 > 0.0f) damage_taken_[ref.fighter] += dmg;
+        if (foe.hp2 > 0.0f) { damage_taken_[ref.fighter] += dmg; damage_by_source_[ref.fighter][si] += dmg; }
         foe.hp2 -= dmg;
     }
 }
@@ -145,6 +149,7 @@ void Arena::reset(std::uint64_t seed) {
     tick_ = 0;
     winner_ = -2;
     damage_taken_[0] = damage_taken_[1] = 0.0f;
+    for (auto& row : damage_by_source_) for (auto& v : row) v = 0.0f;
     last_commit_[0] = last_commit_[1] = -1;
     obs_log_n_ = 0;                 // the fairness ring starts empty each episode
     commit_n_[0] = commit_n_[1] = 0;
@@ -272,31 +277,73 @@ void Arena::build_obs(const Fighter& self, const Fighter& foe, float* o) const {
 }
 
 Action Arena::native_act(int who, float /*dt*/) {
-    // creature.gd essence: chase to reach, wind up, hit; kits off the rate gate.
+    // creature.gd's built-in mind (_chase -> windup -> recover) plus
+    // fighter.gd::pre_tick's native kit driver. Neither is a policy: creature.gd
+    // chases `target_override.global_position` straight off the scene tree and
+    // the arena's 150-250 ms observation delay (policy.gd::delayed_obs) exists
+    // only for ArenaPolicy minds — so this reads the LIVE state, not percept().
+    //
+    // R55 (2026-09-19). The previous port (kept below, commented) decided on the
+    // stale percept, swung from `attack_reach + foe_radius` where creature.gd
+    // swings from `attack_reach * 0.9`, knew neither the lunger pounce nor the
+    // brute slam nor the 0.4 s recover, and fired kits only on ticks it was not
+    // swinging. Measured on the converged nets (tech/39 §2): drake, serpent and
+    // shade natives hit 2-3x harder in the arena than here.
     Action act{};
     Fighter& me = f_[who];
     Fighter& foe = f_[1 - who];
-    if (me.windup_t > 0.0f || !foe.alive() || me.hp <= 0.0f) return act;
-    // FAIRNESS: decide on the stale view, not on f_[]. Own state (windup,
-    // cooldowns, position) stays live — fighter.gd's cmd_* resolve live too.
-    const Percept p = percept(who);
-    const math::Vec2 to_foe = (p.foe_pos - me.pos).normalized_or_zero();
-    const float dist = p.foe_dist;
-    const float reach = me.spec.attack_reach + p.foe_radius;
-    if (me.spec.is_ranged) {
-        // hold a 4-7 tile band, bolt on cooldown
-        if (dist < 4.0f * kTile) act = {-to_foe.x, -to_foe.y, 0};
-        else if (dist > 7.0f * kTile) act = {to_foe.x, to_foe.y, 0};
-        if (me.attack_cd <= 0.0f && dist < 9.0f * kTile) act.act = 1;
-    } else {
-        if (dist > reach * 0.85f) act = {to_foe.x, to_foe.y, 0};
-        if (me.attack_cd <= 0.0f && dist <= reach) act.act = 1;
+    if (!foe.alive() || me.hp <= 0.0f) return act;
+    if (me.windup_t <= 0.0f) me.pounce_pending = false;   // a pounce lives only inside its windup
+    const BodyRef tgt = nearest_enemy_body(who, me.pos);
+    const math::Vec2 to = tgt.pos - me.pos;
+    const float dist = to.length();
+    const math::Vec2 to_foe = to.normalized_or_zero();
+    // _state "windup" and "recover" only tick their timers: no chase, no swing.
+    const bool frozen = me.windup_t > 0.0f || me.recover_t > 0.0f;
+    if (!frozen) {
+        if (me.spec.is_ranged) {
+            // wisp.gd: hold a 4-7 tile band, bolt on cooldown
+            if (dist < 4.0f * kTile) act = {-to_foe.x, -to_foe.y, 0};
+            else if (dist > 7.0f * kTile) act = {to_foe.x, to_foe.y, 0};
+            if (me.attack_cd <= 0.0f && dist < 9.0f * kTile) act.act = 1;
+        } else if (me.spec.archetype == Archetype::kLunger && me.attack_cd <= 0.0f &&
+                   dist >= 2.5f * kTile && dist <= 5.5f * kTile) {
+            // creature.gd::_chase, lunger: leap onto the target from mid-range —
+            // the windup flash IS the tell; _strike dashes onto _pounce_target.
+            me.pounce_pending = true;
+            me.pounce_target = tgt.pos;
+            act.act = 1;
+        } else if (dist <= me.spec.attack_reach * 0.9f && me.attack_cd <= 0.0f) {
+            act.act = 1;                       // _begin_windup(to_player.normalized())
+        } else {
+            act = {to_foe.x, to_foe.y, 0};     // _move(to_player.normalized() * _speed() * delta)
+        }
     }
-    // kits off cooldown, range-checked (fighter.gd's native driver)
-    if (act.act == 0 && me.kit_gate <= 0.0f) {
+    // fighter.gd::pre_tick native kit driver — a SEPARATE CHANNEL from the
+    // body's state machine. pre_tick fires the first ready kit whose range
+    // covers the LIVE distance every frame, whatever the body is doing (mid
+    // windup, mid recover, mid swing), then holds a 0.4 s gate (_kit_fire_t).
+    //
+    // R55-b (2026-09-21): this used to write the kit into the returned Action,
+    // where it COMPETED with the swing for the single act slot and, worse, was
+    // never reached at all on a frozen frame — and a knife-fighting body is
+    // frozen for windup 0.22 s + recover 0.4 s of every 1.12 s cycle, 55% of
+    // them. Measured on the converged drake: the native opponent's bolt damage
+    // in dh-env was HALF the arena's (30.9 vs 58.2 per 10 s). Fire it here, on
+    // its own channel, and leave `act` to the body:
+    //     if (me.kit_gate <= 0.0f) {
+    //         for (int i = 0; i < me.spec.kit_count; ++i) {
+    //             if (me.kit_cd[i] <= 0.0f && dist <= me.spec.kits[i].range) {
+    //                 if (act.act == 1) me.pounce_pending = false;
+    //                 act.act = 3 + i;
+    //                 break;
+    //             }
+    //         }
+    //     }
+    if (me.kit_gate <= 0.0f) {
         for (int i = 0; i < me.spec.kit_count; ++i) {
             if (me.kit_cd[i] <= 0.0f && dist <= me.spec.kits[i].range) {
-                act.act = 3 + i;
+                exec_kit(who, i);      // sets kit_cd[i] AND the 0.4 s gate
                 break;
             }
         }
@@ -304,12 +351,53 @@ Action Arena::native_act(int who, float /*dt*/) {
     return act;
 }
 
+// ---- the pre-R55 native port, for the diff (see the note in native_act) ----
+// Action Arena::native_act(int who, float /*dt*/) {
+//     // creature.gd essence: chase to reach, wind up, hit; kits off the rate gate.
+//     Action act{};
+//     Fighter& me = f_[who];
+//     Fighter& foe = f_[1 - who];
+//     if (me.windup_t > 0.0f || !foe.alive() || me.hp <= 0.0f) return act;
+//     // FAIRNESS: decide on the stale view, not on f_[]. Own state (windup,
+//     // cooldowns, position) stays live — fighter.gd's cmd_* resolve live too.
+//     const Percept p = percept(who);
+//     const math::Vec2 to_foe = (p.foe_pos - me.pos).normalized_or_zero();
+//     const float dist = p.foe_dist;
+//     const float reach = me.spec.attack_reach + p.foe_radius;
+//     if (me.spec.is_ranged) {
+//         // hold a 4-7 tile band, bolt on cooldown
+//         if (dist < 4.0f * kTile) act = {-to_foe.x, -to_foe.y, 0};
+//         else if (dist > 7.0f * kTile) act = {to_foe.x, to_foe.y, 0};
+//         if (me.attack_cd <= 0.0f && dist < 9.0f * kTile) act.act = 1;
+//     } else {
+//         if (dist > reach * 0.85f) act = {to_foe.x, to_foe.y, 0};
+//         if (me.attack_cd <= 0.0f && dist <= reach) act.act = 1;
+//     }
+//     // kits off cooldown, range-checked (fighter.gd's native driver)
+//     if (act.act == 0 && me.kit_gate <= 0.0f) {
+//         for (int i = 0; i < me.spec.kit_count; ++i) {
+//             if (me.kit_cd[i] <= 0.0f && dist <= me.spec.kits[i].range) {
+//                 act.act = 3 + i;
+//                 break;
+//             }
+//         }
+//     }
+//     return act;
+// }
+//
 Action Arena::scripted_act(int who, float dt) {
     // Port of scripted_policy.gd (the R1 baseline), same decision order.
     Action act{};
     Fighter& me = f_[who];
     Fighter& foe = f_[1 - who];
-    if (!foe.alive() || me.windup_t > 0.0f || me.hp <= 0.0f) return act;
+    // R55 (2026-09-19): a policy-driven body keeps WALKING through its own
+    // windup — fighter.gd::pre_tick moves it before creature.gd ticks _state,
+    // and scripted_policy.gd issues cmd_move every frame; only cmd_attack /
+    // cmd_special are refused meanwhile (bot_attack: `_state == "windup"`),
+    // which apply_action enforces. This returned an empty Action for the whole
+    // telegraph, freezing the body 0.35 s per swing:
+    // if (!foe.alive() || me.windup_t > 0.0f || me.hp <= 0.0f) return act;
+    if (!foe.alive() || me.hp <= 0.0f) return act;
     const Percept p = percept(who);      // FAIRNESS: the stale view, as above
     strafe_t_[who] -= dt;
     if (strafe_t_[who] <= 0.0f) {
@@ -513,12 +601,42 @@ void Arena::melee_hit(int who) {
     // only forward motion in that path, is a sprite pose tween that never
     // moves global_position.
     // const float reach = me.spec.attack_reach + tgt.radius + 0.3f * kTile;
+    //
+    // R55 (2026-09-19): creature.gd::_strike is shaped by the ARCHETYPE the
+    // bestiary entry gave the body (fighter.gd::setup -> setup_from_entry),
+    // and the arena's fen_boar/golem are brutes, its marsh_drake/serpent
+    // lungers. Every body used to get the stalker bite below.
+    if (me.spec.archetype == Archetype::kBrute) {
+        // brute: a GROUND SLAM — radial 2.2 tiles + target radius, no arc
+        // ("dodge OUT, not around"), same packet as the swing.
+        if ((tgt.pos - me.pos).length() > kSlamRadius + tgt.radius) return;
+        if (foe.dodge_t > 0.0f) return;    // i-frames
+        hurt(tgt, dmg, (tgt.pos - me.pos).normalized_or_zero());
+        return;
+    }
+    if (me.spec.archetype == Archetype::kLunger && me.pounce_pending) {
+        // lunger pounce: dash up to 3 tiles onto where the target WAS at the
+        // commit (`_pounce_target`), then the ordinary bite from the landing
+        // spot. creature.gd steps the dash through is_walkable; the arena's
+        // walkable set is the ring, so clamp_disc is that gate here.
+        me.pounce_pending = false;
+        math::Vec2 dash = me.pounce_target - me.pos;
+        const float dl = dash.length();
+        if (dl > 3.0f * kTile) dash = dash * (3.0f * kTile / dl);
+        me.pos = clamp_disc(me.pos + dash, me.spec.body_radius);
+    }
     const float reach = me.spec.attack_reach + tgt.radius;
     const math::Vec2 to_tgt = tgt.pos - me.pos;
     if (to_tgt.length() > reach) return;
     if (!in_arc(to_tgt, me.aim, me.spec.attack_arc_deg, tgt.radius)) return;
     if (foe.dodge_t > 0.0f) return;    // i-frames
     hurt(tgt, dmg, me.aim);
+    // Fiery affix: creature.gd::_strike follows the landed bite with
+    // `take_damage(damage * 0.5, _attack_dir, "fire")`. A String arg3 routes
+    // through proxy.gd's element branch — RAW damage on a creature body, no
+    // resist — and is booked as BOLT, not contact. Only this path carries it:
+    // the brute slam returns above, exactly as _strike does.
+    if (me.spec.fiery) hurt(tgt, dmg * 0.5f, me.aim, DmgSource::kBolt);
 }
 
 void Arena::exec_kit(int who, int slot) {
@@ -534,8 +652,16 @@ void Arena::exec_kit(int who, int slot) {
             for (int j = 0; j < 3; ++j) {
                 for (auto& p : projectiles_) {
                     if (p.alive) continue;
+                    // R55-b (2026-09-21): the fan is EXACT. fighter.gd::cmd_aim
+                    // is `if body is ProtoPlayer`, so a creature never reads
+                    // bot_aim at all, and _kit_exec fires down
+                    // (foe_pos - from).normalized() rotated by the fan angle and
+                    // nothing else. This added policy.gd's human-dispersion
+                    // noise to a body the arena never applies it to:
+                    // const float ang = (-12.0f + 12.0f * static_cast<float>(j)) *
+                    //                   kPi / 180.0f + gauss() * kAimNoise;
                     const float ang = (-12.0f + 12.0f * static_cast<float>(j)) *
-                                      kPi / 180.0f + gauss() * kAimNoise;
+                                      kPi / 180.0f;
                     const math::Vec2 dir{base.x * std::cos(ang) - base.y * std::sin(ang),
                                          base.x * std::sin(ang) + base.y * std::cos(ang)};
                     p = Projectile{me.pos, dir * kBoltSpeed,
@@ -620,7 +746,7 @@ void Arena::buddy_tick(int who) {
         me.pos2 = clamp_disc(me.pos2 + to_foe * (speed * kArenaDt),
                              me.buddy_spec.body_radius);
     } else if (me.attack_cd2 <= 0.0f) {
-        me.windup2_t = kWindup;
+        me.windup2_t = me.buddy_spec.windup_time;   // R55: per body; was kWindup
         me.attack_cd2 = me.buddy_spec.attack_cd;
         me.aim2 = to_foe.length() > 0.0f ? to_foe : math::Vec2{1.0f, 0.0f};
     }
@@ -683,7 +809,12 @@ void Arena::apply_action(int who, const Action& act) {
     // budget, every commit is refused and only movement survives the tick —
     // the same shape as can_commit() returning false in GDScript, except it is
     // enforced here because the learner's action arrives from outside.
-    if (!budget_ok(who & 1)) return;
+    // R55-b: the budget is policy.gd's rate cap and binds only a POLICY-driven
+    // body. A native body has no policy — creature.gd swings from its own state
+    // machine and fighter.gd::pre_tick fires its kits; neither ever reaches
+    // can_commit(). This capped an opponent the arena never caps:
+    // if (!budget_ok(who & 1)) return;
+    if (policy_driven && !budget_ok(who & 1)) return;
     switch (act.act) {
         case 1:
             if (me.attack_cd <= 0.0f && me.windup_t <= 0.0f) {
@@ -699,7 +830,7 @@ void Arena::apply_action(int who, const Action& act) {
                     // attack period attack_cd where the arena's is
                     // windup_time + attack_cd — 1.20 s against 1.55 s, i.e.
                     // 29% more swings per second for the same content.
-                    me.windup_t = kWindup;
+                    me.windup_t = me.spec.windup_time;   // R55: per body; was kWindup for all
                 }
                 committed = true;
             }
@@ -722,7 +853,7 @@ void Arena::apply_action(int who, const Action& act) {
                         melee_hit(who);
                         me.attack_cd = me.spec.attack_cd;
                     } else {
-                        me.windup_t = kWindup;
+                        me.windup_t = me.spec.windup_time;   // R55: per body; was kWindup for all
                     }
                     committed = true;
                 }
@@ -788,6 +919,9 @@ bool Arena::step(const Action& learner_act) {
             if (f_[i].windup_t <= 0.0f) {
                 melee_hit(i);
                 f_[i].attack_cd = f_[i].spec.attack_cd;   // _strike sets _cd
+                // _strike: `_state = "recover"; _timer = 0.4` — creature bodies
+                // only; player.gd has no such state (R55).
+                if (!f_[i].spec.is_player) f_[i].recover_t = kRecover;
             }
         }
     }
@@ -809,6 +943,7 @@ bool Arena::step(const Action& learner_act) {
     // 4. projectiles (storm bolts DETONATE mire fields: conduct combo §12.41)
     for (auto& p : projectiles_) {
         if (!p.alive) continue;
+        const math::Vec2 p_from = p.pos;   // this tick's travel, for the swept test
         p.pos += p.vel * kArenaDt;
         p.life -= kArenaDt;
         if (p.life <= 0.0f || p.pos.length() > kArenaRadius + kTile) { p.alive = false; continue; }
@@ -821,7 +956,7 @@ bool Arena::step(const Action& learner_act) {
                 if (victim.alive() && victim.dodge_t <= 0.0f &&
                     (victim.pos - f.pos).length() <= f.radius * 1.5f)
                     hurt({1 - f.owner, 0, victim.pos, victim.spec.body_radius},
-                         p.damage * 2.0f);
+                         p.damage * 2.0f, {}, DmgSource::kBolt);
                 f.alive = false;   // the field is consumed
                 p.alive = false;
                 break;
@@ -831,8 +966,27 @@ bool Arena::step(const Action& learner_act) {
         Fighter& foe = f_[1 - p.owner];
         if (foe.alive() && foe.dodge_t <= 0.0f) {
             const BodyRef tgt = nearest_enemy_body(p.owner, p.pos);
-            if ((tgt.pos - p.pos).length() <= tgt.radius + 2.0f) {
-                hurt(tgt, p.damage, p.vel.normalized_or_zero());
+            // projectile.gd: a SEGMENT-vs-circle test over the frame's travel
+            // ("poor man's CCD") with the bolt's own radius — 4 px, 3 for the
+            // arcane/storm tint. This was a point test at +2 px (R55):
+            // if ((tgt.pos - p.pos).length() <= tgt.radius + 2.0f) {
+            const math::Vec2 seg = p.pos - p_from;
+            const float seg2 = seg.x * seg.x + seg.y * seg.y;
+            float t = 0.0f;
+            if (seg2 > 0.0f) {
+                const math::Vec2 rel = tgt.pos - p_from;
+                t = (rel.x * seg.x + rel.y * seg.y) / seg2;
+                t = t < 0.0f ? 0.0f : (t > 1.0f ? 1.0f : t);
+            }
+            const math::Vec2 closest = p_from + seg * t;
+            // projectile.gd: `var radius := 4.0`, and the only setter that
+            // moves it is set_steel() (3.0) — the Rogue's fan of knives.
+            // set_arcane()/set_violet()/set_frost() are TINTS: a storm bolt is
+            // still 4 px wide. This shrank every storm bolt by a quarter:
+            // const float bolt_r = p.kind == FieldKind::kStorm ? 3.0f : 4.0f;
+            const float bolt_r = 4.0f;
+            if ((tgt.pos - closest).length() <= tgt.radius + bolt_r) {
+                hurt(tgt, p.damage, p.vel.normalized_or_zero(), DmgSource::kBolt);
                 p.alive = false;
             }
         }
@@ -855,7 +1009,7 @@ bool Arena::step(const Action& learner_act) {
             const float bhp = body == 0 ? foe.hp : foe.hp2;
             if (bhp <= 0.0f || (bpos - f.pos).length() >= f.radius + brad) continue;
             if (f.dps > 0.0f) {
-                hurt({1 - f.owner, body, bpos, brad}, f.dps * kFieldTick);
+                hurt({1 - f.owner, body, bpos, brad}, f.dps * kFieldTick, {}, DmgSource::kField);
                 if (body == 0) foe.burn_t = 0.5f;
             }
             if (f.kind == FieldKind::kMire) {
@@ -874,6 +1028,7 @@ bool Arena::step(const Action& learner_act) {
         me.enrage_t = me.enrage_t > kArenaDt ? me.enrage_t - kArenaDt : 0.0f;
         me.dodge_t = me.dodge_t > kArenaDt ? me.dodge_t - kArenaDt : 0.0f;
         me.kit_gate = me.kit_gate > kArenaDt ? me.kit_gate - kArenaDt : 0.0f;
+        me.recover_t = me.recover_t > kArenaDt ? me.recover_t - kArenaDt : 0.0f;
         for (int k = 0; k < 4; ++k)
             me.kit_cd[k] = me.kit_cd[k] > kArenaDt ? me.kit_cd[k] - kArenaDt : 0.0f;
         if (me.dodge_charges < me.spec.dodge_max) {

@@ -838,7 +838,7 @@ Rebuild after the packaging commit for clean provenance; archives remain in
 
   | R52 | NOW / details RECEIVED 2026-09-19 (block below) | A NEW asset generator: hi-fi dark-fantasy pixel-art SPRITES in the Dead Cells / Phantom Tower register — master prompt + mandatory negative prompt + five rendering pillars, recorded verbatim below. Benchmarked against "astra". | genforge; art/ style bible; Godot CanvasTexture normal/emissive channels; queued AFTER the R50 build order (Ricardo's stated order) |
   | R53 | NOW | A brief `.md` in the REPO ROOT explaining the hyperparameter changes (masking, greedy eval/promotion, β + move-std annealing, reversible promotion, snapshot reservoir, plateau stop). | `TRAINING_HYPERPARAMETERS.md` at the root |
-  | R55 | NOW / next RL step (found 2026-09-19 by the R50 run) | The converged nets win in dh-env and lose in the arena on the SAME greedy decode (cinder_drake greedy 0.94 in training vs 0.25 in the 4-episode arena gate; bog_golem 0.86 vs 0.25). Measure the dh-env→arena outcome gap per creature with ≥32 episodes (an `env_parity`-style harness over OUTCOMES, not policy terms), find the divergence, then best-greedy checkpoint export and a second documented run. Also raise the gate's episode count — 4 cannot separate 0.6 from 0.9. | tech/39 (2026-09-19_1015 bullet), tech/25 §5.1.5, `ml/eval/env_parity.py`, `ml/eval/gate.py --episodes` |
+  | R55 | **LARGELY CLOSED 2026-09-21** (tech/39 §2, R55-b rows): four divergences found by DAMAGE-BY-SOURCE in the first 10 s — (1) the **Fiery elite affix** was absent from the sim (`_strike` lands a second packet of half the swing as a "fire" element string, booked as BOLT: 25 of the 27 bolt points cinder_drake was missing per 10 s), (2) the **native kit driver** wrote into the single `act` slot instead of running on its own channel, so it was silent for the 55% of frames a body spends frozen in windup/recover, (3) the kit bolt fan carried **aim noise** `cmd_aim` never applies to a creature, (4) **storm bolts were 3.0 px** where `projectile.gd` says 4.0. Plus a harness bug: `env_parity` ran the arena on a 45 s clock and dh-env on 68.3 s. Matrix worst ratio **3.17 → 1.93**; the ranged-kit natives that drove the finding are closed (cinder_drake taken/s 2.31 → **1.01**, mire_serpent 2.06 → **1.02**, grave_shade 3.17 → 1.48). **Residual:** vs a SCRIPTED opponent the totals agree per channel but the fight runs ~1.8× longer in dh-env — the endgame, not the exchange (96% of the damage lands in the first 10 s, the last 4% takes another ten). Next: port `creature.gd::_separate(delta)` body separation (the arena has it, the sim does not), re-run the matrix at 64 eps, then retrain | LOCALIZED 2026-09-19 (tech/39 §2 matrix): physics at parity (melee/wisp natives and the policy's own bolts agree); the two OPPONENT DRIVER ports in `arena.cpp` diverge — `native_tick` under-uses ranged kits on ground bodies (drake/serpent/shade take 2–3× less in dh-env), `scripted_tick` engages at half the arena's exchange rate on every body. Fix both ports against `fighter.gd`/`scripted_policy.gd`, re-run the matrix, retrain | The converged nets win in dh-env and lose in the arena on the SAME greedy decode (cinder_drake greedy 0.94 in training vs 0.25 in the 4-episode arena gate; bog_golem 0.86 vs 0.25). Measure the dh-env→arena outcome gap per creature with ≥32 episodes (an `env_parity`-style harness over OUTCOMES, not policy terms), find the divergence, then best-greedy checkpoint export and a second documented run. Also raise the gate's episode count — 4 cannot separate 0.6 from 0.9. | tech/39 (2026-09-19_1015 bullet), tech/25 §5.1.5, `ml/eval/env_parity.py`, `ml/eval/gate.py --episodes` |
   | R54 | NOW / standing | Properly document EVERY experiment with its hyperparameters — a ledger, not prose: run id, knobs, result, verdict, kept or not. Every past run that can still be reconstructed goes in too. | `docs/tech/39-experiment-ledger.md`; `tools/train_run.sh` already records `config.json` per run — the ledger indexes them |
 
   **R50 DECISION (2026-09-19): Option A with masking, measured against B at the
@@ -3113,3 +3113,82 @@ Every new ask lands here the moment it arrives; work oldest NOW first.
 - **UE 5.4 install** (~45 GB + Epic account) → `rebirth/unreal/INSTALL.md`.
 - **`sudo apt install python3.10-venv`** (workaround active).
 - **Play the slices for feel** — gates prove loops, not fun.
+### NEW BATCH — Ricardo, 2026-09-21 (verbatim demands, unstarted)
+
+Logged the moment they arrived, per the roadmap rule. Nothing here has been
+touched yet; R56–R60 are bugs and go first.
+
+**Bugs / correctness (do first)**
+
+- **R56 — GPU processes are not ended properly after training in the console.**
+  Training launched from the arena console leaves GPU work alive. Find the
+  owner (`game/arena/console.gd` → `tools/train_*.sh` → the python trainer),
+  make the console's stop path reap the whole process group and free VRAM, and
+  prove it with `nvidia-smi` before/after. Ricardo runs arenas on LOCAL GPUs —
+  a leaked trainer costs him the next run.
+- **R57 — every captured mob turns into a gloamfen stalker.** Capture/bond
+  collapses the captured species to one body. WANTED: maximum variety — every
+  species keeps its own chassis, AND **bosses are capturable as mini-pet
+  versions** with their signature skills ("sick string skills") that help you
+  in a fight, **levelling alongside the player**. Related: NEXT #6 (bond works
+  with ALL creatures) and R64 (pet levels/skills) — R57 is the bug at the root
+  of all three.
+- **R58 — the HP potion does not heal over 2 s.** It is supposed to be a
+  heal-over-time, not an instant top-up. Fix the potion path and cover it with
+  a probe (there is already `game/prototype/tests/flask_probe.gd`).
+- **R59 — creatures do not collide with the player.** They stand *on top of*
+  the player, where he cannot hit them. Ricardo: "bizarre stuff and a bit
+  annoying." Give creature-vs-player the separation creature-vs-creature
+  already has (`creature.gd::_separate`). **Note (2026-09-21):** this is the
+  SAME missing separation the sim is short of — see R55's residual, where
+  `_separate` is the next thing to port into `sim/`. One fix, two payoffs.
+- **R60 — the arena console lost its value labels** (generation etc. — the
+  boxes render without their captions), **and the interface must be legible at
+  20 M-step values.** Training numbers are in the tens of millions now; the
+  console's fields were sized for smoke runs. Format with thousands separators
+  / SI suffixes and widen the boxes.
+- **R61 — bosses are not spawning randomly among new hordes while exploring.**
+  World generation places boss lairs but the roaming-horde path never rolls a
+  boss. Ricardo expects to meet them out in the map, not only at lairs.
+
+**Content volume (the standing "more of everything")**
+
+- **R62 — more of every content axis:** creatures, bosses, loot, skills, pets,
+  mechanics, **and potion enchanting with special effects**. Data-only work by
+  canon §10 — new `pack.type.name` ids validated against `content/schemas/`,
+  no engine change. Potion enchanting is the one new SYSTEM in this line.
+- **R63 — better skill design and playability; probably MORE skills, to make
+  combat more dynamic.** Ricardo's read is that the current kit is too static.
+- **R64 — visual cues for skill cooldowns.** HUD work; pairs with R63.
+- **R65 — pet levels and pet skills**, so a pet scales with the player instead
+  of falling off. Depends on R57 (variety) landing first.
+- **R66 — item scaling** pass. Previously audited (2026-09-12 section above);
+  this is Ricardo asking for it again against the current numbers.
+- **R67 — mob kill counter → streak rewards.** A running kill counter grants
+  bonus gold and XP, and when a streak ENDS on the timer after a LOT of kills,
+  **a chest drops from the sky with legendary loot.** Streak length decides the
+  tier.
+
+**Events, bosses and questlines (the big one)**
+
+- **R68 — multi-boss events (2, 3, 4, 5+).** Named examples from Ricardo:
+  *Giant Graveyard* (seven giants), *Dragon Nest* (baby dragons + adult
+  dragons).
+- **R69 — the DRAGON COUNCIL.** The headline event, and explicitly bigger than
+  the rest: **12 legendary interdimensional dragons join forces to kill you**.
+  Structured as a dungeon/questline, not an arena fight — you face 12 councils,
+  some in COUPLES with combo mechanics, some alone with special skill
+  mechanics. These are the **10+-skill mythical / celestial / demonic** bosses.
+  Defeating all 12 unlocks special loot + a mechanic + a skill. Near-RAID
+  difficulty, gated behind prior ARTIFACTS that open the council dimension, and
+  meant to take real time to unlock.
+- **R70 — bot "player" events.** Bot players act as **mercenaries hired under
+  your bounty**, and bot players go **bounty hunting YOU** — raising and
+  spending your own bounty. This is the leaderboard system already queued at
+  NEXT #6g; R70 is the PvE-facing half of it.
+- **R71 — questline themes** beyond the council: mercenary hunt contracts,
+  political sabotage, underground-city business, political power disputes,
+  wars, conflicting interests, powerful-people scandals. Feeds
+  `docs/design/28-living-world-and-weekly-lore.md` and the weekly-lore
+  generator.
+

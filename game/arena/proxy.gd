@@ -72,7 +72,9 @@ func take_damage(dmg: float, from_dir: Vector2, arg3: Variant = Color("cfd6ff"),
 	else:
 		owner_fighter.take_damage(dmg, from_dir, arg3, crit)
 	if fighter != null:
-		fighter.note_damage_taken(dmg)
+		# a String arg3 is an element packet = a projectile (or a player-style
+		# swing, which no creature-league build throws); a Color is contact
+		fighter.note_damage_taken(dmg, "bolt" if arg3 is String else "contact")
 
 func dot_damage(dmg: float, num_color := Color("ff9a3c")) -> void:
 	if dead:
@@ -82,7 +84,7 @@ func dot_damage(dmg: float, num_color := Color("ff9a3c")) -> void:
 	else:
 		owner_fighter.take_damage(dmg, Vector2.ZERO, "status")
 	if fighter != null:
-		fighter.note_damage_taken(dmg)
+		fighter.note_damage_taken(dmg, "field")
 
 func knockback(vec: Vector2) -> void:
 	if not dead:

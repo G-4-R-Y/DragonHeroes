@@ -1,39 +1,47 @@
 {
   "builds": {
     "core.arena.ashwing_matriarch": {
+      "archetype": "stalker",
       "attack_cd": 1.6,
       "attack_reach": 38.4,
       "body_radius": 20.0,
       "damage": 34.5399997197092,
       "dodge_max": 0,
+      "fiery": false,
       "is_player": false,
       "is_ranged": false,
       "kind": "boss",
       "kits": [],
       "max_hp": 1925.99997706711,
       "move_speed": 88.0,
-      "special_cd": 6.0
+      "special_cd": 6.0,
+      "windup_time": 0.4
     },
     "core.arena.bloodwarrant": {
+      "archetype": "stalker",
       "attack_cd": 0.4,
       "attack_reach": 35.2,
       "body_radius": 8.0,
-      "damage": 148.2888,
+      "damage": 127.7724,
       "dodge_max": 3,
+      "fiery": false,
       "is_player": true,
       "is_ranged": false,
       "kind": "player",
       "kits": [],
-      "max_hp": 407.0,
+      "max_hp": 408.0,
       "move_speed": 94.4,
-      "special_cd": 4.0
+      "special_cd": 4.0,
+      "windup_time": 0.35
     },
     "core.arena.bog_golem": {
+      "archetype": "brute",
       "attack_cd": 1.8,
       "attack_reach": 28.8,
       "body_radius": 15.985,
       "damage": 30.8709798898287,
       "dodge_max": 0,
+      "fiery": false,
       "is_player": false,
       "is_ranged": false,
       "kind": "creature",
@@ -53,14 +61,17 @@
       ],
       "max_hp": 906.163194422722,
       "move_speed": 40.32,
-      "special_cd": 6.0
+      "special_cd": 6.0,
+      "windup_time": 0.55
     },
     "core.arena.cinder_drake": {
+      "archetype": "lunger",
       "attack_cd": 0.9,
       "attack_reach": 28.8,
       "body_radius": 9.84,
       "damage": 11.4620799590945,
       "dodge_max": 0,
+      "fiery": true,
       "is_player": false,
       "is_ranged": false,
       "kind": "creature",
@@ -80,28 +91,34 @@
       ],
       "max_hp": 120.556799257994,
       "move_speed": 107.532,
-      "special_cd": 6.0
+      "special_cd": 6.0,
+      "windup_time": 0.22
     },
     "core.arena.dusk_revenant": {
+      "archetype": "stalker",
       "attack_cd": 0.25,
       "attack_reach": 28.8,
       "body_radius": 8.0,
-      "damage": 61.36128,
+      "damage": 84.51648,
       "dodge_max": 3,
+      "fiery": false,
       "is_player": true,
       "is_ranged": false,
       "kind": "player",
       "kits": [],
-      "max_hp": 299.2,
-      "move_speed": 128.0,
-      "special_cd": 4.5
+      "max_hp": 273.7,
+      "move_speed": 128.8,
+      "special_cd": 4.5,
+      "windup_time": 0.35
     },
     "core.arena.fen_boar_alpha": {
+      "archetype": "brute",
       "attack_cd": 1.8,
       "attack_reach": 28.8,
       "body_radius": 13.915,
       "damage": 31.0125898893233,
       "dodge_max": 0,
+      "fiery": false,
       "is_player": false,
       "is_ranged": false,
       "kind": "creature",
@@ -121,28 +138,34 @@
       ],
       "max_hp": 468.813597114533,
       "move_speed": 41.832,
-      "special_cd": 6.0
+      "special_cd": 6.0,
+      "windup_time": 0.55
     },
     "core.arena.fenwitch_hag": {
+      "archetype": "stalker",
       "attack_cd": 1.8,
       "attack_reach": 28.8,
       "body_radius": 12.0,
       "damage": 21.9799998216331,
       "dodge_max": 0,
+      "fiery": false,
       "is_player": false,
       "is_ranged": false,
       "kind": "boss",
       "kits": [],
       "max_hp": 1112.79998674989,
       "move_speed": 67.2,
-      "special_cd": 6.0
+      "special_cd": 6.0,
+      "windup_time": 0.4
     },
     "core.arena.gloam_wisp": {
+      "archetype": "stalker",
       "attack_cd": 1.2,
       "attack_reach": 28.8,
       "body_radius": 7.65,
       "damage": 12.4949999554083,
       "dodge_max": 0,
+      "fiery": false,
       "is_player": false,
       "is_ranged": false,
       "kind": "creature",
@@ -162,14 +185,17 @@
       ],
       "max_hp": 117.57599927634,
       "move_speed": 75.6,
-      "special_cd": 6.0
+      "special_cd": 6.0,
+      "windup_time": 0.35
     },
     "core.arena.gloamfen_stalker": {
+      "archetype": "stalker",
       "attack_cd": 0.9,
       "attack_reach": 28.8,
       "body_radius": 8.73,
       "damage": 19.3255999310315,
       "dodge_max": 0,
+      "fiery": false,
       "is_player": false,
       "is_ranged": false,
       "kind": "creature",
@@ -189,14 +215,17 @@
       ],
       "max_hp": 162.287999001145,
       "move_speed": 108.864,
-      "special_cd": 6.0
+      "special_cd": 6.0,
+      "windup_time": 0.35
     },
     "core.arena.grave_shade": {
+      "archetype": "stalker",
       "attack_cd": 1.2,
       "attack_reach": 28.8,
       "body_radius": 8.37,
       "damage": 13.9943999500573,
       "dodge_max": 0,
+      "fiery": false,
       "is_player": false,
       "is_ranged": false,
       "kind": "creature",
@@ -216,14 +245,17 @@
       ],
       "max_hp": 139.103999143839,
       "move_speed": 75.6,
-      "special_cd": 6.0
+      "special_cd": 6.0,
+      "windup_time": 0.35
     },
     "core.arena.mire_serpent": {
+      "archetype": "lunger",
       "attack_cd": 0.675,
       "attack_reach": 28.8,
       "body_radius": 9.68,
       "damage": 13.4612799519599,
       "dodge_max": 0,
+      "fiery": false,
       "is_player": false,
       "is_ranged": false,
       "kind": "creature",
@@ -243,77 +275,93 @@
       ],
       "max_hp": 115.174799291119,
       "move_speed": 160.776,
-      "special_cd": 6.0
+      "special_cd": 6.0,
+      "windup_time": 0.22
     },
     "core.arena.pale_concord": {
+      "archetype": "stalker",
       "attack_cd": 0.4,
       "attack_reach": 35.2,
       "body_radius": 8.0,
-      "damage": 102.835392,
+      "damage": 57.25528,
       "dodge_max": 3,
+      "fiery": false,
       "is_player": true,
       "is_ranged": false,
       "kind": "player",
       "kits": [],
-      "max_hp": 418.6,
+      "max_hp": 503.7,
       "move_speed": 93.6,
-      "special_cd": 4.0
+      "special_cd": 4.0,
+      "windup_time": 0.35
     },
     "core.arena.pyre_justiciar": {
+      "archetype": "stalker",
       "attack_cd": 0.4,
       "attack_reach": 35.2,
       "body_radius": 8.0,
-      "damage": 104.832,
+      "damage": 113.568,
       "dodge_max": 3,
+      "fiery": false,
       "is_player": true,
       "is_ranged": false,
       "kind": "player",
       "kits": [],
-      "max_hp": 331.2,
-      "move_speed": 97.6,
-      "special_cd": 4.0
+      "max_hp": 338.4,
+      "move_speed": 96.8,
+      "special_cd": 4.0,
+      "windup_time": 0.35
     },
     "core.arena.pyre_sovereign": {
+      "archetype": "stalker",
       "attack_cd": 1.7,
       "attack_reach": 41.6,
       "body_radius": 22.0,
       "damage": 47.0999996177852,
       "dodge_max": 0,
+      "fiery": false,
       "is_player": false,
       "is_ranged": false,
       "kind": "boss",
       "kits": [],
       "max_hp": 3637.99995668232,
       "move_speed": 92.8,
-      "special_cd": 6.0
+      "special_cd": 6.0,
+      "windup_time": 0.42
     },
     "core.arena.stormwarrant": {
+      "archetype": "stalker",
       "attack_cd": 0.55,
       "attack_reach": 35.2,
       "body_radius": 8.0,
-      "damage": 78.08,
+      "damage": 63.96,
       "dodge_max": 3,
+      "fiery": false,
       "is_player": true,
       "is_ranged": true,
       "kind": "player",
       "kits": [],
-      "max_hp": 203.2,
-      "move_speed": 100.8,
-      "special_cd": 5.0
+      "max_hp": 224.8,
+      "move_speed": 98.4,
+      "special_cd": 5.0,
+      "windup_time": 0.35
     },
     "core.arena.terravore_colossus": {
+      "archetype": "stalker",
       "attack_cd": 2.2,
       "attack_reach": 44.8,
       "body_radius": 26.0,
       "damage": 53.3799995668232,
       "dodge_max": 0,
+      "fiery": false,
       "is_player": false,
       "is_ranged": false,
       "kind": "boss",
       "kits": [],
       "max_hp": 4921.99994139373,
       "move_speed": 44.8,
-      "special_cd": 6.0
+      "special_cd": 6.0,
+      "windup_time": 0.6
     }
   },
   "field_kind_ids": {
@@ -323,6 +371,6 @@
     "mire": 2
   },
   "level": 20,
-  "note": "GENERATED by game/arena/tools/dump_specs.gd — do not hand-edit",
+  "note": "GENERATED by game/arena/tools/dump_specs.gd \u2014 do not hand-edit",
   "schema": "arena.specs.v1"
 }
