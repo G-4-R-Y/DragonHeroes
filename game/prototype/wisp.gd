@@ -65,7 +65,11 @@ func _chase(delta: float, player: Node2D) -> void:
 		_move(dir * _speed() * delta)
 	else:
 		_move(dir.orthogonal() * _speed() * 0.5 * delta)
-	_separate(delta)
+	# R59 (2026-09-21): separation is ProtoCreature._physics_process's job now —
+	# every tick, every state, not only while _chase runs. A wisp that is winding
+	# up its bolt used to stop pushing entirely, which is precisely when a pack
+	# of them stacks into one orb. Old line kept for the record:
+	# _separate(delta)
 	if not arena_duel and dist > aggro_range * 2.2:   # a duel has no disengage
 		_state = "idle"
 

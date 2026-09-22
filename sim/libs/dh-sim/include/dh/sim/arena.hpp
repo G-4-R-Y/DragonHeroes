@@ -330,6 +330,11 @@ class Arena {
     void hurt(const BodyRef& ref, float dmg, math::Vec2 from_dir = {},
               DmgSource src = DmgSource::kContact);
     math::Vec2 clamp_disc(math::Vec2 p, float margin) const;
+    // R59 (2026-09-21): creature.gd::_separate — every live creature body
+    // pushes itself out of an overlap with every other live body, faster when
+    // the other one is a player. See the definition in arena.cpp for why both
+    // runtimes were missing it until now.
+    void separate_bodies();
     float gauss();                       // Box-Muller on the policy stream
 
     Fighter f_[2];

@@ -383,6 +383,21 @@ func _physics_process(delta: float) -> void:
 			_timer -= delta
 			if _timer <= 0.0:
 				_state = "chase"
+	# R59: every living, un-staggered body pushes off the PLAYER every tick —
+	# chasing, winding up, recovering, or driven by a policy in the arena. That
+	# is the bug Ricardo hit, and it is cheap: the "player" group holds one or
+	# two nodes. A staggered body deliberately does not move at all: stagger is
+	# CC. The O(n^2) creature-vs-creature pass is gated below.
+	_separate_player(delta)
+	# Creature-vs-creature is quadratic over a field capped at 120 bodies, so it
+	# stays off for a sleeping one — that is the cost profile this file has
+	# always had, since the only old call site was _chase. What changes is that
+	# windup and recover now count as awake (a pile forms exactly while everyone
+	# is mid-swing), and that an ARENA body always counts: bot_drive parks
+	# `_state` at "idle" forever, and dh-sim separates all four duel bodies
+	# unconditionally, so gating on _state alone would break runtime parity.
+	if bot_drive or _state != "idle":
+		_separate_creatures(delta)
 	_update_anim()
 	_refresh_health_drawing()
 
@@ -486,7 +501,11 @@ func _chase(delta: float, player: Node2D) -> void:
 		_begin_windup(to_player.normalized())
 		return
 	_move(to_player.normalized() * _speed() * delta)
-	_separate(delta)
+	# R59 (2026-09-21): separation moved to _physics_process. Calling it here
+	# meant it ran ONLY while chasing, and _chase returns above the moment the
+	# body is inside attack_reach * 0.9 — i.e. it switched off at exactly the
+	# distance where bodies pile up. Old line kept for the record:
+	# _separate(delta)   # (split into _separate_player / _separate_creatures)
 	if not arena_duel and to_player.length() > aggro_range * 1.8:
 		_state = "idle"
 
@@ -627,16 +646,50 @@ func _move(step: Vector2) -> void:
 		global_position = target
 		_step_accum += step
 
-func _separate(delta: float) -> void:
+# R59 (2026-09-21, Ricardo: "make sure creatures collide with the player, so
+# they are not right on top of me in a way I can't hit them (bizarre stuff and a
+# bit annoying)"). Two bugs sat here:
+#   (a) only the "creatures" group was iterated, so nothing ever pushed a body
+#       off the hero — it could sit inside him, under the swing arc, forever;
+#   (b) the call site was _chase, which returns before it inside attack_reach,
+#       so separation was off at the one distance that needs it.
+# Each body pushes only ITSELF. Two creatures therefore resolve symmetrically
+# (both run this), while creature-vs-player is one-sided on purpose: the hero
+# keeps authority over his own position, which is what "so I can hit them"
+# means — he is never shoved out of his own swing.
+const SEPARATE_RATE := 4.0          # /s, creature vs creature (unchanged)
+const SEPARATE_RATE_PLAYER := 12.0  # /s, vs the player: the overlap that made
+                                    # him unable to connect must clear fast
+
+func _separate_creatures(delta: float) -> void:
 	for other in get_tree().get_nodes_in_group("creatures"):
 		if other == self or other.dead:
 			continue
-		var d: Vector2 = global_position - other.global_position
-		var min_d: float = body_radius + other.body_radius
-		var distance_squared := d.length_squared()
-		if distance_squared < min_d * min_d and distance_squared > 0.0001:
-			var distance := sqrt(distance_squared)
-			_move(d / distance * (min_d - distance) * 4.0 * delta)
+		_push_off(other.global_position, other.body_radius, SEPARATE_RATE, delta)
+
+# The player — and, in an arena duel, the opposing player build — is a body too.
+# The "player" group is NOT homogeneous: it holds ProtoPlayer in a hunt, an
+# MpPuppet for the local hunter on a client (mp/client_hunt.gd), and in three
+# probe harnesses a bare Node2D that exists only to give ProtoWorld a streaming
+# focus. So duck-type it: a body whose radius we cannot read is a body we cannot
+# push off. Reading `who.body_radius` directly raised "Invalid get index" every
+# tick under residency_probe and took the whole _physics_process down with it.
+func _separate_player(delta: float) -> void:
+	for who in get_tree().get_nodes_in_group("player"):
+		if who == self:
+			continue
+		var radius = who.get("body_radius")   # null when the property is absent
+		if radius == null or who.get("dead"):
+			continue
+		_push_off(who.global_position, radius, SEPARATE_RATE_PLAYER, delta)
+
+func _push_off(from: Vector2, other_radius: float, rate: float, delta: float) -> void:
+	var d: Vector2 = global_position - from
+	var min_d: float = body_radius + other_radius
+	var distance_squared := d.length_squared()
+	if distance_squared < min_d * min_d and distance_squared > 0.0001:
+		var distance := sqrt(distance_squared)
+		_move(d / distance * (min_d - distance) * rate * delta)
 
 # Ignite (runes + class skills): refreshes the burn each application, but a
 # weaker proc never erases a stronger burn's dps (same rule as Bleed stacks).

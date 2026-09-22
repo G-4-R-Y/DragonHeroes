@@ -707,7 +707,14 @@ func on_duo_boss_died(b: ProtoDuoBoss) -> void:
 func on_legendary_died(b) -> void:
 	_route_death(b)
 
-func on_player_death() -> void:
+# player.gd calls `main.on_player_death(self)` — it has passed the dying body
+# since v0.3.0 (MP: remote hunters die on the host too), and main.gd's signature
+# is `on_player_death(who = null)`. The arena's copy took no argument, so every
+# player-build death in a duel raised `Invalid call ... Expected 0 argument(s)`
+# and the hook never ran; the episode only ended later, through _route_death.
+# Optional, not required, so a 0-arg caller still works. (2026-09-21, found by
+# the arena selftest while gating R59.)
+func on_player_death(_who = null) -> void:
 	for f in _fighters:
 		if is_instance_valid(f) and f.is_dead():
 			_end_episode(f.enemy)

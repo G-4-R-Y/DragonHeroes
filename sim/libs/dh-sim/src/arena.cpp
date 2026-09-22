@@ -32,6 +32,12 @@ constexpr float kDodgeDash = 3.5f * kTile;
 constexpr float kDodgeRegen = 4.0f;
 constexpr float kAimNoise = 0.06f;    // policy.gd AIM_NOISE_RAD
 constexpr float kPi = 3.14159265358979f;
+// R59 (2026-09-21): creature.gd::_separate — body separation. Each creature
+// pushes only ITSELF out of an overlap, so two creatures resolve symmetrically
+// (both run it) and creature-vs-player is one-sided: ProtoPlayer has no
+// _separate, and the hero must never be shoved out of his own swing.
+constexpr float kSeparateRate = 4.0f;          // /s, creature vs creature
+constexpr float kSeparateRatePlayer = 12.0f;   // /s, creature vs a player body
 
 float clampf(float v, float lo, float hi) { return v < lo ? lo : (v > hi ? hi : v); }
 
@@ -897,6 +903,47 @@ void Arena::apply_action(int who, const Action& act) {
     if (committed) note_commit_time(who & 1);
 }
 
+// creature.gd::_separate, ported verbatim in rule and in constants. Up to four
+// bodies live in a duel (two fighters, each with an optional buddy); a creature
+// pushes off every OTHER live body, at the creature rate or, when the other one
+// is a player, at the faster one. Sequential and in place, the same way Godot
+// runs each creature's _physics_process one after another against already-moved
+// neighbours. Until 2026-09-21 NEITHER runtime ran this in a duel — the arena
+// only called _separate from _chase, and an arena body is bot_drive, so it never
+// chases — which is why adding it to creature.gd required adding it here too.
+void Arena::separate_bodies() {
+    struct Body {
+        math::Vec2* pos;
+        float radius;
+        bool is_player;
+        bool live;
+    };
+    Body b[4] = {
+        {&f_[0].pos,  f_[0].spec.body_radius,       f_[0].spec.is_player,
+         f_[0].hp > 0.0f},
+        {&f_[0].pos2, f_[0].buddy_spec.body_radius, f_[0].buddy_spec.is_player,
+         f_[0].has_buddy && f_[0].hp2 > 0.0f},
+        {&f_[1].pos,  f_[1].spec.body_radius,       f_[1].spec.is_player,
+         f_[1].hp > 0.0f},
+        {&f_[1].pos2, f_[1].buddy_spec.body_radius, f_[1].buddy_spec.is_player,
+         f_[1].has_buddy && f_[1].hp2 > 0.0f},
+    };
+    for (int i = 0; i < 4; ++i) {
+        if (!b[i].live || b[i].is_player) continue;   // ProtoPlayer has no _separate
+        for (int j = 0; j < 4; ++j) {
+            if (i == j || !b[j].live) continue;
+            const math::Vec2 d = *b[i].pos - *b[j].pos;
+            const float min_d = b[i].radius + b[j].radius;
+            const float d2 = d.length_sq();
+            if (d2 >= min_d * min_d || d2 <= 0.0001f) continue;
+            const float dist = std::sqrt(d2);
+            const float rate = b[j].is_player ? kSeparateRatePlayer : kSeparateRate;
+            const float push = (min_d - dist) * rate * kArenaDt / dist;
+            *b[i].pos = clamp_disc(*b[i].pos + d * push, b[i].radius);
+        }
+    }
+}
+
 bool Arena::step(const Action& learner_act) {
     if (done()) return true;
     const math::Vec2 prev[2] = {f_[0].pos, f_[1].pos};
@@ -925,6 +972,12 @@ bool Arena::step(const Action& learner_act) {
             }
         }
     }
+    // 2b. body separation (R59). In creature.gd this is the last thing
+    // _physics_process does, after the state machine has resolved the windup —
+    // so it sits here, after step 2 and before the slams, not next to movement.
+    // A STAGGERED body is deliberately exempt there (stagger is CC, it must not
+    // drift); the sim has no stagger, so there is nothing to exempt.
+    separate_bodies();
     // 3. pending slams
     for (auto& pd : pending_) {
         if (!pd.alive) continue;

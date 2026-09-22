@@ -91,6 +91,58 @@ loads them at runtime (`RbGlb`), native ingests `.dhm`, UE gets
 Blocked for a REAL mesh on the same thing as the parent: a valid concept
 render (Ricardo's local image repo → `GENFORGE_IMAGE_BACKEND=local`).
 
+### 3.1 R72 — "meshy + blender + unreal: is it a natural stepup?" (answered 2026-09-21)
+
+Ricardo, 2026-09-21: *"people are using a pipeline with meshy + blender +
+unreal for game dev, is it a natural stepup? perhaps that's what we were
+looking for when testing out the experiments with 3d stuff. Later we will make
+a boss fight to test out the concept."*
+
+**Judgement: two of those three stations already exist here; the one we are
+actually missing is Blender. And the version of the pipeline worth building
+points back at the 2D game, not away from it.**
+
+- **Meshy is not a step up — it is a provider swap behind a seam we already
+  built.** `genforge/pipeline/mesh_gen.py` defines a `MeshProvider` protocol, a
+  `get_mesh_provider()` registry with five implementations and an `_AUTO_ORDER`
+  of `hunyuan3d → trellis → hunyuan3d-mini → triposr`. Only TripoSR is actually
+  installed (`~/tools/TripoSR`). A `MeshyProvider` is a ~100-line adapter plus a
+  credit card, available any day. So the decision is never "adopt Meshy" as a
+  pipeline; it is "is draft-tier local good enough for THIS asset" — answered
+  per asset. Note the cost asymmetry: TripoSR on the RTX 4050 is free, Meshy
+  bills per generation, and we already parked one hosted GPU tier for exactly
+  that reason (`genforge/service/mesh_cloudrun/PARKED.md`, 2026-09-10).
+- **Unreal is not blocked on tooling.** `rebirth/unreal/` is CODE COMPLETE and
+  UNCOMPILED — no UE on the box, install needs Ricardo's Epic account
+  (`unreal/INSTALL.md`, and §4.2 below). Putting Meshy upstream moves that zero.
+- **Blender is the genuine gap, and it is the free one.** `gen_assets.py` goes
+  concept → `mesh_gen` → GLB → stage-per-engine with NO cleanup station: no
+  retopo, no UV, no rig, no LOD, no bake. Every image-to-3D model on the market,
+  Meshy included, emits dense, badly-topologised, unrigged meshes. Headless
+  Blender (`blender --background --python`) is the scriptable, free, local fix,
+  and it is the piece with no substitute. **Not installed here yet.**
+
+**The pushback.** Meshy → Blender → *Unreal* is a 3D-game pipeline, and Dragon
+Heroes ships 2D pixel art (canon §1/§6/§12.27 — `rebirth/` is explicitly not a
+direction change). The pipeline that feeds the SHIPPING game is `genforge.hifi`,
+the Dead Cells / Phantom Tower sprite generator. So the step up actually worth
+taking is **mesh (Meshy or TripoSR) → Blender → render to sprite sheets → the 2D
+game** — which is how Dead Cells itself was made: 3D models, animated, rendered
+down to pixels. That path buys the one thing a pure-2D image generator cannot
+give: rotational and animation consistency, exactly what breaks when you ask an
+image model for the same creature at eight angles across twelve frames. And a
+64–128 px sprite hides most of what is wrong with a draft-tier mesh — which is
+why TripoSR may well be sufficient there while being nowhere near sufficient for
+Nanite/Lumen.
+
+**The boss fight (the concept test Ricardo asked for).** Build it in
+`godot3d/` — the only slice that RUNS + GATED + CAPTURED today — unless UE gets
+installed, in which case Unreal, since it is already the plan's PICK. The thing
+under test is the ASSET PIPELINE, not the renderer, so the engine is the cheap
+variable. Order of work: install Blender → add a `blender_clean` stage to
+`gen_assets.py` (decimate, UV, origin, scale, LOD) → a turntable/sprite-sheet
+renderer behind the same stage → one boss through it end to end → the fight.
+
 ## 4. Open decisions for Ricardo
 
 1. **Godot renderer.** The slice runs gl_compatibility (agent shell). The

@@ -64,7 +64,10 @@ func _chase(delta: float, player: Node2D) -> void:
 	else:
 		_move((player.global_position - global_position).normalized()
 				* _speed() * delta)
-		_separate(delta)
+		# R59: see ProtoCreature._physics_process — separation runs every tick
+		# now, including through the long telegraphed casts this boss spends most
+		# of its life in. Old line kept for the record:
+		# _separate(delta)
 	if dist <= attack_reach * 0.9 and _cd <= 0.0:
 		_begin_windup((player.global_position - global_position).normalized())
 

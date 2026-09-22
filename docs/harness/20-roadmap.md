@@ -28,11 +28,12 @@ Ricardo's call) · SCHEDULED (decided, sequenced) · DESIGN (research first) ·
 BUDGET (blocked on money) · ANSWER (a question owed a reply, not a task) ·
 DONE.
 
-## 1. The demand table — every ask, R01 → R71
+## 1. The demand table — every ask, R01 → R72
 
 R01–R43 are the 2026-09-12 quota-outage recovery set, recorded verbatim then
 and unchanged since. R44–R55 came in 2026-09-13→19. R56–R71 arrived
-2026-09-21. Detail for any row is in `21-work-journal.md`; search it by id.
+2026-09-21, R72 latest. Detail for any row is in `21-work-journal.md`;
+search it by id.
 
 | ID | Status | Recovered demand | Law / gate |
 |---|---|---|---|
@@ -90,11 +91,11 @@ and unchanged since. R44–R55 came in 2026-09-13→19. R56–R71 arrived
 | R52 | NOW / details received 2026-09-19 | A new asset generator: hi-fi dark-fantasy pixel-art SPRITES in the Dead Cells / Phantom Tower register — master prompt + mandatory negative prompt + five rendering pillars. Benchmarked against "astra". | genforge.hifi (built, commit ab2cd93); art/ style bible; Godot CanvasTexture normal/emissive. Open: real generation once Ricardo picks the image model, the astra bench, pose-by-pose animation, a lit capture, the 13b local backend. |
 | R53 | DONE 2026-09-19 | A brief `.md` in the REPO ROOT explaining the hyperparameter changes (masking, greedy eval/promotion, β + move-std annealing, reversible promotion, snapshot reservoir, plateau stop). | `TRAINING_HYPERPARAMETERS.md` at the root. |
 | R54 | NOW / standing | Document EVERY experiment with its hyperparameters — a ledger, not prose: run id, knobs, result, verdict, kept or not. Reconstruct past runs too. | `docs/tech/39-experiment-ledger.md`; `tools/train_run.sh` already writes `config.json` per run — the ledger indexes them. |
-| R55 | LARGELY CLOSED 2026-09-21 | The converged nets win in dh-env and lose in the arena on the SAME greedy decode. Find the divergence, then retrain. | tech/39 §2 (R55-b rows), `ml/eval/env_parity.py`. Four content divergences found by damage-by-source and fixed (Fiery affix absent from the sim; native kit driver on the wrong channel; aim noise on the kit fan; 3.0 px storm bolts) plus one harness bug (two clocks). Matrix worst ratio 3.17 → 1.93. **Residual:** totals agree per channel but fights run ~1.8× longer in dh-env — the endgame, not the exchange. Next: port `creature.gd::_separate` into the sim (**= R59**), re-run at 64 eps, retrain, raise the gate above 4 episodes. |
+| R55 | LARGELY CLOSED 2026-09-21 | The converged nets win in dh-env and lose in the arena on the SAME greedy decode. Find the divergence, then retrain. | tech/39 §2 (R55-b rows), `ml/eval/env_parity.py`. Four content divergences found by damage-by-source and fixed (Fiery affix absent from the sim; native kit driver on the wrong channel; aim noise on the kit fan; 3.0 px storm bolts) plus one harness bug (two clocks). Matrix worst ratio 3.17 → 1.93. **Residual:** totals agree per channel but fights run ~1.8× longer in dh-env — the endgame, not the exchange. ~~Next: port `creature.gd::_separate` into the sim~~ — **that hypothesis is DEAD (2026-09-21)**: arena bodies are `bot_drive`, so `_chase` never ran there either and neither runtime separated. R59 is now an independent fix, landed, and the residual has no candidate cause. Next: instrument the endgame specifically (time-to-first-death vs time-from-first-death-to-episode-end), then re-run at 64 eps, retrain, raise the gate above 4 episodes. |
 | R56 | NOW / bug | GPU processes are not ended properly after training in the console. | `game/arena/console.gd` → `tools/train_*.sh` → the trainer. The stop path must reap the whole process group and free VRAM; prove with `nvidia-smi` before/after. Arenas run on LOCAL GPUs — a leaked trainer costs the next run. |
 | R57 | NOW / bug | Every captured mob turns into a gloamfen stalker. Wanted: maximum variety — every species keeps its own chassis, AND bosses are capturable as mini-pets with their signature skills, levelling alongside the player. | design/13 §7.1; root of NEXT #6 (bond with ALL creatures) and R65 (pet levels/skills). |
-| R58 | NOW / bug | The HP potion does not heal over 2 s — it is meant to be a heal-over-time, not an instant top-up. | `game/prototype/tests/flask_probe.gd` already exists; extend it. Related to R35's playtest tuning (20% immediate + 20% over two seconds). |
-| R59 | NOW / bug | Creatures do not collide with the player — they stand *on top of* him, where he cannot hit them. "Bizarre stuff and a bit annoying." | `creature.gd::_separate` already does creature-vs-creature; extend it to the player. **Same missing separation as R55's residual in `sim/` — one fix, two payoffs.** |
+| R58 | NOW / bug | The HP potion does not heal over 2 s — it is meant to be a heal-over-time, not an instant top-up. | **Re-scope needed (2026-09-21):** `flask_probe` already passes green with `FLASK OK — real R/click, 20% now + 20% over 2s, exact budget, recharge never heals`. So the heal-over-time IS implemented and gated at the flask. What Ricardo saw is something else — candidates: the HoT is cancelled on damage/dodge, the HUD bar shows only the instant tick so the drip is invisible, or it is a *different* potion (R62's enchanted potions, or the pet's). Reproduce in a real hunt before touching code. |
+| R59 | **DONE 2026-09-21** | Creatures do not collide with the player — they stand *on top of* him, where he cannot hit them. "Bizarre stuff and a bit annoying." | Separation now runs in `creature.gd::_physics_process` every tick in every state (it used to be a line inside `_chase`, which returns the moment a body is inside `attack_reach * 0.9` — it switched OFF at exactly the distance where bodies pile up). Split into `_separate_player` (rate 12/s) and `_separate_creatures` (rate 4/s, gated by `bot_drive or _state != "idle"`), the same two calls commented out in `wisp.gd`/`terravore_colossus.gd`, and ported to `dh-sim` as `Arena::separate_bodies()` (step 2b) so the four runtimes stay in parity. Test: `test_arena_bodies_separate_instead_of_standing_inside_each_other`. **CORRECTION to the R55 row below: the arena never ran `_separate` either** — arena bodies are `bot_drive`, so `creature.gd` parks `_state` at `"idle"` and `_chase` never executes. Separation was therefore NOT the R55 divergence; that residual is re-opened with no candidate cause. |
 | R60 | NOW / bug | The arena console lost its value labels (generation etc. render without captions), and the interface must be legible at 20 M-step values. | design/23; thousands separators / SI suffixes and wider boxes. Overlaps R49; same collision warning on `console.gd`. |
 | R61 | NOW / bug | Bosses are not spawning randomly among new hordes while exploring — Ricardo expects to meet them out in the map, not only at lairs. | **Same bug as R44**, already diagnosed; the fix is the boss slot in the pressure roll. |
 | R62 | NEXT / content | More of every axis: creatures, bosses, loot, skills, pets, mechanics, **and potion enchanting with special effects**. | Data-only by canon §10 — new `pack.type.name` ids validated against `content/schemas/`. Potion enchanting is the one new SYSTEM in this line. |
@@ -106,6 +107,7 @@ and unchanged since. R44–R55 came in 2026-09-13→19. R56–R71 arrived
 | R68 | SCHEDULED / event content | Multi-boss events (2, 3, 4, 5+). Named: *Giant Graveyard* (seven giants), *Dragon Nest* (baby + adult dragons). | design/13/29; with R36/R29. |
 | R69 | SCHEDULED / the headline event | **The DRAGON COUNCIL** — 12 legendary interdimensional dragons join forces to kill you. A dungeon/questline, not an arena fight: 12 councils, some in COUPLES with combo mechanics, some alone with special skill mechanics; the 10+-skill mythical/celestial/demonic tier. Clearing all 12 unlocks special loot + a mechanic + a skill. Near-RAID difficulty, gated behind prior ARTIFACTS that open the council dimension, meant to take real time to unlock. | design/13/29, the living-world generator; the largest single content ask on the ledger. |
 | R70 | SCHEDULED | Bot "player" events: bot players hired as MERCENARIES under your bounty, and bot players BOUNTY-HUNTING you — raising and spending your own bounty. | design/15/16; this is the PvE-facing half of the leaderboard system at NEXT #6g, and it lands on R33 (bounty/notoriety economics, anti-farming, gold sinks). |
+| R72 | **ANSWER DELIVERED 2026-09-21** (rebirth/docs/02-status.md §3.1); the boss fight is SCHEDULED | *"people are using a pipeline with meshy + blender + unreal for game dev, is it a natural stepup? perhaps that's what we were looking for when testing out the experiments with 3d stuff. Later we will make a boss fight to test out the concept"* (2026-09-21). Two parts: (a) a written judgement on Meshy → Blender → Unreal against what we already have (TripoSR installed locally, `genforge/pipeline/mesh_gen.py` with a provider seam, the parked Cloud Run GPU tier, `rebirth/unreal/`), and (b) **a boss fight built through that pipeline as the test of the concept**. | tech/31 (image-to-3D), rebirth/docs, canon §12.44; R02 is the Rebirth track this lands in, and the concept-render unblock it shares is the same one blocking the TripoSR spike. |
 | R71 | SCHEDULED | Questline themes beyond the council: mercenary hunt contracts, political sabotage, underground-city business, political power disputes, wars, conflicting interests, powerful-people scandals. | `docs/design/28-living-world-and-weekly-lore.md` + the weekly-lore generator; with R28/R31. |
 
 ## 2. NOW — in flight, and the strategy behind it (2026-09-21)
@@ -146,6 +148,17 @@ on, and they cost minutes, not days:
   (`GENFORGE_HIFI_IMAGE_MODEL` / `--model`) — **which id to point it at is
   Ricardo's decision.**
 - **R46** — "how are assets gen going?" still owed a written status.
+- **R72** — is Meshy → Blender → Unreal the natural step up? Owed a written
+  judgement against the local TripoSR spike, the `mesh_gen` provider seam and
+  the parked Cloud Run tier, and then a boss fight built through whichever
+  pipeline wins, as the concept test. **ANSWERED 2026-09-21** in
+  `rebirth/docs/02-status.md` §3.1: Meshy is a provider swap behind a seam we
+  already have, Unreal is blocked on an Epic install and not on tooling, and
+  the only real gap is **Blender** (no retopo/UV/rig/LOD/bake station exists).
+  The step up that pays into the SHIPPING 2D game is mesh → Blender → render to
+  sprite sheets, the way Dead Cells was made. Boss fight goes in `godot3d/`
+  unless UE gets installed. Remaining work: install Blender, add the
+  `blender_clean` stage, then the fight.
 - **`builds.json` kit ranges mix units** (CONTENT, not parity): cinder_drake's
   `bolt_volley range 10.0` and `field_cast 9.0` against bog_golem's `112.0`
   (= `7.0 * TILE`). The 7–10 values were almost certainly meant as TILES. Both

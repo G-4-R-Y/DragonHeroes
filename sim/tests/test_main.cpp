@@ -718,6 +718,64 @@ static void test_effect_commands() {
     CHECK(!evaluate_effect(def,owner_a,e)); // tick overflow fails closed
 }
 
+static void test_arena_bodies_separate_instead_of_standing_inside_each_other() {
+    // R59 (2026-09-21, Ricardo: "make sure creatures collide with the player, so
+    // they are not right on top of me in a way I can't hit them"). creature.gd
+    // had _separate, but called it only from _chase — which returns the moment
+    // the body is inside attack_reach * 0.9 — and iterated only the "creatures"
+    // group, never the player. An arena body is bot_drive and therefore never
+    // chases, so NEITHER runtime separated anything in a duel. Both do now.
+    dh::sim::FighterSpec statue;          // stands still, never swings
+    statue.max_hp = 100000.0f; statue.damage = 0.0f; statue.move_speed = 0.0f;
+    statue.attack_reach = 1.0f; statue.attack_cd = 1000.0f; statue.body_radius = 8.0f;
+    statue.dodge_max = 0; statue.kit_count = 0;
+
+    // Walk fighter 0 straight into the statue for `drive` ticks, then stop and
+    // let the spring settle for `settle` ticks. Returns the final gap in px.
+    auto run = [&](bool foe_is_player, int drive, int settle) {
+        dh::sim::FighterSpec me;
+        me.max_hp = 100.0f; me.damage = 0.0f; me.move_speed = 72.0f;
+        me.attack_reach = 1.0f; me.attack_cd = 1000.0f; me.body_radius = 8.0f;
+        me.dodge_max = 0; me.kit_count = 0; me.windup_time = 0.35f;
+        dh::sim::FighterSpec foe = statue;
+        foe.is_player = foe_is_player;
+        dh::sim::Arena a(me, foe, dh::sim::OppPolicy::kScripted, 4);
+        a.reset(4);
+        float o[dh::sim::kObsDim];
+        for (int t = 0; t < drive; ++t) {
+            a.obs_now(o);
+            // o[16..17] is rel/512, so it falls under the creature path's 0.05
+            // magnitude floor at 25.6 px and the body would simply stop there.
+            // Hold a UNIT command instead — full speed, straight in.
+            const float l = std::sqrt(o[16] * o[16] + o[17] * o[17]);
+            if (l <= 1e-6f) break;
+            a.step({o[16] / l, o[17] / l, 0});
+        }
+        for (int t = 0; t < settle; ++t) a.step({0.0f, 0.0f, 0});
+        a.obs_now(o);
+        return o[18] * 512.0f;
+    };
+
+    // Released, the overlap resolves to exactly touching: min_d = 8 + 8 = 16 px.
+    // Before this change the two bodies came to rest at a gap of zero.
+    const float settled = run(false, 400, 240);
+    CHECK(settled > 15.0f);
+    CHECK(settled < 17.0f);
+
+    // Under a body still driving in at 72 px/s the spring does not win outright
+    // — it holds a standoff where speed == rate * overlap. That standoff is what
+    // the two constants buy, so it pins both: pushing off a PLAYER (rate 12)
+    // must hold visibly more ground than pushing off a creature (rate 4).
+    const float vs_creature = run(false, 400, 0);
+    const float vs_player = run(true, 400, 0);
+    // Measured 2026-09-21 at 72 px/s: 7.90 px off a creature, 11.20 px off a
+    // player. Released (above) both settle to exactly 16.000 px.
+    CHECK(vs_player > vs_creature + 2.0f);
+    // And even mid-drive the bodies are no longer concentric, which is the
+    // actual complaint: a swing needs somewhere to land.
+    CHECK(vs_creature > 0.5f);
+}
+
 static void test_arena_fiery_affix_rides_the_bite_as_bolt_damage() {
     // R55-b (2026-09-21). creature.gd::setup_archetype gives an elite one of
     // four affixes. Brutal/Swift/Bulwark multiply damage / speed+cd / max_hp,
@@ -805,6 +863,7 @@ int main() {
     test_arena_archetypes_shape_the_swing();
     test_arena_damage_by_source_sums_to_the_tally();
     test_arena_fiery_affix_rides_the_bite_as_bolt_damage();
+    test_arena_bodies_separate_instead_of_standing_inside_each_other();
     if (g_failures == 0) {
         std::printf("sim-tests: all checks passed\n");
         return EXIT_SUCCESS;
