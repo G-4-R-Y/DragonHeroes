@@ -11,7 +11,7 @@
 
 ## Where the tree is
 
-`master` at **2ac37cf**, working tree clean except two untracked notes of
+`master` at **fb34bcf**, working tree clean except two untracked notes of
 Ricardo's own (`prompts queue.txt`, `sprites prompt.md`). **Pushed** — the 55
 commits that had been sitting locally since `b622aa6` (2026-09-12) are on
 `origin/master`, so R17's "GitHub remote equality" holds as of 2026-09-22 05:15.
@@ -20,12 +20,14 @@ GitHub warned on the way: `builds/dragon-heroes-windows.zip` is **56.82 MB**,
 past its 50 MB recommendation and heading for the **100 MB hard limit** it grew
 13 MB in one merge. Committing the shipped zips is deliberate (they *are* the
 game for anyone downloading), so the next packaging decision is LFS or a release
-asset — not "shrink it later".
+asset — not "shrink it later". Ledgered as **R78**.
 
 Commits this session, newest first:
 
 | commit | what |
 |---|---|
+| `fb34bcf` | **R17/R78/R79** — the push lands; the zip-size and Windows findings get ledger rows |
+| `2ac37cf` | the handoff Ricardo asked for |
 | `25f32f8` | **R77** — one packager, one build, the zips finally ship the real client |
 | `3fd8ed3` | **R75** — the repo stops committing its own build trees |
 | `871bcc6` | R60 — the console captures committed with the fix |
@@ -63,7 +65,7 @@ Last verified package run: EXIT=0, every gate OK, client dated 2026-09-22
 05:00/05:01, `lair journey fps=60.0 frame_cpu_ms=0.325`. Log:
 `genforge/candidates/packaging/r77-merge-build.log`.
 
-## Two findings logged, neither a regression, neither fixed
+## Three findings logged (**R79**), none a regression, none fixed
 
 - **Windows ships no GDExtension.** `game/addons/dh_godot/dh_godot.gdextension`
   declares only `linux.debug.x86_64` / `linux.release.x86_64`, so Godot has
