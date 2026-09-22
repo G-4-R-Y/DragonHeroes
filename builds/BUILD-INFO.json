@@ -1,0 +1,28 @@
+{
+  "_comment": "Index of the published distributables (R78). The zips live in GitHub release assets, not in this repository -- git cannot compress them and never forgets them. Regenerate with tools/publish_release.py.",
+  "release_tag": "build-20260922-3f7b8af",
+  "release_url": "https://github.com/G-4-R-Y/DragonHeroes/releases/tag/build-20260922-3f7b8af",
+  "release_commit": "3f7b8af1269ece847d145759e7cea4c460752ccb",
+  "packages": {
+    "linux": {
+      "file": "dragon-heroes-linux.zip",
+      "bytes": 50885663,
+      "sha256": "252e52e696a3971431f2fd05d2ad650f1e4ee110fafb007edca9ca0c56bc6421",
+      "built": "2026-09-22T21:43:47+00:00",
+      "base_commit": "3f7b8af1269ece847d145759e7cea4c460752ccb",
+      "working_tree_dirty": false,
+      "executable": "dragon-heroes.x86_64",
+      "download_url": "https://github.com/G-4-R-Y/DragonHeroes/releases/download/build-20260922-3f7b8af/dragon-heroes-linux.zip"
+    },
+    "windows": {
+      "file": "dragon-heroes-windows.zip",
+      "bytes": 59938072,
+      "sha256": "073d6a1ab42c6e8a2e549ca7cd7e6c85d9aa9f8b7ca93d089994ea1da8047145",
+      "built": "2026-09-22T21:43:59+00:00",
+      "base_commit": "3f7b8af1269ece847d145759e7cea4c460752ccb",
+      "working_tree_dirty": false,
+      "executable": "dragon-heroes.exe",
+      "download_url": "https://github.com/G-4-R-Y/DragonHeroes/releases/download/build-20260922-3f7b8af/dragon-heroes-windows.zip"
+    }
+  }
+}

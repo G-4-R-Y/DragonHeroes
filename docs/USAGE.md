@@ -768,6 +768,7 @@ python3 tools/smoke_package.py <package.zip>     # exercise the exported PCK + n
 python3 tools/build_app_icon.py                  # regenerate PNG + Windows ICO sizes
 python3 tools/install_linux_launcher.py          # desktop launcher + icon association
 python3 tools/publish_release.py                 # upload the zips as GitHub release assets
+bash tools/clean_clone_gate.sh                   # a fresh clone still builds, runs, and finds them
 ```
 
 Output: `builds/dragon-heroes-<platform>.zip` — the game binary, `dh-server`, the
@@ -775,16 +776,21 @@ offline content review and a LEIA-ME quickstart. Code is MIT, art CC BY-NC
 (business/32): sharing builds is explicitly fine.
 
 Those zips are **not committed** (R78, 2026-09-22). A ZIP is already compressed,
-so git stores every new one whole and never forgets it; 25 versions had put the
-clone at 697 MB and the Windows zip at 57 MB against GitHub's 100 MB hard
-per-file block. `tools/publish_release.py` uploads them as release assets
-instead and writes `builds/BUILD-INFO.json` — the in-tree index naming the
-release, the commit it was built from, and each asset's sha256, so a download
-can be checked against what this repository published. It refuses to publish a
-package built from a dirty tree; `--dry-run` shows what it would do and
-`--check` asks whether the index still matches the zips in `builds/`. A fresh
+so git stores every new one whole and never forgets it; eight zip blobs totalling
+357.9 MB had helped put `.git` at 698 MB, and the Windows zip had reached 57 MB
+against GitHub's 100 MB hard per-file block. `tools/publish_release.py` uploads
+them as release assets instead and writes `builds/BUILD-INFO.json` — the in-tree
+index naming the release, the commit the tag marks, and each asset's sha256, so
+a download can be checked against what this repository published. It refuses to
+publish a package built from a dirty tree, refuses one platform without the
+other, and tags the `base_commit` the packages were built from rather than
+whatever the server's default branch points at. `--dry-run` shows what it would
+do, `--check` asks whether the index still matches the zips in `builds/`, and
+`--reindex` re-verifies an existing release without re-uploading it. A fresh
 clone has no zips and does not need them: sections 1–3 build and run from
-source.
+source, and `bash tools/clean_clone_gate.sh` proves exactly that against a real
+clone — build, `ctest`, `dh-server`, content validation, then a HEAD request on
+each indexed `download_url`.
 
 There is exactly **one** packager (R77, 2026-09-22 — the build merge). It exports
 to an explicit path instead of trusting `export_presets.cfg`, which is what let the

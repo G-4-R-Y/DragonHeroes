@@ -19,19 +19,30 @@ concerned.
 
 They were tracked on purpose — the zip *is* the game to anyone who downloads
 it. But a ZIP is already compressed, so git stores each new one whole, and git
-never forgets: by 2026-09-22 the history held 25 versions of them, the clone
-was 697 MB, and the Windows zip had grown to 57 MB against GitHub's 100 MB
-**hard** per-file block. Git LFS would have moved the same bytes onto a
-recurring bill. Release assets are free, are not cloned, and report download
-counts.
+never forgets. Measured on 2026-09-22: **8 distinct zip blobs, 357.9 MB**; all
+of `builds/` **440.7 MB across 18 blobs**, in a **698 MB `.git`** — about 63% of
+the repository was build output, the largest single object being the pre-R77
+`builds/linux/dragon-heroes.x86_64` at 82.4 MB. The Windows zip had reached
+57 MB against GitHub's 100 MB **hard** per-file block. Git LFS would have moved
+the same bytes onto a recurring bill. Release assets are free, are not cloned,
+and report download counts.
 
     python3 tools/publish_release.py            # package → release → index
     python3 tools/publish_release.py --dry-run  # everything except the upload
     python3 tools/publish_release.py --check    # is the index current?
+    python3 tools/publish_release.py --reindex  # re-verify a release, rewrite the index
 
-It refuses to publish a package built from a dirty tree, and it trusts the
-server's byte counts over the local ones — a truncated upload is exactly the
-failure an index full of local hashes would hide.
+It refuses to publish a package built from a dirty tree, refuses one platform
+without the other, and tags the commit the packages were **built from**
+(`--target`), refusing until that commit is on the remote — `gh release create`
+otherwise tags the server's default-branch HEAD, which is how the first attempt
+marked a commit that had not built the zips. It then trusts the server's byte
+counts over the local ones: a truncated upload is exactly the failure an index
+full of local hashes would hide.
+
+The gate is a real clone, not the working tree:
+
+    bash tools/clean_clone_gate.sh   # no zips → build, ctest, run, validate, fetch
 
 **Removing them from the index does not shrink the history.** The old blobs are
 still in every clone; only a history rewrite removes them, and that invalidates

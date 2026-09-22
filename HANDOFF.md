@@ -1,3 +1,48 @@
+# Handoff — 2026-09-22: R78 landed (the game ships from a release, not from git)
+
+**R78 is done.** `builds/dragon-heroes-*.zip` are no longer tracked. They are
+GitHub release assets, and what stays in the repository is
+`builds/BUILD-INFO.json` — the index naming the release, the commit its tag
+marks, and each asset's bytes and sha256.
+
+    https://github.com/G-4-R-Y/DragonHeroes/releases/tag/build-20260922-3f7b8af
+    linux    50,885,663 B  252e52e6…
+    windows  59,938,072 B  073d6a1d…
+
+This is the project's **first published release**. The same bytes were already
+public in-tree and R78's row had pre-decided release assets, so it was execution
+rather than a new outward-facing decision — but it is worth knowing.
+
+GitHub's 57 MB warning was the symptom, not the disease. Git stores each new ZIP
+whole and forgets none: **8 zip blobs / 357.9 MB**, all of `builds/` **440.7 MB
+across 18 blobs**, inside a **698 MB `.git`** — ~63% of the repo is build output,
+and the largest single object is `builds/linux/dragon-heroes.x86_64` at
+**82.4 MB** (pre-R77, when the export directory was tracked). An earlier figure
+said "25 versions"; the measured count is 8. Commit `3f7b8af`'s message still
+says twenty-five and was **not** amended on purpose — its hash is the
+`base_commit` baked into both published packages and into the release tag.
+
+Two defects came out of doing it. `source_info()` counted **untracked** files,
+so `working_tree_dirty` was pinned true on every working checkout — Ricardo's
+own notes in the repo root were enough to trip it — and the first publish
+refused. It now counts tracked modifications only. And `gh release create` with
+no `--target` tags the **server's** default-branch HEAD: the first tag pointed
+at `3c006ac`, not the `3f7b8af` that built the zips. The publisher now names the
+commit and refuses until it is on the remote. (Repair note: deleting a tag
+reverts its release to a draft with an `untagged-…` URL; `gh release edit
+--draft=false` did not take, `PATCH /releases/{id}` did.)
+
+    python3 tools/publish_release.py            # package → release → index
+    python3 tools/publish_release.py --check    # is the index current?
+    python3 tools/publish_release.py --reindex  # re-verify, don't re-upload
+    bash    tools/clean_clone_gate.sh           # the gate, against a real clone
+
+**Waiting on Ricardo, not on work:** untracking caps future growth but does not
+shrink history. The 440.7 MB already in there needs a rewrite, which invalidates
+every existing clone — and there are concurrent sessions on this tree. His call.
+
+---
+
 # Handoff — 2026-09-22: R79 landed (Windows finally gets the GDExtension)
 
 **R79 is done.** The Windows ZIP shipped no GDExtension — and had never shipped

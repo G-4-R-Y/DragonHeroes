@@ -1438,3 +1438,49 @@ Still open:
    read only by `game/arena/tests/policy_parity_test.gd` and `arena/tests/` is in
    every preset's `exclude_filter`, so a shipped build cannot self-report; that
    clause needs a Windows machine or a test-carrying preset. Docs: USAGE §8.
+
+56. **The distributable left the repository; the index stayed (2026-09-22; R78).**
+   GitHub warned on push that `builds/dragon-heroes-windows.zip` was 57.16 MB,
+   past its 50 MB recommendation and moving toward the **100 MB hard block**.
+   The real cost was never the current pair: git cannot compress a ZIP and never
+   forgets one, so every packaging run added a whole new pair of ~110 MB blobs.
+   Measured at the time of the fix: **8 distinct zip blobs, 357.9 MB**; all of
+   `builds/` **440.7 MB across 18 blobs**, inside a **698 MB `.git`** — roughly
+   63% of the repository was build output, and the single largest object was
+   `builds/linux/dragon-heroes.x86_64` at **82.4 MB**, from the pre-R77 era when
+   the export directory itself was tracked. DECIDED: **GitHub release assets**,
+   not Git LFS — LFS is a recurring bill for the same bytes, release assets are
+   free, are not cloned, and report download counts. What stays in-tree is
+   `builds/BUILD-INFO.json`, an index naming the tag, the release URL, the
+   commit the tag marks, and per platform the file, byte count, sha256, build
+   time, `base_commit`, `working_tree_dirty`, executable and `download_url`.
+   Note the name collision, deliberate: the in-tree index hashes the *packages*,
+   while the `BUILD-INFO.json` **inside** each zip hashes that package's
+   *contents* (§12.53). Publisher: `tools/publish_release.py` (`--dry-run`,
+   `--check`, `--reindex`, `--allow-dirty`, `--draft`), which refuses to publish
+   one platform without the other ("a release half a game"), refuses packages
+   built from a dirty tree, tags the **`base_commit` the packages were built
+   from** via `--target` and refuses until that commit is on the remote, then
+   verifies the **server's** byte counts before writing the index — a truncated
+   upload is exactly the failure an index full of local hashes would hide.
+   Two defects found by doing it, both fixed: (a) `source_info()` in
+   `tools/package_build.py` used `git status --porcelain`, which counts
+   **untracked** files, so `working_tree_dirty` was pinned true on any working
+   checkout and the gate was useless where it mattered — it now counts tracked
+   modifications only (`--untracked-files=no`) and reports `untracked_files` as
+   a separate number; (b) `gh release create` with no `--target` tags the
+   **server's** default-branch HEAD, not local HEAD — observed directly, the
+   first tag resolved to `3c006ac` (the pre-push server tip) instead of
+   `3f7b8af`, the commit that actually built the zips. Deleting a tag reverts
+   its release to a draft, so the repair is: recreate the ref at the right sha,
+   then PATCH the release back to `draft:false`. First release:
+   `build-20260922-3f7b8af` (linux 50,885,663 B `252e52e6…`; windows
+   59,938,072 B `073d6a1d…`), both verified downloadable at their indexed sizes.
+   **`git rm --cached` caps future growth; it does not shrink history** — the
+   old blobs remain in every clone, and only a rewrite removes them, which
+   invalidates every existing clone. That is Ricardo's decision, not a cleanup
+   step, and it is open. Gate: `bash tools/clean_clone_gate.sh` — a fresh clone
+   has no zips, still builds `sim/`, passes `ctest`, runs `dh-server`, validates
+   content, and can fetch its own distributables from the indexed URLs.
+   Docs: `builds/README.md`, `README.md` ("Download and play"), USAGE §8,
+   tech/34, §10.

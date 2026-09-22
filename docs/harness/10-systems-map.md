@@ -435,10 +435,25 @@ is a wrapper over it, keeping only `DH_FETCH_TEMPLATES=1`. Windows uses the sing
 original; `tools/verify_package.py` checks actual Windows PE icon bytes and
 Linux executable formats. Actual release-PCK smoke verifies a streaming Hunt;
 fixed the exported helper capability check that silently selected an island. Source: `genforge/art_sources/app_icon/`; outputs:
-`builds/{linux,windows}` + the two ZIPs (all ignored). Optional Linux launcher
+`builds/{linux,windows}` + the two ZIPs (all ignored — since R78 the ZIPs too). Optional Linux launcher
 ships with the package. Law/runbook: tech/34 packaging section. Product name and
 save directory are both "Dragon Heroes"; `game/tools/user_dir_migration.gd` (first
 autoload) carries pre-merge "Dragon Heroes Codex" saves across on first launch.
+
+**The distributable is a release asset, not a tracked file (R78, 2026-09-22;
+canon §12.56).** A ZIP is already compressed, so git stored each new one whole
+and forgot none: 8 zip blobs / 357.9 MB, `builds/` 440.7 MB across 18 blobs, in
+a 698 MB `.git`. `tools/publish_release.py` now uploads both packages as GitHub
+release assets and writes `builds/BUILD-INFO.json` — the in-tree index (tag,
+URL, `release_commit`, and per platform bytes/sha256/`base_commit`/
+`download_url`). It refuses a dirty tree, refuses one platform without the
+other, `--target`s the commit the packages were built from (`gh` otherwise tags
+the server's default-branch HEAD) and verifies the server's byte counts before
+writing the index. First release: `build-20260922-3f7b8af`. Gate:
+`bash tools/clean_clone_gate.sh` — a real clone, no zips, builds + `ctest` +
+`dh-server` + content validation + a HEAD on each `download_url`. **Open, and
+Ricardo's call:** untracking caps growth but does not shrink history; the
+440.7 MB already in history needs a rewrite, which invalidates every clone.
 
 **The GDExtension now ships on Windows too (R79, 2026-09-22; canon §12.55).**
 `dh_godot.gdextension` declared only `linux.*`, so the exporter had nothing to

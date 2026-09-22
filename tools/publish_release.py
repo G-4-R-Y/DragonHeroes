@@ -116,15 +116,16 @@ def notes(tag: str, packages: dict[str, dict]) -> str:
                      f"| `{info['sha256'][:16]}…` |")
     lines += [
         "",
-        "Verify a download with `sha256sum` against `builds/BUILD-INFO.json` in",
-        "the repository at this tag.",
+        "Verify a download with `sha256sum` against `builds/BUILD-INFO.json` on",
+        "the default branch — the index is written after this release exists, so",
+        "it lands one commit past the tag above.",
         "",
         "The source builds without these assets: see `docs/USAGE.md`.",
     ]
     return "\n".join(lines) + "\n"
 
 
-def write_index(tag: str, url: str, packages: dict[str, dict]) -> None:
+def write_index(tag: str, url: str, packages: dict[str, dict], commit: str) -> None:
     INDEX.write_text(json.dumps({
         "_comment": "Index of the published distributables (R78). The zips live in "
                     "GitHub release assets, not in this repository -- git cannot "
@@ -132,6 +133,7 @@ def write_index(tag: str, url: str, packages: dict[str, dict]) -> None:
                     "tools/publish_release.py.",
         "release_tag": tag,
         "release_url": url,
+        "release_commit": commit,
         "packages": {platform: {**info, "download_url":
                                 f"{url.rsplit('/tag/', 1)[0]}/download/{tag}/{info['file']}"
                                 if "/tag/" in url else None}
@@ -173,6 +175,8 @@ def main() -> int:
     parser.add_argument("--allow-dirty", action="store_true",
                         help="Publish packages built from an uncommitted tree")
     parser.add_argument("--draft", action="store_true", help="Create the release as a draft")
+    parser.add_argument("--reindex", action="store_true",
+                        help="Re-verify an existing release and rewrite the index; upload nothing")
     args = parser.parse_args()
 
     if args.check:
@@ -190,18 +194,38 @@ def main() -> int:
         print("DRY RUN — nothing uploaded")
         return 0
 
+    # gh tags the default branch's REMOTE head unless told otherwise, which would
+    # point the build tag at a commit that did not build it. Name the commit, and
+    # refuse until it is pushed -- an unreachable target is silently ignored.
+    target = packages["linux"]["base_commit"]
+    if any(p["base_commit"] != target for p in packages.values()):
+        raise SystemExit("the packages were built from different commits: "
+                         + ", ".join(f"{k}={v['base_commit'][:7]}" for k, v in packages.items())
+                         + " -- repackage with `python3 tools/package_build.py all`")
+    if gh("api", f"repos/{{owner}}/{{repo}}/commits/{target}", "--jq", ".sha",
+          check=False).returncode != 0:
+        raise SystemExit(f"{target[:7]} is not on the remote yet -- `git push` first, "
+                         "or the release tag will mark a commit that did not build these zips.")
+
     existing = gh("release", "view", tag, "--json", "url", check=False)
     if existing.returncode == 0:
         url = json.loads(existing.stdout)["url"]
-        print(f"release {tag} exists; replacing its assets", flush=True)
-        gh("release", "upload", tag, *[str(OUT / p["file"]) for p in packages.values()],
-           "--clobber")
+        if args.reindex:
+            # Re-uploading bytes the release already holds, to repair a local JSON
+            # file, would cost 100+ MiB to fix nothing. Verify and rewrite instead.
+            print(f"release {tag} exists; verifying it and rewriting the index", flush=True)
+        else:
+            print(f"release {tag} exists; replacing its assets", flush=True)
+            gh("release", "upload", tag, *[str(OUT / p["file"]) for p in packages.values()],
+               "--clobber")
+    elif args.reindex:
+        raise SystemExit(f"--reindex needs an existing release; {tag} does not exist")
     else:
         notes_file = OUT / ".release-notes.md"
         notes_file.write_text(notes(tag, packages), encoding="utf-8")
         try:
             create = ["release", "create", tag, "--title", f"Dragon Heroes — {tag}",
-                      "--notes-file", str(notes_file)]
+                      "--target", target, "--notes-file", str(notes_file)]
             if args.draft:
                 create.append("--draft")
             create += [str(OUT / p["file"]) for p in packages.values()]
@@ -220,7 +244,13 @@ def main() -> int:
                              f"{by_name.get(info['file'])} bytes on the release, "
                              f"{info['bytes']} locally")
 
-    write_index(tag, url, packages)
+    tagged = gh("api", f"repos/{{owner}}/{{repo}}/git/ref/tags/{tag}",
+                "--jq", ".object.sha", check=False).stdout.strip()
+    if tagged and tagged != target:
+        raise SystemExit(f"release tag {tag} points at {tagged[:7]}, not the source "
+                         f"{target[:7]} -- delete the tag and republish")
+
+    write_index(tag, url, packages, tagged or target)
     print(f"RELEASE OK: {url}", flush=True)
     return 0
 

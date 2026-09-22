@@ -4746,3 +4746,130 @@ carries the new number.
 `sim/libs/dh-godot/CMakeLists.txt` · `game/addons/dh_godot/dh_godot.gdextension`
 · `tools/build_dh_godot.sh` · `.gitignore` · `docs/USAGE.md` ·
 `docs/00-canon.md` §12.55 · regenerated `builds/dragon-heroes-windows.zip`.
+
+---
+
+## 2026-09-22 — R78: the distributable leaves the repository
+
+### What the warning was actually about
+
+GitHub warned on push that `builds/dragon-heroes-windows.zip` was 57.16 MB.
+That framing is misleading, and following it would have produced the wrong fix.
+The current pair of zips is 105.7 MiB and would have stayed under the 100 MB
+per-file block for a while yet. The cost is that **git cannot compress a ZIP and
+never forgets one**: every packaging run adds a whole new pair of ~110 MB blobs
+that no future commit can remove.
+
+Measured, rather than assumed (`git rev-list --objects --all` joined against
+`git cat-file --batch-check`):
+
+| what | size | objects |
+| --- | --- | --- |
+| `builds/dragon-heroes-*.zip` | **357.9 MB** | 8 distinct blobs (4 per path) |
+| all of `builds/` | **440.7 MB** | 18 blobs |
+| `.git` | **698 MB** | — |
+| largest single object | **82.4 MB** | `builds/linux/dragon-heroes.x86_64` |
+
+So roughly 63% of the repository is build output, and the biggest object is not
+a zip at all but a loose executable from the pre-R77 era, when the export
+directory itself was tracked. A correction to an earlier figure that reached
+commit `3f7b8af`'s message: it says "Twenty-five versions". The real count is
+**eight**. The commit was deliberately **not** amended — its hash is baked into
+both published packages as `base_commit` and into the release tag, and amending
+it to fix a sentence would invalidate the provenance the whole change exists to
+provide. The correction lives here and in canon §12.56.
+
+### The decision
+
+Release assets, not Git LFS. LFS is a recurring bill for exactly the same bytes;
+release assets are free, are not cloned, and report download counts. R78's row
+had already recommended this, so no new decision was taken — only executed.
+
+What stays in-tree is `builds/BUILD-INFO.json`, the index: release tag, URL,
+`release_commit`, and per platform `file`, `bytes`, `sha256`, `built`,
+`base_commit`, `working_tree_dirty`, `executable`, `download_url`. The name
+collides with the `BUILD-INFO.json` **inside** each zip, deliberately: the inner
+one hashes that package's contents (§12.53), the in-tree one hashes the
+packages themselves.
+
+### Two defects found by doing it
+
+**1. `working_tree_dirty` was pinned true on every working checkout.**
+`source_info()` in `tools/package_build.py` used `git status --porcelain`, which
+lists untracked files. Ricardo permanently keeps untracked notes in the repo
+root (`prompts queue.txt`, `sprites prompt.md`), so the flag read `true` on any
+real checkout — and the first `publish_release.py --dry-run` duly refused:
+
+    dragon-heroes-linux.zip was built from a dirty tree (3fd8ed3).
+
+A provenance flag that is always true is worse than no flag, because a gate
+reads it. Fixed to count tracked modifications only
+(`git status --porcelain --untracked-files=no`), with the untracked count
+reported separately as a number. Verified: repackaged with 22 and 21 untracked
+files present, both packages report `working_tree_dirty: false`.
+
+**2. `gh release create` tagged the wrong commit.** With no `--target`, it tags
+the **server's** default-branch HEAD, not local HEAD. Observed directly:
+
+    === tag points at (server):
+    3c006ac7ca0e9072f0ec3ea334bb7a9e663b99f2
+    === local 3f7b8af full:
+    3f7b8af1269ece847d145759e7cea4c460752ccb
+
+`3c006ac` was the pre-push server tip. The tag on a build release is the one
+thing that has to be right — it is what "rebuild these exact bytes" means. The
+publisher now passes `--target <base_commit>`, refuses to publish when the
+packages disagree about their `base_commit`, and refuses when that commit is not
+yet on the remote (an unreachable target is silently ignored, which is how this
+failed quietly the first time). It then reads the tag ref back and compares.
+
+Repairing it turned up GitHub behaviour worth recording: **deleting a tag reverts
+its release to a draft**, and the release's URL becomes
+`…/releases/tag/untagged-<hash>`. `gh release edit --draft=false` did not take;
+the fix was `PATCH /repos/{o}/{r}/releases/{id}` with `draft=false` and
+`tag_name` restated, after recreating the ref at the right sha.
+
+### Published
+
+    https://github.com/G-4-R-Y/DragonHeroes/releases/tag/build-20260922-3f7b8af
+
+| platform | bytes | sha256 |
+| --- | --- | --- |
+| linux | 50,885,663 | `252e52e696a3971431f2fd05d2ad650f1e4ee110fafb007edca9ca0c56bc6421` |
+| windows | 59,938,072 | `073d6a1ab42c6e8a2e549ca7cd7e6c85d9aa9f8b7ca93d089994ea1da8047145` |
+
+Both built from `3f7b8af` with a clean tracked tree, both verified against the
+server's own byte counts (a truncated upload is exactly what an index full of
+local hashes would hide), and both confirmed downloadable anonymously at those
+sizes. The release is public; the same bytes were already public in-tree, and
+R78's row had pre-decided release assets, so this was execution rather than a
+new outward-facing choice — but it is stated plainly here because it is the
+project's first published artifact.
+
+### The gate
+
+`tools/clean_clone_gate.sh`, promoted out of the scratchpad because canon names
+it. It clones `file://` with `--no-hardlinks`, asserts no zip came along,
+asserts the index is present, then builds `sim/` from source, runs `ctest`, runs
+`dh-server --entities 2000 --ticks 3000`, validates the content pack, and sends
+a HEAD request to each `download_url` asserting `Content-Length` equals the
+indexed byte count. It runs against a real clone rather than the working tree,
+so a file that only exists because it was never committed cannot fool it.
+
+### Still open, and it is Ricardo's call
+
+`git rm --cached` caps future growth. **It does not shrink history.** The
+440.7 MB of `builds/` blobs are in every clone and only a history rewrite
+removes them — which invalidates every existing clone, and he runs concurrent
+sessions on this tree. Not something to do autonomously.
+
+### Files
+
+`tools/publish_release.py` (new) · `tools/clean_clone_gate.sh` (new) ·
+`tools/package_build.py` (`source_info`) · `.gitignore` · `builds/README.md` ·
+`README.md` ("Download and play") · `docs/USAGE.md` §8 ·
+`docs/tech/34-living-content-pipeline.md` · `docs/00-canon.md` §10 and §12.56 ·
+`builds/BUILD-INFO.json` (the index itself) ·
+`game/prototype/tests/{bond,capture}_probe.gd.uid` (untracked siblings of 140
+tracked `.uid` files; an untracked one regenerates with a different UID in a
+fresh clone).
