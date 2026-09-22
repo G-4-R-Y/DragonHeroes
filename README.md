@@ -1,4 +1,4 @@
-![Dragon Heroes — gold title above a luminous ruined kingdom, three adventurers and a spectral wolf facing an ivory dragon](docs/art/readme-banner/dragon-heroes-banner.png)
+![Dragon Heroes — gold title over a luminous ruined marsh kingdom at blue hour: three caped adventurers and a spectral wolf set out along a lantern-lit causeway, the keepers' bell tower still lit on the far bank, a distant wyrm on the high mist](docs/art/readme-banner/dragon-heroes-banner.png)
 
 # Dragon Heroes
 
@@ -11,8 +11,9 @@ I can finally create some of the things that kid once dreamed of - for pure joy,
 ---
 
 Fast-paced dark-fantasy pixel-art multiplayer ARPG by IntelliGames: an infinite
-procedurally generated world of creature hunts, weekly content drops, skill-based PvP and tournaments, as well as item markets, with real-money.
-player-to-player item marketplace settled via Pix.
+procedurally generated world of creature hunts, weekly content drops, skill-based
+PvP and tournaments, plus a real-money player-to-player item marketplace settled
+via Pix.
 
 **Start here:** [docs/00-canon.md](docs/00-canon.md) — the single source of truth for
 every decision — then [docs/README.md](docs/README.md) for the full design document

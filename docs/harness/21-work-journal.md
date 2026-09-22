@@ -3573,3 +3573,112 @@ split was mechanical: save the final file, strip the known R61 blocks with a
 boundary-asserting helper, verify the intermediate still parses *and* passes
 `repop_probe`, commit the cold tree, restore the final file, commit this. Each
 side is reviewable on its own.
+
+---
+
+## 2026-09-22 — R76: the banner loses its hallucinated dragon
+
+Ricardo, verbatim: *"hey, can we improve our banner? In github repo's readme. I
+liked the vibe, but the giant dragon head in the horizon is bizarre and
+hallucinated lol / Perhaps use our new quests themes to represent stuff! The
+heroes party and spirit dog vibe was neat, tho, keep that. Reminds me of lord of
+the rings journeys - companionship and adventure"*
+
+### The constraint that shaped the deliverable
+
+This session has no `image_gen` tool and `OPENAI_API_KEY` is unset, so re-rolling
+the plate was not available. Re-rolling would have been the wrong answer anyway:
+a banner only one session can reproduce is not an asset, it is a lucky file. The
+deliverable is therefore a **deterministic in-repo compositor** —
+`genforge/pipeline/readme_banner.py`, PIL + numpy, fixed seeds, no network —
+that repaints the right third of the v1 plate, plus a corrected v2 prompt carried
+for the day the paid path runs.
+
+- v1 plate preserved: `docs/art/readme-banner/plate-v1-genai.png` (git mv, not delete).
+- Gate: `python3 -m genforge.pipeline.readme_banner --check` re-renders and
+  compares sha256 against the committed PNG →
+  `BANNER OK — committed PNG matches the compositor`, exit 0.
+- Shipped PNG 2172x724, sha256 `2cc63ad91eab968055e048cf923c36166543882fa00c95d5c9d8d4f8d53a4270`.
+- The prompt was not innocent: v1's own text asked for *"an elegant monumental
+  ivory-and-antique-gold dragon"* at the far right. The model did not hallucinate
+  it unprompted. `prompt.txt` keeps v1 verbatim with that line marked `>>>`.
+
+### What changed in the picture
+
+Kept untouched: the party of three + spectral wolf, the causeway and its lanterns,
+the pillar and banner, the moon and mountains, the citadel, the genuine waterfall,
+the gothic arch ruins, and the whole gold title block.
+
+Killed: the monumental dragon (wing x 0.685-0.86, head x 0.775-0.95, neck to the
+right edge, the fake jaw-waterfalls at x 0.79-0.83).
+
+Added, all sourced from `genforge/releases/bell_beneath_fen.json` so the banner
+advertises the actual weekly-content promise: a ruined keepers' bell tower with a
+lit belfry arch and a bronze bell, a lantern-lit ferry on the open water, Lumen
+motes, and **two small distant wyrms on the high mist** — a rumour of dragons
+rather than a portrait of one.
+
+### Measurement trail (the part worth keeping)
+
+**Stop eyeballing a downscaled crop.** I was convinced there was a hard rectangle
+edge at x 0.774 and y 0.633 — a "pasted box". Blurred-luma gradient profiling
+(`np.abs(np.diff(...)).mean(axis)`) disproved it: the strongest vertical edge in
+the frame is at x 0.706-0.740 (the plate's own fog lip) and the strongest
+horizontal at y 0.934-0.959 (the water line). There was no edge at 0.774 at all.
+
+**The defect was a value hole, not a seam.** x 0.80-0.99 measured 32-40 luma
+against the plate's 56-83. Repainting terrain alone ran 10-20 grey levels under
+the painting *and the deficit grew with depth into the frame* — the signature of
+missing atmosphere. Fixed with an aerial-perspective pass (`_haze`) plus lifted
+layer colours; post-fix bands land within ~6 levels on every honest row.
+
+**Reference bands can be contaminated.** My first comparator crop (x 0.555-0.680)
+runs straight through the gold title at y 0.40-0.55, where R 91-102 > B 60-70.
+It produced false "too dark" flags until I restricted comparisons to
+blue-dominant rows.
+
+### Four lessons, now also in `docs/art/readme-banner/README.md`
+
+1. **A flat fill is the tell, not the seam.** Plate sky sigma 19.1 / mist 29.5 /
+   bank 16.1; a clean repaint came back at 0.91-2.63. The eye reads the texture
+   gap long before it finds an edge.
+2. **Sigma is a diagnostic, not a target.** Grain amp 0.150 hit the number and
+   looked like burlap. The usable band is ~10-12.
+3. **Distance washes toward the sky, it does not darken.** Stacking ever-darker
+   silhouettes digs a hole exactly where the composition wants light.
+4. **Silhouettes composite; fills do not.** A three-tone bronze bell read as
+   vector clipart. A dark shape with light coming *through* it has no fills to
+   compare against.
+
+Corollary learned the hard way: **a distant object must be hazed to ITS depth.**
+The tower drawn at the foreground ruins' near-black (12,22,33) read as a floating
+phone booth. Lifting it to (20,35,52) and seating it on a drawn bank with a teal
+reflection made it read as a tower in the mid-distance.
+
+And: **lay fog across a boundary, not up to it.** Feathering only converts a hard
+seam into a soft one.
+
+### Iteration sequence
+
+- **try11** — `_haze` aerial perspective + lifted terrain colours. Closed the value hole.
+- **try12** — `WING_X 0.685 -> 0.632`. The mask's feather ramp runs *from* x0
+  *to* x0+fx, so at 0.685 the plate's lit dragon-wing edge survived at partial
+  alpha across x 0.679-0.721 and read as a diagonal contrail. Also L1 fade
+  0.30 -> 0.13 (a 217px fade made the ridge a wall) and the tower rewritten.
+- **try13** — tower hazed to its depth, seated on a promontory, reflected on the fen.
+- **try14** — `_clouds`: the repaint measured within six levels of the plate's sky
+  and still read as a different picture, because the mismatch was never value or
+  hue (R-B came back -60 against the plate's -66). An empty sky beside a worked
+  one is a hole with correct colour. Noise on a wide, short grid stretched to the
+  frame (which is what wind does to cloud), thresholded into masses, lit from the
+  moon's side at x~0.21. Sky darkening eased 0.14 -> 0.09 and 0.12 -> 0.08.
+
+Each iteration was judged against a rendered full-size read and an x>=0.60 crop,
+never assumed.
+
+### Also fixed in passing
+
+Root `README.md` carried an orphaned half-sentence — *"as well as item markets,
+with real-money. / player-to-player item marketplace settled via Pix."* — evidently
+a bad edit. Rewritten into one sentence, and the image alt text now describes the
+picture that actually exists.

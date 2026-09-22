@@ -1,10 +1,46 @@
+=== v1 (2026-09-12, built-in image_gen) ====================================
+Produced plate-v1-genai.png. SUPERSEDED. The line marked >>> is what put a
+monumental dragon head on the horizon -- the prompt asked for it explicitly;
+the model did not hallucinate it unprompted. Kept verbatim as the provenance
+record of the plate the v2 banner is composited over.
+
 Use case: ads-marketing.
 Asset type: finished GitHub README hero banner for Dragon Heroes, an original modern pixel-art dark-fantasy adventure ARPG.
 Create a panoramic horizontal 3:1 banner, ideally 2304x768 pixels. Edge-to-edge opaque artwork. This must feel like exquisite hand-authored modern pixel-art game key art: deliberate square pixel clusters, beautifully stepped contours, rich atmospheric depth and sharply designed silhouettes, never a blurry painting or chunky low-detail retro screenshot.
-Scene: an ancient luminous marsh kingdom at blue hour. Broken gothic stone arches and an impossibly distant ruined citadel rise through blue-green mist; tiny turquoise flowers and Lumen fireflies glow across reflective water. At the lower left, three small caped adventurers with distinct sword, staff and bow silhouettes stand together on a ruined causeway, a small spectral wolf companion beside them, looking into an immense magical world. At the far right, an elegant monumental ivory-and-antique-gold dragon emerges through the mist, head in profile toward the center, swept-back horns and a luminous turquoise eye. Its dark scaled neck and wing fade into the ruins; majestic and mysterious, not cartoonish. Match the project's visual identity of warm ivory/gold dragon forms, midnight-indigo shadows and a living turquoise flame.
+Scene: an ancient luminous marsh kingdom at blue hour. Broken gothic stone arches and an impossibly distant ruined citadel rise through blue-green mist; tiny turquoise flowers and Lumen fireflies glow across reflective water. At the lower left, three small caped adventurers with distinct sword, staff and bow silhouettes stand together on a ruined causeway, a small spectral wolf companion beside them, looking into an immense magical world. >>> At the far right, an elegant monumental ivory-and-antique-gold dragon emerges through the mist, head in profile toward the center, swept-back horns and a luminous turquoise eye. Its dark scaled neck and wing fade into the ruins; majestic and mysterious, not cartoonish. Match the project's visual identity of warm ivory/gold dragon forms, midnight-indigo shadows and a living turquoise flame.
 Composition: a refined cinematic panorama with a quiet, dark central mist field reserved for a very large and highly legible title. Keep the dragon on the right third, the adventuring party in the lower left, and details around the perimeter. The title is the dominant center anchor, occupying approximately 60% of the width; all lettering and essential subjects stay safely inside the frame with generous margins. A faint turquoise glow beneath the lettering connects the landscape; tiny warm-gold lamps lead the eye across the causeway. Keep hierarchy bold at GitHub's approximately 900px display width, and still recognizable on mobile.
 Text (verbatim, the ONLY text): "DRAGON HEROES".
 Typography: one centered horizontal line of beautifully spaced custom fantasy capital serif lettering, warm antique gold with ivory highlights, subtle dark inset depth and crisp pixel-edged craftsmanship. Elegant, confident, clean and readable, no distressed letter interiors. Exact spelling, no extra words.
 Mood: beauty beneath the dark; wonder, ancient legends, dangerous magic, and the joy of an adventure shared with friends.
 Palette: deep navy, forest teal, jade and turquoise emission, restrained antique gold and warm ivory, very subtle violet distant sky.
 Constraints: original IP only, no franchise references or copied emblems, no UI, no game statistics, no badges, no logos from other brands, no watermark, no collage panels, no fake screenshot chrome, no decorative rectangular frame. Preserve disciplined modern pixel-art texture throughout. Deliver one finished banner.
+
+
+=== v2 (2026-09-22) ========================================================
+NOT YET RUN THROUGH ANY IMAGE MODEL. The shipped banner is composited by
+genforge/pipeline/readme_banner.py over the v1 plate. This prompt is what to
+send the day the paid path runs (ImageBackend seam, `openai` backend), so the
+regeneration starts from the corrected brief rather than from v1's mistake.
+
+Changes from v1, all in the right third:
+  - the monumental dragon is GONE. Dragons appear only as small, distant
+    silhouettes on the high mist -- the scale a rare world boss is telegraphed
+    at, not a head the size of the sky standing in front of the ruins it haunts.
+  - the space it occupied is given to the chapter's own imagery, from
+    genforge/releases/bell_beneath_fen.json: the keepers' bell tower and the
+    ferry, so the banner advertises the living world instead of a mascot.
+  - the party, causeway, citadel, moon and title are unchanged. Ricardo kept
+    those by name: "the heroes party and spirit dog vibe was neat, tho, keep
+    that. Reminds me of lord of the rings journeys - companionship and
+    adventure."
+
+Use case: ads-marketing.
+Asset type: finished GitHub README hero banner for Dragon Heroes, an original modern pixel-art dark-fantasy adventure ARPG.
+Create a panoramic horizontal 3:1 banner, ideally 2304x768 pixels. Edge-to-edge opaque artwork. This must feel like exquisite hand-authored modern pixel-art game key art: deliberate square pixel clusters, beautifully stepped contours, rich atmospheric depth and sharply designed silhouettes, never a blurry painting or chunky low-detail retro screenshot.
+Scene: an ancient luminous marsh kingdom at blue hour. Broken gothic stone arches and an impossibly distant ruined citadel rise through blue-green mist; tiny turquoise flowers and Lumen fireflies glow across reflective water. At the lower left, three small caped adventurers with distinct sword, staff and bow silhouettes stand together on a ruined causeway, a small spectral wolf companion beside them, looking into an immense magical world. At the right, on the far bank across the water, a slender ruined stone bell tower with a broken crown still stands, a great bronze bell hanging lit in its belfry arch and two small warm lamps burning in the keepers' windows below; a lantern-lit ferry crosses the open water toward it. Far off and small on the high mist, two winged wyrm silhouettes ride the wind -- distant, ominous and no larger than a hand, a rumour of dragons rather than a portrait of one.
+Composition: a refined cinematic panorama with a quiet, dark central mist field reserved for a very large and highly legible title. Keep the bell tower and ferry on the right third, the adventuring party in the lower left, and details around the perimeter. The title is the dominant center anchor, occupying approximately 60% of the width; all lettering and essential subjects stay safely inside the frame with generous margins. A faint turquoise glow beneath the lettering connects the landscape; tiny warm-gold lamps lead the eye across the causeway, over the ferry, to the lit bell. Keep hierarchy bold at GitHub's approximately 900px display width, and still recognizable on mobile.
+Text (verbatim, the ONLY text): "DRAGON HEROES".
+Typography: one centered horizontal line of beautifully spaced custom fantasy capital serif lettering, warm antique gold with ivory highlights, subtle dark inset depth and crisp pixel-edged craftsmanship. Elegant, confident, clean and readable, no distressed letter interiors. Exact spelling, no extra words.
+Mood: beauty beneath the dark; wonder, ancient legends, dangerous magic, and the joy of an adventure shared with friends. A long journey begun together, not a monster reveal.
+Palette: deep navy, forest teal, jade and turquoise emission, restrained antique gold and warm ivory, very subtle violet distant sky.
+Constraints: original IP only, no franchise references or copied emblems, no UI, no game statistics, no badges, no logos from other brands, no watermark, no collage panels, no fake screenshot chrome, no decorative rectangular frame. NO large or foreground dragon, no dragon head, no creature occupying more than a few percent of the frame. Preserve disciplined modern pixel-art texture throughout. Deliver one finished banner.

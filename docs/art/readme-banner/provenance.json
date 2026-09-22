@@ -1,11 +1,21 @@
 {
-  "provider": "built-in image_gen",
-  "model": "not exposed by tool",
-  "purpose": "GitHub README key art",
-  "prompt": "prompt.txt",
   "asset": "dragon-heroes-banner.png",
+  "version": "v2",
+  "purpose": "GitHub README key art",
   "width": 2172,
   "height": 724,
-  "sha256": "c8767d702ad535b679db1a291b1ee731574699532660b20a3c6798a08f529d69",
-  "post_processing": "none; original generated PNG copied byte-for-byte"
+  "sha256": "2cc63ad91eab968055e048cf923c36166543882fa00c95d5c9d8d4f8d53a4270",
+  "pipeline": "genforge/pipeline/readme_banner.py",
+  "reproduce": "python3 -m genforge.pipeline.readme_banner --out docs/art/readme-banner/dragon-heroes-banner.png",
+  "verify": "python3 -m genforge.pipeline.readme_banner --check",
+  "derived_from": {
+    "plate": "plate-v1-genai.png",
+    "sha256": "c8767d702ad535b679db1a291b1ee731574699532660b20a3c6798a08f529d69",
+    "provider": "built-in image_gen",
+    "model": "not exposed by tool",
+    "prompt": "prompt.txt (v1 section)"
+  },
+  "post_processing": "deterministic in-repo compositor: the v1 plate's right third repainted (sky, cloud, aerial haze, three hazed terrain ridges, matched grain, three fog passes) and redrawn with the fen_bells chapter imagery -- Orun's bell tower, Ilyra's ferry, Lumen motes, two distant wyrms. Fixed seeds, no network, no API key; byte-identical on every run.",
+  "why_not_regenerated": "R76 removed a hallucinated element from an otherwise good plate. Re-rolling the whole prompt would have risked the party, causeway and citadel that Ricardo asked to keep, and would have produced an image no later session could reproduce.",
+  "prompt_v2": "prompt.txt (v2 section) -- carried for the day the paid image path runs; it no longer asks for a monumental dragon."
 }
