@@ -11,6 +11,12 @@ func check(ok: bool, why: String) -> void:
 func frames(n: int = 2) -> void:
 	for i in n: await get_tree().process_frame
 
+# R57's trap: headless process frames outrun the fixed 60 Hz physics clock, so
+# anything asserted on a `_physics_process` effect (the flask burn, the HUD
+# gauge pass) must wait on `physics_frame` or it is a coin flip.
+func physics_frames(n: int = 2) -> void:
+	for i in n: await get_tree().physics_frame
+
 func key(pressed: bool, echo := false) -> void:
 	var event := InputEventKey.new()
 	event.keycode = KEY_R
@@ -104,8 +110,51 @@ func run() -> void:
 	await click(button)
 	p._process_flask(2.0)
 	check(p.flask_charges == 2 and is_equal_approx(p.hp, p.max_hp * 0.1), "Flask revived a dead hunter")
+	# ---- R58: the drip must be VISIBLE, not merely correct ------------------
+	# Everything above drives `_process_flask()` by hand with physics disabled,
+	# which is exactly why this gate stayed green while Ricardo watched an
+	# "instant top-up": `refresh_hud()` is event-driven, so during the 2 s burn
+	# the bar sat frozen and the text lied (measured: hp 50 -> 70, bar stuck at
+	# 90.00 px, text stuck on "50 / 100 HP" for the whole burn AND after it).
+	# So this section runs the real clock and watches the HUD, not the model.
+	p.dead = false
+	p.refill_flask()
+	p.hp = p.max_hp * 0.3
+	hunt.refresh_hud()
+	hunt.set_physics_process(true)
+	p.set_physics_process(true)
+	for creature in get_tree().get_nodes_in_group("creatures"): creature.queue_free()
+	hunt._use_flask()
+	await physics_frames(2)
+	var mid_bar: float = hunt._hud.hp_bar.size.x
+	var mid_hp: float = p.hp
+	var mid_text: String = hunt._hud.hp_text.text
+	check(p._flask_hot > 0.0, "the burn ended before the live sample")
+	await physics_frames(30)   # ~0.5 s of real 60 Hz ticks, mid-burn
+	check(p.hp > mid_hp, "the heal-over-time did not tick on the real clock")
+	check(hunt._hud.hp_bar.size.x > mid_bar,
+		"the HP bar did not move while the flask was healing")
+	# Movement, not equality: the player's `_physics_process` (which burns the
+	# flask) and main's (which draws the gauge) are one node apart, so the text
+	# trails the model by at most a single 16 ms tick. Exactness is asserted
+	# below, once the burn has ended and HP has stopped moving.
+	check(hunt._hud.hp_text.text != mid_text,
+		"the HP text went stale during the heal-over-time")
+	var drips := 0
+	while p._flask_hot > 0.0 and drips < 240:
+		await physics_frames(1)
+		drips += 1
+	await physics_frames(2)
+	check(is_equal_approx(hunt._hud.hp_bar.size.x, 180.0 * p.hp / p.max_hp),
+		"the HP bar did not settle on the healed total")
+	check(hunt._hud.hp_text.text == "%d / %d HP" % [ceili(p.hp), ceili(p.max_hp)],
+		"the HP text did not settle on the healed total")
+	check(is_equal_approx(p.hp, p.max_hp * 0.7), "the live burn did not deliver 20% + 20%")
+	hunt.set_physics_process(false)
+	p.set_physics_process(false)
+
 	for why in failures: push_error("FLASK FAIL: " + why)
-	if failures.is_empty(): print("FLASK OK — real R/click, 20% now + 20% over 2s, exact budget, recharge never heals, full/empty/dead feedback")
+	if failures.is_empty(): print("FLASK OK — real R/click, 20% now + 20% over 2s on the real clock, the bar and text follow the drip, exact budget, recharge never heals, full/empty/dead feedback")
 	hunt.queue_free()
 	await frames(3)
 	get_tree().quit(0 if failures.is_empty() else 1)

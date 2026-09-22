@@ -305,6 +305,13 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event.is_action_pressed("ui_cancel"):
 		_confirm.visible = not _confirm.visible
 
+# R58: `_flask_drip_base` is the HP the instant tick left behind, so when the
+# 2 s burn ends `_update_gauges()` can float a SECOND "+N HP" for the drip.
+# Without it the only number the player ever read was the immediate 20 %, which
+# is why a working heal-over-time felt like an instant top-up.
+var _flask_drip_base := -1.0
+var _flask_healing_prev := false
+
 func _use_flask() -> void:
 	var before := player.hp
 	if player.drink_flask():
@@ -312,6 +319,7 @@ func _use_flask() -> void:
 		fx.aura(player, Color("7ce7a2"), {"dur": 0.6})
 		_hud.hint.text = ProtoLang.t("msg_flask_sip")
 		damage_number(player.global_position, 0, Color("9fefbc"), "+%d HP" % ceili(player.hp - before))
+		_flask_drip_base = player.hp
 	elif player.dead:
 		_hud.hint.text = ProtoLang.t("msg_flask_dead")
 	elif player._flask_hot > 0.0:
@@ -1830,15 +1838,38 @@ func _update_boss_bar() -> void:
 
 var _low_hp := false   # low-HP feedback state (refresh_hud)
 var _hp_ghost := 1.0   # ghost-damage trail: recent loss drains behind the bar
+# R58: what the HP readout currently DRAWS, so the per-frame gauge pass can tell
+# whether it is stale without redrawing (or re-formatting a string) every tick.
+var _hp_shown := -1.0
+var _max_hp_shown := -1.0
+var _hp_ghost_shown := -1.0
+var _hp_text_shown := -1
+var _max_hp_text_shown := -1
 
-func refresh_hud() -> void:
+# R58: the HP readout is its own function because its inputs move EVERY frame
+# while `refresh_hud()` is only called on events (a hit, a level-up, a flask
+# sip). That mismatch was the bug Ricardo reported as "the potion does not heal
+# over 2 s": the heal-over-time was working perfectly -- measured 50.0 -> 70.0 hp
+# linearly across the 2 s burn -- but `hp_bar.size.x` sat frozen at 90.00 px and
+# `hp_text` read "50 / 100 HP" the whole time and after, so the only thing the
+# player could see was the instant 20 % tick. (The ghost trail had the same
+# disease: `_hp_ghost` drains in `_physics_process` but was only ever *drawn*
+# from `refresh_hud()`.) `_update_gauges()` now calls this whenever the numbers
+# it draws have moved, so any per-frame HP source -- this flask, a field DoT, a
+# future regen -- shows up without its author having to remember a HUD call.
+func _refresh_hp_readout() -> void:
 	var hp_frac := clampf(player.hp / player.max_hp, 0, 1)
 	# ghost trail: falls instantly with damage, then drains to meet the bar
 	if hp_frac > _hp_ghost:
 		_hp_ghost = hp_frac
 	_hud.hp_bar.size.x = 180.0 * hp_frac
 	_hud.hp_ghost.size.x = 180.0 * _hp_ghost
-	_hud.hp_text.text = "%d / %d HP" % [ceili(player.hp), ceili(player.max_hp)]
+	var hp_int := ceili(player.hp)
+	var max_int := ceili(player.max_hp)
+	if hp_int != _hp_text_shown or max_int != _max_hp_text_shown:
+		_hud.hp_text.text = "%d / %d HP" % [hp_int, max_int]   # only on change: no
+		_hp_text_shown = hp_int                                # per-frame string
+		_max_hp_text_shown = max_int                           # churn at 60 FPS
 	# low-HP read: the bar goes red and breathes; crossing the line pulses the post
 	if hp_frac <= 0.3 and player.hp > 0.0:
 		var pulse := 0.5 + 0.5 * sin(Time.get_ticks_msec() / 160.0)
@@ -1850,6 +1881,12 @@ func refresh_hud() -> void:
 	else:
 		_hud.hp_bar.color = Color("58c470")
 		_low_hp = false
+	_hp_shown = player.hp
+	_max_hp_shown = player.max_hp
+	_hp_ghost_shown = _hp_ghost
+
+func refresh_hud() -> void:
+	_refresh_hp_readout()
 	_hud.stats.text = ProtoLang.t("hud_stats") % [
 			Session.level, gold, kills, stones, snares,
 			Session.inventory.size(), ProtoItems.INVENTORY_CAP,
@@ -1860,10 +1897,25 @@ func refresh_hud() -> void:
 # ---- gauges: fill animations + glow on charge-complete (canon §4 UI) ----------
 
 func _update_gauges(delta: float) -> void:
+	# R58: the HP bar, its ghost trail and the HP text follow values that move
+	# every frame, so they are refreshed here rather than only on events. Three
+	# float compares per frame when nothing moved; the low-HP branch keeps
+	# redrawing so the red bar actually breathes.
+	if _low_hp \
+			or not is_equal_approx(player.hp, _hp_shown) \
+			or not is_equal_approx(player.max_hp, _max_hp_shown) \
+			or not is_equal_approx(_hp_ghost, _hp_ghost_shown):
+		_refresh_hp_readout()
 	var healing := player._flask_hot > 0.0 and not player.dead
 	_hud.flask_button.modulate = Color("baffd1") if healing else (Color.WHITE if player.flask_charges > 0 else Color("858784"))
 	_hud.flask_burn.visible = healing
 	_hud.flask_burn.size.x = 26.0 * player._flask_hot / ProtoPlayer.FLASK_BURN_S
+	if _flask_healing_prev and not healing:   # R58: the burn just finished
+		var drip := player.hp - _flask_drip_base
+		if drip >= 1.0 and not player.dead:
+			damage_number(player.global_position, 0, Color("9fefbc"), "+%d HP" % ceili(drip))
+		_flask_drip_base = -1.0
+	_flask_healing_prev = healing
 	_pip_flash = maxf(_pip_flash - delta * 3.0, 0.0)
 	_q_flash = maxf(_q_flash - delta * 3.0, 0.0)
 	_hud.xp_bar.size.x = 184.0 * _level_progress(kills)

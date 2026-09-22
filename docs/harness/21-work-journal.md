@@ -4169,3 +4169,83 @@ changed — the whole fix is in `game/prototype/tests/residency_probe.gd`.
 The lesson for the next probe: **a gate that builds its own fixture must pin the
 world it builds it in, and must respect the radius of the system it is testing.**
 Both halves of this failure looked like product bugs from the outside.
+
+## 2026-09-22 — R58: the flask healed correctly for two seconds and never said so
+
+Ricardo's complaint was "the HP potion does not heal over 2 s — it is meant to be
+a heal-over-time, not an instant top-up." The ledger row had been re-scoped on
+2026-09-21 with an explicit instruction: `flask_probe` is green, so **reproduce
+the complaint in a real hunt before touching code**. That instruction is what
+found the bug, and it was not in the flask.
+
+### The reproduction
+
+A throwaway scene (`_flask_repro`, deleted after use like `_seed_scan` before it)
+pinned seed 41487, booted `main.tscn` with physics running, freed the creatures so
+nothing could interfere, set `hp = max_hp * 0.3`, called `_use_flask()`, and then
+printed the model and the HUD side by side every five physics ticks:
+
+```
+t=0.08 hp=50.8 (50.8%) bar=90.00 text=50 / 100 HP burn=1.92
+t=0.42 hp=54.2 (54.2%) bar=90.00 text=50 / 100 HP burn=1.58
+t=1.00 hp=60.0 (60.0%) bar=90.00 text=50 / 100 HP burn=1.00
+t=2.00 hp=70.0 (70.0%) bar=90.00 text=50 / 100 HP burn=0.00
+--- drip over: hp=70.0 bar_should_be=126.00 bar_is=90.00
+```
+
+The heal-over-time is **exactly right**: 20% immediately, then 20% more spread
+linearly across 2.00 s on the real 60 Hz clock, landing on 70.0. The bar never
+moved off the instant tick, and the text never moved at all — not during the burn,
+not after it. From the player's chair that is indistinguishable from "the potion
+gave me 20% and stopped". Ricardo was reporting the HUD.
+
+Two candidate causes from the re-scope are now **disproved**: the HoT is not
+cancelled by damage or dodge (nothing damaged the player here and the drip still
+looked dead), and it is not a different potion.
+
+### The cause
+
+`main.gd::refresh_hud()` is the sole writer of `_hud.hp_bar.size.x`,
+`_hud.hp_ghost.size.x` and `_hud.hp_text.text`, and it is **event-driven only** —
+it runs on a hit, a kill, a level-up, an equip. `_update_gauges(delta)` runs every
+frame from `_physics_process`, and it owned the damage-ghost *computation*
+(`_hp_ghost` at main.gd:788) while the *drawing* of that ghost lived in
+`refresh_hud()`. So any HP source that moves per frame rather than per event —
+the flask being the only one today — was invisible until the next unrelated event
+redrew the bar. A regeneration item, a bleed, or a pet's heal would all have hit
+exactly the same wall.
+
+### The fix
+
+Split the readout out of `refresh_hud()` into `_refresh_hp_readout()` (bar, ghost,
+text, low-HP pulse), and drive it from `_update_gauges()` behind a staleness check
+against what is currently drawn (`_hp_shown` / `_max_hp_shown` / `_hp_ghost_shown`):
+nothing moving means nothing redrawn, so the per-frame cost is a float compare.
+The text write is additionally gated on `ceili()` changing, so there is no
+per-frame string churn at 60 FPS. `refresh_hud()` now calls the same function, so
+every existing caller keeps working unchanged. The burn also ends with a second
+floating number — `+N HP` in the heal colour — so the drip is legible even at a
+glance.
+
+### The gate's blind spot
+
+`flask_probe` was green *through* this bug, and it is worth recording why: it
+drives `_process_flask()` by hand with `hunt.set_physics_process(false)` and
+`p.set_physics_process(false)`, and it only sampled `hp_text` immediately after a
+click — the one moment `refresh_hud()` had just run. A hand-driven model check
+cannot see a rendering-cadence bug by construction. The probe now has a live-drip
+section that re-enables physics, drinks, and asserts on the real clock that HP
+climbs, the bar widens, the text changes, and that both settle exactly on the
+healed total.
+
+One detail in that section is itself a lesson: mid-burn the text is asserted to
+have **moved**, not to be exact. The player node burns the flask in its own
+`_physics_process` and main draws the gauge in its, so the readout trails the model
+by at most one 16 ms tick — real, invisible, and not worth serialising nodes over.
+Exactness is asserted after the burn ends, when HP has stopped moving.
+
+Gate string (USAGE §10 updated): `FLASK OK — real R/click, 20% now + 20% over 2s
+on the real clock, the bar and text follow the drip, exact budget, recharge never
+heals, full/empty/dead feedback`. Re-ran green three times, plus the three gates
+that share `refresh_hud()` — `level_up_probe`, `click_test`, `renewal_probe` — all
+green.

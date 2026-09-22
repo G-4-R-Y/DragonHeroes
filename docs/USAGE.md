@@ -813,7 +813,7 @@ Every row below was run on 2026-09-13 and printed exactly this.
 | Hunt level-up | `godot --headless --path game res://prototype/tests/level_up_probe.tscn` | `LEVEL UP OK — real kills refresh stats/HP/HUD/dodges/flasks; party parity; no gear heal, duplicate refill, build reroll or revival` |
 | FX budget | `godot --headless --path game res://prototype/tests/fx_stress.tscn --quit-after 260` | `FXSTRESS OK ribbons_peak<=40(40) lights_peak<=32(32) telegraphs_peak<=24(20) labels_peak<=48(48) nodes_created_after_warmup=0 draws<120(0) frame_ms<16.6(2.19)` |
 | Escape to Haven | `godot --headless --path game res://prototype/tests/esc_probe.tscn` | `ESC OK — returned to haven.tscn (static mem 99 -> 46 MB)` |
-| Flasks | `godot --headless --path game res://prototype/tests/flask_probe.tscn` | `FLASK OK — real R/click, 20% now + 20% over 2s, exact budget, recharge never heals, full/empty/dead feedback` |
+| Flasks | `godot --headless --path game res://prototype/tests/flask_probe.tscn` | `FLASK OK — real R/click, 20% now + 20% over 2s on the real clock, the bar and text follow the drip, exact budget, recharge never heals, full/empty/dead feedback` |
 | Capture / pets | `godot --headless --path game res://prototype/tests/capture_probe.tscn` | `CAPTURE OK — 40 rolls legal; species/kit/rig/level/essence/F-path all held` |
 | Repopulation | `godot --headless --path game res://prototype/tests/repop_probe.tscn` | `REPOP OK — field restocked 0 -> 10 creatures across 3 species` |
 | Arena | `godot --headless --path game res://arena/arena.tscn -- --selftest` | `ARENA SELFTEST OK — 4 matchups, damage flowed, no orphan proxies, HUD 4134 frames` |
