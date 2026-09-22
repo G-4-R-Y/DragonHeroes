@@ -116,28 +116,41 @@ search it by id.
 | R77 | DONE | *"hey, we are building on top of the code build, right? It really levelled up graphics and solved a lot of roadmap items. I think it's time we fully merge the build and keep our final one! Add that when finishing the roadmap (and consider that for continuing and perhaps fixing the roadmap!)"* (2026-09-22). | **Answer to the question first: the codex SOURCE is already merged** — `246a6a5` landed the parallel session's living-world/residency tree, and `game/export_presets.cfg` has written to `builds/codex/` ever since, so every export since then IS the codex build. What was never merged is the **packaging**, and that is a live bug: `tools/package_game.sh` exports (to `builds/codex/`) and then zips a DIFFERENT directory (`builds/<plat>/`), so `builds/dragon-heroes-*.zip` has shipped a **2026-09-12 client** for ten days — the levelled-up graphics Ricardo is describing were never in the zips. Two rival packagers exist: the legacy `package_game.sh` (3 files, no verification) and `tools/package_codex.py` (smoke test, `verify_package.py`, living-preview + lair-journey gates, icon, launcher installer, hashed `BUILD-INFO.json`, GDExtension `.so`) which aborts rather than ship a bad zip. Merge = ONE packager, the codex one, producing `builds/dragon-heroes-<plat>.zip`; `package_game.sh` retired to a wrapper (commented, not deleted). | **DONE 2026-09-22** (canon §12.53, journal for the evidence). ONE packager: `tools/package_codex.py` → **`tools/package_build.py`**, chosen because it passes an explicit path to `--export-release`, which overrides the preset and makes preset drift impossible; `tools/package_game.sh` is now a 142-line wrapper (`exec python3 tools/package_build.py`) keeping only `DH_FETCH_TEMPLATES=1`, whole old body commented out, not deleted. Carried across from the legacy script: the prebuilt Windows-helper cache, as `helper_candidates()` — fresh local build first, `builds/prebuilt/windows/` second, order load-bearing. Product identity renamed everywhere (`dragon-heroes.x86_64` / `.exe`, save dir `Dragon Heroes`) with `game/tools/user_dir_migration.gd` as the FIRST autoload: additive copy, never clobbers, never deletes — **verified against Ricardo's real saves, 88 files copied, old dir intact**. Gone: `builds/codex/`, `sim/build-codex-windows/` (~365 MB), every `-codex` affix, `--codex-smoke`→`--package-smoke`, `--codex-profile`→`--client-profile`. UNTOUCHED: the in-game CODEX effects/affix registry (§12.12) — different thing. **The ten-day bug is dead:** the zips now hold a client dated 2026-09-22 05:00/05:01 (was 2026-09-12); 37.5→50.8 MB linux, 46.5→59.6 MB windows, every gate OK. Also fixed on the way: the mingw cross-build was broken at HEAD (`-Wunused-const-variable` on R55's orphaned `kWindup`, invisible to gcc), the committed `builds/prebuilt/windows/dh-server.exe` was 97 KB of 2026-09-12 code because the path canon called "the output" is a hand-copy nothing rebuilds (real output: `libs/dh-server/`, 287 KB), and `zip -r` was appending to the old archive instead of replacing it. Two findings logged, not regressions: Windows ships **no GDExtension** (`dh_godot.gdextension` declares only `linux.*`; `neural_policy.gd` falls back to GDScript) and the mingw tree emits a misnamed `libdhgodot.linux.template_debug.x86_64.dll`. |
 | R78 | NEXT | Harness finding, 2026-09-22 (R17's push): `builds/dragon-heroes-windows.zip` is **56.82 MB** and GitHub warned on push — past its 50 MB recommendation, and it gained 13 MB in one merge. | The zips are committed on purpose (canon §10, `builds/README.md`: they ARE the game to anyone downloading), so the fix is not "stop committing them". Decide before the **100 MB per-file hard limit** forces it: Git LFS on `builds/*.zip`, or move the distributable to GitHub release assets and keep only `BUILD-INFO.json` in-tree. Recommendation: release assets — LFS quota is a recurring bill, releases are free and give download counts. Gate: a clean clone must still be able to build and run without the zips. |
 | R79 | NEXT | Harness findings, 2026-09-22 (found while proving R77): the Windows package ships **no GDExtension**, the mingw tree emits a misnamed artifact, and the Windows export prints an unexplained warning. | (a) `game/addons/dh_godot/dh_godot.gdextension` declares only `linux.debug.x86_64` / `linux.release.x86_64`, so Godot has nothing to put in the Windows zip; `game/arena/neural_policy.gd` falls back to GDScript, so Windows plays — a pre-existing platform gap, older than R77, not a regression. (b) The mingw tree emits `sim/build-windows/libs/dh-godot/libdhgodot.linux.template_debug.x86_64.dll` — says linux, says debug, is a `.dll`; nothing consumes it today. (c) `Project export for preset "Windows Desktop" completed with warnings. at: _fs_changed (editor/editor_node.cpp:1353)` — not investigated. Gate: `windows.release.x86_64` declared, built by the cross-build, present in the zip, and the arena reporting the native policy path on Windows. |
+| R80 | **DONE 2026-09-22** | Harness finding, 2026-09-22 (found running the full gate suite for R57): `residency_probe` — a USAGE §10 gate — was **red on master**, and red for two independent reasons, neither of them a game bug. Measured before the fix: HEAD baseline in-place `pass=0 fail=5`; the R57 tree `pass=1 fail=4`. Two failure strings, `RESIDENCY FAIL: water fixture missing` and `RESIDENCY FAIL: flying creature over drawn water did not return`. | (a) **No pinned seed.** `main.gd:176` calls `randomize()` and `world_gen.gd:126` rolls `_hunt_seed = forced_seed if forced_seed != 0 else randi()`, so the probe's water fixture existed only on lucky maps — a 28-seed scan found **3 seeds with no water at all** within ±35 tiles of spawn and several more out at ring 28–35. Now pinned to `41487` via `MpNet.pending_seed` before `add_child` (the same seat `stream_recovery.gd:48` and `residency_capture.gd:28` use), released immediately after; that seed leaves origin walkable, so `spawn_point()` is exactly `(0,0)`. (b) **The fixture search took the wrong tile.** It walked `y` from −35 upward and took the first hit in that row, i.e. the most NORTHERN water rather than the nearest — up to 560 px from spawn, past residency's 512 px `wake_distance()`, so the flyer *correctly* refused to wake and the probe called it a failure. It now rings outwards from spawn and never past `wake_distance()/TILE - 4`. Gate: `RESIDENCY OK`, **5/5 green**, `worst_step_ms` 0.50–0.87. Evidence and the debug line that located it (`dist=615.7 wake_d=512.0`): journal 2026-09-22. |
 
 ## 2. NOW — in flight, and the strategy behind it (2026-09-21)
 
 Ricardo's standing order is "finish up all the other tasks in the roadmap",
 and his latest batch says bugs first. Order below is the order to work in.
 
-1. **Port `creature.gd::_separate(delta)` into `sim/` and give it the player
-   body too.** This is R59 and R55's residual at once: the arena separates
-   overlapping bodies, the sim does not, which is why dh-env fights run ~1.8×
-   longer with identical per-channel damage totals, and why creatures stand on
-   top of Ricardo where he cannot hit them. Then re-run the parity matrix at 64
+**Closed since this list was last rewritten (2026-09-22):** ~~R56~~, ~~R57~~,
+~~R59~~, ~~R60~~, ~~R61/R44~~, ~~R74~~, ~~R75~~, ~~R76~~, ~~R80~~. The old item 1
+— *port `creature.gd::_separate` into `sim/`* — is **dead as written**: R59
+landed separation in all four runtimes, and the arena never ran it either
+(arena bodies are `bot_drive`), so it was never R55's divergence.
+
+1. **R58** — the potion's heal-over-time. Re-scope first: `flask_probe` passes,
+   so reproduce the complaint in a real hunt before touching the code.
+2. **R65** — the skills half of pets. R57 delivered the scaling half (a bond
+   re-derives hp/damage from its own chassis at the hunter's level every tick);
+   what is left is that rolled skills are stored and displayed but never cast,
+   and a pet has no level/XP of its own.
+3. **R47 / R48 / R49 / R51** — the four NOW items that never moved: the reward
+   function's full version history, the GenForge console's missing Back
+   navigation, the arena interface polish, and watching a match from the
+   console. R49 shares `game/arena/console.gd` with the other session.
+4. **R55 residual** — instrument the endgame specifically (time-to-first-death
+   vs time-from-first-death-to-episode-end), since the exchange agrees per
+   channel and only the tail disagrees. Then re-run the parity matrix at 64
    episodes and retrain — best-greedy checkpoint export in `ppo.py`, then
    `STEPS=60000000 PLATEAU_UPDATES=80 PLATEAU_DELTA=0.02
    PLATEAU_MIN_STEPS=20000000 CLONE=heuristic tools/train_all.sh --ppo`, with
    the gate's `--episodes` raised above 4 (4 cannot separate 0.6 from 0.9).
-2. **R56** — reap the trainer's process group and free VRAM on console stop.
-3. **R58** — the potion's heal-over-time.
-4. **R60** — the console's missing value labels and 20 M-step legibility.
-5. **R61 / R44** — a rare boss slot in the horde pressure roll. Check
-   `encounter_residency.gd` first: the other session owns that seam.
-6. ~~**R57**~~ — **done 2026-09-22**; R65 (pet levels/skills) is unblocked.
-7. Then the content and event lines, R62 → R71, largest last.
+5. **R78 / R79** — distribution: the 56.82 MB Windows zip heading for GitHub's
+   100 MB hard limit, and the Windows package that ships no GDExtension.
+6. Then the content and event lines, **R62 → R71**, largest last.
+7. **R72(b)** — the boss fight through Meshy → Blender → Unreal; the written
+   judgement is already delivered, the real gap is Blender.
 
 **Standing, always open:** R17/R26/R30 (push everything, preserve every
 prompt verbatim, keep the docs current in the same change), R54 (every

@@ -396,6 +396,18 @@ spawn_probe, click_test, fx_stress (+ captures/), `game/arena/tests/`,
 Reference frames: `docs/media/v1-vs-v2.png`, `captures/03_firefield_burning.png`,
 `captures/ui_hunt_far.png`, `captures/ui_3d.png`.
 
+**Probe discipline (R80, 2026-09-22).** A probe that builds its own world
+fixture must (a) pin the seed — `MpNet.pending_seed = <seed>` before
+`main.tscn` is instantiated, released to `0` right after, the way
+`stream_recovery.gd:48` and `residency_capture.gd:28` do it — because `main.gd`
+calls `randomize()` and an unpinned hunt only sometimes contains the terrain the
+gate needs; and (b) place the fixture inside the radius of the system under
+test, or the system correctly ignores it and the gate reports a bug that is not
+there. `residency_probe` was red on master for both reasons at once. Related:
+any assertion on a `_physics_process` effect must `await
+get_tree().physics_frame`, never `process_frame` — headless process frames
+outrun the fixed 60 Hz physics clock (R57).
+
 ## Docs system
 `docs/00-canon.md` (truth + §12 log) · `docs/README.md` (index) · `HANDOFF.md`
 (volatile) · `docs/harness/` (durable, this) · `docs/USAGE.md` (commands) ·

@@ -4098,3 +4098,74 @@ rewrite `duo_boss.gd`'s comment promised), `docs/USAGE.md` §10 (the
 breath), `docs/harness/10-systems-map.md` (a new **Capture & pets** section),
 `docs/harness/20-roadmap.md` (R57 DONE; R65 marked unblocked, with the note that
 its levelling half landed here and only the skills half remains).
+
+## 2026-09-22 — R80: the gate that was red for two reasons, neither of them a bug
+
+Found while running the full gate suite before committing R57. `residency_probe`
+— a USAGE §10 gate — was red, and red **at HEAD too**, so it was not R57's doing.
+Measured both trees before touching anything:
+
+| tree | result |
+| --- | --- |
+| HEAD (`eed38cc`'s parent, probe in place) | `pass=0 fail=5` |
+| the R57 tree | `pass=1 fail=4` |
+
+Two independent causes, found one after the other. Neither is a game bug; both
+are the probe lying about its own fixture.
+
+### (a) The probe pinned no seed
+
+The gate needs a water tile near the spawn point so it can park a flying record
+over drawn water and watch residency wake it. It never asked for one. `main.gd`
+calls `randomize()` and `world_gen.gd::_ready` rolls
+`_hunt_seed = forced_seed if forced_seed != 0 else randi()`, so the fixture
+existed only on lucky seeds.
+
+Quantified it with a throwaway scanner (`ProtoWorld.new()` per seed with
+`forced_seed`, reporting `origin_walkable`, `spawn_point()`, and the Chebyshev
+ring of the nearest `T_WATER` tile within ±35 tiles). Over 28 seeds:
+
+- seeds **41, 10, 24** — no water at all in range (ring 999)
+- seeds **7, 16, 18** — ring 28–35, i.e. water exists but far outside the wake radius
+- seed **42** (the lair-tour seat) — ring 19
+- seed **41487** — `origin_walkable=true`, `spawn=(0,0)`, water at **ring 2**
+
+So roughly one run in nine had no fixture at all, and several more had one too
+far away to matter. Pinned to **41487** — the seat `stream_recovery.gd:48` and
+`residency_capture.gd:28` already use — via `MpNet.pending_seed` before
+`add_child(hunt)`, released to `0` immediately after so nothing else in the run
+inherits a forced world.
+
+### (b) The fixture search took the wrong tile
+
+The seed pin alone did not turn it green: `flying creature over drawn water did
+not return` survived. A temporary debug print located it in one run:
+
+```
+water=(-256.0, -560.0) here=(0.0, 0.0) dist=615.740234375 wake_d=512.0 ready=true
+```
+
+The old search was a row-major scan (`for y in -35..35: for x in -35..35:` then
+break on the first hit), which returns the **most-northern** water tile, not the
+nearest. 615.7 px is past residency's 512 px `wake_distance()`, so the system
+did exactly the right thing and refused to wake the record — and the probe
+called that a failure. Replaced with a ring-outward search bounded by the wake
+radius itself:
+
+```gdscript
+var max_ring := int(residence.wake_distance() / ProtoWorld.TILE) - 4
+```
+
+The bound is the point: the probe can no longer place a fixture the system is
+contractually allowed to ignore. If no water exists inside the wake radius the
+gate now fails loudly with `water fixture missing` instead of blaming residency.
+
+### After
+
+`RESIDENCY OK`, then five consecutive runs: `R80 residency: pass=5 fail=0`,
+`worst_step_ms` 0.50–0.87 across them. Nothing in `encounter_residency.gd`
+changed — the whole fix is in `game/prototype/tests/residency_probe.gd`.
+
+The lesson for the next probe: **a gate that builds its own fixture must pin the
+world it builds it in, and must respect the radius of the system it is testing.**
+Both halves of this failure looked like product bugs from the outside.

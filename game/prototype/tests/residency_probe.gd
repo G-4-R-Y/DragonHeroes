@@ -14,8 +14,18 @@ func _ready() -> void:
 
 func run() -> void:
 	Session.login("residency_probe")
+	# R80: this gate needs a water tile near the spawn point, and an unpinned hunt
+	# does not always have one -- `main.gd` calls `randomize()` and `world_gen.gd`
+	# rolls `_hunt_seed = randi()`, so the fixture existed only on lucky seeds
+	# (measured over 28 seeds: 3 had NO water within +/-35 tiles and several more
+	# sat at ring 28-35, which is why this probe was red on master). Seed 41487 is
+	# the one `stream_recovery.gd` already pins: origin walkable, so `spawn_point()`
+	# is exactly (0,0), with water at ring 2. Pinned the way the co-op lobby does it,
+	# then released so nothing else in the run inherits a forced world.
+	MpNet.pending_seed = 41487
 	var hunt := preload("res://prototype/main.tscn").instantiate()
 	add_child(hunt)
+	MpNet.pending_seed = 0
 	hunt.set_physics_process(false)
 	hunt.world.set_process(false)
 	hunt.world._streaming = false  # this probe isolates entity lifetime from chunk jobs
@@ -32,13 +42,23 @@ func run() -> void:
 			c.call_deferred("set_physics_process", false))
 	var residence: ProtoEncounterResidency = hunt._residency
 	var here: Vector2 = hunt.world.spawn_point()
+	# R80: the NEAREST water tile, not "the first scanned row that holds water".
+	# The old scan walked y from -35 up and took the first hit in that row, so the
+	# fixture could land 560 px from spawn -- past residency's 512 px
+	# `wake_distance()`, and the flyer then correctly refused to wake. That is
+	# exactly how this gate produced "flying creature over drawn water did not
+	# return". Ring outwards instead, and never further out than the wake radius.
 	var water_position := here
-	for y in range(-35, 36):
-		for x in range(-35, 36):
-			var point := here + Vector2(x * 16, y * 16)
-			if hunt.world.tile_at(point) == ProtoWorld.T_WATER:
-				water_position = point
-				break
+	var max_ring := int(residence.wake_distance() / ProtoWorld.TILE) - 4
+	for ring in range(1, max_ring + 1):
+		for y in range(-ring, ring + 1):
+			for x in range(-ring, ring + 1):
+				if maxi(absi(x), absi(y)) != ring: continue   # ring shell only
+				var point := here + Vector2(x * ProtoWorld.TILE, y * ProtoWorld.TILE)
+				if hunt.world.tile_at(point) == ProtoWorld.T_WATER:
+					water_position = point
+					break
+			if water_position != here: break
 		if water_position != here: break
 	check(water_position != here, "water fixture missing")
 	var wisp := ProtoWisp.new()
