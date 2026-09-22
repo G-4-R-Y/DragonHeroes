@@ -18,7 +18,7 @@ def check(package=None, capture=False):
         env=dict(os.environ)
         for key in ('XDG_DATA_HOME','XDG_CONFIG_HOME','XDG_CACHE_HOME'):
             path=Path(temporary)/key.lower(); path.mkdir(); env[key]=str(path)
-        command=[str(package.resolve()/'dragon-heroes-codex.x86_64')] if package else ['godot','--path',str(ROOT/'game')]
+        command=[str(package.resolve()/'dragon-heroes.x86_64')] if package else ['godot','--path',str(ROOT/'game')]
         command += ['--rendering-method','gl_compatibility','--max-fps','60']
         if not capture: command += ['--headless']
         command += ['--','--lairs-selftest']
@@ -29,7 +29,7 @@ def check(package=None, capture=False):
         log=log_path.read_text()
         if process.returncode or 'ERROR:' in log:
             raise RuntimeError(f'Lair journey failed; {log_path}\n{log[-4000:]}')
-        data=Path(env['XDG_DATA_HOME'])/'Dragon Heroes Codex'
+        data=Path(env['XDG_DATA_HOME'])/'Dragon Heroes'
         report=json.loads((data/'lair-smoke.json').read_text())
         if not report.get('passed') or report['earned_artifacts']!=2: raise RuntimeError(str(report))
         (output/f'{name}.json').write_text(json.dumps(report,indent=2)+'\n')

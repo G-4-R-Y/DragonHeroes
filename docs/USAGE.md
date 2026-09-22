@@ -39,7 +39,7 @@ tools/run_vulkan.sh                                 # Ricardo only: same game, V
 
 Menu → name your hunter → pick a class (Reaver / Emberkin / Frostbinder / Gloam
 Mage / Veilblade) → **ENTER THE HUNT**. Saved hunters load automatically (saves
-in `user://saves/`, i.e. `~/.local/share/Dragon Heroes Codex/`). The menu also
+in `user://saves/`, i.e. `~/.local/share/Dragon Heroes/`). The menu also
 offers **PLAY NEW CONTENT: LAIRS & LEGENDS** (§6), **CO-OP (P2P)** (§2),
 **ARENA** (opens the training console, §4), a **LANGUAGE** toggle (EN / PT-BR)
 and **OPTIONS** — a modal with MUSIC and SFX switches plus two volume sliders,
@@ -754,20 +754,25 @@ Deeper background: `genforge/README.md` (the generation service),
 ## 8. Package and distribute (no Godot on their end)
 
 ```bash
-tools/package_game.sh linux                     # or: windows | all   (not run here)
-DH_FETCH_TEMPLATES=1 tools/package_game.sh all  # first time: fetch ~1 GB export templates
-python3 tools/package_codex.py all              # Codex review packages (linux | windows | all)
-python3 tools/package_codex.py all --require-clean
-python3 tools/verify_package.py <package.zip>   # verifies contents incl. embedded Windows icons
-python3 tools/smoke_codex.py <package.zip>      # exercise the exported PCK + native helper
-python3 tools/build_app_icon.py                 # regenerate PNG + Windows ICO sizes
-python3 tools/install_linux_launcher.py         # desktop launcher + icon association
+python3 tools/package_build.py all               # THE packager (linux | windows | all)
+python3 tools/package_build.py all --require-clean
+DH_FETCH_TEMPLATES=1 tools/package_game.sh all   # first time only: fetch ~1 GB export templates
+python3 tools/verify_package.py <package.zip>    # verifies contents incl. embedded Windows icons
+python3 tools/smoke_package.py <package.zip>     # exercise the exported PCK + native helper
+python3 tools/build_app_icon.py                  # regenerate PNG + Windows ICO sizes
+python3 tools/install_linux_launcher.py          # desktop launcher + icon association
 ```
 
-Output: `builds/dragon-heroes-<platform>.zip` (mainline) or
-`builds/codex/dragon-heroes-codex-<platform>.zip` — the game binary, `dh-server`
-and a LEIA-ME quickstart. Code is MIT, art CC BY-NC (business/32): sharing
-builds is explicitly fine.
+Output: `builds/dragon-heroes-<platform>.zip` — the game binary, `dh-server`, the
+offline content review and a LEIA-ME quickstart. Code is MIT, art CC BY-NC
+(business/32): sharing builds is explicitly fine.
+
+There is exactly **one** packager (R77, 2026-09-22 — the build merge). It exports
+to an explicit path instead of trusting `export_presets.cfg`, which is what let the
+two rival packagers drift apart and ship a ten-day-old client; then it gates the
+result (icon/manifest verify, headless smoke, living-preview and lair-journey
+checks, zip CRC) before it will write a ZIP. `tools/package_game.sh` is now a thin
+wrapper around it and keeps only the export-template fetch.
 
 ## 9. The 3D experiments
 

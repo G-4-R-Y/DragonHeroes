@@ -3,7 +3,7 @@
 extends Node
 
 func _ready() -> void:
-	if "--codex-profile" in OS.get_cmdline_user_args(): call_deferred("run")
+	if "--client-profile" in OS.get_cmdline_user_args(): call_deferred("run")
 
 func percentile(values: Array[float], fraction: float) -> float:
 	var ordered := values.duplicate()

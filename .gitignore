@@ -6,6 +6,10 @@ sim/libs/dh-godot/third_party/
 # built by tools/build_dh_godot.sh; the arena falls back to GDScript without it
 game/addons/dh_godot/*.so
 sim/build-windows/
+# Pre-merge leftovers (R77, 2026-09-22). The Windows cross-build consolidated
+# into sim/build-windows/ and the codex flavour's output into builds/. These
+# two stay ignored so a tree that still has the old directories on disk never
+# offers them up; nothing writes to them any more and both are safe to delete.
 sim/build-codex-windows/
 builds/codex/
 *.o

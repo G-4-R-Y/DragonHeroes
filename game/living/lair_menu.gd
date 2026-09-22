@@ -69,7 +69,7 @@ func _ready() -> void:
 				name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 				content.add_child(name_label)
 		label(box, "Each victory earns an artifact. New facets unlock as your collection grows.", 8)
-	label(box, "Codex collection · local profile · separate from your regular equipment", 8, Color("acb8b4"))
+	label(box, "Trial collection · local profile · separate from your regular equipment", 8, Color("acb8b4"))
 	button(box, "BACK TO MAIN MENU", func() -> void: get_tree().change_scene_to_file("res://prototype/ui/main_menu.tscn"))
 
 func label(parent: Node, text: String, size: int, color := Color("d9d4c7")) -> void:

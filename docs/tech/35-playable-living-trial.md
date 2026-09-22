@@ -2,12 +2,12 @@
 
 Ricardo, 2026-09-12: “where do I review what's up for review before being
 playable? generate a binary with them so I can test it out.” This promotes
-the first chapter into a playable **Codex trial**, with a C++ simulation and
+the first chapter into a playable **trial**, with a C++ simulation and
 Godot presentation. Law: canon §12.45, design/26, tech/34.
 
 ## Explore, unlock and farm
 
-Run the Codex Linux or Windows executable with `dh-server(.exe)` beside it.
+Run the Linux or Windows executable with `dh-server(.exe)` beside it.
 Choose **PLAY NEW CONTENT: LAIRS & LEGENDS**, then **EXPLORE SHRINE ENTRANCES**.
 This guided Hunt uses seed 42 and starts beside the first generated doorway.
 Normal solo Hunts also contain seeded lair entrances. Follow the bell bearing
@@ -34,7 +34,7 @@ when earned. Higher tiers retain the common 100-point power ceiling.
 
 **PRACTICE THE BELL SHRINE** keeps all four presets available and grants no
 items or unlocks. No online account is needed. The native host saves the local
-Codex collection to `user://lair-collection-v1.txt`, separately from regular
+trial collection to `user://lair-collection-v1.txt`, separately from regular
 Hunt equipment and all cashable economy state.
 
 | Input | Trial action |
@@ -86,10 +86,10 @@ from the playable trial; neither interface marks assets approved for live releas
 
 ```bash
 python3 tools/stage_living_preview.py
-python3 tools/package_codex.py all
-python3 tools/check_living_preview.py --package builds/codex/linux
+python3 tools/package_build.py all
+python3 tools/check_living_preview.py --package builds/linux
 python3 tools/check_living_preview.py --capture
-python3 tools/check_lair_journey.py --package builds/codex/linux
+python3 tools/check_lair_journey.py --package builds/linux
 python3 tools/check_lair_journey.py --capture
 ```
 

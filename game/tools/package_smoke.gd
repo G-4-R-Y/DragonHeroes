@@ -1,9 +1,10 @@
-# Explicit outcome probe for exported Codex review packages. Release templates
-# disable external --script overrides; this runs only with -- --codex-smoke.
+# Explicit outcome probe for exported packages. Release templates disable
+# external --script overrides; this runs only with -- --package-smoke.
+# (Was --codex-smoke until the R77 build merge, 2026-09-22.)
 extends Node
 
 func _ready() -> void:
-	if "--codex-smoke" in OS.get_cmdline_user_args():
+	if "--package-smoke" in OS.get_cmdline_user_args():
 		call_deferred("_run")
 
 func _verdict(ok: bool, detail: String) -> bool:
@@ -19,7 +20,7 @@ func _run() -> void:
 	var tree := get_tree()
 	for frame in range(20):
 		await tree.process_frame
-	if OS.get_user_data_dir().get_file() != "Dragon Heroes Codex":
+	if OS.get_user_data_dir().get_file() != "Dragon Heroes":
 		_verdict(false, "save isolation")
 		return
 	var icon: Texture2D = load("res://branding/dragon-heroes.png")

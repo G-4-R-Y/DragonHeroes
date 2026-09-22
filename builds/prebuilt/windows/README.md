@@ -7,8 +7,9 @@ infinite world and no co-op world parity.
 
 | | |
 |---|---|
-| sha256 | `246445fa35cf3de24ed80edd265730eaf48c8377fbb072a7bfd158fb0d8b4349` |
-| size | 97,792 bytes |
+| sha256 | `bd9ece1f7bf8d10b3aca3d63542e0ccb88021d80509751ba876baad1dff88392` |
+| size | 287,232 bytes |
+| built | 2026-09-22 from `3fd8ed3` + the `kWindup` fix |
 | target | PE32+ x86-64, MS Windows console |
 | toolchain | portable llvm-mingw, `sim/cmake/mingw-w64-x86_64.cmake` |
 | first committed | `674d57b` (as `sim/build-windows/dh-server.exe`) |
@@ -23,9 +24,15 @@ reproduce locally.
 It used to ride along inside a fully committed 137-file CMake build tree
 (`sim/build-windows/`: `CMakeCache.txt`, object files, generated Makefiles,
 compiler logs) that `.gitignore` had *already* been told to ignore. That tree is
-untracked now; the 97 KB artifact that was actually load-bearing moved here,
-where the path says what it is and nobody will delete it while clearing build
-directories.
+untracked now; the artifact that was actually load-bearing moved here, where the
+path says what it is and nobody will delete it while clearing build directories.
+
+The copy committed with R75 was 97 KB and dated 2026-09-12, because the path the
+docs called "the output" (`sim/build-windows/dh-server.exe`, root of the build
+tree) is a hand-copy nothing rebuilds — CMake writes
+`libs/dh-server/dh-server.exe`. Rebuilding on 2026-09-22 produced 287 KB: the
+committed binary had been missing `living_preview` and `lair_profile`, i.e. a
+week of server code. Copy from the CMake path, never from the root.
 
 ## Rebuilding it
 
@@ -37,6 +44,7 @@ cp sim/build-windows/libs/dh-server/dh-server.exe builds/prebuilt/windows/
 ```
 
 `tools/package_game.sh` prefers a fresh local cross-build
-(`sim/build-windows/dh-server.exe`) over this copy, so a rebuild wins
-automatically and this file only matters when no local build exists. Refresh it
-whenever `sim/` changes in a way that affects worldgen.
+(`sim/build-windows/libs/dh-server/dh-server.exe`, the real CMake output) over
+this copy, so a rebuild wins automatically and this file only matters when no
+local build exists. Refresh it whenever `sim/` changes in a way that affects
+worldgen.

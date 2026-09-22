@@ -10,7 +10,7 @@
 #   tools/build_console.sh genforge        # just the content cockpit
 #   tools/build_console.sh all --no-install # binaries only
 #
-# The codex flavour already had this treatment (tools/package_codex.py exports,
+# The shipping client already had this treatment (tools/package_build.py exports,
 # stages the PNG and points at an installer); the cockpits had none of it.
 #
 # Like the trainer export, a release template refuses a scene path on the command

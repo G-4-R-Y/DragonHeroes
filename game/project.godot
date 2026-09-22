@@ -11,11 +11,14 @@ config_version=5
 
 [application]
 
-config/name="Dragon Heroes — Codex"
+config/name="Dragon Heroes"
 config/icon="res://branding/dragon-heroes.png"
 config/windows_native_icon="res://branding/dragon-heroes.ico"
 config/use_custom_user_dir=true
-config/custom_user_dir_name="Dragon Heroes Codex"
+; Renamed from "Dragon Heroes Codex" on 2026-09-22 (R77, the build merge).
+; A rename orphans every existing save, so the UserDirMigration autoload below
+; copies the old directory across on first launch — see tools/user_dir_migration.gd.
+config/custom_user_dir_name="Dragon Heroes"
 config/description="Fast-paced dark-fantasy pixel-art ARPG. This client is a thin presentation layer over the dh-sim GDExtension."
 run/main_scene="res://prototype/ui/main_menu.tscn"
 ; The "trainer" export boots straight into the arena: a RELEASE template
@@ -40,13 +43,17 @@ config/features=PackedStringArray("4.6")
 
 [autoload]
 
+; FIRST on purpose: it moves the pre-rename save directory into place before any
+; other autoload reads user://. See tools/user_dir_migration.gd.
+UserDirMigration="*res://tools/user_dir_migration.gd"
+
 LairJourney="*res://living/journey.gd"
 
 LairJourneyProbe="*res://living/journey_probe.gd"
 
-CodexPackageProbe="*res://tools/package_smoke.gd"
+PackageProbe="*res://tools/package_smoke.gd"
 
-CodexPerformanceProbe="*res://tools/performance_probe.gd"
+PerformanceProbe="*res://tools/performance_probe.gd"
 
 Session="*res://prototype/ui/session.gd"
 MpNet="*res://mp/mp_net.gd"

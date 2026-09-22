@@ -21,7 +21,13 @@ constexpr float kFieldTick = 0.25f;
 // creature.gd::windup_time. Was 0.25 here until 2026-09-14 — a telegraph
 // 100 ms shorter than the one the shipping game draws, which is 100 ms of
 // dodge window the learner never had to find.
-constexpr float kWindup = 0.35f;
+// R55 (2026-09-19) made the telegraph per body: the live value is
+// BodySpec::windup_time (arena.hpp), which still DEFAULTS to this 0.35 f,
+// so the number below is the default's provenance, not dead weight.
+// Commented rather than deleted: clang's -Wunused-const-variable + -Werror
+// broke the mingw cross-build on it (2026-09-22), and gcc stayed quiet, so
+// the Linux build never noticed the constant had gone unused.
+// constexpr float kWindup = 0.35f;
 // creature.gd::_strike: `_state = "recover"; _timer = 0.4` — the built-in mind
 // neither chases nor swings until it runs out (R55, 2026-09-19).
 constexpr float kRecover = 0.4f;

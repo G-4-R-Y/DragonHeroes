@@ -96,8 +96,8 @@ def verify_icon(executable, ico):
 def verify(package, ico):
     package = package.resolve()
     manifest = json.loads((package / "BUILD-INFO.json").read_text())
-    required = {manifest["executable"], manifest["world_helper"], "dragon-heroes-codex.png",
-                "dragon-heroes-codex.ico", "LEIA-ME.txt", "content-review/index.html"}
+    required = {manifest["executable"], manifest["world_helper"], "dragon-heroes.png",
+                "dragon-heroes.ico", "LEIA-ME.txt", "content-review/index.html"}
     if not required <= set(manifest["files"]):
         raise ValueError("Package manifest is missing required files")
     for relative, expected in manifest["files"].items():
@@ -126,4 +126,4 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("package", type=Path)
     args = parser.parse_args()
-    verify(args.package, args.package / "dragon-heroes-codex.ico")
+    verify(args.package, args.package / "dragon-heroes.ico")

@@ -176,16 +176,26 @@ see [tech/35](35-playable-living-trial.md) for its bounded preview scope.
 These are tracked in the single roadmap, not silently treated as complete.
 
 
-## Codex review packages and application icon
+## Shipping packages and application icon
 
-On `codex/modern-pixel-content-engine`, build both desktop packages with:
+Build both desktop packages with:
 
 ```bash
-python3 tools/package_codex.py all   # or linux / windows
-python3 tools/verify_package.py builds/codex/linux
-python3 tools/verify_package.py builds/codex/windows
-python3 tools/smoke_codex.py builds/codex/linux
+python3 tools/package_build.py all   # or linux / windows
+python3 tools/verify_package.py builds/linux
+python3 tools/verify_package.py builds/windows
+python3 tools/smoke_package.py builds/linux
 ```
+
+**One packager (R77, 2026-09-22 — the build merge.)** `tools/package_build.py` is
+the former `package_codex.py`, promoted. It won the merge because it exports to an
+explicit staged path rather than trusting `export_presets.cfg`, and because it
+gates its own output. The legacy `tools/package_game.sh` trusted the preset, the
+preset drifted to `builds/codex/`, and the ZIPs it built from `builds/<plat>/`
+shipped a ten-day-old client; it is now a thin wrapper that keeps only the
+export-template fetch (`DH_FETCH_TEMPLATES=1`). The separate `builds/codex/`
+flavour, the `sim/build-codex-windows/` tree and the `-codex` binary affixes are
+gone.
 
 Requires the existing Python authoring dependencies, CMake/C++ compiler,
 Godot **4.6 stable** and its installed export templates. Windows helpers use
@@ -195,11 +205,12 @@ calls an image provider. It rebuilds helpers from source, runs CTest and content
 validation, imports assets, exports into a fresh stage and checks every file
 hash before making CRC-checked archives:
 
-- `builds/codex/dragon-heroes-codex-linux.zip`
-- `builds/codex/dragon-heroes-codex-windows.zip`
+- `builds/dragon-heroes-linux.zip`
+- `builds/dragon-heroes-windows.zip`
 
-The extracted directories sit beside those ZIPs. The primary executables are
-`dragon-heroes-codex.x86_64` and `dragon-heroes-codex.exe`; `dh-server(.exe)`
+The extracted directories sit beside those ZIPs (`builds/linux`, `builds/windows`).
+The primary executables are
+`dragon-heroes.x86_64` and `dragon-heroes.exe`; `dh-server(.exe)`
 retains the name the world-generation loader expects. `BUILD-INFO.json`
 records source HEAD, branch, dirty state and SHA-256 per packaged file. Build
 from a clean committed checkout for an exact review reference. Generated
@@ -207,8 +218,13 @@ packages and cross-build outputs are ignored by Git. Export logs live under
 `genforge/candidates/packaging/`; a failed icon check preserves its client
 there for inspection and does not publish a ZIP.
 
-The project title and application-data directory are **Dragon Heroes Codex**
-(the window title includes an em dash), keeping review saves/settings separate.
+The project title and application-data directory are both **Dragon Heroes**.
+They were *Dragon Heroes Codex* until the merge; renaming a
+`custom_user_dir_name` silently orphans every save, so the first autoload in
+`game/project.godot` is `UserDirMigration` (`game/tools/user_dir_migration.gd`),
+which copies the old directory across on first launch. It is additive — it never
+overwrites a file that already exists and never deletes the source — and a
+`user://.user-dir-migrated` marker makes it one-shot.
 Each package includes `content-review/index.html` and its complete offline
 candidate bundle. This is an accompanying art/design review: new Orun art,
 artifact tiers and skills are playable through **PLAY NEW CONTENT: THE BELL
@@ -237,7 +253,7 @@ The packager does not install
 anything into the user's desktop menu.
 
 The Linux packager runs the actual exported release executable with the
-explicit `-- --codex-smoke` flag. A dormant `game/tools/package_smoke.gd`
+explicit `-- --package-smoke` flag. A dormant `game/tools/package_smoke.gd`
 autoload checks embedded icons, save isolation, the built menu and a populated
 streaming Hunt, writing an outcome report in isolated temporary user data.
 This caught and fixed `world_gen.gd` checking the development helper path in
@@ -252,11 +268,15 @@ are verified here; native Windows gameplay and Explorer/taskbar appearance
 require a Windows machine. Headless Linux startup checks are separate from
 visual captures and do not prove 60 FPS or desktop-shell appearance.
 
-Codex Windows cross-builds use the ignored `sim/build-codex-windows/` tree,
-isolated from `sim/build-windows/`. Both build trees are untracked now (R75,
-2026-09-22); the one artifact that was load-bearing lives at
-`builds/prebuilt/windows/dh-server.exe`, and `tools/package_game.sh` prefers a
-fresh local cross-build over it.
+Windows cross-builds use one ignored tree, `sim/build-windows/`; the merge
+dropped the second (`sim/build-codex-windows/`). Build trees are untracked (R75, 2026-09-22); the one artifact that was
+load-bearing lives at `builds/prebuilt/windows/dh-server.exe`, the committed cache
+that lets a clone without llvm-mingw still ship a complete Windows ZIP.
+`package_build.py::helper_candidates()` prefers a fresh local cross-build over it
+and the order is load-bearing: a cached helper must never outrank a rebuilt one.
+Note the real CMake output is `sim/build-windows/libs/dh-server/dh-server.exe` —
+the tree root once held a hand-copy that nothing rebuilt, which is how a 2026-09-12
+helper stayed committed for ten days.
 
 ## Connected weekly lore and local-cost contract (2026-09-13)
 

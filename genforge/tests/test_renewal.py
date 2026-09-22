@@ -31,16 +31,16 @@ def test_action_bake_has_distinct_motion_and_matching_lighting(tmp_path):
 def test_linux_icon_installs_a_valid_relocatable_launcher(tmp_path):
     package = tmp_path / 'Dragon Heroes $test % "quoted"'
     package.mkdir()
-    executable = package / "dragon-heroes-codex.x86_64"
+    executable = package / "dragon-heroes.x86_64"
     executable.write_bytes(b"test")
-    icon = package / "dragon-heroes-codex.png"
+    icon = package / "dragon-heroes.png"
     icon.write_bytes(b"icon test fixture")
     data = tmp_path / "xdg"
     desktop, associated = install(package, data=data, metadata=False)
     assert not associated
     assert (data / "icons/hicolor/512x512/apps" / icon.name).read_bytes() == icon.read_bytes()
-    assert (package / "Dragon Heroes Codex.desktop").read_bytes() == desktop.read_bytes()
-    assert "Icon=dragon-heroes-codex\n" in desktop.read_text()
+    assert (package / "Dragon Heroes.desktop").read_bytes() == desktop.read_bytes()
+    assert "Icon=dragon-heroes\n" in desktop.read_text()
     if shutil.which("desktop-file-validate"):
         subprocess.run(["desktop-file-validate", str(desktop)], check=True)
     moved = tmp_path / "Moved Game"
@@ -57,8 +57,8 @@ def test_snap_ide_installs_for_host_desktop(monkeypatch, tmp_path):
     monkeypatch.setenv("GIO_MODULE_DIR", str(tmp_path / "real_home/snap/code/common/.cache/gio-modules"))
     package = tmp_path / "package"
     package.mkdir()
-    (package / "dragon-heroes-codex.x86_64").write_bytes(b"fixture")
-    (package / "dragon-heroes-codex.png").write_bytes(b"icon")
+    (package / "dragon-heroes.x86_64").write_bytes(b"fixture")
+    (package / "dragon-heroes.png").write_bytes(b"icon")
     desktop, _ = install(package, metadata=False)
-    assert desktop == tmp_path / "real_home/.local/share/applications/dragon-heroes-codex.desktop"
+    assert desktop == tmp_path / "real_home/.local/share/applications/dragon-heroes.desktop"
     assert "GIO_MODULE_DIR" not in desktop_environment()

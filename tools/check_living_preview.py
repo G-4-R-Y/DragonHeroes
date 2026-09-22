@@ -21,7 +21,7 @@ def check(package=None, capture=False):
             path = folder / key.lower()
             path.mkdir()
             env[key] = str(path)
-        command = [str(package.resolve()/"dragon-heroes-codex.x86_64")] if package else ["godot", "--path", str(ROOT/"game")]
+        command = [str(package.resolve()/"dragon-heroes.x86_64")] if package else ["godot", "--path", str(ROOT/"game")]
         command += ["--rendering-method", "gl_compatibility", "--max-fps", "60"]
         if not capture:
             command.append("--headless")
@@ -34,7 +34,7 @@ def check(package=None, capture=False):
         log = log_path.read_text()
         if result.returncode or "ERROR:" in log:
             raise RuntimeError(f"Playable trial failed; {log_path}\n{log[-3500:]}")
-        data = Path(env["XDG_DATA_HOME"])/"Dragon Heroes Codex"
+        data = Path(env["XDG_DATA_HOME"])/"Dragon Heroes"
         if capture:
             shutil.copyfile(data/"living-trial.png", output/"living-trial.png")
             shutil.copyfile(data/"living-render.json", output/"living-render.json")

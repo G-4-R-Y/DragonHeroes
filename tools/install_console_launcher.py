@@ -2,7 +2,7 @@
 """Put a Dragon Heroes console in the desktop menu, with the Dragon Heroes icon.
 
 Ricardo, 2026-09-13: "create an execution icon binary as the rest ... we even
-have custom icons". The codex flavour already ships one (tools/package_codex.py
+have custom icons". The shipping client already ships one (tools/package_build.py
 stages a PNG and tools/install_linux_launcher.py registers the .desktop entry);
 the training cockpit did not — it was a godot command line you had to remember.
 This is the same treatment for it.
@@ -61,7 +61,7 @@ TARGETS = {
 def desktop_environment() -> dict:
     """A Snap-confined IDE redirects XDG at its own sandbox; a desktop entry has
     to land in the user's real home or it never reaches their menu. Same reason
-    tools/install_linux_launcher.py does this for the codex build."""
+    tools/install_linux_launcher.py does this for the game build."""
     env = dict(os.environ)
     if env.get("SNAP"):
         for key in ("GIO_MODULE_DIR", "GIO_EXTRA_MODULES", "LD_LIBRARY_PATH"):

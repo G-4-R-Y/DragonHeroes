@@ -3764,3 +3764,169 @@ dated note. No structural change.
   (Under system `python3` two mask tests fail on `ModuleNotFoundError: torch` —
   pre-existing and environmental; torch lives in `ml/.venv`.)
 - `bash -n tools/package_game.sh`, plus both resolver branches run by hand.
+
+## 2026-09-22 — R77: the build merge, and the client that had been stale for ten days
+
+Ricardo, verbatim:
+
+> hey, we are building on top of the code build, right? It really levelled up
+> graphics and solved a lot of roadmap items. I think it's time we fully merge
+> the build and keep our final one! Add that when finishing the roadmap (and
+> consider that for continuing and perhaps fixing the roadmap!)
+
+and, a moment later:
+
+> yeah, i just noticed that as well, you were looking exactly at that lol. Keep
+> in mind codex advanced some stuff we can reuse and perhaps extend
+
+### The answer to the question, and the bug hiding behind it
+
+**Yes — and the source had been merged for ten days already.** `246a6a5` landed
+the parallel session's living-world/residency tree, and `game/export_presets.cfg`
+has pointed at `builds/codex/` ever since. Every *export* since then was the
+codex build.
+
+What was never merged was the **packaging**, and that was a live shipping bug:
+
+```
+game/export_presets.cfg  →  export_path = ../builds/codex/<plat>/dragon-heroes-codex.<ext>
+tools/package_game.sh    →  pack() zips  builds/<plat>/
+```
+
+The export landed in one directory and the zip was built from another. So
+`builds/dragon-heroes-linux.zip` and `…-windows.zip` — the two artifacts that
+are the game, as far as anyone downloading is concerned — carried a
+**2026-09-12 client for ten days**. The levelled-up graphics Ricardo was
+describing had never once been inside them.
+
+### The decision: one packager, and which one
+
+Two rival packagers existed. The legacy `tools/package_game.sh` copied three
+files and verified nothing. `tools/package_codex.py` built the icon, validated
+content, staged the living preview, built the sim and ran ctest, cross-built
+mingw, ran Godot `--import`, exported, hashed a `BUILD-INFO.json`, then gated on
+`verify_package.py`, a package smoke run, `check_living_preview`,
+`check_lair_journey` and a zip CRC test — and refused to ship if any of them
+failed.
+
+The codex one wins, and the deciding reason is not the gate list. It is this
+line:
+
+```
+godot --headless --path game --export-release "<preset>" <explicit path>
+```
+
+The explicit path argument **overrides** the preset's `export_path`. A packager
+that passes it cannot be betrayed by preset drift — which is exactly the class
+of bug that caused the ten-day staleness. The legacy script trusted the preset
+and lost.
+
+- `tools/package_codex.py` → **`tools/package_build.py`** (git mv + rewrite).
+- `tools/smoke_codex.py` → `tools/smoke_package.py`; `tools/profile_codex.py` →
+  `tools/profile_client.py`. Flags followed: `--codex-smoke` → `--package-smoke`,
+  `--codex-profile` → `--client-profile`.
+- `tools/package_game.sh` survives as a **142-line wrapper**: the whole old body
+  is commented out, not deleted (standing rule), and the only live code is
+  `fetch_templates()` — the one capability the Python packager never had — plus
+  `exec python3 tools/package_build.py "${1:-all}"`. `DH_FETCH_TEMPLATES=1
+  tools/package_game.sh all` still works on a fresh machine.
+
+**What was reused from the legacy side**, per *"codex advanced some stuff we can
+reuse and perhaps extend"* read in both directions: the prebuilt Windows-helper
+cache, carried across as `helper_candidates()`. Fresh local cross-build first,
+`builds/prebuilt/windows/dh-server.exe` second. That order is load-bearing and
+is commented as such: **a cached helper must never outrank a rebuilt one**, or
+the cache silently ships stale code — the same failure mode in a different
+costume.
+
+### Product identity, and the save directory that would have orphaned every hunter
+
+Renaming `config/custom_user_dir_name` from `Dragon Heroes Codex` to
+`Dragon Heroes` moves the save directory out from under every existing save.
+Godot does not migrate; it just starts fresh, and the hunters appear to be gone.
+
+So `game/tools/user_dir_migration.gd` runs as the **first** autoload, before
+LairJourney, Session or anything else that reads `user://`. It works in
+`_init()`, copies additively, **never clobbers an existing file and never
+deletes the old directory**, and drops `user://.user-dir-migrated` so it runs
+once.
+
+Verified against Ricardo's real data, not a fixture:
+
+```
+USER DIR MIGRATION: copied 88 file(s) from …/.local/share/Dragon Heroes Codex
+MENU OK — 13 buttons + OPTIONS screen … settings survive a language save
+          (…/.local/share/Dragon Heroes), script compiled
+```
+
+Old directory afterwards: 89 files, 4 saves — untouched.
+
+### The proof the bug is dead
+
+`python3 tools/package_build.py all`, EXIT=0, every gate printing OK
+(`CONTENT OK`, contents 18/16 files, `PACKAGE SMOKE OK … creatures=60`,
+`LIVING PLAYTEST OK`, `LAIR JOURNEY OK: … fps=60.0 frame_cpu_ms=0.325`, both
+six-size `EMBEDDED ICON OK` checks, both `PACKAGE OK`). Log:
+`genforge/candidates/packaging/r77-merge-build.log`.
+
+| | before | after |
+|---|---|---|
+| `dragon-heroes.x86_64` in the linux zip | 2026-09-12 | **2026-09-22 05:00**, 96,236,632 B |
+| `dragon-heroes.exe` in the windows zip | 2026-09-12 | **2026-09-22 05:01**, 129,746,984 B |
+| `dragon-heroes-linux.zip` | 37,542,323 B | 50,797,130 B |
+| `dragon-heroes-windows.zip` | 46,463,352 B | 59,579,269 B |
+
+The mingw cross-build ran for real this time (no fallback WARNING in the log,
+`sim/build-windows/` rebuilt at 05:00), so the prebuilt cache was not exercised
+by this run — it stays as the fallback for machines without mingw.
+
+### Deleted, after the safety check
+
+`builds/codex/` (331 MB) and `sim/build-codex-windows/` (34 MB), ~365 MB total —
+and only **after** the new package run succeeded, so the only existing export
+was never the thing being destroyed. Concurrent-session rule applied first:
+nothing under either path was newer than 04:50, and `git status --porcelain` on
+both was empty.
+
+**Untouched, and deliberately so: the in-game CODEX** — the effects/affix
+registry of canon §12.12. Same word, unrelated thing; it is game fiction, not a
+build flavor.
+
+### Fixed on the way
+
+1. **The mingw cross-build was broken at HEAD.** `arena.cpp:24:17: error: unused
+   variable 'kWindup' [-Werror,-Wunused-const-variable]` — R55 orphaned it, and
+   gcc does not diagnose an unused namespace-scope `constexpr` while clang does,
+   so the Linux build stayed green and nobody noticed. Commented out with a
+   provenance note rather than deleted. Linux ctest stayed 4/4.
+2. **The committed `builds/prebuilt/windows/dh-server.exe` was 97 KB of
+   2026-09-12 code**, because the path canon §12(e) called "the output" is a
+   hand-copy that nothing rebuilds. The real CMake output is
+   `sim/build-windows/libs/dh-server/dh-server.exe` (287,232 B, sha256
+   `bd9ece1f…88392`). Canon corrected, the cache replaced, and the trap written
+   into `builds/prebuilt/windows/README.md`.
+3. **`zip -qr` was appending to the previous archive** instead of replacing it.
+   Moot under the new packager, which always zips from a fresh stage.
+
+### Two findings logged, neither a regression
+
+- **The Windows package ships no GDExtension.**
+  `game/addons/dh_godot/dh_godot.gdextension` declares only
+  `linux.debug.x86_64` and `linux.release.x86_64`, so Godot's exporter has
+  nothing to put in the Windows zip. `game/arena/neural_policy.gd` already falls
+  back to GDScript when the extension is absent, so Windows is playable — it is
+  a pre-existing platform gap, older than R77.
+- **The mingw tree emits a misnamed artifact**:
+  `sim/build-windows/libs/dh-godot/libdhgodot.linux.template_debug.x86_64.dll`
+  — says "linux", says "debug", is a `.dll`. Harmless today only because nothing
+  consumes it.
+
+### Docs updated in the same change
+
+`docs/00-canon.md` §12.53 (the canonical record), `docs/USAGE.md` §8,
+`docs/tech/34-living-content-pipeline.md`,
+`docs/tech/35-playable-living-trial.md`,
+`docs/harness/10-systems-map.md`. Historical narrative was deliberately left
+alone — the recovery history in `10-systems-map.md`, the older entries in this
+file and `genforge/candidates/packaging/recovery-*.log` still say `codex`,
+because that is what happened.

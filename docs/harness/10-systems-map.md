@@ -341,19 +341,28 @@ UE install (Epic account, ~45 GB).
 ## Packaging & platforms
 **Desktop packaging LANDED; Android documented, not exported.** docs/USAGE.md,
 tech/30 (Android/LAN), business/32 (open source: MIT code, CC BY-NC art
-pending confirm). `game/export_presets.cfg`, `tools/package_game.sh`
-(binary + dh-server + LEIA-ME), `builds/`. Issues: export templates (~1 GB)
-installed locally for the Codex desktop exports; no touch controls; no mobile perf pass (60 FPS directive).
+pending confirm). `game/export_presets.cfg`, `tools/package_build.py`
+(binary + dh-server + offline review + LEIA-ME), `builds/`. Issues: export
+templates (~1 GB) installed locally for the desktop exports; no touch controls;
+no mobile perf pass (60 FPS directive).
 
-**Codex review packaging:** `tools/package_codex.py` rebuilds both clients and
-helpers, bundles the offline review, records source/file hashes and verifies
-archives. Windows uses `sim/build-codex-windows` to avoid upstream's tracked
-build cache. `tools/build_app_icon.py` derives PNG + six-size ICO from a curated
+**One packager (R77, 2026-09-22 — the build merge):** `tools/package_build.py`
+(the promoted `package_codex.py`) rebuilds both clients and helpers, bundles the
+offline review, records source/file hashes and verifies archives. It exports to an
+explicit staged path instead of trusting the preset's `export_path` — the drift
+between those two is what made `builds/dragon-heroes-*.zip` ship a ten-day-old
+client — and it refuses to write a ZIP that fails a gate. `tools/package_game.sh`
+is a wrapper over it, keeping only `DH_FETCH_TEMPLATES=1`. Windows uses the single
+`sim/build-windows` tree, falling back to the committed
+`builds/prebuilt/windows/dh-server.exe` cache when llvm-mingw is absent.
+`tools/build_app_icon.py` derives PNG + six-size ICO from a curated
 original; `tools/verify_package.py` checks actual Windows PE icon bytes and
 Linux executable formats. Actual release-PCK smoke verifies a streaming Hunt;
 fixed the exported helper capability check that silently selected an island. Source: `genforge/art_sources/app_icon/`; outputs:
-`builds/codex/` (ignored). Optional Linux launcher ships with the package.
-Law/runbook: tech/34 packaging section. Window title and saves are Codex-specific.
+`builds/{linux,windows}` + the two ZIPs (all ignored). Optional Linux launcher
+ships with the package. Law/runbook: tech/34 packaging section. Product name and
+save directory are both "Dragon Heroes"; `game/tools/user_dir_migration.gd` (first
+autoload) carries pre-merge "Dragon Heroes Codex" saves across on first launch.
 
 ## Sim workspace (C++20)
 **M0 benchmark harness.** tech/20-22, canon §10. `sim/libs/{dh-math,dh-sim,
