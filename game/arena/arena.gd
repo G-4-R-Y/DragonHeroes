@@ -26,6 +26,12 @@ extends Node2D
 const TILE := 16.0
 const INTRO_S := 1.0
 const END_S := 1.4
+# The scripted policy's retreat trigger (scripted_policy.gd: `my_hp < 0.25`).
+# R55-c splits every episode at the first crossing of it: everything before is
+# the EXCHANGE, everything after is the CHASE, and the two runtimes are compared
+# phase by phase. The residual gap is a clock gap, so the question is which
+# phase spends the extra seconds -- a total cannot answer that.
+const LOW_HP := 0.25
 const SELFTEST_MATCHES := [
 	["core.arena.dusk_revenant", "core.arena.fen_boar_alpha", "scripted", "native"],
 	["core.arena.fen_boar_alpha", "core.arena.gloamfen_stalker", "scripted", "scripted"],
@@ -70,6 +76,7 @@ var _stdin_buf := ""               # stdin is a byte stream, not a line reader
 var _episode := 0
 var _episodes := 1
 var _timer := 0.0
+var _low_t := -1.0          # _timer when either side first fell below LOW_HP; -1 = never
 var _time_limit := 90.0
 var _wins := [0, 0, 0]             # side A, side B, draws
 var _results: Array = []
@@ -327,6 +334,14 @@ func _start_episode() -> void:
 	_fighters[1].enemy = _fighters[0]
 	for i in 2:
 		_fighters[i].policy.setup(_fighters[i], _fighters[i].enemy, _rng.randi())
+	# a net that failed to load is silent, not loud: it would fight the whole
+	# match at zero output and write a perfectly shaped result. Refuse instead.
+	for f in _fighters:
+		if f.policy is ArenaNeuralPolicy and not (f.policy as ArenaNeuralPolicy).loaded():
+			push_error("arena: policy weights did not load: %s (use an ABSOLUTE path)"
+					% (f.policy as ArenaNeuralPolicy).path)
+			_advance_or_quit(1)
+			return
 	if not _replay.is_empty():
 		# after setup(): the policy's own clock starts at zero here, on the same
 		# frame the bodies are seated, so cursor() and the bodies share an origin
@@ -343,6 +358,7 @@ func _start_episode() -> void:
 				"level": Session.level, "seed": int(_cfg.get("seed", 2026))})
 	_timer = 0.0
 	_rec_t = 0.0
+	_low_t = -1.0
 	_state = "intro"
 	if _fast:
 		_state = "fight"
@@ -365,6 +381,9 @@ func _end_episode(winner: ArenaFighter) -> void:
 			# every episode and still scored 0.607).
 			"winner_side": "draw" if draw else ("a" if winner == _fighters[0] else "b"),
 			"duration_s": snappedf(duration, 0.01),
+			# R55-c: when the fight became a chase. -1.0 when neither side ever
+			# dropped below LOW_HP, which is itself the answer for that episode.
+			"low_t_s": snappedf(_low_t, 0.01) if _low_t >= 0.0 else -1.0,
 			"hp_a": snappedf(_fighters[0].hp_frac(), 0.001),
 			"hp_b": snappedf(_fighters[1].hp_frac(), 0.001),
 			"dmg_taken_a": snappedf(_fighters[0].damage_taken, 0.1),
@@ -543,6 +562,13 @@ func _physics_process(delta: float) -> void:
 			f.pre_tick(delta, f.enemy)
 	_tick_fields(delta)
 	_tick_summon_wiring(delta)
+	# the phase split, sampled BEFORE the outcome checks so a killing blow that
+	# crosses the threshold lands at low_t == duration (an empty chase), not at -1
+	if _low_t < 0.0:
+		for f in _fighters:
+			if is_instance_valid(f) and f.hp_frac() < LOW_HP:
+				_low_t = _timer
+				break
 	# obs+action logging at 30 Hz (every 2nd physics frame at 60, 8th at 240)
 	_rec_t += delta
 	if _recorder.is_open() and _rec_t >= 1.0 / 30.0:

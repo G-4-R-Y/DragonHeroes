@@ -4873,3 +4873,182 @@ sessions on this tree. Not something to do autonomously.
 `game/prototype/tests/{bond,capture}_probe.gd.uid` (untracked siblings of 140
 tracked `.uid` files; an untracked one regenerates with a different UID in a
 fresh clone).
+
+## 2026-09-22 — R55-c: the loser could not slide along the wall it was touching
+
+R55's residual had been stated for a day: every damage channel agreed, and the
+episodes still ran ~1.8× longer in dh-env than in the arena. Row 110 of the
+experiment ledger named a cause — port `creature.gd::_separate(delta)` into the
+sim — and R59 killed it: separation landed in all four runtimes, and the arena
+never ran it either (arena bodies are `bot_drive`, so `_state` parks at `"idle"`
+and `_chase`, where the old call lived, never executed). The residual was left
+with no candidate cause at all.
+
+### The instrument first, because the roadmap's wording was degenerate
+
+The roadmap asked for *time-to-first-death vs time-from-first-death-to-episode-
+end*. Arena matches are 1v1 mirrors: the first death **is** the episode end, so
+that split measures the whole clock against nothing. The measurable split with
+the same intent is the one the scripted opponent itself defines —
+`scripted_policy.gd` re-arms `_retreat_t = 2.5` the moment its hp drops below
+`0.25`. So:
+
+- **EXCHANGE** — spawn → the first moment either side falls below 0.25 hp.
+- **CHASE** — that moment → episode end.
+
+Both runtimes book it the same way. `arena.gd` samples `LOW_HP` once per
+physics tick *before* the outcome checks (a killing blow that crosses the
+threshold therefore lands at `low_t == duration`, an empty chase, not at `-1`)
+and publishes `low_t_s` in the result dict; `env_parity.py` accumulates
+`exch_ticks`/`chase_ticks` in dh-env and derives the same pair from `low_t_s`
+for the arena. `exchange_s`/`chase_s` are deliberately **not** in `RATIO_TERMS`:
+they do not move `verdict["agree"]`. They attribute a divergence the gate has
+already caught, and `attribute_phase()` prints which phase owns what share.
+
+First reading, cinder_drake v6.0 vs scripted, 32 eps, seed 4242:
+
+| phase | dh-env | arena | ratio |
+|---|---|---|---|
+| exchange | 11.79 s | 10.87 s | 1.08× |
+| chase | 8.73 s | 3.58 s | **2.44×** |
+
+**89% of the whole clock gap lives in the chase**, and the exchange agrees. The
+question stopped being "what does the sim mis-model about combat" and became
+"what happens to two bodies at the ring after one of them turns to run".
+
+### The cause: a movement fence that refused the whole step
+
+`creature.gd::_move` was three lines:
+
+```gdscript
+var target := global_position + step
+if world and world.is_walkable(target):
+    global_position = target
+```
+
+All-or-nothing. A body running into the arena ring froze flat against it — it
+could not even slide *along* the wall it was touching. The sim does not do that:
+`Arena::clamp_disc` projects the post-move position radially back onto the ring
+and **keeps the tangential component**, so a retreating body there keeps moving
+around the boundary. Same fight, same policy, same ring radius (`kArenaRadius =
+26.0f * 16.0f` == `ArenaWorld.radius := 26.0 * TILE` == 416 px): the sim's loser
+slid and lived, the arena's stood still and died.
+
+It is not only a parity bug. It is a gameplay bug that has always been there: a
+fleeing creature pins itself in a corner and dies to a wall rather than to you.
+`player.gd::_move` has had the axis-separated fallback since forever, and
+`hunt3d.gd:307` calls its copy "wall slide, 2D parity". Creatures never got one.
+
+### The fix, in two stages, because stage one was not enough
+
+**Stage 1** — the general axis-separated fallback, copied from `player.gd`: try
+the full step, else x-only, else y-only. Honest, and it moved most of the gap:
+seconds 1.51× → 1.22×, chase 2.44× → 1.35×, win-rate gap 0.2188 → 0.0938. But
+`dps_taken` stayed at **1.27×** against a 1.25× tolerance — the axis fallback
+slides along a *circle* in two discrete chunks and loses distance every tick a
+true radial projection would keep.
+
+**Stage 2** — ask the world. `ArenaWorld` already had an unused
+`clamp_inside(pos, margin) -> pos.limit_length(radius - margin)`, which is
+`clamp_disc` exactly. `_move` now routes through it when the world offers the
+method, and falls back to the axis slide for the tile grid in `world_gen.gd`,
+which has no closed form. One deliberate semantic change came along: a null
+world now moves freely instead of freezing, matching `player.gd`.
+
+### Result — PARITY OK
+
+cinder_drake v6.0 vs scripted, 32 eps, seed 4242, `core.arena.cinder_drake`:
+
+| term | before | stage 1 | stage 2 |
+|---|---|---|---|
+| win_rate gap | 0.2188 DIVERGES | 0.0938 ok | **0.0000 ok** |
+| seconds | 1.51× DIVERGES | 1.22× ok | **1.00× ok** (17.169 / 17.192) |
+| dps_dealt | 1.43× DIVERGES | 1.17× ok | **1.06× ok** |
+| dps_taken | 1.60× DIVERGES | 1.27× DIVERGES | **1.01× ok** |
+| exchange | 1.08× | 1.10× | 1.11× |
+| chase | **2.44×** | 1.35× | **1.10×** |
+| verdict | PARITY FAILED | PARITY FAILED | **PARITY OK** |
+
+### The trap that cost an hour on the way
+
+Godot resolves a bare relative path against `res://`. A relative `--policy`
+loads fine in dh-env (cwd-relative, Python) and silently fails in the arena: the
+fighter runs the whole match at zero output and writes a perfectly well-formed
+result with 0.000 bars in every channel, which reads as a catastrophic
+environment divergence and is a typo. Three guards now: `env_parity.run()`
+resolves `--policy` to an absolute path and `SystemExit`s if the file is
+missing; `ArenaNeuralPolicy.loaded()` reports whether any layer parsed; and
+`arena.gd::_start_episode` refuses to start a match whose neural policy did not
+load, with an error that says *use an ABSOLUTE path*.
+
+### Files
+
+`game/prototype/creature.gd` (`_move`) · `game/arena/arena.gd` (`LOW_HP`,
+`_low_t`, `low_t_s`, the unloaded-net refusal) · `game/arena/neural_policy.gd`
+(`loaded()`) · `ml/eval/env_parity.py` (phase split, `attribute_phase`,
+absolute-path resolution).
+
+### The 64-episode matrix, measured both ways
+
+The roadmap asked for the matrix re-run at 64 episodes. Running it only *after*
+the fix would have proved nothing, so it ran twice — same seed, same nets, same
+opponent, the only variable being `creature.gd::_move` (HEAD vs fixed). dh-env
+is untouched by a GDScript change, and the numbers confirm it: **every dh-env
+column is bit-identical between the two runs.** Only the arena moved.
+
+Chase seconds, dh-env / arena (all vs `scripted`, 64 eps, seed 4242):
+
+| build | dh-env | arena HEAD | arena fixed |
+|---|---|---|---|
+| bog_golem | 4.29 | 6.39 | 5.90 |
+| cinder_drake | 8.96 | 3.87 | **8.54** |
+| fen_boar_alpha | 18.89 | 13.48 | **20.65** |
+| gloam_wisp | 4.64 | 8.50 | 11.70 |
+| gloamfen_stalker | 6.10 | 3.45 | 8.93 |
+| grave_shade | 19.60 | 7.41 | **18.87** |
+| mire_serpent | 8.58 | 2.65 | **6.29** |
+
+Summary terms:
+
+| | HEAD | fixed |
+|---|---|---|
+| `agree` (the gate) | **0 / 7** | **3 / 7** |
+| worst ratio across the matrix | 2.08× | 1.81× |
+| mean \|chase ratio − 1\| | 1.098 | **0.415** |
+| mean \|seconds ratio − 1\| | 0.361 | **0.138** |
+
+### What is honestly left, and it is a different shape
+
+The fence was a **one-directional bias**: the arena's chase was uniformly
+truncated because the loser died against the wall. Removing it leaves a
+residual of **mixed sign**, which is the healthier failure — no longer one
+systematic error, just per-body driver differences:
+
+- **Four builds converged** (cinder_drake 2.31× → 1.05×, grave_shade 2.65× →
+  1.04×, fen_boar_alpha 1.40× → 1.09×, mire_serpent 3.24× → 1.36×).
+- **Two overshot past parity** — `gloam_wisp` (1.83× → 2.52×) and
+  `gloamfen_stalker` (1.77× → 1.46×, still improved but now on the other side).
+  Both are the **kiting/ranged** bodies, and for both the *arena* chase is now
+  the longer one: the sim ends their endgame too early, the opposite sign from
+  the fence bug. gloam_wisp's worst ratio got worse (1.54× → 1.81×) while its
+  worst absolute gap improved (0.165 → 0.149). That is the new R55 residual, and
+  it is far better posed than the old one: one phase, two named builds, known
+  sign, and the instrument to measure it already exists.
+- **bog_golem's `worst` gap reads 0.234 → 0.422** and should not be read as a
+  regression: that term is `win_rate` in a **mirror matchup with a greedy
+  decode**, which is near-deterministic — a hair of divergence flips every
+  episode at once. Its rate ratios all improved (1.14× → 1.08×). The ledger
+  already says to judge this probe on rate ratios, not win_rate.
+
+### Gates
+
+MENU · SPAWNTEST (creatures=58, nearest=176 px) · STREAMTEST (worst_apply
+1.27 ms of a 2 ms budget) · GROUND STATE · RESIDENCY (worst_step 1.072 ms) ·
+CAPTURE (40 rolls) · BOND (19 skills, all 7 behaviors) · LEVEL UP · CLICKTEST
+(6/6) · FXSTRESS (frame 3.75 ms of 16.6, 0 nodes after warmup) · ROAM BOSS ·
+ARENA SELFTEST (4 matchups, HUD 7072 frames) · CONSOLE SELFTEST · COSMETICS ·
+TRAINER STOP · TRACE REPLAY · MP TEST — all OK. `validate_content.py`: 46
+definitions, 11 types, 5 registries, 0 problems. `pytest ml/tests
+genforge/tests`: 291 passed, 1 skipped; the 2 reported failures are
+`ModuleNotFoundError: torch` under the *system* python — all 7 pass under
+`ml/.venv/bin/python3`, which is where torch lives.

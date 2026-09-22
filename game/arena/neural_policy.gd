@@ -40,6 +40,16 @@ const LEAKY_SLOPE := 0.01
 func policy_id() -> String:
 	return "neural:" + path.get_file()
 
+
+# Did the weights actually arrive? Every failure path above clears `_layers` and
+# returns the object anyway, so an unloaded net is a fighter that thinks for the
+# whole match and outputs nothing -- it moves at zero and never fires a kit. The
+# result FILE is well formed, which is the danger: a relative --policy path
+# (2026-09-22) produced a full parity run where side A dealt exactly 0.000 bars
+# in every channel, and that reads like an environment divergence, not a typo.
+func loaded() -> bool:
+	return not _layers.is_empty()
+
 static func from_file(p: String) -> ArenaNeuralPolicy:
 	var pol := ArenaNeuralPolicy.new()
 	pol.path = p

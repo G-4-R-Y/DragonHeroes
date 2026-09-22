@@ -1,3 +1,93 @@
+# Handoff — 2026-09-22: R55-c (the loser could not slide along the wall)
+
+**The dh-env↔arena parity residual had a cause, and it was the arena's.** R55
+had been "largely closed" with a clock gap nobody could name: every damage
+channel agreed and the episodes still ran ~1.5x longer in dh-env.
+
+Instrumenting it first is what named it. The roadmap's wording
+(time-to-first-death vs time-after) is degenerate in a 1v1 mirror — the first
+death IS the episode end — so the split actually measured is **EXCHANGE**
+(spawn → the first side below `LOW_HP = 0.25`, the `scripted_policy.gd` retreat
+trigger) vs **CHASE** (that moment → end). One reading: exchange **1.08x**,
+chase **2.44x**. 89% of the clock gap lives after the retreat begins. Both
+columns are deliberately NOT in `RATIO_TERMS` — they attribute a divergence the
+gate already caught, they never create one.
+
+The cause, from there, is three lines of `creature.gd`:
+
+    if world and world.is_walkable(target):   # all or nothing
+
+A body pressed against the arena ring had its WHOLE step refused, so it froze
+flat and could not even slide along the wall it was touching. `Arena::clamp_disc`
+projects the post-move position radially and **keeps the tangential component**.
+So the sim's retreating loser slid along the boundary and lived, and the arena's
+stood still and died. `player.gd::_move` has had the axis-separated fallback
+since forever — `hunt3d.gd:307` even calls its copy "wall slide, 2D parity" —
+and creatures never got one. **It is also a shipping gameplay bug:** a fleeing
+creature pins itself in a corner and dies to a wall instead of to you.
+
+`_move` now routes through `ArenaWorld::clamp_inside(target, body_radius)` when
+the world has a closed form for its own shape (the ring does, and resolves it
+the way the sim does), and takes the axis-separated slide otherwise (the tile
+grid in `world_gen.gd`). An axis-only first attempt was measurably not enough —
+`dps_taken` 1.27x against a 1.25x tolerance — which is itself the evidence that
+the *radial* geometry, not merely "some slide", is what the sim does.
+
+    cinder_drake, 32 eps, seed 4242      HEAD  →  fixed
+    win-rate gap                        0.2188 →  0.0000
+    seconds                              1.51x →  1.00x
+    dps_dealt / dps_taken          1.43x/1.60x →  1.06x/1.01x
+    chase                                2.44x →  1.10x        PARITY OK
+
+The 64-episode matrix (7 creature builds x scripted) was run **twice** — once at
+HEAD's `_move`, once fixed, nothing else different. Every dh-env column is
+bit-identical between the runs, which is the proof that a GDScript change could
+only have moved the arena:
+
+    agree              0/7  →  3/7
+    worst ratio       2.08x →  1.81x
+    mean |chase-1|    1.098 →  0.415
+    mean |seconds-1|  0.361 →  0.138
+
+**The residual is now a different shape, and a healthier one.** The fence was a
+one-directional bias — every arena chase was truncated. What is left has MIXED
+sign: four builds converged, and the two **kiting/ranged** bodies overshot past
+parity — `gloam_wisp` 1.83x → **2.52x**, `gloamfen_stalker` 1.77x → 1.46x — with
+the arena chase now the LONGER one. That means the sim ends a kiting body's
+endgame too early: opposite sign, separate cause. Lead: arena bodies run under
+`bot_drive`, so `creature.gd::_state` parks at `idle` and `wisp.gd::_chase`
+never runs — the arena's kiting comes from `fighter.gd`'s driver. (Ignore
+bog_golem's worst-gap move 0.234 → 0.422: it is `win_rate` in a near-
+deterministic greedy mirror, where a hair of divergence flips every episode at
+once. Judge these on rate ratios.)
+
+**A trap worth knowing, now guarded three ways.** Godot resolves a bare relative
+path against `res://`. A relative `--policy` therefore loads fine in dh-env
+(cwd-relative, Python) and silently fails in the arena — the fighter runs the
+whole match at zero output and writes a perfectly well-formed result with 0.000
+bars in every column. `neural_policy.gd` gained `loaded()`, `arena.gd` refuses
+an unloaded net with "use an ABSOLUTE path", and `env_parity` resolves the path
+itself and exits before launching anything.
+
+    ml/.venv/bin/python ml/eval/env_parity.py --build cinder_drake \
+      --policy "$PWD/ml/runs/.../weights/cinder_drake.json" \
+      --opp scripted --episodes 64 --seed 4242 --time-limit 45
+
+**What is still owed on R55:** the retrain half, untouched and expensive —
+best-greedy checkpoint export in `ppo.py`, then `STEPS=60000000
+PLATEAU_UPDATES=80 PLATEAU_DELTA=0.02 PLATEAU_MIN_STEPS=20000000
+CLONE=heuristic tools/train_all.sh --ppo`, with the gate's `--episodes` raised
+above 4 (4 cannot separate 0.6 from 0.9). **Local GPUs only.**
+
+Gates, all green this pass: MENU, SPAWNTEST, STREAMTEST, GROUND STATE,
+RESIDENCY, CAPTURE, BOND, LEVEL UP, CLICKTEST, FXSTRESS, ROAM BOSS, ARENA
+SELFTEST, CONSOLE SELFTEST, COSMETICS, TRAINER STOP, TRACE REPLAY, MP TEST;
+`validate_content.py` 46 definitions / 0 problems; `ml/.venv/bin/python -m
+pytest ml/tests` (the 2 torch failures under the *system* python are an
+environment artifact — 7 passed inside `ml/.venv`).
+
+---
+
 # Handoff — 2026-09-22: R78 landed (the game ships from a release, not from git)
 
 **R78 is done.** `builds/dragon-heroes-*.zip` are no longer tracked. They are

@@ -323,6 +323,39 @@ pytest genforge/tests/test_hifi.py` + `python3 -m genforge.hifi selftest`
 The R50 converged run finished the same day (tech/39 bullet): 2/7 deployed,
 and a dh-env→arena OUTCOME gap on the greedy decode is now roadmap R55.
 
+**2026-09-22 (R55-c — the loser could not slide along the wall it was
+touching):** the endgame is instrumented and the parity residual has a cause.
+1v1 mirrors make "time-to-first-death vs time-after" degenerate (the first death
+IS the end), so the split measured is **EXCHANGE** (spawn → the first side below
+`LOW_HP = 0.25`, the `scripted_policy.gd` retreat trigger; `arena.gd` publishes
+`low_t_s`, dh-env counts its own ticks) vs **CHASE** (that moment → episode end).
+Both are DIAGNOSTIC — excluded from `RATIO_TERMS`, so they attribute a
+divergence the gate already caught and never create one. First reading named it:
+exchange 1.08x, chase **2.44x**, 89% of the whole clock gap. The cause was
+`creature.gd::_move` refusing the WHOLE step when the target was unwalkable — a
+body at the ring froze flat and could not slide along the wall it touched, while
+`Arena::clamp_disc` projects radially and KEEPS the tangential component. The
+sim's retreating loser slid and lived; the arena's stood still and died. Also a
+shipping gameplay bug: a fleeing creature pinned itself in a corner and died to a
+wall instead of to the player. Fix: `_move` routes through
+`ArenaWorld::clamp_inside(target, body_radius)` when the world has a closed form
+(the ring does, the tile grid does not) and otherwise takes `player.gd`'s
+axis-separated slide, which creatures never had. cinder_drake 32 eps → **PARITY
+OK** (seconds 1.51x → 1.00x, dps_taken 1.60x → 1.01x, chase 2.44x → 1.10x). The
+64-episode matrix was run TWICE — HEAD's `_move` and the fix, nothing else
+different — and every dh-env column is bit-identical, so only the arena moved:
+`agree` **0/7 → 3/7**, worst ratio 2.08x → 1.81x, mean |chase-1| **1.098 →
+0.415**, mean |seconds-1| 0.361 → 0.138. Three guards now cover the trap that a
+relative `--policy` silently produces an inert fighter with a well-formed
+all-zero result (Godot resolves a bare relative path against `res://`):
+`neural_policy.gd::loaded()`, an `arena.gd` refusal that says "use an ABSOLUTE
+path", and `env_parity` resolving the path itself. Residual, better posed: the
+two KITING bodies (`gloam_wisp` 2.52x, `gloamfen_stalker` 1.46x) overshot PAST
+parity — the arena chase is now the LONGER one, so the sim ends their endgame
+early. Opposite sign, separate cause, and arena bodies are `bot_drive`, so that
+kiting comes from `fighter.gd`'s driver, not `wisp.gd::_chase`. Docs: tech/39
+§2 (row 110 superseded twice), harness/21.
+
 **2026-09-22 (R51 — the trace: a dh-env match, replayed in the arena):** the
 headless runtime is watchable now. dh-env records every tick
 (`dh_env_trace_*`; `arena.trace.v1`, 23 floats = tick + 11 per side: position,

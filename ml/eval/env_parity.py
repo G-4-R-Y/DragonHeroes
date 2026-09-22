@@ -50,6 +50,12 @@ from ml.training.distill import TeacherNet           # noqa: E402
 from ml.training.policy_net import ACTION_LOGITS, decode  # noqa: E402
 
 BASELINES = ("native", "scripted")
+# game/arena/scripted_policy.gd retreats below this fraction, and R55-c splits
+# every episode there: EXCHANGE = spawn -> the first crossing by either side,
+# CHASE = that moment -> the episode end. The residual R55 gap is a CLOCK gap
+# (totals and per-channel damage agree, seconds do not), and a mean duration
+# cannot say which half of the fight spends the extra time.
+LOW_HP = 0.25
 
 
 def deployed_json(key: str) -> str:
@@ -101,22 +107,33 @@ def run_dh_env(build: str, policy: str, opp: str, episodes: int,
     bar_a, bar_b = max(float(sa.max_hp), 1.0), max(float(sb.max_hp), 1.0)
     kit_count, is_player = mask_args(build)
     wins = hp_self = hp_foe = ticks = dmg_self = dmg_foe = 0.0
+    exch_ticks = chase_ticks = low_hit = 0.0   # the R55-c phase split
     src_self = {k: 0.0 for k in DhEnv.SOURCES}   # by-source, in bars (R55)
     src_foe = {k: 0.0 for k in DhEnv.SOURCES}
     try:
         for e in range(episodes):
             obs = env.reset(seed + e)
             done = False
+            low_tick = -1
             for _ in range(max_ticks):
                 y = net.forward(np.concatenate([obs, emb])[None, :])[0]
                 move, act = act_from(y, obs, kit_count, is_player)
                 done, obs = env.step(move, act)
+                # sampled every tick, not at the end: the threshold is crossed
+                # once and the episode may end on the same tick
+                if low_tick < 0 and min(env.hp_frac(0), env.hp_frac(1)) < LOW_HP:
+                    low_tick = env.tick
                 if done:
                     break
             wins += 1.0 if env.winner == 0 else 0.0
             hp_self += env.hp_frac(0)
             hp_foe += env.hp_frac(1)
             ticks += env.tick
+            # never crossed -> the whole episode was the exchange and the
+            # chase is empty, which is itself the answer for that episode
+            exch_ticks += low_tick if low_tick >= 0 else env.tick
+            chase_ticks += (env.tick - low_tick) if low_tick >= 0 else 0.0
+            low_hit += 1.0 if low_tick >= 0 else 0.0
             # read BEFORE the next reset clears the tally
             dmg_self += env.damage_taken(0) / bar_a
             dmg_foe += env.damage_taken(1) / bar_b
@@ -137,6 +154,10 @@ def run_dh_env(build: str, policy: str, opp: str, episodes: int,
             # the arena reports duration_s per episode; this is the same
             # quantity, so the columns compare directly
             "seconds": secs,
+            # R55-c, diagnostic (not gate terms): where the seconds go.
+            "exchange_s": (exch_ticks / n) / tick_hz(),
+            "chase_s": (chase_ticks / n) / tick_hz(),
+            "low_rate": low_hit / n,
             # damage in HEALTH BARS, not hit points: dh-env's stats come from
             # ml/env/specs.json and the arena's from the live content, so raw
             # hit points are two different units. Bars are one unit.
@@ -174,6 +195,15 @@ def run_arena(build: str, policy: str, opp: str, episodes: int, seed: int,
         return float(np.mean([float(e[dmg_field]) / max(float(e[bar_field]), 1.0)
                               for e in eps]))
     secs = mean("duration_s")
+    # R55-c: arena.gd logs low_t_s, the clock at the first crossing of LOW_HP,
+    # or -1.0 when neither side ever crossed. An arena build predating the
+    # column has no key at all, and reports no phase rather than a wrong one.
+    has_phase = bool(eps) and "low_t_s" in eps[0]
+    lows = [(float(e["low_t_s"]), float(e["duration_s"])) for e in eps] \
+        if has_phase else []
+    exch = float(np.mean([d if lo < 0.0 else lo for lo, d in lows])) if lows else 0.0
+    chase = float(np.mean([0.0 if lo < 0.0 else d - lo for lo, d in lows])) if lows else 0.0
+    low_rate = float(np.mean([1.0 if lo >= 0.0 else 0.0 for lo, _ in lows])) if lows else 0.0
     dmg_dealt = bars("dmg_taken_b", "max_hp_b")
     dmg_taken = bars("dmg_taken_a", "max_hp_a")
     return {"runtime": "arena", "episodes": len(eps),
@@ -184,6 +214,8 @@ def run_arena(build: str, policy: str, opp: str, episodes: int, seed: int,
             "dps_dealt": dmg_dealt / max(secs, 1e-6),
             "dps_taken": dmg_taken / max(secs, 1e-6),
             # by source; an arena predating the columns reports 0.0 for each
+            **({"exchange_s": exch, "chase_s": chase, "low_rate": low_rate}
+               if has_phase else {}),
             "src_dealt": {k: bars(f"dmg_{k}_b", "max_hp_b") for k in DhEnv.SOURCES},
             "src_taken": {k: bars(f"dmg_{k}_a", "max_hp_a") for k in DhEnv.SOURCES},
             "raw": row}
@@ -198,6 +230,10 @@ RATIO_TERMS = ("seconds", "dps_dealt", "dps_taken")
 # either way — loose enough for 12-episode noise, tight enough that the 2.24x
 # incoming-damage gap this found does not hide inside it.
 RATE_TOL = 1.25
+# Reported, never gated (R55-c). A chase phase can be a fraction of a second
+# long, where a ratio is noise wearing a decimal point; these columns exist to
+# ATTRIBUTE a divergence the gate terms already caught, not to catch one.
+PHASE_TERMS = ("exchange_s", "chase_s")
 
 
 def ratio_of(a: float, b: float) -> float:
@@ -221,8 +257,11 @@ def compare(a: dict, b: dict, tolerance: float) -> dict:
               for f in RATIO_TERMS}
     worst = max(gaps.values()) if gaps else 0.0
     worst_ratio = max(ratios.values()) if ratios else 1.0
+    # diagnostic only: absent from worst_ratio and from `agree` on purpose
+    phases = {f: round(ratio_of(a[f], b[f]), 3)
+              for f in PHASE_TERMS if f in a and f in b}
     return {"gaps": gaps, "ratios": ratios, "worst": worst,
-            "worst_ratio": worst_ratio,
+            "worst_ratio": worst_ratio, "phase_ratios": phases,
             "agree": worst <= tolerance and worst_ratio <= RATE_TOL}
 
 
@@ -266,6 +305,7 @@ def diagnose(dh: dict, ar: dict, tolerance: float) -> list[str]:
         out.append("EPISODE LENGTH: {:.1f}s in dh-env vs {:.1f}s in the arena "
                    "({:.2f}x).".format(dh.get("seconds", 0.0),
                                        ar.get("seconds", 0.0), sec_ratio))
+        out.extend(attribute_phase(dh, ar))
     if not out:
         return out
     out.append("Neither runtime is assumed correct here. The arena is what the "
@@ -273,6 +313,50 @@ def diagnose(dh: dict, ar: dict, tolerance: float) -> list[str]:
     out.append("is the reference for CONTENT; dh-env is what PPO trains in, so "
                "it is the one to")
     out.append("move, unless the arena is the one that is wrong.")
+    return out
+
+
+def attribute_phase(dh: dict, ar: dict) -> list[str]:
+    """Say WHICH half of the fight the extra seconds are in.
+
+    An episode ends when someone dies, so a mean duration answers "the fights
+    are longer" and nothing else. Split at the scripted retreat threshold and
+    the same number answers a usable question: the two runtimes trade blows at
+    the same rate (R55-b: per-channel damage inside ~10%), so a gap that sits
+    entirely in the CHASE is a pursuit/termination problem, not a combat one --
+    below LOW_HP the loser runs, both bodies move at the same speed, and the
+    fight only ends when something breaks the symmetry.
+    """
+    if not all(f in dh and f in ar for f in PHASE_TERMS):
+        return ["  (no phase split: this arena build predates low_t_s)"]
+    gap = dh["seconds"] - ar["seconds"]
+    d_ex, d_ch = dh["exchange_s"], dh["chase_s"]
+    a_ex, a_ch = ar["exchange_s"], ar["chase_s"]
+    out = ["  exchange (spawn -> first side below {:.0%} hp): {:.1f}s dh-env "
+           "vs {:.1f}s arena".format(LOW_HP, d_ex, a_ex),
+           "  chase    (that moment -> episode end)         : {:.1f}s dh-env "
+           "vs {:.1f}s arena".format(d_ch, a_ch)]
+    if dh.get("low_rate", 1.0) < 0.999 or ar.get("low_rate", 1.0) < 0.999:
+        out.append("  reached the threshold in {:.0%} of dh-env episodes and "
+                   "{:.0%} of arena ones;".format(dh.get("low_rate", 0.0),
+                                                 ar.get("low_rate", 0.0)))
+        out.append("  an episode that never reached it counts entirely as "
+                   "exchange.")
+    if abs(gap) < 1e-6:
+        return out
+    share = (d_ch - a_ch) / gap
+    if share >= 0.6:
+        out.append("  -> {:.0%} of the {:+.1f}s is the CHASE. The exchange "
+                   "agrees; what differs is how".format(share, gap))
+        out.append("     long the loser survives once it starts running.")
+    elif share <= 0.4:
+        out.append("  -> {:.0%} of the {:+.1f}s is the EXCHANGE. The fight "
+                   "itself is slower, so look".format(1.0 - share, gap))
+        out.append("     at reach, cooldown and tracking before the endgame.")
+    else:
+        out.append("  -> the {:+.1f}s is split across both phases ({:.0%} "
+                   "chase), so it is not an".format(gap, share))
+        out.append("     endgame effect alone.")
     return out
 
 
@@ -296,6 +380,14 @@ def print_report(dh: dict, ar: dict, verdict: dict, tolerance: float) -> None:
         print("  {:<12}{:>10}{:>10}{:>12}  {}".format(
             name, a, b, gap, "ok" if ok else "DIVERGES"))
     print("  " + "-" * 62)
+    if verdict.get("phase_ratios"):
+        # diagnostic rows: printed with their ratio, never with a verdict,
+        # because they are not part of `agree`
+        for f in PHASE_TERMS:
+            print("  {:<12}{:>10.3f}{:>10.3f}{:>12}  {}".format(
+                f, dh[f], ar[f], "{:.2f}x".format(verdict["phase_ratios"][f]),
+                "diag"))
+        print("  " + "-" * 62)
     if "src_dealt" in dh and "src_dealt" in ar:
         # WHERE the bars came from — the column that says which mechanic the two
         # runtimes disagree on, not only that they disagree (R55).
@@ -354,6 +446,15 @@ def run(args) -> int:
         raise SystemExit("env_parity: dh-env drives side A externally, so a "
                          "baseline on side A would not be the same experiment "
                          "in both runtimes. Pass a net JSON.")
+    # ABSOLUTE, always. Godot resolves a bare relative path against res://, so a
+    # net passed as `ml/runs/.../x.json` loads in dh-env (cwd) and NOT in the
+    # arena, where the fighter then runs the whole match at zero output. That
+    # reads as a total environment divergence -- side A dealing 0.000 bars in
+    # every channel -- and it is a path, not an environment. Fail here instead.
+    pol = Path(policy).expanduser()
+    if not pol.is_file():
+        raise SystemExit(f"env_parity: no policy file at {pol}")
+    policy = str(pol.resolve())
     max_ticks = args.max_ticks or int(round(args.time_limit * 60.0))
     dh = run_dh_env(args.build, policy, args.opp, args.episodes,
                     args.seed, max_ticks)

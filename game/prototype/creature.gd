@@ -700,12 +700,39 @@ func _strike(player: Node2D) -> void:
 				or to_pet.normalized().dot(_attack_dir) >= cos_half):
 			pet.take_damage(damage, _attack_dir)
 
+# R55-c (2026-09-22): this used to refuse the WHOLE step when the target was
+# unwalkable, so a body that ran into the movement fence froze flat against it
+# -- it could not even slide along the wall it was touching. `player.gd::_move`
+# has had the axis-separated fallback since forever, and `hunt3d.gd` calls its
+# copy "wall slide, 2D parity"; creatures never got one. It is a gameplay bug
+# (a fleeing creature pins itself in a corner and dies to a wall, not to you)
+# AND it was the arena/sim parity residual: `Arena::clamp_disc` projects onto
+# the ring and KEEPS the tangential component, so the sim's retreating loser
+# slid along the boundary and lived while the arena's stood still and died.
+# Measured before this: chase phase 8.73 s in dh-env vs 3.58 s in the arena,
+# 89% of the whole clock gap, while the exchange agreed at 1.08x.
 func _move(step: Vector2) -> void:
 	var world := get_tree().get_first_node_in_group("world")
 	var target := global_position + step
-	if world and world.is_walkable(target):
+	# A world that knows its own shape resolves the slide itself. Only the arena
+	# ring does (`ArenaWorld::clamp_inside`), and it resolves it the way the sim
+	# does -- radial projection, angle preserved -- so the two runtimes corner a
+	# fleeing body identically instead of approximately. The tile grid in
+	# `world_gen.gd` has no such closed form and takes the axis fallback below.
+	if world != null and world.has_method("clamp_inside"):
+		var slid: Vector2 = world.clamp_inside(target, body_radius)
+		_step_accum += slid - global_position
+		global_position = slid
+		return
+	if world == null or world.is_walkable(target):
 		global_position = target
 		_step_accum += step
+	elif world.is_walkable(Vector2(target.x, global_position.y)):
+		global_position.x = target.x
+		_step_accum += Vector2(step.x, 0.0)
+	elif world.is_walkable(Vector2(global_position.x, target.y)):
+		global_position.y = target.y
+		_step_accum += Vector2(0.0, step.y)
 
 # R59 (2026-09-21, Ricardo: "make sure creatures collide with the player, so
 # they are not right on top of me in a way I can't hit them (bizarre stuff and a
