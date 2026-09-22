@@ -815,6 +815,7 @@ Every row below was run on 2026-09-13 and printed exactly this.
 | Escape to Haven | `godot --headless --path game res://prototype/tests/esc_probe.tscn` | `ESC OK — returned to haven.tscn (static mem 99 -> 46 MB)` |
 | Flasks | `godot --headless --path game res://prototype/tests/flask_probe.tscn` | `FLASK OK — real R/click, 20% now + 20% over 2s on the real clock, the bar and text follow the drip, exact budget, recharge never heals, full/empty/dead feedback` |
 | Capture / pets | `godot --headless --path game res://prototype/tests/capture_probe.tscn` | `CAPTURE OK — 40 rolls legal; species/kit/rig/level/essence/F-path all held` |
+| Pet kit / bond track | `godot --headless --path game res://prototype/tests/bond_probe.tscn` | `BOND OK — 19 skills resolve; curve/credit/unlock/potency and all 7 behaviors held` |
 | Repopulation | `godot --headless --path game res://prototype/tests/repop_probe.tscn` | `REPOP OK — field restocked 0 -> 10 creatures across 3 species` |
 | Arena | `godot --headless --path game res://arena/arena.tscn -- --selftest` | `ARENA SELFTEST OK — 4 matchups, damage flowed, no orphan proxies, HUD 4134 frames` |
 | Training console | `godot --headless --path game res://arena/console.tscn -- --selftest` | `CONSOLE SELFTEST OK — 2 generations, 8/12 matches, ETA 1:20, chart draws 2, hint '12 matches/gen (pop 6 × 2 opp) · jobs 20 · 20 cores — 8 workers idle: pop 10 fills them'` |

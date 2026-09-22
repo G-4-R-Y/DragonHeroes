@@ -345,6 +345,33 @@ contribution to each.
 
   *Gate:* `game/prototype/tests/capture_probe.tscn` (CAPTURE OK) asserts every line above.
 
+- **The bond track — the kit comes online as the bond fights (R65, 2026-09-22).**
+  *Design call made in implementation, awaiting Ricardo's confirmation: §7.1 specified the
+  roll but never said what a pet's own progression is.* A pet levels **with** the hunter
+  already (above); the **bond level** is the pet's own track, and it buys the one thing the
+  hunter's level cannot — **the rolled kit unlocks one skill at a time**:
+
+  | Bond level | 1 | 4 | 7 | 10 (cap) |
+  |---|---|---|---|---|
+  | Rolled skills castable | 1 | 2 | 3 | 4 |
+
+  - **Earned by fighting, never by owning.** `bond_xp` is +1 per kill the bond was *present*
+    for: alive, not resting, within the 11-tile leash of the corpse. A **stabled** pet banks
+    nothing, and a **called summon** banks nothing.
+  - **Cost curve:** `6 + 2*level` kills for the next level — 8 to bond 2, **144 to the cap**.
+  - **Potency:** +3% HP and damage per bond level over 1 (×1.27 at the cap), applied **on top
+    of** the chassis curve at the hunter's level, never instead of it.
+  - The full roll is always **stored and shown** on the companion card — locked slots print
+    the bond level that opens them, so the prize you rolled at capture is visible from day one
+    and is a reason to take that pet out rather than the next one.
+  - **Rolled skills are cast** from a behavior dispatcher (`melee_arc`, `projectile`,
+    `aoe_field`, `channel`, `dash`, `buff`, `summon`) reading the authored content in
+    `content/core/skills/` — adding a pet skill stays a JSON edit (canon §10). The kit gets
+    first refusal every time the pet's swing comes off cooldown; the bite is the fallback.
+  - Records saved before R65 carry no `bond_xp` and read as bond 1 with one live skill.
+
+  *Gate:* `game/prototype/tests/bond_probe.tscn` (BOND OK) asserts every line above.
+
 **The instance roll: attributes + a skill set from the family pool.** Per
 [canon](../00-canon.md) §3, a pet *instance* rolls **random attributes** — a spread of 80–120%
 per stat over the species' stat block (proposal) — **and a random skill set**: **2–4 skills
@@ -357,7 +384,9 @@ two parts:
   `capture` block (§1).
 
 Roll rules (proposal): every pet rolls **at least one signature skill**, so species identity
-always reads; remaining slots pick signature over family-shared at roughly 70/30 weight.
+always reads; remaining slots pick signature over family-shared at roughly 70/30 weight. The
+whole roll is recorded at capture and never changes; **the bond track above decides how much of
+it the pet can cast today** (signature first, in roll order).
 **Sharing is deliberately rare so skill permutations stay novel** (canon §3): two pets of the
 same species usually differ, and two pets of the same family feel like kin, almost never like
 copies.

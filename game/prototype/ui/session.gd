@@ -182,6 +182,100 @@ func rename_companion(uid: int, nickname: String) -> bool:
 				return true
 	return false
 
+# ---- pet skills (R65) --------------------------------------------------------
+# The `core.skill.*` ids a capture rolls (main._roll_pet) are NOT class-tree
+# nodes: skill_def() above resolves skill_trees.json ({kind, params: {cd, mult}}),
+# while a pet skill carries the CONTENT schema ({behavior, damage_type, numbers,
+# telegraph}) and lives one file per skill under prototype/data/ — hand-synced
+# from content/core/skills/ like every other snapshot in that directory. Before
+# R65 nothing loaded them at all: the roll was stored, printed on the companion
+# card, and never cast.
+var _pet_skill_cache := {}
+
+func pet_skill_def(skill_id: String) -> Dictionary:
+	if _pet_skill_cache.has(skill_id):
+		return _pet_skill_cache[skill_id]
+	var def := {}
+	if skill_id.begins_with("core.skill."):
+		var loaded := load_content(skill_id.trim_prefix("core.skill."))
+		# the snapshot directory is FLAT, so a name collision would silently hand
+		# back the wrong content (abyssal.json is a pet FAMILY, not a skill) —
+		# the loaded file only counts when its own id is the one we asked for
+		if str(loaded.get("id", "")) == skill_id:
+			def = loaded
+	if def.is_empty():
+		push_warning("Session.pet_skill_def: unknown pet skill " + skill_id)
+	_pet_skill_cache[skill_id] = def
+	return def
+
+# Display name for a rolled id, falling back to the prettified tail so an id with
+# no snapshot still reads as a name on the companion card.
+func pet_skill_name(skill_id: String) -> String:
+	var def := pet_skill_def(skill_id)
+	if not def.is_empty():
+		return str(def.get("name", skill_id))
+	return skill_id.trim_prefix("core.skill.").replace("_", " ").capitalize()
+
+# ---- the bond track (R65) ----------------------------------------------------
+# A pet levels WITH the hunter already (R57: hp/damage re-derive from the chassis
+# at Session.level every tick). The BOND level is the pet's own track and it buys
+# something the hunter's level cannot: the rolled kit comes online one skill at a
+# time, and each bond level adds a small potency bump on top of the chassis curve.
+# Earned by FIGHTING — a stabled pet earns nothing, a pet that hunts every night
+# ends up carrying its full roll. (Design call, not in design/13 §7.1 — flagged.)
+const BOND_LEVEL_CAP := 10
+const BOND_POWER_PER_LEVEL := 0.03     # +3% hp/damage per bond level over 1
+const BOND_SLOT_EVERY := 3             # a new rolled skill unlocks every 3 levels
+
+# Kills the bond must take part in to reach the NEXT level (144 to cap).
+func bond_kills_for_level(lvl: int) -> int:
+	return 6 + 2 * lvl
+
+func bond_level(data: Dictionary) -> int:
+	var xp := int(data.get("bond_xp", 0))
+	var lvl := 1
+	var need := 0
+	while lvl < BOND_LEVEL_CAP:
+		need += bond_kills_for_level(lvl)
+		if xp < need:
+			break
+		lvl += 1
+	return lvl
+
+func bond_progress(data: Dictionary) -> float:
+	var xp := int(data.get("bond_xp", 0))
+	var lvl := 1
+	var need := 0
+	while lvl < BOND_LEVEL_CAP:
+		var prev := need
+		need += bond_kills_for_level(lvl)
+		if xp < need:
+			return float(xp - prev) / float(need - prev)
+		lvl += 1
+	return 1.0
+
+# How many of the rolled skills a bond of this level may cast (1 at capture, +1
+# every BOND_SLOT_EVERY levels — a 4-skill legendary roll is fully online at 10).
+func bond_skill_slots(lvl: int) -> int:
+	return 1 + (maxi(lvl, 1) - 1) / BOND_SLOT_EVERY
+
+# The inverse of bond_skill_slots: the bond level at which rolled skill `idx`
+# comes online. The companion card prints it on the slots still locked.
+func bond_slot_level(idx: int) -> int:
+	return 1 + BOND_SLOT_EVERY * maxi(idx, 0)
+
+# One shared credit path: the bond that took part in a kill banks it. Returns
+# true when the bond levelled, so the caller can pay the moment out.
+func credit_bond_kill(uid: int) -> bool:
+	for pet in pets:   # ACTIVE bonds only — the stables are a rest, not a career
+		if int(pet.get("uid", -1)) != uid:
+			continue
+		var was := bond_level(pet)
+		pet["bond_xp"] = int(pet.get("bond_xp", 0)) + 1
+		request_save()
+		return bond_level(pet) > was
+	return false
+
 func save_path() -> String:
 	var safe := player_name.to_lower().replace(" ", "_").validate_filename()
 	return "user://saves/%s.json" % safe

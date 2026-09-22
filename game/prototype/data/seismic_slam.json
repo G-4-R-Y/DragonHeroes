@@ -1,0 +1,23 @@
+{
+  "id": "core.skill.seismic_slam",
+  "name": "Seismic Slam",
+  "kind": "active",
+  "tags": [
+    "earth",
+    "boss"
+  ],
+  "behavior": "aoe_field",
+  "damage_type": "physical",
+  "numbers": {
+    "damage_coeff": 1.6,
+    "field_radius_m": 3,
+    "field_duration_s": 2,
+    "cooldown_s": 9,
+    "windup_ticks": 18
+  },
+  "applies_field": "core.field.earth",
+  "telegraph": {
+    "shape": "circle",
+    "duration_ticks": 18
+  }
+}

@@ -1,4 +1,4 @@
-# Handoff — 2026-09-22: captured mobs keep their own body, and the red gate was the gate's fault
+# Handoff — 2026-09-22: the pets finally cast what they rolled, and the bond levels with them
 
 **Read this first, then `docs/harness/README.md` → `10-systems-map.md` →
 `20-roadmap.md` (the one demand ledger) → `21-work-journal.md` (the evidence).**
@@ -11,14 +11,16 @@
 
 ## Where the tree is
 
-`master` at **9fb6a17**, working tree clean except two untracked notes of
-Ricardo's own (`prompts queue.txt`, `sprites prompt.md`). **Two commits ahead of
-`origin/master`** as of 2026-09-22 16:30 — `eed38cc` (R57) and `9fb6a17` (R80)
-still need a push for R17's "GitHub remote equality" to hold again. Everything
-older is already on the remote (the 55-commit backlog went up at 05:15).
+`master` at **ad85d26**, **in sync with `origin/master`** as of 2026-09-22 —
+R17's "GitHub remote equality" holds. The working tree carries the **R65** change
+(uncommitted at the time of writing: `game/prototype/{pet,main,creature}.gd`,
+`ui/{session,lang,companion_card}.gd`, 19 new `game/prototype/data/*.json`
+skill snapshots, `game/prototype/tests/bond_probe.{gd,tscn}`, and the doc set)
+plus two untracked notes of Ricardo's own (`prompts queue.txt`,
+`sprites prompt.md`) — those two are his, never stage them.
 
 GitHub warned on the way: `builds/dragon-heroes-windows.zip` is **56.82 MB**,
-past its 50 MB recommendation and heading for the **100 MB hard limit** it grew
+past its 50 MB recommendation and heading for the **100 MB hard limit** — it grew
 13 MB in one merge. Committing the shipped zips is deliberate (they *are* the
 game for anyone downloading), so the next packaging decision is LFS or a release
 asset — not "shrink it later". Ledgered as **R78**.
@@ -27,6 +29,9 @@ Commits this session, newest first:
 
 | commit | what |
 |---|---|
+| *(pending)* | **R65** — rolled pet skills actually cast, and the bond has a level of its own |
+| `ad85d26` | **R58** — the heal-over-time was right; the HUD never redrew it |
+| `8e0218e` | the handoff delta after R57 and R80 |
 | `9fb6a17` | **R80** — `residency_probe` was red on master for two non-bug reasons; both fixed |
 | `eed38cc` | **R57** — a captured mob keeps its own species, art, stats and skills |
 | `142b813` | the handoff delta pointed at the R78/R79 rows |
@@ -103,39 +108,88 @@ Last verified package run: EXIT=0, every gate OK, client dated 2026-09-22
    `element_signatures[element]` + `archetype_signatures[archetype]`. Known
    coverage gap: `blood` and `frost` have no dedicated skill in
    `content/core/skills/` yet, so those elements fall through to archetype.
-4. **R65's levelling half landed here.** What remains of R65 is that rolled
-   skills are stored and shown but never cast, and a pet has no level/XP of its
-   own.
+4. **R65's levelling half landed here**, and R65 itself is now **closed** (see
+   the next section) — a bond casts what it rolled and carries its own bond
+   level. Do not re-open it from an older note.
+
+## What R65 changed that you will trip over
+
+1. **`pet.gd` dispatches on `behavior`, it does not hand-code skills.** Seven
+   kinds cover all 19 authored skills — `melee_arc`, `projectile`, `aoe_field`,
+   `channel`, `dash`, `buff`, `summon`. `boss.gd` hand-writes its own skills;
+   that shape was deliberately **not** copied, because canon §10 says a new pet
+   skill must stay a JSON edit. Add an eighth behavior only if no existing one
+   can express it, and extend `bond_probe`'s `BEHAVIORS` in the same change.
+2. **`Session.pet_skill_def()` guards against the flat data directory.**
+   `game/prototype/data/` has no subfolders, so `core.skill.abyssal` and the pet
+   *family* `abyssal.json` collide by filename. The resolver accepts a loaded
+   file only when `str(loaded.get("id","")) == skill_id`, so a family id returns
+   `{}` instead of being cast as a skill. Never relax that check.
+3. **`damage_coeff` defaults to `0.0`, not `1.0`** (`pet.gd`, in the numbers
+   reader). `void_step` and `shrieking_curse` carry no coefficient and must deal
+   **zero** damage; a `1.0` default silently invents a full-weapon hit on both.
+   `bond_probe` catches exactly this — it was one of the two mutation tests.
+4. **Three executor hazards, all load-bearing.** Pet fields spawn `friendly:
+   true`; pet bolts carry a real `shooter` but an **empty** `skill_def` (a
+   populated one would run the *hunter's* synergy pipeline through the pet); and
+   summons take `uid = -1` so they never reach `Session.pets` and never bank a
+   bond kill (real uids start at 1).
+5. **The bond track is a design call made in implementation and flagged for
+   Ricardo** — written up in `docs/design/13-creatures-and-bestiary.md` §7.1,
+   marked *awaiting confirmation*. `bond_xp` +1 per kill the bond was present
+   for; `bond_kills_for_level(lvl) = 6 + 2*lvl`; cap **10** = 144 kills;
+   `bond_skill_slots(lvl) = 1 + (lvl-1)/3` → 1/2/3/4 skills at bond 1/4/7/10, in
+   roll order (signature first); `BOND_POWER_PER_LEVEL = 0.03` stacks **on top
+   of** R57's chassis curve (×1.27 at cap). Numbers live in
+   `game/prototype/ui/session.gd:226-265` — change them there, not in the card.
+6. **Credit is gated to bonds that were actually there:** ACTIVE `Session.pets`
+   only (never `Session.stables`), alive, not resting, within
+   `ProtoPet.LEASH_DIST` (11 tiles) of the corpse, `uid > 0`. The leash check was
+   the second mutation test — disabling it makes a bond across the map bank kills
+   it never saw.
+7. **The record is mutated live, not copied.** `sync_pet_nodes` hands
+   `pet.setup()` the live `Session.pets` dictionary, and `main.gd::_credit_bonds`
+   calls `pet.refresh_bond()`, so a newly unlocked slot is castable on the next
+   swing rather than after a reload. Pass a copy anywhere in that path and the
+   card and the pet silently disagree.
+8. **The gate is `game/prototype/tests/bond_probe.tscn`** —
+   `godot --headless --path game res://prototype/tests/bond_probe.tscn`, expect
+   `BOND OK — 19 skills resolve; curve/credit/unlock/potency and all 7 behaviors
+   held`. It drives the pet on the **physics** clock (`await
+   get_tree().physics_frame`) for the reason in the traps section below.
+9. **Unrelated bug found and fixed on the way:** `creature.gd::_apply_presence_glow`
+   is `call_deferred`-ed from `_ready` and dereferenced `get_tree()`
+   unconditionally, so any creature freed the same frame it spawned (a stream
+   cull, or a probe tearing down) threw. It now returns early on
+   `not is_inside_tree()`.
 
 ## Where to pick up
 
 `20-roadmap.md` §2 NOW was rewritten on 2026-09-22 — the old item 1, *port
 `creature.gd::_separate` into `sim/`*, is **dead**: R59 landed separation in all
 four runtimes and the arena never ran it either (arena bodies are `bot_drive`),
-so it was never R55's divergence. The live order:
+so it was never R55's divergence. **R58 and R65 have since closed too**, so the
+live order now starts at what was item 3:
 
-1. **R58** — the potion's heal-over-time. Re-scope first: `flask_probe` passes,
-   so reproduce the complaint in a real hunt before touching code.
-2. **R65** — the skills half of pets (see above; the scaling half is done).
-3. **R47 / R48 / R49 / R51** — the four NOW items that never moved: reward-function
+1. **R47 / R48 / R49 / R51** — the four NOW items that never moved: reward-function
    version history, the GenForge console's missing Back navigation, arena
    interface polish, watching a match from the console. R49 shares
    `game/arena/console.gd` with the other session.
-4. **R55 residual** — instrument the endgame specifically (time-to-first-death vs
+2. **R55 residual** — instrument the endgame specifically (time-to-first-death vs
    time-from-first-death-to-episode-end), since the exchange agrees per channel
    and only the tail disagrees. Then re-run the parity matrix at **64 episodes**
    and retrain: `STEPS=60000000 PLATEAU_UPDATES=80 PLATEAU_DELTA=0.02
    PLATEAU_MIN_STEPS=20000000 CLONE=heuristic tools/train_all.sh --ppo`, with the
    gate's `--episodes` raised above 4.
-5. **R78 / R79** — the 56.82 MB Windows zip heading for the 100 MB limit, and the
+3. **R78 / R79** — the 56.82 MB Windows zip heading for the 100 MB limit, and the
    Windows package that ships no GDExtension.
-6. **R62 → R71** — potion enchanting, skill design + cooldown cues, item scaling,
+4. **R62 → R71** — potion enchanting, skill design + cooldown cues, item scaling,
    kill-streak sky chest, DRAGON COUNCIL, bot mercenaries, questline themes.
    Largest last.
-7. **R72(b)** — the boss fight as the Meshy→Blender→Unreal concept test; the
+5. **R72(b)** — the boss fight as the Meshy→Blender→Unreal concept test; the
    judgement is already written in `rebirth/docs/02-status.md` §3.1 (the real
    gap is Blender, not Meshy or Unreal).
-8. **R46** — a written status answer is still owed.
+6. **R46** — a written status answer is still owed.
 
 ## Two traps this session paid for (R57, R80)
 
@@ -153,6 +207,13 @@ so it was never R55's divergence. The live order:
   system correctly ignored it and the probe called that a bug. Now pinned to seed
   **41487** via `MpNet.pending_seed` (released to 0 right after `add_child`) with
   a ring-outward search bounded by the wake radius. `pass=5 fail=0`.
+
+**Awaiting Ricardo's word (R65):** the bond track — how fast a bond levels
+(6 + 2·lvl kills), when its rolled skills unlock (bond 1/4/7/10) and how much
+power each level is worth (+3%). It shipped as written because a pet with no
+progression was the actual complaint, but every number there is a balance call
+that is his, not the harness's. Spec: `docs/design/13-creatures-and-bestiary.md`
+§7.1.
 
 **Owed to Ricardo, still:** the `builds.json` kit-range unit mix (cinder_drake
 `bolt_volley range 10.0` and `field_cast 9.0` against bog_golem's `112.0` =

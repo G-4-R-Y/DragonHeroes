@@ -72,7 +72,9 @@ been aborting the menu's `_build` for 9 days behind "no errors" boot checks)
 → `tests/level_up_probe.tscn` (LEVEL UP OK)
 → `tests/capture_probe.tscn` (CAPTURE OK — the R57 bond: captured species keep
 their own chassis/rig/kit, bosses bond as mini-pets, pets level with the hunter,
-the Spirit Essence faucet is unchanged) → `bash tools/trainer_stop_test.sh`
+the Spirit Essence faucet is unchanged) → `tests/bond_probe.tscn` (BOND OK —
+the R65 kit: every rolled id resolves, the bond track credits only the bonds
+that were there, and all 7 skill behaviors fire) → `bash tools/trainer_stop_test.sh`
 (TRAINER STOP OK) → `bash tools/mp_test.sh` (MP TEST OK) → `python3 -m pytest
 ml/tests genforge/tests -q` → `python3 tools/validate_content.py` (0 problems).
 Spawn placement gate now pauses enemy pursuit while checking initial spacing;

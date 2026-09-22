@@ -1181,6 +1181,10 @@ func _roll_pet(body: ProtoCreature) -> Dictionary:
 			"name": "%s %d%%" % [str(prof.get("species_name", "Gloam Stalker")), roll],
 			"species": str(prof.get("species", "core.creature.gloamfen_stalker")),
 			"bundle": str(prof.get("bundle", "")),   # companion_card reads this for portraits
+			# R65: the bond's OWN track. It starts at 1 with one rolled skill live and
+			# earns the rest by hunting at your side (Session.bond_*); an older save
+			# without the key reads as bond 1, so nothing has to be migrated.
+			"bond_xp": 0,
 			"roll_pct": roll, "skills": skills, "chassis": prof}
 
 func _spawn_pet(data: Dictionary, at: Vector2) -> void:
@@ -1282,8 +1286,30 @@ func on_creature_died(c: ProtoCreature) -> void:
 		_maybe_drop_rune(c.global_position + Vector2(0, -14))
 	_feed_flask()
 	_grant_level_ups()
+	_credit_bonds(c.global_position)
 	_sync_session()
 	refresh_hud()
+
+# R65: a kill pays the bonds that were THERE for it. Presence, not damage: a pet
+# is a companion, not a damage meter, and a leash-radius check is the same rule
+# the pet itself hunts by. Resting bonds and called wisplings (uid -1) earn
+# nothing. A level-up lands mid-hunt — refresh_bond() re-derives the unlocked
+# slots and the potency immediately, so the new skill is castable on the next
+# swing instead of at the next load.
+func _credit_bonds(at: Vector2) -> void:
+	for p in _pets:
+		if not is_instance_valid(p) or p.uid <= 0 or p.resting():
+			continue
+		if p.global_position.distance_to(at) > ProtoPet.LEASH_DIST:
+			continue
+		if not Session.credit_bond_kill(p.uid):
+			continue
+		p.refresh_bond()
+		damage_number(p.global_position + Vector2(0, -30), 0, Color("ffd166"),
+				ProtoLang.t("msg_bond_level") % [p.pet_name, p.bond_lvl])
+		fx.aura(p, Color(1.0, 0.82, 0.4), {"radius": 20.0, "dur": 1.2,
+				"orbit_ribbons": 3})
+		play_ui("capture", -12.0)
 
 # Big death finisher (spec §3): orbital finale + fat shockwave + post pulse/flash
 # + a beefed hitstop. `tier` scales the whole thing (legendary = largest). Additive

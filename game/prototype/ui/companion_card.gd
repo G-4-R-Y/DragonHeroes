@@ -48,18 +48,31 @@ static func create(data: Dictionary, status := "", action_text := "", action := 
 	if data.has("kind"):
 		facts.text = "%s   ·   +%d%% %s" % [ProtoLang.t("cp_flying") if str(data.kind) == "fly" else ProtoLang.t("cp_walking"), roundi((float(data.get("speed_mult", 1.0)) - 1.0) * 100.0), ProtoLang.t("mount_speed")]
 	else:
-		facts.text = "%d%% %s   ·   %d %s" % [int(data.get("roll_pct", 100)), ProtoLang.t("companion_potential"), data.get("skills", []).size(), ProtoLang.t("companion_skills")]
+		facts.text = "%d%% %s   ·   %s   ·   %d %s" % [int(data.get("roll_pct", 100)), ProtoLang.t("companion_potential"), ProtoLang.t("companion_bond") % Session.bond_level(data), data.get("skills", []).size(), ProtoLang.t("companion_skills")]
 	facts.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	facts.add_theme_color_override("font_color", ProtoTheme.LUMEN)
 	info.add_child(facts)
-	if not data.get("skills", []).is_empty():
-		var skills := Label.new()
-		var names := PackedStringArray()
-		for id in data.skills:
-			names.append(str(id).get_slice(".", str(id).get_slice_count(".") - 1).replace("_", " ").capitalize())
-		skills.text = " · ".join(names)
-		skills.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		info.add_child(skills)
+	# R65: the rolled kit is real now, so the card stops printing raw ids and says
+	# which skills this bond can actually cast — and what the locked ones cost.
+	if not data.has("kind") and not data.get("skills", []).is_empty():
+		var lvl: int = Session.bond_level(data)
+		var slots: int = Session.bond_skill_slots(lvl)
+		var track := Label.new()
+		if lvl >= Session.BOND_LEVEL_CAP:
+			track.text = ProtoLang.t("companion_bond_max")
+		else:
+			var need: int = Session.bond_kills_for_level(lvl)
+			track.text = ProtoLang.t("companion_bond_next") % [roundi(Session.bond_progress(data) * float(need)), need, lvl + 1]
+		track.add_theme_color_override("font_color", ProtoTheme.DIM)
+		info.add_child(track)
+		for i in data.skills.size():
+			var line := Label.new()
+			line.text = Session.pet_skill_name(str(data.skills[i]))
+			if i >= slots:
+				line.text += "   ·   " + ProtoLang.t("companion_locked") % Session.bond_slot_level(i)
+				line.add_theme_color_override("font_color", ProtoTheme.DIM)
+			line.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			info.add_child(line)
 	var edit_row := HBoxContainer.new()
 	info.add_child(edit_row)
 	var edit := LineEdit.new()

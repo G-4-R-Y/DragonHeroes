@@ -1,0 +1,17 @@
+{
+  "id": "core.skill.ember_screech",
+  "name": "Ember Screech",
+  "kind": "active",
+  "tags": [
+    "buff",
+    "boss"
+  ],
+  "behavior": "buff",
+  "damage_type": "fire",
+  "numbers": {
+    "attack_speed_pct": 25,
+    "duration_s": 8,
+    "cooldown_s": 20,
+    "windup_ticks": 10
+  }
+}

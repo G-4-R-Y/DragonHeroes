@@ -178,6 +178,8 @@ func _apply_rim() -> void:
 # while main is still assembling its fx child. Commons/elites skip it (32-pool
 # is for the few things that MATTER; elites already carry the rim).
 func _apply_presence_glow() -> void:
+	if not is_inside_tree():      # freed/culled before the deferred call landed
+		return
 	var main := get_tree().get_first_node_in_group("main")
 	if main == null or main.get("fx") == null:
 		return

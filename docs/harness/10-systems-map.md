@@ -168,11 +168,12 @@ overhaul), design/24 §1 (polish pack landed: input buffering, dodge
 i-frames, point-blank hits…). `player.gd`, `creature.gd`, `boss.gd`,
 `hag.gd`, `pyre_sovereign.gd`, `terravore_colossus.gd`, `wisp.gd`, `pet.gd`,
 `projectile.gd`, `stats.gd`, `telegraphs.gd`. Known: hitboxes are
-sprite-scale hacks (Ricardo: "too sketchy"), pets' rolled skills never cast
-(L4), bolts fly through walls. The real fix is L5: authority into `dh-sim`.
+sprite-scale hacks (Ricardo: "too sketchy"), bolts fly through walls. The real
+fix is L5: authority into `dh-sim`. (L4 — *pets' rolled skills never cast* — is
+closed: R65, see Capture & pets.)
 
 ## Capture & pets
-**LANDED (R57, 2026-09-22).** Law: design/13 §7.1. `creature.gd::capture_profile()`
+**LANDED (R57 + R65, 2026-09-22).** Law: design/13 §7.1. `creature.gd::capture_profile()`
 is the single export seam — species id, archetype, element, tint, scale, the
 level-free base hp/damage (it divides out the `1 + rate*(level-1)` that
 `_apply_entry` baked in) and, for a legendary, the authored `kit`.
@@ -185,9 +186,30 @@ fraction. **Every tier is capturable**: elites/legendaries bond as mini-pets
 at 0.5–0.6); a capture pays no loot, no rune, no kill credit, and the duo
 survivor enrages. Pre-R57 saves carry no chassis and stay the founding 120/14
 stalker. Gate: `tests/capture_probe.tscn` (`CAPTURE OK`), mutation-verified.
+**R65 — the kit, and a track of the pet's own.** `session.gd::pet_skill_def`
+resolves a rolled `core.skill.*` id against the 19 snapshots now mirrored into
+`game/prototype/data/` (the directory is flat, so the loaded file only counts
+when its own `id` matches — `abyssal.json` is a pet *family*). `pet.gd` executes
+them through a **behavior dispatcher** — `melee_arc`, `projectile`, `aoe_field`,
+`channel`, `dash`, `buff`, `summon` — reading authored numbers in SIM units
+(`windup_ticks / 30`, `*_m * TILE`), so a new pet skill stays a JSON edit; the
+kit gets first refusal each time the swing comes off cooldown, the bite is the
+fallback, and a skill with no `damage_coeff` does **no** damage (`void_step` is
+pure mobility). Fields the pet lays are `friendly`, bolts carry a real `shooter`
+and an empty `skill_def` (they never enter the hunter's synergy pipeline), and
+summons take `uid -1` so they never collide with a real bond or reach the
+roster. The **bond track**: `bond_xp` +1 per kill the bond was present for
+(alive, not resting, inside the leash — a stabled record and a summon bank
+nothing), `6 + 2*lvl` kills per level, cap 10 at 144 kills, a rolled skill
+unlocked every 3 levels (1 → 4 slots) and +3% hp/damage per level **on top of**
+the chassis curve. Levelling lands live: `main.gd::_credit_bonds` calls
+`pet.refresh_bond()`, so the new skill is castable on the next swing, not after
+a reload. The companion card prints the bond, the progress to the next level and
+`locked · bond N` on the slots still shut. Gate: `tests/bond_probe.tscn`
+(`BOND OK`), mutation-verified — defaulting `damage_coeff` to 1.0 or dropping
+the leash check each produce exactly one FAIL line.
 Known: `blood` and `frost` have no dedicated skill in `content/core/skills/` and
-degrade to the neighbouring element's pair; rolled pet skills still never cast
-(R65's remaining half).
+degrade to the neighbouring element's pair.
 
 ## Bestiary & content
 **LANDED.** design/13-14, tech/23. `content/` packs + `content/schemas/`

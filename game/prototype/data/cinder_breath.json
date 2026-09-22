@@ -1,0 +1,27 @@
+{
+  "id": "core.skill.cinder_breath",
+  "name": "Cinder Breath",
+  "kind": "active",
+  "tags": [
+    "fire",
+    "field",
+    "line",
+    "boss"
+  ],
+  "behavior": "channel",
+  "damage_type": "fire",
+  "numbers": {
+    "damage_coeff": 1.1,
+    "line_length_m": 7,
+    "line_width_m": 3,
+    "field_radius_m": 1.6,
+    "field_duration_s": 5,
+    "cooldown_s": 9,
+    "windup_ticks": 21
+  },
+  "applies_field": "core.field.fire",
+  "telegraph": {
+    "shape": "line",
+    "duration_ticks": 21
+  }
+}

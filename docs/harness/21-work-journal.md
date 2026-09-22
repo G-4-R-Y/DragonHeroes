@@ -4249,3 +4249,107 @@ on the real clock, the bar and text follow the drip, exact budget, recharge neve
 heals, full/empty/dead feedback`. Re-ran green three times, plus the three gates
 that share `refresh_hud()` — `level_up_probe`, `click_test`, `renewal_probe` — all
 green.
+
+---
+
+## 2026-09-22 — R65: the pets had a kit on paper and a bite in practice
+
+R57 gave the bond the *body* it was captured from. R65 is the other half of the
+same promise: the skills that body fought with, and a reason to keep taking the
+same pet out instead of the next one.
+
+### What was actually broken
+
+Nothing threw. `_roll_pet` rolled 2–4 `core.skill.*` ids, `Session.pets` stored
+them, the companion card printed them — and `pet.gd` never read them. The pet
+walked up and bit. That was the L4 known-issue in `10-systems-map.md`, and it had
+two distinct causes stacked on top of each other:
+
+1. **The content was not reachable at runtime.** `Session.load_content()` reads
+   `res://prototype/data/<name>.json`, and the authored skills live in
+   `content/core/skills/`. Nineteen snapshots now mirror into the prototype's flat
+   data directory — the same mirroring every other content type already used.
+2. **There was no executor.** `boss.gd` hand-writes each of its skills in
+   `_cast`/`_strike`. Copying that shape would have made every new pet skill an
+   engine change, which canon §10 forbids: content is data. So the pet dispatches
+   on the snapshot's `behavior` field instead — seven of them (`melee_arc`,
+   `projectile`, `aoe_field`, `channel`, `dash`, `buff`, `summon`) covering all 19
+   authored skills — and reads the numbers in the units they were authored in:
+   `windup_ticks / SIM_HZ` for seconds, `*_m * TILE` for pixels. Adding
+   `core.skill.frost_nova` tomorrow is a JSON file, not a patch.
+
+### The flat directory has teeth
+
+`load_content("abyssal")` is the pet *family* definition. A naive
+`pet_skill_def("core.skill.abyssal")` would have loaded it and handed back a
+dictionary with no `behavior` and no `numbers`. The resolver therefore only
+accepts a file whose own `id` equals the id that was asked for, and that exact
+collision is now an assertion in the gate.
+
+### The default that would have invented damage
+
+`damage_coeff` defaults to **0.0**, not 1.0. Two authored skills (`void_step`,
+`shrieking_curse`) carry no coefficient at all because they are pure mobility and
+pure buff. A 1.0 default reads as "sensible" and silently gives both of them a
+full-weapon hit. The gate asserts `void_step` moves the pet and takes the dummy's
+HP down by exactly zero.
+
+### A track of the pet's own
+
+design/13 §7.1 specified the roll and said nothing about pet progression, so this
+is a **design call made in implementation and flagged for Ricardo** (written into
+§7.1, marked as awaiting confirmation). The shape:
+
+- `bond_xp` +1 per kill the bond was **present** for — alive, not resting, inside
+  the 11-tile leash of the corpse. A stabled pet banks nothing (the stables are a
+  rest, not a career); a called wispling banks nothing.
+- `6 + 2*level` kills for the next level → 8 to bond 2, **144 to the cap of 10**.
+- One more rolled skill castable every 3 levels: **1 slot at capture, 4 at bond
+  10**. The whole roll stays visible on the card from day one, locked slots
+  printing the bond level that opens them — the prize you rolled is the reason to
+  keep hunting with *that* pet.
+- +3% hp/damage per bond level **on top of** the R57 chassis curve, never instead
+  of it. A capped bond is ×1.27, not a second hunter.
+
+The unlock had to land mid-hunt, not on reload: `main.gd::_credit_bonds` calls
+`pet.refresh_bond()` on the live node after crediting, and because
+`sync_pet_nodes` hands `pet.setup()` the **live** `Session.pets` dictionary
+(`_record`, not a copy), the record, the node and the card all move together.
+
+### Three hazards the executor had to respect
+
+- A pet-laid field is `friendly: true` — otherwise the bond's Magma Breath burns
+  the hunter who called for it.
+- A pet bolt carries a real `shooter` (the friendly sweep dereferences it) and an
+  **empty** `skill_def` — a populated one would run the *hunter's* synergy
+  pipeline off a pet's cast.
+- Summons take `uid = -1`. Real uids start at 1, and the HUD chips, rename and
+  character panel all match on uid; a wispling with uid 0 would have shown up as a
+  roster pet with a rename button.
+
+### The gate
+
+`tests/bond_probe.tscn` → `BOND OK — 19 skills resolve; curve/credit/unlock/
+potency and all 7 behaviors held`. It drives the pet on the **physics** clock
+(`physics_frames`, never process frames — the same headless flake that bit
+`capture_probe`) and waits on `_skill_cd[0] > 0.0`, the one signal that means
+"the cast branch ran", whatever the behavior was. Nine sections: id resolution
+(including the family-collision and unknown-id guards), the curve and its inverse
+`bond_slot_level`, a fresh capture (1 of N live, a pre-R65 record readable, an
+unresolvable id not eating the slot it was paid for), credit (near banks, far
+does not, resting does not, stabled does not, summon does not — then the same
+thing again through a real `take_damage` → `_die` → `on_creature_died`), the live
+unlock at 30 kills, potency layered on the chassis curve, one check per behavior,
+the zero-coefficient rule, and a summon expiring on its own clock.
+
+Mutation-verified twice: defaulting `damage_coeff` back to 1.0 produces exactly
+one FAIL line (`void_step dealt 23.8 damage`), and deleting the leash check in
+`_credit_bonds` produces exactly one (`a bond across the map banked a kill it
+never saw`). Green ×3, with `capture_probe` and `level_up_probe` green beside it.
+
+### One unrelated bug the probe surfaced
+
+`creature.gd::_apply_presence_glow` is `call_deferred`-ed from `_ready`, and it
+called `get_tree()` unconditionally. Any creature freed in the same frame it
+spawned — the probe's teardown, or a stream cull in the real game — reached it
+with a null tree and printed two errors per run. Guarded with `is_inside_tree()`.

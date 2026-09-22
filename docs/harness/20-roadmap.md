@@ -101,7 +101,7 @@ search it by id.
 | R62 | NEXT / content | More of every axis: creatures, bosses, loot, skills, pets, mechanics, **and potion enchanting with special effects**. | Data-only by canon §10 — new `pack.type.name` ids validated against `content/schemas/`. Potion enchanting is the one new SYSTEM in this line. |
 | R63 | NEXT / design then implementation | Better skill design and playability; probably MORE skills, to make combat more dynamic — the current kit reads as too static. | design/10/11/26; pairs with R37 (skill-tree screen) and R64. |
 | R64 | NEXT | Visual cues for skill cooldowns. | design/10/17; HUD work, pairs with R43 (cooldowns need too much attention) and R63. |
-| R65 | NEXT / **unblocked 2026-09-22** | Pet levels and pet skills, so a pet scales with the player instead of falling off. | design/13. **Half of it came free with R57:** a pet now re-derives hp/damage from its own chassis at the hunter's current level every tick (`pet.gd`), so it no longer falls off — gated by `capture_probe.tscn` (level 11 → 21 re-derivation, wound fraction preserved). **What is left is the skills half:** rolled skills are stored on the record and shown in the UI but never cast (the L4 known-issue in `10-systems-map.md`), and a pet has no level/XP of its own. |
+| R65 | **DONE 2026-09-22** | Pet levels and pet skills, so a pet scales with the player instead of falling off. | design/13 §7.1. **The scaling half came with R57** (a bond re-derives hp/damage from its own chassis at the hunter's level every tick). **The skills half is R65:** `session.gd::pet_skill_def` resolves a rolled `core.skill.*` id against the 19 snapshots mirrored into `game/prototype/data/` (flat directory → the file counts only when its own `id` matches, so `abyssal.json`, a pet *family*, cannot answer as a skill), and `pet.gd` casts it through a **behavior dispatcher** — `melee_arc`/`projectile`/`aoe_field`/`channel`/`dash`/`buff`/`summon` — reading authored SIM units (`windup_ticks / 30`, `*_m * TILE`), so a new pet skill stays a JSON edit (canon §10). The kit gets first refusal each time the swing comes off cooldown; a skill with no `damage_coeff` does no damage; pet fields are `friendly`, pet bolts carry a real shooter and an empty `skill_def`, summons take `uid -1`. **The pet now has a track of its own:** `bond_xp` +1 per kill it was present for (alive, not resting, inside the leash — a stabled record and a summon bank nothing), `6 + 2*lvl` kills per level, cap 10 at 144 kills, one more rolled skill castable every 3 levels (1 → 4) and +3% hp/damage per level on top of the chassis curve; `_credit_bonds` refreshes the pet in place, so the new skill is live on the next swing, not after a reload. The companion card prints the bond, the progress and `locked · bond N`. Closes the L4 known-issue. Gate: `tests/bond_probe.tscn` → `BOND OK` (19 ids, curve, credit, unlock, potency, all 7 behaviors), mutation-verified — defaulting `damage_coeff` to 1.0 or dropping the leash check each produce exactly one FAIL line. **Design call awaiting Ricardo:** the bond track is not in design/13 §7.1 — it is now written there, flagged. |
 | R66 | NEXT | Item scaling pass — asked again against the current numbers (previously audited 2026-09-12). | design/24; with R16/R19. |
 | R67 | NEXT / new system | Mob kill counter → streak rewards: bonus gold and XP while it runs, and when the streak ENDS on the timer after a LOT of kills, a chest drops from the sky with legendary loot. Streak length decides the tier. | design/11/15; hooks `on_creature_died` (the same feed the Ember Flask rekindle uses). |
 | R68 | SCHEDULED / event content | Multi-boss events (2, 3, 4, 5+). Named: *Giant Graveyard* (seven giants), *Dragon Nest* (baby + adult dragons). | design/13/29; with R36/R29. |
@@ -124,30 +124,26 @@ Ricardo's standing order is "finish up all the other tasks in the roadmap",
 and his latest batch says bugs first. Order below is the order to work in.
 
 **Closed since this list was last rewritten (2026-09-22):** ~~R56~~, ~~R57~~,
-~~R58~~, ~~R59~~, ~~R60~~, ~~R61/R44~~, ~~R74~~, ~~R75~~, ~~R76~~, ~~R80~~. The old item 1
+~~R58~~, ~~R59~~, ~~R60~~, ~~R61/R44~~, ~~R65~~, ~~R74~~, ~~R75~~, ~~R76~~, ~~R80~~. The old item 1
 — *port `creature.gd::_separate` into `sim/`* — is **dead as written**: R59
 landed separation in all four runtimes, and the arena never ran it either
 (arena bodies are `bot_drive`), so it was never R55's divergence.
 
-1. **R65** — the skills half of pets. R57 delivered the scaling half (a bond
-   re-derives hp/damage from its own chassis at the hunter's level every tick);
-   what is left is that rolled skills are stored and displayed but never cast,
-   and a pet has no level/XP of its own.
-2. **R47 / R48 / R49 / R51** — the four NOW items that never moved: the reward
+1. **R47 / R48 / R49 / R51** — the four NOW items that never moved: the reward
    function's full version history, the GenForge console's missing Back
    navigation, the arena interface polish, and watching a match from the
    console. R49 shares `game/arena/console.gd` with the other session.
-3. **R55 residual** — instrument the endgame specifically (time-to-first-death
+2. **R55 residual** — instrument the endgame specifically (time-to-first-death
    vs time-from-first-death-to-episode-end), since the exchange agrees per
    channel and only the tail disagrees. Then re-run the parity matrix at 64
    episodes and retrain — best-greedy checkpoint export in `ppo.py`, then
    `STEPS=60000000 PLATEAU_UPDATES=80 PLATEAU_DELTA=0.02
    PLATEAU_MIN_STEPS=20000000 CLONE=heuristic tools/train_all.sh --ppo`, with
    the gate's `--episodes` raised above 4 (4 cannot separate 0.6 from 0.9).
-4. **R78 / R79** — distribution: the 56.82 MB Windows zip heading for GitHub's
+3. **R78 / R79** — distribution: the 56.82 MB Windows zip heading for GitHub's
    100 MB hard limit, and the Windows package that ships no GDExtension.
-5. Then the content and event lines, **R62 → R71**, largest last.
-6. **R72(b)** — the boss fight through Meshy → Blender → Unreal; the written
+4. Then the content and event lines, **R62 → R71**, largest last.
+5. **R72(b)** — the boss fight through Meshy → Blender → Unreal; the written
    judgement is already delivered, the real gap is Blender.
 
 **Standing, always open:** R17/R26/R30 (push everything, preserve every

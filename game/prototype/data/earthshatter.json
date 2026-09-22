@@ -1,0 +1,26 @@
+{
+  "id": "core.skill.earthshatter",
+  "name": "Earthshatter",
+  "kind": "active",
+  "tags": [
+    "earth",
+    "field",
+    "aoe",
+    "boss"
+  ],
+  "behavior": "aoe_field",
+  "damage_type": "physical",
+  "numbers": {
+    "damage_coeff": 1.5,
+    "quake_radius_m": 4.5,
+    "field_radius_m": 3.5,
+    "field_duration_s": 7,
+    "cooldown_s": 12,
+    "windup_ticks": 27
+  },
+  "applies_field": "core.field.earth",
+  "telegraph": {
+    "shape": "circle",
+    "duration_ticks": 27
+  }
+}

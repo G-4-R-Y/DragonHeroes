@@ -1,0 +1,18 @@
+{
+  "id": "core.skill.ember_bolt",
+  "name": "Ember Bolt",
+  "kind": "active",
+  "tags": [
+    "ranged",
+    "fire"
+  ],
+  "behavior": "projectile",
+  "damage_type": "fire",
+  "numbers": {
+    "damage_coeff": 0.9,
+    "projectile_speed_mps": 18,
+    "cooldown_s": 1.5,
+    "windup_ticks": 5,
+    "recovery_ticks": 4
+  }
+}
