@@ -1,4 +1,4 @@
-# Handoff — 2026-09-22: the build merge closes the cleanup arc
+# Handoff — 2026-09-22: captured mobs keep their own body, and the red gate was the gate's fault
 
 **Read this first, then `docs/harness/README.md` → `10-systems-map.md` →
 `20-roadmap.md` (the one demand ledger) → `21-work-journal.md` (the evidence).**
@@ -11,10 +11,11 @@
 
 ## Where the tree is
 
-`master` at **fb34bcf**, working tree clean except two untracked notes of
-Ricardo's own (`prompts queue.txt`, `sprites prompt.md`). **Pushed** — the 55
-commits that had been sitting locally since `b622aa6` (2026-09-12) are on
-`origin/master`, so R17's "GitHub remote equality" holds as of 2026-09-22 05:15.
+`master` at **9fb6a17**, working tree clean except two untracked notes of
+Ricardo's own (`prompts queue.txt`, `sprites prompt.md`). **Two commits ahead of
+`origin/master`** as of 2026-09-22 16:30 — `eed38cc` (R57) and `9fb6a17` (R80)
+still need a push for R17's "GitHub remote equality" to hold again. Everything
+older is already on the remote (the 55-commit backlog went up at 05:15).
 
 GitHub warned on the way: `builds/dragon-heroes-windows.zip` is **56.82 MB**,
 past its 50 MB recommendation and heading for the **100 MB hard limit** it grew
@@ -26,6 +27,9 @@ Commits this session, newest first:
 
 | commit | what |
 |---|---|
+| `9fb6a17` | **R80** — `residency_probe` was red on master for two non-bug reasons; both fixed |
+| `eed38cc` | **R57** — a captured mob keeps its own species, art, stats and skills |
+| `142b813` | the handoff delta pointed at the R78/R79 rows |
 | `fb34bcf` | **R17/R78/R79** — the push lands; the zip-size and Windows findings get ledger rows |
 | `2ac37cf` | the handoff Ricardo asked for |
 | `25f32f8` | **R77** — one packager, one build, the zips finally ship the real client |
@@ -78,27 +82,77 @@ Last verified package run: EXIT=0, every gate OK, client dated 2026-09-22
   `Project export for preset "Windows Desktop" completed with warnings. at:
   _fs_changed (editor/editor_node.cpp:1353)`. Not investigated.
 
+## What R57 changed that you will trip over
+
+1. **`creature.gd::capture_profile()` is the capture seam.** Every chassis
+   answers with its own species id, archetype, element, tint, scale, **level-free**
+   base hp/damage, its tier's capture terms, and (for the legendaries) a `kit`.
+   Level-free is the subtle part: `_apply_entry()` bakes `1 + rate*(level-1)`
+   into `max_hp`/`damage` in `_ready`, so `capture_profile()` divides
+   `_level_hp_mult`/`_level_dmg_mult` back out. A bond then re-derives its stats
+   from that chassis at the hunter's current level — add a new creature and it is
+   capturable with no code change.
+2. **Three hardcodes are gone**, and any one of them would re-break it:
+   `main.gd::_roll_pet()` no longer stamps `"species":
+   "core.creature.gloamfen_stalker"`, `pet.gd` no longer dresses every bond with
+   `ProtoSprites.stalker_frames()` at a flat 120 hp / 14 dmg, and design/13 §7.1
+   no longer declares the Legendary tier uncapturable.
+3. **Skills roll from a three-tier pool** in `main.gd::_signature_pool`:
+   a legendary `kit` (which suppresses the rest and grants one extra slot) → the
+   species row in `content/core/pet-families/abyssal.json` →
+   `element_signatures[element]` + `archetype_signatures[archetype]`. Known
+   coverage gap: `blood` and `frost` have no dedicated skill in
+   `content/core/skills/` yet, so those elements fall through to archetype.
+4. **R65's levelling half landed here.** What remains of R65 is that rolled
+   skills are stored and shown but never cast, and a pet has no level/XP of its
+   own.
+
 ## Where to pick up
 
-The ledger order in `20-roadmap.md` §2 NOW, unchanged:
+`20-roadmap.md` §2 NOW was rewritten on 2026-09-22 — the old item 1, *port
+`creature.gd::_separate` into `sim/`*, is **dead**: R59 landed separation in all
+four runtimes and the arena never ran it either (arena bodies are `bot_drive`),
+so it was never R55's divergence. The live order:
 
-1. **R55 residual / R59** — port `creature.gd::_separate(delta)` into `sim/`
-   (the arena separates overlapping bodies, the sim does not — that is why
-   dh-env fights run ~1.8× longer at identical per-channel damage, and why
-   creatures stand on top of Ricardo where he cannot hit them). Then re-run the
-   parity matrix at **64 episodes** and retrain:
-   `STEPS=60000000 PLATEAU_UPDATES=80 PLATEAU_DELTA=0.02 PLATEAU_MIN_STEPS=20000000
-   CLONE=heuristic tools/train_all.sh --ppo`.
-2. **R57** — captured-species variety, then boss mini-pets that level with the
-   player (unblocks R65).
-3. **R62 → R71** — potion enchanting, skill design + cooldown cues, pet
-   levels/skills, item scaling, kill-streak sky chest, multi-boss events,
-   DRAGON COUNCIL, bot mercenaries, questline themes. Largest last.
-4. **R72(b)** — the boss fight as the Meshy→Blender→Unreal concept test; the
+1. **R58** — the potion's heal-over-time. Re-scope first: `flask_probe` passes,
+   so reproduce the complaint in a real hunt before touching code.
+2. **R65** — the skills half of pets (see above; the scaling half is done).
+3. **R47 / R48 / R49 / R51** — the four NOW items that never moved: reward-function
+   version history, the GenForge console's missing Back navigation, arena
+   interface polish, watching a match from the console. R49 shares
+   `game/arena/console.gd` with the other session.
+4. **R55 residual** — instrument the endgame specifically (time-to-first-death vs
+   time-from-first-death-to-episode-end), since the exchange agrees per channel
+   and only the tail disagrees. Then re-run the parity matrix at **64 episodes**
+   and retrain: `STEPS=60000000 PLATEAU_UPDATES=80 PLATEAU_DELTA=0.02
+   PLATEAU_MIN_STEPS=20000000 CLONE=heuristic tools/train_all.sh --ppo`, with the
+   gate's `--episodes` raised above 4.
+5. **R78 / R79** — the 56.82 MB Windows zip heading for the 100 MB limit, and the
+   Windows package that ships no GDExtension.
+6. **R62 → R71** — potion enchanting, skill design + cooldown cues, item scaling,
+   kill-streak sky chest, DRAGON COUNCIL, bot mercenaries, questline themes.
+   Largest last.
+7. **R72(b)** — the boss fight as the Meshy→Blender→Unreal concept test; the
    judgement is already written in `rebirth/docs/02-status.md` §3.1 (the real
    gap is Blender, not Meshy or Unreal).
-5. **R58** (reproduce the potion HoT complaint in a real hunt before touching
-   it), **R51**, **R47**, **R48**, **R49**, **R46**.
+8. **R46** — a written status answer is still owed.
+
+## Two traps this session paid for (R57, R80)
+
+- **`process_frame` is a coin flip in headless.** Headless Godot runs process
+  frames far faster than the fixed 60 Hz physics clock, so three `process_frame`
+  awaits can contain **zero** physics ticks. Any probe asserting on a
+  `_physics_process` effect must `await get_tree().physics_frame`.
+  `capture_probe` flaked 1-in-4 until this was fixed; 16/16 green after.
+- **A probe that builds its own world fixture must pin the seed and respect the
+  radius of the system it tests.** `residency_probe` was red on master
+  (`pass=0 fail=5`) for both reasons at once: it pinned no seed while `main.gd`
+  calls `randomize()` (3 of 28 sampled seeds have no water within ±35 tiles), and
+  its row-major scan returned the most-northern water tile rather than the
+  nearest — 615.7 px out, past residency's 512 px `wake_distance()`, so the
+  system correctly ignored it and the probe called that a bug. Now pinned to seed
+  **41487** via `MpNet.pending_seed` (released to 0 right after `add_child`) with
+  a ring-outward search bounded by the wake radius. `pass=5 fail=0`.
 
 **Owed to Ricardo, still:** the `builds.json` kit-range unit mix (cinder_drake
 `bolt_volley range 10.0` and `field_cast 9.0` against bog_golem's `112.0` =
