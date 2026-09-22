@@ -4353,3 +4353,132 @@ never saw`). Green ×3, with `capture_probe` and `level_up_probe` green beside i
 called `get_tree()` unconditionally. Any creature freed in the same frame it
 spawned — the probe's teardown, or a stream cull in the real game — reached it
 with a null tree and printed two errors per run. Guarded with `is_inside_tree()`.
+
+## 2026-09-22 — R81: current assets and order-of-magnitude opportunities
+
+Ricardo's request, verbatim:
+
+> sup man, weekly session limit restarted so we can resume. Claude probably went through what you were previously on, so your new task will be to check up assets and see what might be up for improvement for order of magnitude gains. We got some new guidelines, as well, distilling what was previously done, so make sure to aalyze those, and perhaps propose improvements for order of magnitude gains:
+
+The complete supplied Portuguese brief is preserved byte-for-byte in
+`requests/2026-09-22-asset-pillars.md`. This is a fresh audit/proposal, not
+authorization to replace the established art direction or restart completed
+packaging work. Inspection starts at `3c006ac`; concurrent dirty R49 arena
+files, the roadmap's prior edits, captures and Ricardo's root notes are retained.
+
+Strategy: trace source art → hifi cleanup/scorecard → bundle → actual runtime
+consumer; inspect images, quantify animation/catalog coverage, run relevant
+offline gates, and compare the brief's rendering claims to primary sources.
+Separate measured faults, unverified hypotheses and proposed investments.
+
+## 2026-09-22 — R49: the arena cockpit fits, and the gate can finally see it
+
+Ricardo's demand, verbatim from the ledger: *"Arena interface needs polishing to
+fit everything in."* The row had sat at NOW since 2026-09-14 behind a collision
+warning; the warning is stale (the file's last writer is this session's R60
+commit `1bb4e4d`, and Ricardo lifted the block: *"no other agent is currently
+changing code. You have total autonomy!"*).
+
+### Why a green gate and a broken screen disagreed
+
+`game/arena/tests/console_layout_probe.gd::_walk` ends with
+
+```gdscript
+if not (c is ScrollContainer):
+    out += _walk(c, canvas, label)
+```
+
+and that is *correct* in the general case — growing past the viewport is the
+entire purpose of a ScrollContainer, so measuring its contents against the canvas
+would fire on every healthy scroll in the project. But the arena's **whole left
+column** was inside one. Every control Ricardo complained about was structurally
+invisible to the gate: the probe walked ~800 controls per canvas, none of them
+the run knobs.
+
+So the gate came first. `_check_roster` measures the one thing `_walk` cannot:
+the scroll's **content height against its own viewport height**, plus a per-child
+height dump when it is over. Run red on purpose, it printed the bug as a number:
+
+```
+roster column: content 401 px in a 256 px viewport (OVER by 145)   # 640x360
+roster column: content 401 px in a 346 px viewport (OVER by 55)    # 800x450
+    Label        y=0    h=12  trainee — the build the net plays as
+    ItemList     y=15   h=88
+    HBoxContainer y=106 h=20  key
+    Label        y=129  h=27  opponents — multi-select · none = native + scr
+    ItemList     y=159  h=72
+    GridContainer y=234 h=42  gens
+    HBoxContainer y=279 h=20  speed
+    HBoxContainer y=302 h=20  net
+    Label        y=325  h=34  12 matches/gen (pop 6 × 2 opp) · jobs 16 · 20
+    HBoxContainer y=362 h=24  isolated run
+```
+
+800x450 is not a corner case: it is what `DhConsoleFit._fit_window` picks on a
+1080p desktop. 55 px over means the mode toggles (`isolated run` / `GPU (PPO)` /
+`bracket`) are off-screen and the parallelism hint is sliced in half by the
+viewport edge — which is exactly what the before capture shows.
+
+### The fix is structural, not smaller numbers
+
+Three alternatives were measured and rejected: rosters side by side (creature
+names clip below ~114 px of width), an 8-column knob grid (each cell too narrow
+for its SpinBox), and merging speed+net onto one row (the net caption
+`default  [64, 64] tanh` overflows its own Button and trips the probe's `c`-axis
+check). What landed instead:
+
+- **The roster is the only thing that scrolls.** `key_row`, `grid`, `speed_row`,
+  `net_row`, `_hint`, `mode_row` and `_cmd_label` moved out of the scrolled VBox
+  and are pinned in `left_frame`. A knob you have to find an inner scrollbar to
+  reach is a knob that is not there.
+- **The lists got a floor, not a height.** `ROSTER_MIN_H := 28.0` (about two
+  rows) + `SIZE_EXPAND_FILL` on both, and `SIZE_EXPAND_FILL` on the VBox inside
+  the scroll — a ScrollContainer hands its child the child's minimum unless the
+  child asks to expand, so without that last flag the lists sat at 28 px with
+  blank space under them. The roster is now what grows when the canvas grows.
+  The old fixed `88` / `72` are kept as `# PREVIOUS:` comments.
+- **The title moved into a band already paid for.** `hb.offset_top = 28.0` has
+  always reserved 28 px at the top for BACK alone. `TRAINING CONSOLE` is a
+  heading, not a control, so it sits next to BACK in an HBox and the column gets
+  a row back. BACK is built unconditionally now — R48's lesson: a button skipped
+  under `_selftest` is a button the probe cannot measure.
+- **The command echo is capped at two lines** with the whole invocation in its
+  tooltip (`_set_cmd`, three call sites). A `train_run.sh` line with a full
+  opponent list is longer than a 236 px column can ever show.
+- **`opponents — multi-select · none = native + scripted`** wrapped to two lines
+  and orphaned the last word; the rule stays on screen, the how-to-work-the-widget
+  half went to the tooltip.
+
+### Two probe bugs found on the way
+
+`_text_width` measured every string with `ThemeDB.fallback_font` regardless of
+the control's own font override. With the title moved into an HBox that override
+started mattering: the probe called it `210 > 105 (over by 105)` at all seven
+canvases — a false alarm, and in the other direction a blind spot for anything
+drawn with a *wider* font than the fallback. `_font_of()` now honours the
+override.
+
+And `_check_roster` exempts `DhConsoleFit.MIN_CANVAS` (640x360) from the
+no-scroll rule, because the arithmetic says it cannot hold the console: ~250 px
+of pinned controls in a 326 px frame. `console_fit.gd` calls that canvas "the
+fallback nobody chooses"; on every canvas `_fit_window` can actually pick, a
+scrollbar is a failure. What is asserted there instead is `ROSTER_MIN_VIEW := 72`
+— the lists may never be squeezed to slivers by what is pinned around them.
+
+### Verification
+
+```
+CONSOLE LAYOUT OK — 7 canvases x 5656 controls, nothing leaves the canvas
+on EITHER axis and no caption collapsed
+```
+
+with the roster line at each canvas: `74 px viewport (scrolls by 15)` at 640x360
+(exempt, above the floor), then **fits** at 800x450 (164 px), 960x540 (254),
+1024x576 (290), 1152x648 (362), 1280x720 (434), 1440x810 (524). Note 5656
+controls measured against ~800 before — the pinned knobs left the ScrollContainer
+and `_walk` now checks them directly, on both axes and for collapse, for free.
+
+Capture: `game/prototype/tests/captures/ui_r49_fixed.png` (1600x900, 97 draw
+calls, 4.1 ms) beside the before shot `ui_r49_progress.png`. Before: a scrollbar
+down the whole column, the hint sliced, the mode row absent. After: both rosters
+full-height, every knob and toggle on screen, no scrollbar.

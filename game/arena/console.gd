@@ -70,6 +70,10 @@ const AI_DEFAULTS := "game/arena/data/ai_defaults.json"
 const SPEEDS := [["max", "max (CPU-bound)"], ["16", "16x wall"], ["8", "8x wall"],
 		["4", "4x wall (old fast)"], ["2", "2x wall"], ["1", "1x real-time"]]
 const STRIP_MAX := 4000   # per-match score points kept for the strip
+# The roster lists' FLOOR, not their height (R49): about two rows, enough to
+# read one name and see there are more. Above the floor they expand, so the
+# roster is what grows when the canvas does — never the run knobs' position.
+const ROSTER_MIN_H := 28.0
 
 const EMBER := Color("ff9a3c")
 const PALE := Color("d9d4c7")
@@ -82,6 +86,11 @@ var _repo := ""
 var _selftest := false
 
 # roster
+# The scrolling body of the left column. Held as a member so the layout
+# probe can measure what it CONTAINS against what it SHOWS: a
+# ScrollContainer is the one widget a canvas-overflow check cannot see
+# through, and R49 is exactly the bug it hid.
+var _roster_scroll: ScrollContainer
 var _trainee: ItemList
 var _key_edit: LineEdit
 var _opps: ItemList
@@ -247,16 +256,38 @@ func _build_ui() -> void:
 
 	# BACK — the console also opens from the title menu in-process (standalone
 	# console.tscn boots keep working; hidden in the selftest)
-	if not _selftest:
-		var back := Button.new()
-		back.name = "ArenaBack"
-		back.text = ProtoLang.t("opt_back")
-		back.focus_mode = Control.FOCUS_NONE
-		back.add_theme_font_size_override("font_size", 8)
-		back.position = Vector2(6, 4)
-		back.pressed.connect(func() -> void:
-			get_tree().change_scene_to_file("res://prototype/ui/main_menu.tscn"))
-		add_child(back)
+	# The 28 px band `hb` reserves at the top held one small BACK button and
+	# nothing else. R49 (Ricardo, 2026-09-14: "in the arena interface, can we get
+	# a little polishing to better fit everything in there"): the left column is
+	# ~55 px taller than its own viewport at 800x450 — the canvas _fit_window
+	# picks on a 1080p desktop — so the run knobs sat below the fold behind a
+	# scrollbar. The title is a heading, not a control: it moves into the band
+	# that was already paid for, and the column gets that row back.
+	var top := HBoxContainer.new()
+	top.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
+	top.offset_left = 6.0
+	top.offset_top = 2.0
+	top.offset_right = -8.0
+	top.offset_bottom = 26.0
+	top.add_theme_constant_override("separation", 8)
+	add_child(top)
+	# Built even under selftest (R48's lesson from the genforge cockpit: BACK
+	# skipped in the probe is BACK the probe cannot measure). Nothing presses it
+	# there, so it costs a layout slot and no behaviour.
+	var back := Button.new()
+	back.name = "ArenaBack"
+	back.text = ProtoLang.t("opt_back")
+	back.focus_mode = Control.FOCUS_NONE
+	back.add_theme_font_size_override("font_size", 8)
+	back.pressed.connect(func() -> void:
+		get_tree().change_scene_to_file("res://prototype/ui/main_menu.tscn"))
+	top.add_child(back)
+	# no wrap: a wrapping Label in an HBox is handed a minimum width of 1 (R60)
+	var title := _label("TRAINING CONSOLE", EMBER, ProtoTheme.SIZE_TITLE, false)
+	var big := ProtoTheme.font_big()
+	if big != null:
+		title.add_theme_font_override("font", big)
+	top.add_child(title)
 
 	var hb := HBoxContainer.new()
 	hb.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -273,22 +304,30 @@ func _build_ui() -> void:
 	left_frame.add_theme_constant_override("separation", 3)
 	hb.add_child(left_frame)
 
-	var title := _label("TRAINING CONSOLE", EMBER, ProtoTheme.SIZE_TITLE)
-	var big := ProtoTheme.font_big()
-	if big != null:
-		title.add_theme_font_override("font", big)
-	left_frame.add_child(title)
-	var roster_scroll := ScrollContainer.new()
-	roster_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	roster_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	left_frame.add_child(roster_scroll)
+	# The roster is the ONLY thing that scrolls. Everything the console is
+	# operated with — the key, the knobs, the mode toggles, the parallelism hint
+	# — is pinned below it in left_frame, so it is on screen at every canvas and
+	# the lists absorb whatever height is left over (R49).
+	_roster_scroll = ScrollContainer.new()
+	_roster_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_roster_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	left_frame.add_child(_roster_scroll)
 	var left := VBoxContainer.new()
 	left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	# A ScrollContainer hands its child the child's own minimum size unless the
+	# child asks to EXPAND — without this the two lists sit at their 28 px floor
+	# and the rest of the roster viewport is blank (R49).
+	left.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	left.add_theme_constant_override("separation", 3)
-	roster_scroll.add_child(left)
+	_roster_scroll.add_child(left)
 
 	left.add_child(_label("trainee — the build the net plays as", DIM))
-	_trainee = _list(88, false)
+	# R49: the heights were fixed (88 / 72) and the column was 145 px too tall at
+	# 640x360. They are a FLOOR now — two rows each — and both lists expand, so
+	# the roster grows with the canvas instead of pushing the knobs off it.
+	# PREVIOUS: _trainee = _list(88, false) / _opps = _list(72, true)
+	_trainee = _list(ROSTER_MIN_H, false)
+	_trainee.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_trainee.item_selected.connect(_on_trainee_selected)
 	left.add_child(_trainee)
 
@@ -305,10 +344,16 @@ func _build_ui() -> void:
 	_key_edit.text_submitted.connect(func(t: String) -> void:
 		_attach(_progress_path(t.strip_edges()), 0))
 	key_row.add_child(_key_edit)
-	left.add_child(key_row)
+	left_frame.add_child(key_row)
 
-	left.add_child(_label("opponents — multi-select · none = native + scripted", DIM))
-	_opps = _list(72, true)
+	# R49: "opponents — multi-select · none = native + scripted" wrapped to two
+	# lines in a 236 px column and orphaned the last word. The rule it states is
+	# what matters on screen; how to work the widget goes in the tooltip.
+	left.add_child(_label("opponents — none = native + scripted", DIM))
+	_opps = _list(ROSTER_MIN_H, true)
+	_opps.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_opps.tooltip_text = ("Multi-select: click to add, click again to drop. "
+			+ "Select none and the trainee fights the native + scripted defaults.")
 	_opps.multi_selected.connect(func(_i: int, _on: bool) -> void: _refresh_ui())
 	left.add_child(_opps)
 
@@ -323,7 +368,7 @@ func _build_ui() -> void:
 	# 2026-09-13, jobs 16 and 20 both 6.4 s/gen, so the cap is free.
 	# PREVIOUS: clampi(OS.get_processor_count() / 2, 1, 4)  # 4 jobs, 1.5x slower
 	_jobs = _spin(grid, "jobs", 1, 64, clampi(OS.get_processor_count() - 4, 1, 16))
-	left.add_child(grid)
+	left_frame.add_child(grid)
 
 	var speed_row := HBoxContainer.new()
 	speed_row.add_theme_constant_override("separation", 4)
@@ -337,7 +382,7 @@ func _build_ui() -> void:
 	_speed.select(0)
 	_speed.item_selected.connect(func(_i: int) -> void: _refresh_ui())
 	speed_row.add_child(_speed)
-	left.add_child(speed_row)
+	left_frame.add_child(speed_row)
 
 	# NET — the architecture every trainer shares (Ricardo, 2026-09-13: "net
 	# hyperparams should be configurable, as to test new architectures"). The
@@ -358,12 +403,12 @@ func _build_ui() -> void:
 			_net.select(i)
 	_net.item_selected.connect(func(_i: int) -> void: _refresh_ui())
 	net_row.add_child(_net)
-	left.add_child(net_row)
+	left_frame.add_child(net_row)
 
 	_hint = _label("", DIM)
 	_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_hint.custom_minimum_size = Vector2(0, 34)
-	left.add_child(_hint)
+	left_frame.add_child(_hint)
 
 	var mode_row := HBoxContainer.new()
 	mode_row.add_theme_constant_override("separation", 6)
@@ -398,7 +443,7 @@ func _build_ui() -> void:
 			+ "PPO is one of the entrants, so the GPU tick does not apply.") % TOURNEY_BEST_OF
 	_bracket.toggled.connect(func(_on: bool) -> void: _refresh_ui())
 	mode_row.add_child(_bracket)
-	left.add_child(mode_row)
+	left_frame.add_child(mode_row)
 
 	var btns := GridContainer.new()
 	btns.columns = 3
@@ -416,12 +461,17 @@ func _build_ui() -> void:
 	_gate_btn = _button(btns, "GATE", _gate)
 	_watch_btn = _button(btns, "WATCH", _watch)
 	left_frame.add_child(btns)
-	left_frame.move_child(btns, 1)   # launch/stop actions stay above the scrolling roster
+	left_frame.move_child(btns, 0)   # launch/stop actions stay above the scrolling roster
 
 	_cmd_label = _label("", DIM)
 	_cmd_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_cmd_label.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	left.add_child(_cmd_label)
+	# R49: this used to be the column's expanding child, which is why the roster
+	# never got the slack. A launched command wraps to four or five lines in a
+	# 236 px column, so it is capped at two and the whole line is in the tooltip.
+	# PREVIOUS: _cmd_label.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_cmd_label.max_lines_visible = 2
+	_cmd_label.custom_minimum_size = Vector2(1, 0)
+	left_frame.add_child(_cmd_label)
 
 	# ---- right: the cockpit tabs (PROGRESS / RUNS / NETS / VERSUS)
 	var tabs := TabContainer.new()
@@ -875,6 +925,14 @@ func _label(text: String, color: Color, size := ProtoTheme.SIZE_BODY,
 	l.add_theme_color_override("font_color", color)
 	return l
 
+# The command echo draws at most two lines (R49), so the line itself lives in
+# the tooltip — a train_run.sh invocation with a full opponent list is longer
+# than a 236 px column can ever show.
+func _set_cmd(text: String) -> void:
+	_cmd_label.text = text
+	_cmd_label.tooltip_text = text
+
+
 func _button(parent: Container, text: String, cb: Callable) -> Button:
 	var b := Button.new()
 	b.text = text
@@ -1076,7 +1134,7 @@ func _spawn_league(args: String, kind: String, key: String) -> void:
 	else:
 		_pid_kind = kind
 		_proc_note = "%s started · pid %d · log %s" % [kind, _pid, _log_rel(key)]
-	_cmd_label.text = "python3 -m ml.training.league " + args
+	_set_cmd("python3 -m ml.training.league " + args)
 	_refresh_ui()
 
 func _train() -> void:
@@ -1988,7 +2046,7 @@ func _runs_promote() -> void:
 	var pid := OS.create_process("bash", ["-lc", cmd])
 	_proc_note = ("promoting %s — gate-PASSING nets only; see %s" % [run, _log_rel("promote")]
 			if pid > 0 else "could not spawn tools/train_run.sh")
-	_cmd_label.text = "tools/train_run.sh --promote " + rel
+	_set_cmd("tools/train_run.sh --promote " + rel)
 	_refresh_ui()
 
 # The registry, newest version first per key. The DEPLOYED pin is what the game
@@ -2542,7 +2600,7 @@ func _spawn_train_run(key: String, build: String, all_creatures := false) -> voi
 		_proc_note = "%s started · pid %d · %s" % [_pid_kind, _pid, run_dir]
 	# the isolated run writes its progress inside the run folder
 	_attach(_repo.path_join(run_dir).path_join("progress").path_join(key + ".jsonl"), 0)
-	_cmd_label.text = "env %stools/train_run.sh %s" % [env, args]
+	_set_cmd("env %stools/train_run.sh %s" % [env, args])
 	_refresh_runs()
 	_refresh_ui()
 

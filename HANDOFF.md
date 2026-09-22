@@ -11,13 +11,9 @@
 
 ## Where the tree is
 
-`master` at **ad85d26**, **in sync with `origin/master`** as of 2026-09-22 —
-R17's "GitHub remote equality" holds. The working tree carries the **R65** change
-(uncommitted at the time of writing: `game/prototype/{pet,main,creature}.gd`,
-`ui/{session,lang,companion_card}.gd`, 19 new `game/prototype/data/*.json`
-skill snapshots, `game/prototype/tests/bond_probe.{gd,tscn}`, and the doc set)
-plus two untracked notes of Ricardo's own (`prompts queue.txt`,
-`sprites prompt.md`) — those two are his, never stage them.
+`master` at **3c006ac** (R65 landed) as of 2026-09-22. R49 — the arena cockpit
+polish — is committed on top of it. Two untracked notes are Ricardo's own
+(`prompts queue.txt`, `sprites prompt.md`) — those are his, never stage them.
 
 GitHub warned on the way: `builds/dragon-heroes-windows.zip` is **56.82 MB**,
 past its 50 MB recommendation and heading for the **100 MB hard limit** — it grew
@@ -29,7 +25,8 @@ Commits this session, newest first:
 
 | commit | what |
 |---|---|
-| *(pending)* | **R65** — rolled pet skills actually cast, and the bond has a level of its own |
+| *(this one)* | **R49** — the arena cockpit fits, and the gate can finally see it |
+| `3c006ac` | **R65** — rolled pet skills actually cast, and the bond has a level of its own |
 | `ad85d26` | **R58** — the heal-over-time was right; the HUD never redrew it |
 | `8e0218e` | the handoff delta after R57 and R80 |
 | `9fb6a17` | **R80** — `residency_probe` was red on master for two non-bug reasons; both fixed |

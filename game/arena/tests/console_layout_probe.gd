@@ -39,6 +39,11 @@ var CANVASES: Array = DhConsoleFit.every_canvas()
 # than 8 px. Nothing legitimate in the console is a 1-8 px wide Label.
 const MIN_LABEL_W := 8.0
 
+# The floor for the roster scroll's VIEWPORT — what the two creature lists and
+# their captions are actually shown in. Below this the column has stopped being
+# a roster and become a wall of knobs with a slot in it.
+const ROSTER_MIN_VIEW := 72
+
 var _last_canvas_h := 0
 var _last_chart_h := 0.0
 
@@ -88,6 +93,8 @@ func _ready() -> void:
 			for _j in 3:
 				await get_tree().process_frame
 		if not _check_progress(console, canvas):
+			bad.append(canvas)
+		if not _check_roster(console, canvas):
 			bad.append(canvas)
 		console.queue_free()
 		await get_tree().process_frame
@@ -241,11 +248,78 @@ func _check_progress(console: Control, canvas: Vector2i) -> bool:
 	return ok
 
 
+# R49 (Ricardo, 2026-09-14): "in the arena interface, can we get a little
+# polishing to better fit everything in there". _walk deliberately does not
+# descend into a ScrollContainer — growing past the viewport is what one is FOR
+# — and the left column is a ScrollContainer, so every check above reported OK
+# while the 2026-09-22 capture showed the run knobs below the fold and the last
+# hint line sliced in half by the scroll viewport's edge.
+#
+# A scroll is a safety net, not a layout. If the roster column needs to scroll
+# on a canvas Ricardo actually opens, the column is too tall: the knobs he sets
+# before every run (gens/pop/eps/jobs, speed, net) have to be visible without
+# him discovering an inner scrollbar first.
+func _check_roster(console: Control, canvas: Vector2i) -> bool:
+	var scroll: ScrollContainer = console.get("_roster_scroll")
+	if scroll == null:
+		push_error("CONSOLE LAYOUT: no roster scroll to measure")
+		return false
+	var body: Control = null
+	for child in scroll.get_children():
+		if child is Control and not (child is ScrollBar):
+			body = child
+			break
+	if body == null:
+		push_error("CONSOLE LAYOUT: the roster scroll has no content")
+		return false
+	var over := body.size.y - scroll.size.y
+	print("    roster column: content %.0f px in a %.0f px viewport (%s)" % [
+			body.size.y, scroll.size.y,
+			"fits" if over <= 0.5 else "scrolls by %.0f" % over])
+	var ok := true
+	# A roster squeezed to a sliver is not a roster. Whatever else the canvas
+	# takes, the lists keep enough height to show a name and hint at the rest.
+	if scroll.size.y < ROSTER_MIN_VIEW:
+		ok = false
+		push_error("CONSOLE LAYOUT: the roster viewport is %.0f px at %dx%d (floor %d) — "
+				% [scroll.size.y, canvas.x, canvas.y, ROSTER_MIN_VIEW]
+				+ "the lists have been squeezed out by what is pinned around them")
+	# 640x360 is the fallback nobody chooses (console_fit.gd): a console is a
+	# desktop tool and its content genuinely does not fit there, so the roster is
+	# allowed to scroll. On every canvas _fit_window can actually PICK, it must
+	# not: scrolling means rows Ricardo has to go looking for.
+	if over > 0.5 and canvas != DhConsoleFit.MIN_CANVAS:
+		ok = false
+		for child in body.get_children():
+			if child is Control:
+				var c: Control = child
+				print("        %-18s y=%-5.0f h=%-5.0f %s" % [c.get_class(), c.position.y,
+						c.size.y, _first_text(c)])
+		push_error("CONSOLE LAYOUT: the roster needs %.0f px it does not have at "
+				% over + "%dx%d — rows are below the fold" % [canvas.x, canvas.y])
+	return ok
+
+
+# A one-line identity for a container in the diagnostic dump above: whatever the
+# first bit of text inside it is.
+func _first_text(c: Control) -> String:
+	if c is Label:
+		return (c as Label).text.substr(0, 46)
+	if c is Button:
+		return (c as Button).text
+	for child in c.get_children():
+		if child is Control:
+			var t := _first_text(child)
+			if t != "":
+				return t
+	return ""
+
+
 # How wide the text in this control actually draws. Only for controls that do
 # not wrap and do not scroll: an autowrapping Label reflows, a ScrollContainer
 # and an ItemList are allowed to hold more than they show.
 func _text_width(c: Control) -> float:
-	var font := ThemeDB.fallback_font
+	var font := _font_of(c)
 	var size := ProtoTheme.SIZE_BODY
 	if c is Label:
 		var l: Label = c
@@ -262,6 +336,17 @@ func _text_width(c: Control) -> float:
 			size = b.get_theme_font_size("font_size")
 		return font.get_string_size(b.text, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x + 12.0
 	return 0.0
+
+
+# The font the control will ACTUALLY draw with. R49 moved the TRAINING CONSOLE
+# title into the top band with its ProtoTheme big font on it, and this probe
+# called it 105 px too wide at every canvas: it measured every string with
+# ThemeDB.fallback_font, which is not the pixel font the cockpit draws. A width
+# check against the wrong font is a false alarm at best and a blind spot at worst.
+func _font_of(c: Control) -> Font:
+	if c.has_theme_font_override("font"):
+		return c.get_theme_font("font")
+	return ThemeDB.fallback_font
 
 
 func _find_tabs(node: Node) -> TabContainer:
@@ -293,6 +378,14 @@ func _load_it_up(console: Control) -> void:
 	for k in 10:
 		run.cands.append({"g": 199, "cand": k, "fitness": -3.1 + float(k) * 0.4})
 	console.set("_run", run)
+	# the echo is pinned below the roster now (R49) and capped at two lines: give
+	# it the longest thing it can ever hold, a full isolated run invocation.
+	var cmd: Label = console.get("_cmd_label")
+	if cmd != null:
+		cmd.text = ("env DH_ARENA_SPEED=max tools/train_run.sh --key gloamfen_stalker "
+				+ "--build core.arena.gloamfen_stalker --generations 200 --pop 10 "
+				+ "--episodes 6 --jobs 16 --net default --isolated --opponents "
+				+ "core.arena.fen_boar_alpha,core.arena.dusk_revenant,native,scripted")
 	var status: Label = console.get("_status")
 	var note: Label = console.get("_note")
 	var gate: Label = console.get("_gate_label")
