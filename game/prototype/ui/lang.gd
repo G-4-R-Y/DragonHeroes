@@ -456,6 +456,12 @@ const S := {
 			"pt": "slots de pet cheios — F de novo em 3 s estabula %s"},
 	"msg_sent_stables": {"en": "%s sent to the stables", "pt": "%s foi para o estábulo"},
 	"msg_bonded": {"en": "BONDED — %s (pet %d/%d)", "pt": "VINCULADO — %s (pet %d/%d)"},
+	# R57: a bonded boss did not FALL, so the hunt/duo lines a kill would print
+	# would read as a lie. The trophy is the pet, and the hint says so.
+	"msg_bonded_leg": {"en": "The hunt's Legendary walks beside you now — no spoils, but the bond is the trophy.",
+			"pt": "A Lendária da caçada agora anda ao seu lado — sem espólios, mas o vínculo é o troféu."},
+	"msg_duo_taken": {"en": "Half the duo was TAKEN — the survivor is enraged. Finish it.",
+			"pt": "Metade da dupla foi LEVADA — o sobrevivente está enfurecido. Acabe com ele."},
 	"msg_resisted": {"en": "RESISTED!", "pt": "RESISTIU!"},
 	"msg_matriarch_felled": {"en": "MATRIARCH FELLED!", "pt": "A MATRIARCA CAIU!"},
 	"msg_mount_bonded": {"en": "MOUNT BONDED — Emberwing Drakeling (press Z to FLY)",

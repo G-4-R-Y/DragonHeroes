@@ -14,6 +14,69 @@
       ]
     }
   ],
+  "element_signatures": {
+    "physical": [
+      "core.skill.cleave",
+      "core.skill.seismic_slam"
+    ],
+    "umbral": [
+      "core.skill.shadow_rend",
+      "core.skill.abyssal_maw"
+    ],
+    "venom": [
+      "core.skill.creeping_mire",
+      "core.skill.shrieking_curse"
+    ],
+    "fire": [
+      "core.skill.ember_bolt",
+      "core.skill.cinder_breath"
+    ],
+    "storm": [
+      "core.skill.wing_gust",
+      "core.skill.ember_screech"
+    ],
+    "blood": [
+      "core.skill.abyssal_maw",
+      "core.skill.cleave"
+    ],
+    "frost": [
+      "core.skill.void_step",
+      "core.skill.hex_bolt"
+    ]
+  },
+  "archetype_signatures": {
+    "stalker": [
+      "core.skill.shadow_rend",
+      "core.skill.void_step"
+    ],
+    "lunger": [
+      "core.skill.talon_dive",
+      "core.skill.cleave"
+    ],
+    "brute": [
+      "core.skill.boulder_hurl",
+      "core.skill.seismic_slam"
+    ],
+    "wisp": [
+      "core.skill.hex_bolt",
+      "core.skill.wispling_call"
+    ],
+    "dragon": [
+      "core.skill.cinder_breath",
+      "core.skill.wing_gust",
+      "core.skill.meteor_call"
+    ],
+    "hag": [
+      "core.skill.hex_bolt",
+      "core.skill.shrieking_curse",
+      "core.skill.wispling_call"
+    ],
+    "colossus": [
+      "core.skill.earthshatter",
+      "core.skill.stone_upheaval",
+      "core.skill.stone_spikes"
+    ]
+  },
   "roll_rules": {
     "skill_slots": 3,
     "family_skill_chance": 0.25,

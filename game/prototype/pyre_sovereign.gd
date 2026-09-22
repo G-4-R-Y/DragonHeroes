@@ -35,6 +35,9 @@ func _ready() -> void:
 	_skill_cd = {"bolt": 2.0, "meteor": 4.0, "breath": 6.0, "gust": 3.0}
 	super._ready()
 
+func capture_archetype() -> String:
+	return "dragon" if legendary_entry.is_empty() else super()
+
 func _make_frames() -> SpriteFrames:
 	return _bundle_or(ProtoSprites.boss_frames())
 

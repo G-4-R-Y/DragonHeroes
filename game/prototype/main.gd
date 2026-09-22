@@ -1030,9 +1030,12 @@ func play_ui(sfx_name: String, vol_db := -8.0) -> void:
 
 # ---- pet capture (canon §3, design/13 §7.1 — now THREE slots, proposal) ---------
 
-# F: consume a Soul Snare on a weakened (<35% HP) stalker within 3 m.
-# Capture chance = 0.25 + 0.6 * (1 - hp/max_hp)  (proposal). With all pet slots
-# full, the first F opens a 3 s confirm window; F again replaces the OLDEST bond.
+# F: consume a Soul Snare on a weakened creature within 3 m. Capture chance =
+# (0.25 + 0.6 * (1 - hp/max_hp)) * the body's capture_chance_scale (proposal).
+# R57: the HP gate and that scale come from the BODY, not from here — a normal
+# frazzles below 35% on a fair roll, an Elite only below 15% at a third of the
+# odds, and the Duologue below 10% at 0.15. With all pet slots full, the first F
+# opens a 3 s confirm window; F again replaces the OLDEST bond.
 func _try_capture() -> void:
 	if player.dead:
 		return
@@ -1053,7 +1056,7 @@ func _try_capture() -> void:
 		damage_number(player.global_position + Vector2(0, -24), 0,
 				Color(0.7, 0.9, 1.0, 0.9), ProtoLang.t("msg_no_stalker"))
 		return
-	if best.hp > best.max_hp * 0.35:
+	if best.hp > best.max_hp * best.capture_hp_gate:
 		damage_number(best.global_position + Vector2(0, -24), 0,
 				Color(0.7, 0.9, 1.0, 0.9), ProtoLang.t("msg_too_strong"))
 		return
@@ -1065,7 +1068,7 @@ func _try_capture() -> void:
 		return
 	_replace_window = 0.0
 	snares -= 1
-	var chance := 0.25 + 0.6 * (1.0 - best.hp / best.max_hp)
+	var chance := (0.25 + 0.6 * (1.0 - best.hp / best.max_hp)) * best.capture_chance_scale
 	if randf() < chance:
 		play_ui("capture", -6.0)
 		if Session.pets.size() >= Session.MAX_PETS:   # oldest bond goes to the STABLES
@@ -1077,13 +1080,14 @@ func _try_capture() -> void:
 					old_node.queue_free()
 			damage_number(player.global_position + Vector2(0, -36), 0,
 					Color(0.7, 0.9, 1.0, 0.8), ProtoLang.t("msg_sent_stables") % str(old.get("name", "")))
-		var data := _roll_pet()
+		var data := _roll_pet(best)
 		Session.pets.append(data)
 		var at: Vector2 = best.global_position
 		hit_spark(at, Color("7fe7ff"))
 		damage_number(at + Vector2(0, -24), 0, Color("7fe7ff"), ProtoLang.t("msg_bonded")
 				% [data["name"], Session.pets.size(), Session.MAX_PETS])
 		best.dead = true   # removed, not killed: no loot, no kill credit
+		_release_captured(best)
 		best.queue_free()
 		_spawn_pet(data, at)
 	else:
@@ -1094,31 +1098,82 @@ func _try_capture() -> void:
 	_sync_session()
 	refresh_hud()
 
-# INSTANCE ROLL per canon §3: 2-3 skills from the Abyssal pool (abyssal.json) —
-# species signature weighted ~70%, family-shared ~30%, at least 1 signature —
-# plus a 70-110% attribute roll applied to hp/damage.
-func _roll_pet() -> Dictionary:
+# A captured boss leaves the same holes in the hunt state a dead one would —
+# minus every spoil (no loot, no rune, no kill credit, no victory line): the bond
+# IS the trophy (Ricardo, R57). What still has to happen is the bookkeeping, or
+# the HUD keeps hinting at a legendary that walked home beside the hunter and the
+# surviving half of a Duologue never learns its mate is gone.
+func _release_captured(b: ProtoCreature) -> void:
+	if b == legendary_boss:
+		legendary_boss = null
+		_legendary_name = ""
+		_hud.hint.text = ProtoLang.t("msg_bonded_leg")
+	if b is ProtoDuoBoss:
+		# untyped: a fallen partner is a freed instance (see on_duo_boss_died)
+		var mate: Variant = b.partner
+		if is_instance_valid(mate) and not mate.dead:
+			mate.avenge()   # its mate was not killed — it was taken
+			_hud.hint.text = ProtoLang.t("msg_duo_taken")
+
+# The signature pool for ONE captured body (R57). Before R57 this was the
+# literal string "core.creature.gloamfen_stalker", which is why every bond came
+# home a cyan stalker. Order of preference:
+#   1. a legendary's own kit — a bonded boss keeps the skills it fought with;
+#   2. the hand-written species row in abyssal.json (the founding stalker);
+#   3. the element pool, then the archetype pool (both added in R57) — this is
+#      what covers the 1000 generated bestiary species that have no row.
+# The last fallback is the founding bond's signature, so a hostile/typo'd entry
+# still yields a legal pet instead of an empty skill list.
+func _signature_pool(fam: Dictionary, prof: Dictionary) -> Array:
+	var pool: Array = (prof.get("kit", []) as Array).duplicate()
+	if pool.is_empty():
+		for sp in fam.get("species", []):
+			if str(sp.get("creature", "")) == str(prof.get("species", "")):
+				pool.append_array(sp.get("signature_skills", []))
+		var elements: Dictionary = fam.get("element_signatures", {})
+		pool.append_array(elements.get(str(prof.get("element", "")), []))
+		var archetypes: Dictionary = fam.get("archetype_signatures", {})
+		pool.append_array(archetypes.get(str(prof.get("archetype", "")), []))
+	var seen := {}
+	var out: Array = []
+	for skill in pool:
+		if not seen.has(skill):
+			seen[skill] = true
+			out.append(skill)
+	out.shuffle()   # which signature is guaranteed varies per capture
+	return out if not out.is_empty() else ["core.skill.shadow_rend"]
+
+# INSTANCE ROLL per canon §3, off the CAPTURED BODY (R57): 2-3 skills (3-4 for a
+# boss chassis) from that body's signature pool plus the Abyssal family-shared
+# pool, at least 1 signature, weighted by abyssal.json's roll_rules — plus a
+# 70-110% attribute roll. The record also carries the body's whole chassis
+# (capture_profile) so the pet is drawn and statted as the species it was.
+func _roll_pet(body: ProtoCreature) -> Dictionary:
+	var prof := body.capture_profile()
 	var fam: Dictionary = Session.load_content("abyssal")
-	var sig_pool: Array = []
-	for sp in fam.get("species", []):
-		if str(sp.get("creature", "")) == "core.creature.gloamfen_stalker":
-			sig_pool = (sp.get("signature_skills", []) as Array).duplicate()
-	if sig_pool.is_empty():
-		sig_pool = ["core.skill.shadow_rend"]
+	var sig_pool := _signature_pool(fam, prof)
 	var shared_pool: Array = (fam.get("family_shared_skills", []) as Array).duplicate()
-	var slots := randi_range(2, 3)
+	var rules: Dictionary = fam.get("roll_rules", {})
+	var shared_chance := clampf(float(rules.get("family_skill_chance", 0.25)), 0.0, 1.0)
+	var max_slots := clampi(int(rules.get("skill_slots", 3)), 1, 4)
+	var slots := randi_range(mini(2, max_slots), max_slots)
+	if not (prof.get("kit", []) as Array).is_empty():
+		slots = clampi(slots + 1, 1, 4)   # a bonded legendary keeps a real kit
 	var skills: Array = [sig_pool.pop_front()]   # signature guaranteed
 	while skills.size() < slots and (not sig_pool.is_empty() or not shared_pool.is_empty()):
-		var from_sig := randf() < 0.7
+		var from_sig := randf() >= shared_chance
 		var pool := sig_pool if (from_sig and not sig_pool.is_empty()) or shared_pool.is_empty() \
 				else shared_pool
 		var pick: Variant = pool.pick_random()
 		pool.erase(pick)
 		skills.append(pick)
-	var roll := randi_range(70, 110)
-	return {"uid": ProtoItems.next_uid(), "name": "Gloam Stalker %d%%" % roll,
-			"species": "core.creature.gloamfen_stalker",
-			"roll_pct": roll, "skills": skills}
+	var span: Dictionary = rules.get("attribute_roll_range", {})
+	var roll := randi_range(int(span.get("min_pct", 70)), int(span.get("max_pct", 110)))
+	return {"uid": ProtoItems.next_uid(),
+			"name": "%s %d%%" % [str(prof.get("species_name", "Gloam Stalker")), roll],
+			"species": str(prof.get("species", "core.creature.gloamfen_stalker")),
+			"bundle": str(prof.get("bundle", "")),   # companion_card reads this for portraits
+			"roll_pct": roll, "skills": skills, "chassis": prof}
 
 func _spawn_pet(data: Dictionary, at: Vector2) -> void:
 	var p := PetScene.new()
@@ -1213,7 +1268,7 @@ func on_creature_died(c: ProtoCreature) -> void:
 	if randf() < c.item_chance:
 		_drop_item(ProtoItems.roll_loot(c.elite, Session.level),
 				c.global_position + Vector2(4, 10))
-	if c.capturable and randf() < ESSENCE_CHANCE:   # Spirit Essence: abyssal kills
+	if c.drops_essence and randf() < ESSENCE_CHANCE:   # Spirit Essence: abyssal kills
 		_drop_item(ProtoItems.make_essence(), c.global_position + Vector2(-14, -4))
 	if c.elite:
 		_maybe_drop_rune(c.global_position + Vector2(0, -14))

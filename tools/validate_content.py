@@ -174,6 +174,11 @@ def main() -> int:
                 pet_membership.setdefault(sp.get("creature", ""), []).append(fid)
                 for s in sp.get("signature_skills", []):
                     check_ref(path, s, "skill", "species signature_skill")
+            # R57: element/archetype pools let ANY captured body find signatures
+            for key in ("element_signatures", "archetype_signatures"):
+                for pool, skills in (d.get(key) or {}).items():
+                    for s in skills:
+                        check_ref(path, s, "skill", f"{key}[{pool}]")
         elif token == "ai":
             for b in d.get("behaviors", []):
                 if b.get("skill"):

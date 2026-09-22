@@ -20,6 +20,11 @@ const LOOT_STATE := ["kind", "amount", "item", "_t", "_base_y", "_warned"]
 const STATE := ["max_hp", "hp", "damage", "move_speed", "body_radius", "aggro_range",
 	"attack_reach", "attack_arc_deg", "windup_time", "attack_cd", "gold_min", "gold_max",
 	"stone_chance", "snare_chance", "capturable", "guaranteed_stone", "elite", "item_chance",
+	# R57 capture terms: a boss that walked away at 12% HP must still be the hard
+	# mini-pet capture when you come back, and the level factors keep the restored
+	# body's capture_profile bases honest after the hunter levels while away.
+	"drops_essence", "capture_hp_gate", "capture_chance_scale", "capture_hp_share",
+	"capture_dmg_share", "capture_scale", "_level_hp_mult", "_level_dmg_mult",
 	"archetype", "elite_affix", "fiery", "name_tag", "species_name", "dmg_scale",
 	"legendary_entry", "_entry", "_bundle", "_base_tint", "_scale", "pack_anchor", "threat",
 	"_cd", "_enrage_t", "_slow_t", "_burn_t", "_burn_tick", "_burn_dps", "_bleed_t",

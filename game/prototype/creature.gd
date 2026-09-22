@@ -24,7 +24,19 @@ var gold_min := 4
 var gold_max := 18
 var stone_chance := 0.08
 var snare_chance := 0.12         # Soul Snare drop (pet capture, design/13 §7.1)
-var capturable := true           # in the Abyssal pool (abyssal.json) — boss/wisp opt out
+# ---- pet capture (R57, design/13 §7.1) --------------------------------------
+# Before R57 `capturable` did two jobs: gate the snare AND gate the Spirit
+# Essence drop (main.on_creature_died). Bosses becoming capturable would have
+# silently opened an essence faucet, so the two are separate flags now and the
+# essence drop set is UNCHANGED (stalker/lunger/brute normals only) until a
+# balance pass says otherwise.
+var capturable := true           # a Soul Snare may target this body at all
+var drops_essence := true        # Spirit Essence on death (was tied to capturable)
+var capture_hp_gate := 0.35      # snare only below this HP fraction
+var capture_chance_scale := 1.0  # multiplies the snare success roll
+var capture_hp_share := 1.0      # the pet keeps this share of the body's HP...
+var capture_dmg_share := 1.0     # ...and this share of its damage
+var capture_scale := 1.0         # mini-pet sprite scale vs. the captured body
 var guaranteed_stone := false    # first pack seeds the Bestial Skill discovery
 var elite := false               # Elite+ tier: boosted loot rarity + rune drops (proposal)
 var item_chance := 0.10          # (proposal) chance a kill rolls a real item drop
@@ -38,6 +50,11 @@ var dmg_scale := 1.0             # entry dmg_mult x level curve — scales skill
 var legendary_entry := {}        # hunt legendary riding this chassis (main routes _die)
 var _entry := {}                 # bestiary_normal.json species entry (applied in _ready)
 var _bundle := ""                # baked GenForge actor key ("" = archetype frames)
+# The player-level factors _apply_entry folded into max_hp/damage at spawn. A
+# captured pet divides them back out to recover PRE-LEVEL bases, so the bond
+# levels with the player instead of freezing at capture-time power (R57).
+var _level_hp_mult := 1.0
+var _level_dmg_mult := 1.0
 var _base_tint := Color(1, 1, 1)
 var _scale := 1.0
 
@@ -262,6 +279,8 @@ func _apply_entry() -> void:
 	var lvl := float(maxi(Session.level - 1, 0))
 	var hp_mult := 1.0 + rates.x * lvl
 	var dmg_mult := 1.0 + rates.y * lvl
+	_level_hp_mult = hp_mult     # the level part only — capture_profile divides it out
+	_level_dmg_mult = dmg_mult
 	var gold_mult := 1.0 + rates.y * lvl   # loot scales mildly with the same curve
 	if not _entry.is_empty():
 		species_name = str(_entry.get("name", ""))
@@ -292,6 +311,46 @@ func _apply_entry() -> void:
 	dmg_scale = dmg_mult   # boss kits multiply their hardcoded packets by this
 	gold_min = maxi(int(gold_min * gold_mult), 1)
 	gold_max = maxi(int(gold_max * gold_mult), gold_min)
+
+# ---- what the bond carries away (R57) ---------------------------------------
+# The pool key the pet skill roll reads for this body: bestiary archetype for
+# normals, the legendary's chassis (dragon|hag|colossus) when one rides it.
+# Boss subclasses override this so a hand-placed boss still finds a pool.
+func capture_archetype() -> String:
+	if not legendary_entry.is_empty():
+		return str(legendary_entry.get("base", archetype))
+	return archetype
+
+# Everything needed to rebuild THIS body as a pet: the chassis it is drawn with
+# (bundle/tint/scale/radius), the keys its skills roll from (species/element/
+# archetype + any legendary kit), and PRE-LEVEL base stats plus the level rates,
+# so pet.gd can re-derive hp/damage at whatever level the player is now.
+# Values are plain JSON types — the record is saved with the character.
+func capture_profile() -> Dictionary:
+	var rates := _power_rates()
+	var species_id := str(_entry.get("id", ""))
+	if species_id.is_empty():
+		species_id = "core.creature.gloamfen_stalker"   # hand-placed pack stalker
+	var display := species_name if species_name != "" else "Gloam Stalker"
+	return {
+		"species": species_id,
+		"species_name": display,
+		"bundle": _bundle,
+		"tint": [_base_tint.r, _base_tint.g, _base_tint.b],
+		"scale": _scale * capture_scale,
+		"body_radius": body_radius * capture_scale,
+		"archetype": capture_archetype(),
+		"element": str(_entry.get("element", "")),
+		"kit": (legendary_entry.get("kit", []) as Array).duplicate(),
+		# pre-level bases: undo the level curve _apply_entry baked in at spawn
+		"base_hp": max_hp / maxf(_level_hp_mult, 0.01) * capture_hp_share,
+		"base_damage": damage / maxf(_level_dmg_mult, 0.01) * capture_dmg_share,
+		"base_speed": move_speed,
+		"attack_reach": attack_reach,
+		"attack_cd": attack_cd,
+		"hp_rate": rates.x,
+		"dmg_rate": rates.y,
+	}
 
 # Baked GenForge bundle for a catalog species when the actor exists on disk —
 # else the archetype's procedural frames (sliced once, cached in ProtoBundleArt).

@@ -319,13 +319,31 @@ contribution to each.
 | Epic | 12% | ×0.5 |
 | Legendary | 5% | ×0.5 |
 
-- **Tier gate:** Normal and Elite tiers are capturable; **Legendary tier never** (proposal) —
-  bosses feed the economy through unique drops, and a captured boss would break the power cap.
+- **Tier gate (R57, Ricardo, 2026-09-22):** **every tier is capturable — Normal, Elite and
+  Legendary alike.** The earlier rule here ("Legendary tier never") is superseded: bosses bond
+  as **mini-pets**, which keeps the power cap without closing the pool. The cap is enforced by
+  the *terms of the bond*, not by a tier ban:
+
+  | Chassis | Snare only below | Roll x | Pet keeps HP | Pet keeps dmg | Drawn at |
+  |---|---|---|---|---|---|
+  | Normal (stalker/lunger/brute/wisp) | 35% HP | ×1.0 | 100% | 100% | 100% |
+  | Elite (Matriarch, Bog Hag) | 15% HP | ×0.35 | 25% | 50% | 55% / 60% |
+  | Legendary duo (Pyre Sovereign, Terravore) | 10% HP | ×0.15 | 20% | 45% | 50% |
+
+  A bonded boss is a **trophy with its own kit**, never a second boss walking beside the
+  hunter. Unique drops still feed the economy: a capture pays **no loot, no rune, no kill
+  credit** — the bond *is* the spoil.
 - A failed Snare is consumed and enrages the target (+25% damage for 10 s, proposal).
-- The Pet keeps its rarity multipliers and palette — its skills come from the instance roll
-  below; it occupies the single companion slot
-  ([classes & progression](../design/10-classes-and-progression.md)) and scales
-  to the owner's level band (proposal), so old captures stay usable under the power cap.
+- **The Pet is the body it was captured from (R57).** The capture records the whole chassis —
+  species id and name, bundle, tint, scale, hitbox, element, archetype, any legendary kit, and
+  **pre-level base stats plus that chassis' level rates** — so the pet is drawn and statted as
+  *that species*, on *that species' rig* (wisp chassis → wisp rig, dragon/colossus → boss rig),
+  and **re-derives its HP/damage at the hunter's current level** every time the hunter levels,
+  keeping its wound fraction. Skills come from the instance roll below; pets occupy the
+  companion slots ([classes & progression](../design/10-classes-and-progression.md)).
+  Records saved before R57 carry no chassis and stay exactly the founding 120/14 stalker.
+
+  *Gate:* `game/prototype/tests/capture_probe.tscn` (CAPTURE OK) asserts every line above.
 
 **The instance roll: attributes + a skill set from the family pool.** Per
 [canon](../00-canon.md) §3, a pet *instance* rolls **random attributes** — a spread of 80–120%

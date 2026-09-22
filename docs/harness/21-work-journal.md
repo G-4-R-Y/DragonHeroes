@@ -3944,3 +3944,157 @@ merge. The 100 MB per-file hard limit is now the real deadline. Committing the
 shipped zips is deliberate (canon §10, `builds/README.md`: they *are* the game to
 anyone downloading), so the choice when it arrives is Git LFS or GitHub release
 assets, decided before the limit forces it rather than after.
+
+---
+
+## 2026-09-22 — R57: the bond carries the body
+
+**The complaint (verbatim):** *"Every captured mob turns into a gloamfen
+stalker. Wanted: maximum variety — every species keeps its own chassis, AND
+bosses are capturable as mini-pets with their signature skills, levelling
+alongside the player."*
+
+### Two hardcodes, not one
+
+The complaint reads like one bug and is three:
+
+1. `main.gd::_roll_pet()` stamped `"species": "core.creature.gloamfen_stalker"`
+   into every record it wrote, no matter what body the snare took.
+2. `pet.gd` then dressed whatever it was handed with
+   `ProtoSprites.stalker_frames()` and gave it the founding `120` hp / `14`
+   damage block — so even a correct record would have rendered as a stalker.
+3. The design doc agreed with the bug: design/13 §7.1 said the **Legendary tier
+   is never capturable**, and `duo_boss.gd` carried a comment promising that
+   line would be rewritten "in the same change" if the rule ever moved.
+
+### The seam: `capture_profile()`
+
+`creature.gd::capture_profile()` is now the single export point. The subtlety is
+levels: `_apply_entry()` runs unconditionally in `_ready` and bakes
+`1 + rate*(level-1)` into `max_hp`/`damage`, recording `_level_hp_mult` /
+`_level_dmg_mult`. A profile must export the **level-free** base, so
+`capture_profile()` divides those multipliers back out — otherwise a pet
+captured at level 30 would be re-levelled a second time on every tick and grow
+without bound. Normals use `_power_rates() = (0.02, 0.01)`; boss/hag/duo
+override to `(0.06, 0.03)`.
+
+The profile carries species id, archetype, element, tint, scale, the level-free
+hp/damage, the per-chassis capture terms, and — for a legendary — the authored
+`kit`.
+
+### Skills: a three-tier pool, not a constant
+
+`main.gd::_signature_pool(fam, prof)` resolves in order:
+
+1. the legendary's authored **`kit`** — if present it suppresses everything
+   else, because that kit *is* the creature's identity;
+2. a hand-written **species row** in `abyssal.json`;
+3. `element_signatures[element]` + `archetype_signatures[archetype]`.
+
+Deduped, then `out.shuffle()`, so `skills[0]` — the one the record leads with —
+is a random member of the pool rather than always the same head. Final fallback
+`["core.skill.shadow_rend"]`. `_roll_pet` takes `slots = randi_range(min(2,
+max_slots), max_slots)`, **+1 if the profile carries a kit**, seeds with
+`sig_pool.pop_front()` and fills the rest from the shared pool at
+`family_skill_chance = 0.25`.
+
+**Coverage gap worth recording:** `blood` and `frost` have **no dedicated skill**
+in `content/core/skills/`. They degrade to their neighbours —
+blood → `abyssal_maw` / `cleave`, frost → `void_step` / `hex_bolt`. The pool is
+legal and the probe passes; it is authored content that is missing, not code.
+Two skill definitions would close it.
+
+### Every tier is capturable
+
+The tier gate moved from "Normal only" to "all three, on their own terms":
+
+| Chassis | Snare only below | Roll × | Pet keeps HP | Pet keeps dmg | Drawn at |
+| --- | --- | --- | --- | --- | --- |
+| Normal (stalker/lunger/brute/wisp) | 35% HP | ×1.0 | 100% | 100% | 100% |
+| Elite (Matriarch, Bog Hag) | 15% HP | ×0.35 | 25% | 50% | 55% / 60% |
+| Legendary duo (Pyre, Terravore) | 10% HP | ×0.15 | 20% | 45% | 50% |
+
+A capture pays **no loot, no rune, no kill credit** — the bond *is* the spoil.
+`_release_captured` nulls `legendary_boss` / `_legendary_name`, and if the taken
+body is half of a duo whose mate still lives, the mate `avenge()`s. Every
+elite/legendary chassis keeps its old `# capturable = false # pre-R57: …` line
+commented rather than deleted, per the standing rule.
+
+Records saved before R57 carry no chassis at all and stay **exactly** the
+founding 120/14 stalker — the probe asserts that explicitly with a synthetic
+old record, so the change is not retroactive on anyone's save.
+
+### The gate, and proof it has teeth
+
+`game/prototype/tests/capture_probe.tscn` →
+`CAPTURE OK — 40 rolls legal; species/kit/rig/level/essence/F-path all held`,
+zero ERROR lines. It boots the real `main.tscn`, takes the clock
+(`set_physics_process(false)` on the hunt, `_streaming = false`, world and
+residency processing off), clears the spawned creatures and then asserts:
+
+- **species** — over 40 rolls of one body, every record's `species` is the
+  probe drake, never `gloamfen_stalker` (`"R57 REGRESSION: every bond is a
+  gloamfen stalker again"`), every skill id resolves in the family, and
+  `kits.size() >= 3` so the shuffle actually varies;
+- **rig** — a wisp pet carries `ProtoSprites.wisp_frames()`; a drake-chassis pet
+  carries its species hue (`self_modulate.r > self_modulate.b * 2.0`);
+- **kit** — the legendary's pet gets `prof["kit"]` verbatim and `>= 3` skills;
+- **level** — at `Session.level = 11` the boss chassis reads `max_hp == 1440`,
+  `base_hp == 225`, `base_damage == 11`, `hp_rate == 0.06`; moving the hunter
+  11 → 21 re-derives the pet to `225 * 2.2 * roll` with `hp == max_hp * 0.5`
+  preserved (the wound fraction, not the absolute HP);
+- **essence** — the faucet is unchanged: stalker/lunger/brute drop, wisp/boss/
+  hag/pyre/colossus do not;
+- **the real F path** — the HP gate refuses *for free* (no snare spent), a bond
+  spends one, `kills` does not move, `legendary_boss == null`,
+  `_legendary_name == ""`, the hint reads `msg_bonded_leg`, and the duo survivor
+  comes back `_enraged` with `msg_duo_taken`.
+
+**Mutation test.** Reverting `capture_profile()`'s species lookup to the
+pre-R57 hardcode (`var species_id := ""` / `if true:`) and re-running produced
+**34 `CAPTURE FAIL` lines**; restoring `creature.gd` from the scratchpad backup
+returned exit 0. The gate fails when the bug returns.
+
+Capture is probabilistic, so the probe does not seed the RNG — `_bond()` makes
+up to 200 fresh attempts at 1% HP (p ≈ 0.844 normal, 0.295 boss, 0.127 duo
+half), which puts the residual flake below any threshold worth engineering for,
+and it is handed `4 * TRIES` snares so the supply never runs dry.
+
+### Two things the probe found on its way
+
+- **Pre-existing error spam, not R57's.** Every pet spawn logged
+  `There is no animation with name 'idle'` from `pet.gd:122`. `git diff` proved
+  the line was a context line, older than this change: `_ready` called
+  `sprite.play("idle")` before `_dress()` had installed any frames. Deleted —
+  `_dress()` already plays idle when the current animation is missing.
+- **Two probe bugs caught before the first run**, both worth naming because they
+  are traps for the next test: parking the Terravore half at the player's
+  position would have made *it* the nearest snare target (the reach is only
+  `3 * TILE = 48 px`), so duo halves are parked at `FAR = (0, 320)`; and
+  `partner` is declared on `ProtoDuoBoss`, not `ProtoCreature`, so any probe var
+  holding a duo half must be untyped or GDScript's static analysis rejects
+  `.partner`.
+
+### The gate flaked, and the fix is worth remembering
+
+Re-running the suite before the commit, `capture_probe` failed once in four with
+`CAPTURE FAIL: the bond did not level with the hunter` — the one assertion that
+waits for something to happen rather than reading it straight back. The cause is
+a clock mismatch, not the code under test: the bond re-levels inside
+`pet.gd::_physics_process`, the probe waited `await get_tree().process_frame`
+three times, and **headless Godot runs process frames far faster than the fixed
+60 Hz physics clock**, so three process frames can contain zero physics ticks.
+Fixed with a `physics_frames()` helper that awaits `get_tree().physics_frame`;
+16 consecutive runs green afterwards. Any probe that waits on a
+`_physics_process` effect must wait on `physics_frame` — `process_frame` is a
+coin flip in headless.
+
+### Docs updated in the same change
+
+`docs/design/13-creatures-and-bestiary.md` §7.1 (the tier gate rewritten to the
+mini-pet rule, the terms table, the chassis-travels paragraph — this is the
+rewrite `duo_boss.gd`'s comment promised), `docs/USAGE.md` §10 (the
+`Capture / pets` gate row), `docs/harness/README.md` (the probe in the gate
+breath), `docs/harness/10-systems-map.md` (a new **Capture & pets** section),
+`docs/harness/20-roadmap.md` (R57 DONE; R65 marked unblocked, with the note that
+its levelling half landed here and only the skills half remains).

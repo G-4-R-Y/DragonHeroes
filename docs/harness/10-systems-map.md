@@ -171,6 +171,24 @@ i-frames, point-blank hits…). `player.gd`, `creature.gd`, `boss.gd`,
 sprite-scale hacks (Ricardo: "too sketchy"), pets' rolled skills never cast
 (L4), bolts fly through walls. The real fix is L5: authority into `dh-sim`.
 
+## Capture & pets
+**LANDED (R57, 2026-09-22).** Law: design/13 §7.1. `creature.gd::capture_profile()`
+is the single export seam — species id, archetype, element, tint, scale, the
+level-free base hp/damage (it divides out the `1 + rate*(level-1)` that
+`_apply_entry` baked in) and, for a legendary, the authored `kit`.
+`main.gd::_roll_pet` rolls from a three-tier signature pool (legendary kit ▸
+hand-written species row in `abyssal.json` ▸ `element_signatures` +
+`archetype_signatures`), `pet.gd` dresses itself from that chassis and
+re-derives hp/damage at the hunter's current level every tick, keeping its wound
+fraction. **Every tier is capturable**: elites/legendaries bond as mini-pets
+(HP gate 0.15/0.10, chance ×0.35/×0.15, keeps 25%/20% hp and 50%/45% dmg, drawn
+at 0.5–0.6); a capture pays no loot, no rune, no kill credit, and the duo
+survivor enrages. Pre-R57 saves carry no chassis and stay the founding 120/14
+stalker. Gate: `tests/capture_probe.tscn` (`CAPTURE OK`), mutation-verified.
+Known: `blood` and `frost` have no dedicated skill in `content/core/skills/` and
+degrade to the neighbouring element's pair; rolled pet skills still never cast
+(R65's remaining half).
+
 ## Bestiary & content
 **LANDED.** design/13-14, tech/23. `content/` packs + `content/schemas/`
 (incl. `arena_build.schema.json`), `tools/validate_content.py` (46 defs / 11

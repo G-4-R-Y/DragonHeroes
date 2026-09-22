@@ -31,13 +31,26 @@ func _ready() -> void:
 	gold_min = 80
 	gold_max = 260
 	snare_chance = 0.0
-	capturable = false   # Elites are not in the pet capture pool
+	# R57: bosses ARE capturable now — as MINI-pets (Ricardo). Kept hard: they
+	# only frazzle below 15% HP, the roll is a third as kind, and the bond keeps
+	# a quarter of the HP / half the damage at 55% size, so a boss pet is a
+	# trophy with its own kit, never a second boss walking beside the hunter.
+	# capturable = false # pre-R57: elites were out of the capture pool
+	drops_essence = false      # essence drop set unchanged (see creature.gd)
+	capture_hp_gate = 0.15
+	capture_chance_scale = 0.35
+	capture_hp_share = 0.25
+	capture_dmg_share = 0.5
+	capture_scale = 0.55
 	elite = true         # Elite tier: boosted loot rarity + the rune drop pool
 	item_chance = 1.0    # an Elite kill always rolls real items (proposal)
 	super._ready()
 
 func _make_frames() -> SpriteFrames:
 	return _bundle_or(ProtoSprites.boss_frames())
+
+func capture_archetype() -> String:
+	return "dragon" if legendary_entry.is_empty() else super()
 
 # All bosses scale power with the player (task 3, Ricardo, proposal):
 # hp x(1 + 0.06*(level-1)), damage x(1 + 0.03*(level-1)), read at spawn.

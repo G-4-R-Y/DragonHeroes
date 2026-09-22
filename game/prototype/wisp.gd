@@ -30,11 +30,19 @@ func _ready() -> void:
 	gold_max = 24
 	stone_chance = 0.12
 	snare_chance = 0.0
-	capturable = false            # not in the Abyssal capture pool (abyssal.json)
+	# R57: wisps ARE capturable now (278 of the 1000 bestiary species ride this
+	# chassis — excluding them was excluding a third of the variety).
+	# capturable = false          # pre-R57: not in the Abyssal capture pool
+	drops_essence = false         # essence drop set unchanged (see creature.gd)
 	super._ready()
 
 func _make_frames() -> SpriteFrames:
 	return _bundle_or(ProtoSprites.wisp_frames())
+
+# setup_from_entry never calls setup_archetype for wisps (the flavor IS this
+# class), so `archetype` is still the default here — name the pool explicitly.
+func capture_archetype() -> String:
+	return "wisp" if legendary_entry.is_empty() else super()
 
 func _sprite_lift() -> float:
 	return 10.0                   # floats well above its tiny shadow

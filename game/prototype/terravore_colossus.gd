@@ -36,6 +36,9 @@ func _ready() -> void:
 	_skill_cd = {"quake": 5.0, "spikes": 3.0, "upheaval": 7.0, "boulder": 2.0}
 	super._ready()
 
+func capture_archetype() -> String:
+	return "colossus" if legendary_entry.is_empty() else super()
+
 func _make_frames() -> SpriteFrames:
 	# giant rig stand-in, scaled 2.3x (legendary bundles override)
 	return _bundle_or(ProtoSprites.stalker_frames())

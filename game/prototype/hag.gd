@@ -36,12 +36,22 @@ func _ready() -> void:
 	gold_max = 160
 	snare_chance = 0.0
 	stone_chance = 0.0
-	capturable = false         # Elites are not in the pet capture pool
+	# R57: capturable as a mini-pet on the same hard terms as the Matriarch.
+	# capturable = false       # pre-R57: elites were out of the capture pool
+	drops_essence = false      # essence drop set unchanged (see creature.gd)
+	capture_hp_gate = 0.15
+	capture_chance_scale = 0.35
+	capture_hp_share = 0.25
+	capture_dmg_share = 0.5
+	capture_scale = 0.6
 	elite = true               # Elite tier: boosted loot rarity + rune pool
 	item_chance = 1.0          # an Elite kill always rolls real items (proposal)
 	_base_tint = Color(0.72, 1.0, 0.78)   # swamp-green cast over the wisp rig
 	_scale = 1.5
 	super._ready()
+
+func capture_archetype() -> String:
+	return "hag" if legendary_entry.is_empty() else super()
 
 func _make_frames() -> SpriteFrames:
 	# spirit rig stand-in until the hag rig lands (legendary bundles override)
@@ -261,6 +271,7 @@ class Wispling:
 		gold_max = 3
 		stone_chance = 0.0
 		item_chance = 0.0
+		capturable = false   # R57: a summon that expires in 12 s is no bond
 		_state = "chase"
 
 	func _physics_process(delta: float) -> void:

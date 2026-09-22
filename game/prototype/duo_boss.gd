@@ -24,7 +24,17 @@ var _aggro_cried := false
 func _ready() -> void:
 	snare_chance = 0.0
 	stone_chance = 0.0
-	capturable = false   # Legendaries are certainly not in the capture pool
+	# R57: even the Duologue can be bonded — but it is the hardest capture in
+	# the game (10% HP gate, a roll scaled to 0.15) and the smallest share of
+	# the parent's power. design/13 §7.1's "Legendary tier never" is overridden
+	# by Ricardo's demand; the tier gate there is updated in the same change.
+	# capturable = false # pre-R57: legendaries were out of the capture pool
+	drops_essence = false      # essence drop set unchanged (see creature.gd)
+	capture_hp_gate = 0.10
+	capture_chance_scale = 0.15
+	capture_hp_share = 0.2
+	capture_dmg_share = 0.45
+	capture_scale = 0.5
 	elite = true         # Elite+ loot path: rarity boost + rune pool
 	item_chance = 1.0
 	super._ready()

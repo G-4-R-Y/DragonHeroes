@@ -1,34 +1,90 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Pet family definition",
-  "description": "Canon §3 (v0.2): a captured pet rolls random attributes + a random skill set from its family pool — sparse lore-coherent family-shared skills plus species-signature skills. Perfect-roll pets are top marketplace chase assets.",
+  "description": "Canon \u00a73 (v0.2): a captured pet rolls random attributes + a random skill set from its family pool \u2014 sparse lore-coherent family-shared skills plus species-signature skills. Perfect-roll pets are top marketplace chase assets.",
   "type": "object",
-  "required": ["id", "name", "lore", "family_shared_skills", "species"],
+  "required": [
+    "id",
+    "name",
+    "lore",
+    "family_shared_skills",
+    "species"
+  ],
   "additionalProperties": false,
   "properties": {
-    "id": { "type": "string", "pattern": "^[a-z0-9_]+\\.pet_family\\.[a-z0-9_]+$" },
-    "name": { "type": "string" },
-    "lore": { "type": "string", "description": "The story that makes skill sharing coherent (e.g. creatures of the Abyss)" },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9_]+\\.pet_family\\.[a-z0-9_]+$"
+    },
+    "name": {
+      "type": "string"
+    },
+    "lore": {
+      "type": "string",
+      "description": "The story that makes skill sharing coherent (e.g. creatures of the Abyss)"
+    },
     "family_shared_skills": {
       "type": "array",
       "maxItems": 4,
-      "items": { "type": "string", "pattern": "^[a-z0-9_]+\\.skill\\.[a-z0-9_]+$" },
-      "description": "Kept sparse deliberately — rarity of sharing preserves permutation novelty (canon §3)"
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z0-9_]+\\.skill\\.[a-z0-9_]+$"
+      },
+      "description": "Kept sparse deliberately \u2014 rarity of sharing preserves permutation novelty (canon \u00a73)"
     },
     "species": {
       "type": "array",
       "minItems": 1,
       "items": {
         "type": "object",
-        "required": ["creature", "signature_skills"],
+        "required": [
+          "creature",
+          "signature_skills"
+        ],
         "additionalProperties": false,
         "properties": {
-          "creature": { "type": "string", "pattern": "^[a-z0-9_]+\\.creature\\.[a-z0-9_]+$" },
+          "creature": {
+            "type": "string",
+            "pattern": "^[a-z0-9_]+\\.creature\\.[a-z0-9_]+$"
+          },
           "signature_skills": {
             "type": "array",
             "minItems": 1,
-            "items": { "type": "string", "pattern": "^[a-z0-9_]+\\.skill\\.[a-z0-9_]+$" }
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z0-9_]+\\.skill\\.[a-z0-9_]+$"
+            }
           }
+        }
+      }
+    },
+    "element_signatures": {
+      "type": "object",
+      "description": "R57: signature pool per creature ELEMENT, for generated bestiary species that have no hand-written species row. Keys are element names (physical, umbral, venom, fire, blood, storm, frost).",
+      "propertyNames": {
+        "pattern": "^[a-z_]+$"
+      },
+      "additionalProperties": {
+        "type": "array",
+        "minItems": 1,
+        "items": {
+          "type": "string",
+          "pattern": "^[a-z0-9_]+\\.skill\\.[a-z0-9_]+$"
+        }
+      }
+    },
+    "archetype_signatures": {
+      "type": "object",
+      "description": "R57: signature pool per creature ARCHETYPE \u2014 stalker/lunger/brute/wisp for normals, dragon/hag/colossus for boss chassis captured as mini-pets. Used when neither the species row nor the element pool fills a slot.",
+      "propertyNames": {
+        "pattern": "^[a-z_]+$"
+      },
+      "additionalProperties": {
+        "type": "array",
+        "minItems": 1,
+        "items": {
+          "type": "string",
+          "pattern": "^[a-z0-9_]+\\.skill\\.[a-z0-9_]+$"
         }
       }
     },
@@ -36,14 +92,28 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "skill_slots": { "type": "integer", "minimum": 1, "maximum": 4, "default": 3 },
-        "family_skill_chance": { "type": "number", "minimum": 0, "maximum": 1, "description": "Per-slot chance a roll comes from the family pool instead of species signatures" },
+        "skill_slots": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4,
+          "default": 3
+        },
+        "family_skill_chance": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Per-slot chance a roll comes from the family pool instead of species signatures"
+        },
         "attribute_roll_range": {
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "min_pct": { "type": "number" },
-            "max_pct": { "type": "number" }
+            "min_pct": {
+              "type": "number"
+            },
+            "max_pct": {
+              "type": "number"
+            }
           }
         }
       }
