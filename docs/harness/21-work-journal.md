@@ -3682,3 +3682,85 @@ Root `README.md` carried an orphaned half-sentence — *"as well as item markets
 with real-money. / player-to-player item marketplace settled via Pix."* — evidently
 a bad edit. Rewritten into one sentence, and the image alt text now describes the
 picture that actually exists.
+
+---
+
+## 2026-09-22 — R75: the repo cleanup, with the evidence
+
+Ricardo: *"Hey clean up the repo when done - i noticed there are some unused
+whole folders"*
+
+The contract in the ledger was explicit: prove each candidate dead (no code
+import, no path string, no CI/tooling reference, no doc link) before removing it,
+and never silently delete something merely **paused**. Here is the whole
+inventory and the verdict on each.
+
+### DELETE — empty, unreferenced, nothing lost
+
+| Path | Evidence |
+|---|---|
+| `sim/bin/` | Empty since 2026-09-14. 0 tracked files. `grep -rn "sim/bin"` across md/sh/py/cmake: no hits. |
+| `rebirth/native/shaders/` | Empty since 2026-09-11. 0 tracked files. `grep -rn "native/shaders"`: no hits. |
+| `.pytest_cache/`, `genforge/.pytest_cache/` | Tool caches. 0 tracked files. `.pytest_cache/` was not in `.gitignore` — added. |
+| 14 × `__pycache__/` | Already gitignored, 0 tracked files, regenerated on demand. |
+
+### UNTRACK — gitignored yet still in the index
+
+`git` keeps tracking a file that entered the index before its ignore rule
+existed, so both of these were being committed *despite* `.gitignore` naming
+them. `git rm -r --cached` only; every file stays on disk.
+
+| Path | Tracked | Note |
+|---|---|---|
+| `sim/build-windows/` | 137 files, 1.9 MB | A full CMake build tree: `CMakeCache.txt`, `CMakeFiles/`, generated Makefiles, compiler logs, object files. Entered in `674d57b`; `.gitignore` has said `sim/build-windows/` ever since. |
+| `ml/data/logs/` | 7 files | Training logs. `.gitignore` has said `ml/data/logs/`; 19 files on disk, 7 of them tracked — an arbitrary subset, which is worse than either extreme. |
+
+**The one thing in that tree that was load-bearing.** `dh-server.exe` (97 KB,
+PE32+ x86-64) is what `tools/package_game.sh windows` ships next to the game
+binary; without it the packaged Windows build has no infinite world and no co-op
+world parity. Untracking the build tree wholesale would have silently downgraded
+every clean clone's Windows zip to client-only.
+
+So it moved to `builds/prebuilt/windows/dh-server.exe` with a README recording
+its sha256 (`246445fa…`), size, target, toolchain and the commit it came from,
+and `package_game.sh` now resolves the server binary in order:
+
+```
+sim/build-windows/dh-server.exe                  # a fresh local cross-build wins
+sim/build-windows/libs/dh-server/dh-server.exe   # …even un-copied
+builds/prebuilt/windows/dh-server.exe            # the committed cache
+```
+
+Both branches exercised: with the local build present it picks the local one;
+with it hidden it falls back to the prebuilt. A rebuild always beats the cache,
+so the cache can never go stale behind someone's back — it only answers when
+nothing else can. `docs/tech/34` §256, which described the tracked cache, updated
+in the same change.
+
+### KEEP — and the reason each one looked empty
+
+Nothing here was removed. Three of them gained a README, because the actual
+defect was never that the folders were unused — it was that an unfamiliar or
+empty folder had no way to say what it was for.
+
+| Path | Verdict |
+|---|---|
+| `art/` (`palettes/ rigs/ tiles/`, all `.gitkeep`) | Canon §10 scaffold. Empty because art production runs through GenForge today; it is where hand-authored sources land. **README added.** |
+| `reference_repos/` | Empty, awaiting the local image-gen repo (13b) — *paused, not dead*. **README + `.gitignore` added**: third-party checkouts are read, never imported, never committed; only the README is tracked. |
+| `builds/` | Ships the two zips. **README added** mapping every subfolder to tracked/untracked. |
+| `rebirth/`, `rebirth/godot3d/`, `game/prototype3d/` | Documented engine experiments (canon §12.27) with their own README and status log. Paused ≠ dead. |
+| `genforge/candidates/*` | Quarantined generator output by contract (docs/tech/28 §6); the directory is kept, contents ignored. |
+| `ml/runs/`, `ml/data/*` | Live training artifacts. `benchmarks/` and `ppo_snapshots/` were untracked-but-unignored, so they nagged in every `git status` — now ignored. |
+
+**Canon §10 was the root cause for three of these.** `builds/`, `rebirth/` and
+`reference_repos/` exist on disk but were missing from the tree that calls itself
+the canonical layout, so they read as cruft to anyone checking. Added, with a
+dated note. No structural change.
+
+### Gate
+
+- `python3 -m pytest genforge/tests -q` → **146 passed**.
+- `ml/.venv/bin/python -m pytest ml/tests -q` → **147 passed, 1 skipped**.
+  (Under system `python3` two mask tests fail on `ModuleNotFoundError: torch` —
+  pre-existing and environmental; torch lives in `ml/.venv`.)
+- `bash -n tools/package_game.sh`, plus both resolver branches run by hand.

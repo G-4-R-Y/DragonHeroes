@@ -1,0 +1,4 @@
+# Third-party checkouts are never committed — see README.md.
+*
+!README.md
+!.gitignore

@@ -20,6 +20,7 @@ game/export/
 __pycache__/
 *.pyc
 .venv/
+.pytest_cache/
 
 # Go
 backend/economy-core/economy-core
@@ -47,6 +48,8 @@ genforge/candidates/*
 .env.local
 ml/data/progress/
 ml/data/logs/
+ml/data/benchmarks/
+ml/data/ppo_snapshots/
 ml/.venv/
 
 # raw export dirs (100 MB GitHub limit) — the zips are the distributable

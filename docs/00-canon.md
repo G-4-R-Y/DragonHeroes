@@ -349,8 +349,16 @@ dragon-heroes/
 │   └── service/           # API: generate creature/item/skill → sprites + JSON
 ├── art/                   # source art: aseprite files, archetype rigs, palettes
 ├── tools/                 # content validator, atlas baker, balance sims, bot load-test
-└── infra/                 # terraform, k8s/agones, docker, CI
+├── infra/                 # terraform, k8s/agones, docker, CI
+├── builds/                # distributable zips + builds/prebuilt/ (committed cross-build cache)
+├── rebirth/               # 3D engine experiments — NOT a direction change (§12.27)
+└── reference_repos/       # third-party checkouts read for reference; untracked, never imported
 ```
+
+*(Note, 2026-09-22 — R75 repo cleanup: `builds/`, `rebirth/` and
+`reference_repos/` existed on disk but were missing from this tree, which is the
+canonical layout, so an empty or unfamiliar folder read as cruft. Added, each
+with a README stating what belongs in it. No structural change.)*
 
 **Coupling rules (canonical):**
 1. `sim/` never imports Godot (except `dh-godot`), never does I/O (except `dh-server`,

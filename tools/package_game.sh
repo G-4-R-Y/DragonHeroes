@@ -17,6 +17,8 @@
 #          -DCMAKE_BUILD_TYPE=Release && cmake --build sim/build-windows -j
 #        cp sim/build-windows/libs/dh-server/dh-server.exe sim/build-windows/
 #      (toolchain lives at ~/.local/share/dh-toolchains — fetched once, ~80 MB)
+#      Without the toolchain, builds/prebuilt/windows/dh-server.exe is used —
+#      a committed cache so a clean clone can still ship a complete Windows zip.
 #
 # Usage: tools/package_game.sh [windows|linux|all]   (default: all available)
 set -euo pipefail
@@ -67,16 +69,29 @@ EOF
 
 [ "${DH_FETCH_TEMPLATES:-0}" = "1" ] && fetch_templates
 
+# A fresh local cross-build always wins; the committed cache is the fallback so
+# a clean clone without the mingw toolchain still produces a complete zip.
+win_server() {
+  for c in sim/build-windows/dh-server.exe \
+           sim/build-windows/libs/dh-server/dh-server.exe \
+           builds/prebuilt/windows/dh-server.exe; do
+    [ -f "$c" ] && { echo "$c"; return 0; }
+  done
+  return 1
+}
+
 want="${1:-all}"
 case "$want" in
-  windows) pack windows "Windows Desktop" dragon-heroes.exe "sim/build-windows/dh-server.exe" ;;
+  windows)
+    srv="$(win_server)" || { echo "[package] no dh-server.exe (mingw cross-build needed)"; exit 1; }
+    pack windows "Windows Desktop" dragon-heroes.exe "$srv" ;;
   linux)   pack linux   "Linux/X11"      dragon-heroes.x86_64 "sim/build/libs/dh-server/dh-server" ;;
   all)
     pack linux "Linux/X11" dragon-heroes.x86_64 "sim/build/libs/dh-server/dh-server" || true
-    if [ -f "sim/build-windows/dh-server.exe" ]; then
-      pack windows "Windows Desktop" dragon-heroes.exe "sim/build-windows/dh-server.exe"
+    if srv="$(win_server)"; then
+      pack windows "Windows Desktop" dragon-heroes.exe "$srv"
     else
-      echo "[package] skipping windows: sim/build-windows/dh-server.exe missing (mingw cross-build needed)"
+      echo "[package] skipping windows: no dh-server.exe (mingw cross-build needed)"
     fi
     ;;
   *) echo "usage: $0 [windows|linux|all]"; exit 1 ;;

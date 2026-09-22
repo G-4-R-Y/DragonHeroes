@@ -253,7 +253,10 @@ require a Windows machine. Headless Linux startup checks are separate from
 visual captures and do not prove 60 FPS or desktop-shell appearance.
 
 Codex Windows cross-builds use the ignored `sim/build-codex-windows/` tree,
-isolated from upstream's tracked `sim/build-windows/` cache and artifacts.
+isolated from `sim/build-windows/`. Both build trees are untracked now (R75,
+2026-09-22); the one artifact that was load-bearing lives at
+`builds/prebuilt/windows/dh-server.exe`, and `tools/package_game.sh` prefers a
+fresh local cross-build over it.
 
 ## Connected weekly lore and local-cost contract (2026-09-13)
 
