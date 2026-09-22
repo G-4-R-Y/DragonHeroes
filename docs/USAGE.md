@@ -321,6 +321,12 @@ tools/build_dh_godot.sh        # vendors godot-cpp if needed, ~1 min, then secon
 Rebuild it after changing `sim/libs/dh-godot/`. Note the per-tick win no longer
 dominates a generation — see `docs/tech/37` for where the time actually goes now.
 
+It builds four libraries, not two: the Linux `.so` pair plus the Windows `.dll`
+pair, cross-built with llvm-mingw when that toolchain is installed (override the
+location with `DH_MINGW_ROOT`). Without the toolchain the Windows step is
+skipped with a note and the Linux pair is unaffected — but then the Windows
+export ships no extension and that build runs the GDScript policy (R79).
+
 **Matches reuse one engine by default.** Booting Godot costs more than the
 fight does, so `league.py` keeps a resident arena worker per job (`--serve`) and
 feeds it matchups instead of starting an engine per match. Results are identical

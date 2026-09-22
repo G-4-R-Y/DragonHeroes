@@ -1406,3 +1406,34 @@ Still open:
    unit-length move vectors and 1.9 px/s of net speed — a contact equilibrium
    dh-sim produces out of its own windup/recover/separation state, which a
    command-only replay cannot reproduce. Docs: design/23, tech/25 §5.3.2.
+
+55. **The platform tag follows the toolchain, not the host (2026-09-22; R79).**
+   Three defects, one root. `game/addons/dh_godot/dh_godot.gdextension` declared
+   only `linux.debug.x86_64` / `linux.release.x86_64`, so Godot's exporter had
+   nothing to copy into the Windows ZIP; it logged
+   `WARNING: GDExtension: Biblioteca "x86_64" não encontrada` and **finished
+   anyway**, which is how a shipped Windows build quietly ran the GDScript
+   fallback in `game/arena/neural_policy.gd` for as long as the Windows preset
+   has existed — older than §12.53, not a regression from it. The unexplained
+   `Project export for preset "Windows Desktop" completed with warnings.` was
+   that same warning and nothing else, so one fix closed two findings. The third:
+   `sim/libs/dh-godot/CMakeLists.txt` hard-coded `linux` into `OUTPUT_NAME`, so
+   the mingw tree emitted `libdhgodot.linux.template_debug.x86_64.dll` — a file
+   that says linux, says debug, and is a DLL. DECIDED: the platform tag is part
+   of the FILENAME the `.gdextension` names, so it is derived from
+   `CMAKE_SYSTEM_NAME` (`Windows`→`windows`, `Darwin`→`macos`, else `linux`),
+   never from the host. `tools/build_dh_godot.sh` now builds **four** libraries —
+   the Linux `.so` pair plus the Windows `.dll` pair cross-built with llvm-mingw
+   (`DH_MINGW_ROOT` overrides the location) — and the Windows step is a SKIP with
+   a note when the toolchain is absent, so a clone without it still gets a
+   working Linux extension. The DLLs are gitignored like the `.so`s: binaries are
+   built, not committed. Evidence: post-fix `export-windows.log` has zero
+   `completed with warnings`; the ZIP carries
+   `libdhgodot.windows.template_release.x86_64.dll` (742,400 B) byte-identical to
+   the addon copy, export ordinal 1 = `dh_godot_library_init` (matches
+   `entry_symbol`), imports only `KERNEL32.dll` + UCRT `api-ms-win-crt-*` stubs,
+   so it is self-contained on a stock Windows box. NOT OBSERVED, and stated as
+   such: the arena *reporting* the native path on Windows — `uses_native()` is
+   read only by `game/arena/tests/policy_parity_test.gd` and `arena/tests/` is in
+   every preset's `exclude_filter`, so a shipped build cannot self-report; that
+   clause needs a Windows machine or a test-carrying preset. Docs: USAGE §8.

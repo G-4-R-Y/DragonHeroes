@@ -3908,7 +3908,7 @@ build flavor.
 3. **`zip -qr` was appending to the previous archive** instead of replacing it.
    Moot under the new packager, which always zips from a fresh stage.
 
-### Two findings logged, neither a regression
+### Two findings logged, neither a regression — both closed the same day by R79
 
 - **The Windows package ships no GDExtension.**
   `game/addons/dh_godot/dh_godot.gdextension` declares only
@@ -3920,6 +3920,11 @@ build flavor.
   `sim/build-windows/libs/dh-godot/libdhgodot.linux.template_debug.x86_64.dll`
   — says "linux", says "debug", is a `.dll`. Harmless today only because nothing
   consumes it.
+
+Both are fixed in the R79 section at the end of this file, along with the third
+finding they turned out to share a root with: the unexplained
+`completed with warnings` on the Windows export was the missing-library warning
+and nothing else.
 
 ### Docs updated in the same change
 
@@ -4649,3 +4654,95 @@ INFO (not gated — the known contact-range divergence): ARENA REPLAY drift_mean
 CONSOLE SELFTEST OK — 2 generations, 8/12 matches, ETA 1:20, chart draws 1
 CONSOLE LAYOUT OK — 7 canvases x 5796 controls (roster 74 px at 640x360, the R49 value)
 ```
+
+## R79 — the Windows package shipped no GDExtension (2026-09-22)
+
+Three findings from R77's packaging proof, logged so they would not be lost:
+(a) the extension declared no Windows libraries, (b) the mingw tree emitted a
+misnamed artifact, (c) the Windows export printed an unexplained
+`completed with warnings`. They turned out to be two defects and one symptom.
+
+### (c) was (a) — proven from the pre-fix log, not guessed
+
+`genforge/candidates/packaging/export-windows.log` (2026-09-22 05:01), line 13:
+
+```
+WARNING: GDExtension: Biblioteca "x86_64" não encontrada para GDExtension: "res://addons/dh_godot/dh_godot.gdextension"
+```
+
+and line 663:
+
+```
+Project export for preset "Windows Desktop" completed with warnings.
+```
+
+The Linux log of the same run has neither line. So the "unexplained warning"
+was the missing-library warning and nothing else — one fix closes both. The
+export **finished anyway**, which is the whole shape of the bug: a Windows ZIP
+that looks complete, passes every gate, and quietly runs the GDScript fallback
+in `game/arena/neural_policy.gd` because `ClassDB.class_exists("DhPolicyNet")`
+is false. Older than R77; as old as the Windows preset.
+
+### (b) — the platform tag was following the host
+
+`sim/libs/dh-godot/CMakeLists.txt` hard-coded `linux` into `OUTPUT_NAME`, so
+the cross-build produced `libdhgodot.linux.template_debug.x86_64.dll`: says
+linux, says debug, is a DLL. The tag is part of the FILENAME the `.gdextension`
+names, so it has to follow `CMAKE_SYSTEM_NAME` — `Windows`→`windows`,
+`Darwin`→`macos`, else `linux`. Two lines of `if`, and the packager's own
+`sim/build-windows` tree now links a correctly named DLL.
+
+### (a) — the two rows, and the build that fills them
+
+`game/addons/dh_godot/dh_godot.gdextension` gained
+`windows.debug.x86_64` / `windows.release.x86_64`, and
+`tools/build_dh_godot.sh` gained the llvm-mingw loop that produces them. It now
+builds **four** libraries, not two. The Windows step is guarded on
+`$DH_MINGW_ROOT/bin/x86_64-w64-mingw32-clang++` and is a SKIP with a note when
+the toolchain is missing — a clone without llvm-mingw must still end up with a
+working Linux extension, so that case is not a failure. The DLLs are gitignored
+alongside the `.so`s (`.gitignore:8`): binaries are built, not committed.
+
+### Gate — three clauses proven, the fourth stated as unobserved
+
+Roadmap gate, verbatim: *"`windows.release.x86_64` declared, built by the
+cross-build, present in the zip, and the arena reporting the native policy path
+on Windows."*
+
+```
+declared        dh_godot.gdextension, [libraries] windows.release.x86_64
+cross-built     tools/build_dh_godot.sh → ✓ built: 4 libraries in game/addons/dh_godot/   (44 s)
+in the zip      libdhgodot.windows.template_release.x86_64.dll   742,400 B
+                sha256 f38f4a6a0e86fa2c95b1bfec8134b8564e967affa4b20906826e1650a782c8c2
+                identical to the addon copy (same digest, byte for byte)
+loadable        Export { Ordinal: 1  Name: dh_godot_library_init }   — matches entry_symbol
+self-contained  imports: KERNEL32.dll + api-ms-win-crt-{convert,environment,filesystem,heap,
+                locale,math,private,runtime,stdio,string}-l1-1-0.dll — UCRT stubs only,
+                no libc++ / libunwind / libwinpthread to ship alongside
+post-fix log    grep -c "completed with warnings" export-windows.log → 0
+linux regress   POLICY PARITY OK — 256 forward passes matched bit-for-bit across
+                linear, tanh, relu, leaky_relu
+packager        PLAYABLE CONTENT OK · EMBEDDED ICON OK (both binaries) ·
+                PACKAGE CONTENTS OK: windows / 17 files · PACKAGE OK
+```
+
+**The fourth clause was not observed and is not claimed.** `uses_native()`
+(`game/arena/neural_policy.gd:104`) is read by exactly one caller,
+`game/arena/tests/policy_parity_test.gd:78`, and `arena/tests/` sits in every
+export preset's `exclude_filter` — so a shipped build has no code path that can
+report which policy it is running. Confirming it needs a Windows machine or a
+preset that carries the test. What is above is the honest substitute: the right
+filename, the right export symbol, an import table a stock Windows box already
+satisfies, and the same bytes inside the ZIP as on disk.
+
+### R78 datum
+
+The Windows ZIP went 59,579,269 → 59,938,069 B (+358,800 B, the release DLL):
+56.82 → **57.16 MiB**. Still under GitHub's 100 MB hard limit, and R78's row
+carries the new number.
+
+### Files
+
+`sim/libs/dh-godot/CMakeLists.txt` · `game/addons/dh_godot/dh_godot.gdextension`
+· `tools/build_dh_godot.sh` · `.gitignore` · `docs/USAGE.md` ·
+`docs/00-canon.md` §12.55 · regenerated `builds/dragon-heroes-windows.zip`.

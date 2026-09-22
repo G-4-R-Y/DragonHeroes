@@ -1,4 +1,45 @@
-# Handoff — 2026-09-22: R51 landed (a dh-env match you can watch)
+# Handoff — 2026-09-22: R79 landed (Windows finally gets the GDExtension)
+
+**R79 is done.** The Windows ZIP shipped no GDExtension — and had never shipped
+one. `dh_godot.gdextension` declared only `linux.*`, so Godot's exporter logged
+`WARNING: GDExtension: Biblioteca "x86_64" não encontrada` and **finished
+anyway**; every Windows build quietly ran the GDScript fallback in
+`game/arena/neural_policy.gd`. The third R79 finding — the unexplained
+`Project export ... completed with warnings.` — was that same warning and
+nothing else, proven from the pre-fix `export-windows.log` (line 13 warning,
+line 663 summary; the Linux log has neither). The second finding shared the
+root: `sim/libs/dh-godot/CMakeLists.txt` hard-coded `linux` into `OUTPUT_NAME`,
+so the cross-build emitted `libdhgodot.linux.template_debug.x86_64.dll`. The
+platform tag is part of the filename the `.gdextension` names, so it now follows
+`CMAKE_SYSTEM_NAME`, never the host.
+
+**What you will trip over:** `tools/build_dh_godot.sh` builds **four** libraries
+now, not two — the Linux `.so` pair plus the Windows `.dll` pair, cross-built
+with llvm-mingw (`DH_MINGW_ROOT` overrides
+`~/.local/share/dh-toolchains/llvm-mingw-20260908-ucrt-ubuntu-22.04-x86_64`).
+No toolchain → the Windows step SKIPS with a note and Linux is unaffected; that
+is deliberate, a clone must still work. The DLLs are gitignored like the `.so`s
+(`.gitignore:8`), and `sim/build-godot-win-{debug,release}/` are new trees
+covered by the existing `sim/build-godot*` ignore.
+
+**Gate, honestly:** three of four clauses proven — declared ✓, cross-built ✓
+(`✓ built: 4 libraries`, 44 s), in the zip ✓
+(`libdhgodot.windows.template_release.x86_64.dll`, 742,400 B, sha256
+`f38f4a6a…82c8c2`, byte-identical to the addon copy; export ordinal 1 =
+`dh_godot_library_init`; imports KERNEL32 + UCRT stubs only). The fourth — *the
+arena reporting the native policy path on Windows* — **was not observed and is
+not claimed**: `uses_native()`'s only caller is
+`game/arena/tests/policy_parity_test.gd` and `arena/tests/` is in every preset's
+`exclude_filter`, so a shipped build has no path that can report which policy it
+ran. It needs a Windows box or a test-carrying preset. Post-fix export log: zero
+`completed with warnings`. Linux regression check: `POLICY PARITY OK — 256
+forward passes` bit-for-bit. Packager green, `PACKAGE CONTENTS OK: windows / 17
+files`.
+
+**R78 datum:** the Windows ZIP is now 59,938,069 B — 56.82 → **57.16 MiB**.
+Canon §12.55, journal §R79.
+
+## Previous handoff — R51 landed (a dh-env match you can watch)
 
 **R51 is done.** dh-env is headless C++ and has no renderer, so "watch a dh-env
 match" became a RECORDING: `arena.trace.v1` (23 floats/tick — the tick, then 11
@@ -118,7 +159,10 @@ Last verified package run: EXIT=0, every gate OK, client dated 2026-09-22
 05:00/05:01, `lair journey fps=60.0 frame_cpu_ms=0.325`. Log:
 `genforge/candidates/packaging/r77-merge-build.log`.
 
-## Three findings logged (**R79**), none a regression, none fixed
+## Three findings logged (**R79**), none a regression — ALL THREE NOW FIXED
+
+What follows is how they were found, kept for the trail. The fixes are at the
+top of this file and in canon §12.55.
 
 - **Windows ships no GDExtension.** `game/addons/dh_godot/dh_godot.gdextension`
   declares only `linux.debug.x86_64` / `linux.release.x86_64`, so Godot has
@@ -225,8 +269,8 @@ live order now starts at what was item 3:
    and retrain: `STEPS=60000000 PLATEAU_UPDATES=80 PLATEAU_DELTA=0.02
    PLATEAU_MIN_STEPS=20000000 CLONE=heuristic tools/train_all.sh --ppo`, with the
    gate's `--episodes` raised above 4.
-3. **R78 / R79** — the 56.82 MB Windows zip heading for the 100 MB limit, and the
-   Windows package that ships no GDExtension.
+3. **R78** — the 57.16 MB Windows zip heading for the 100 MB limit. (R79, its
+   companion, is DONE — and is what took the zip from 56.82 to 57.16 MB.)
 4. **R62 → R71** — potion enchanting, skill design + cooldown cues, item scaling,
    kill-streak sky chest, DRAGON COUNCIL, bot mercenaries, questline themes.
    Largest last.

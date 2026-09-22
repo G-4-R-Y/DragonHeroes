@@ -13,3 +13,9 @@ reloadable = false
 [libraries]
 linux.debug.x86_64 = "res://addons/dh_godot/libdhgodot.linux.template_debug.x86_64.so"
 linux.release.x86_64 = "res://addons/dh_godot/libdhgodot.linux.template_release.x86_64.so"
+; The Windows rows are what puts the extension in the Windows ZIP. Without
+; them the export logged a missing-library warning for x86_64 and finished
+; anyway, so the shipped build silently ran the GDScript policy (R79).
+; The DLLs come from the llvm-mingw cross-build in tools/build_dh_godot.sh.
+windows.debug.x86_64 = "res://addons/dh_godot/libdhgodot.windows.template_debug.x86_64.dll"
+windows.release.x86_64 = "res://addons/dh_godot/libdhgodot.windows.template_release.x86_64.dll"

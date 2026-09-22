@@ -440,6 +440,20 @@ ships with the package. Law/runbook: tech/34 packaging section. Product name and
 save directory are both "Dragon Heroes"; `game/tools/user_dir_migration.gd` (first
 autoload) carries pre-merge "Dragon Heroes Codex" saves across on first launch.
 
+**The GDExtension now ships on Windows too (R79, 2026-09-22; canon §12.55).**
+`dh_godot.gdextension` declared only `linux.*`, so the exporter had nothing to
+copy into the Windows ZIP, warned (`Biblioteca "x86_64" não encontrada`) and
+finished anyway — every Windows build ran the `neural_policy.gd` GDScript
+fallback. Fixed by deriving the platform tag in `sim/libs/dh-godot/CMakeLists.txt`
+from `CMAKE_SYSTEM_NAME` (it was hard-coded `linux`, so the mingw tree emitted a
+DLL named `.linux.`), adding the two `windows.*` rows, and giving
+`tools/build_dh_godot.sh` a guarded llvm-mingw loop — it builds **four**
+libraries now (`DH_MINGW_ROOT` overrides the toolchain path; a clone without it
+skips the Windows step with a note). DLLs are gitignored like the `.so`s.
+Unverified and unclaimed: the arena *reporting* the native path on Windows —
+`uses_native()`'s only caller lives in `arena/tests/`, which every preset
+excludes.
+
 ## Sim workspace (C++20)
 **M0 benchmark harness.** tech/20-22, canon §10. `sim/libs/{dh-math,dh-sim,
 dh-procgen,dh-server,dh-net,dh-env,dh-godot,dh-content}`; `cmake --build

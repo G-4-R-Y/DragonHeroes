@@ -25,8 +25,21 @@ add_library(dhgodot SHARED
     src/register_types.cpp
 )
 target_link_libraries(dhgodot PRIVATE godot-cpp)
+
+# The platform tag is part of the FILENAME the .gdextension names, so it has to
+# follow the toolchain and not the host. The mingw cross-build used to emit
+# libdhgodot.linux.template_debug.x86_64.dll — a .dll that claims to be linux —
+# which is exactly the kind of artifact nothing dares consume (R79).
+if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+    set(DH_GODOT_PLATFORM "windows")
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+    set(DH_GODOT_PLATFORM "macos")
+else()
+    set(DH_GODOT_PLATFORM "linux")
+endif()
+
 set_target_properties(dhgodot PROPERTIES
     PREFIX "lib"
-    OUTPUT_NAME "dhgodot.linux.${DH_GODOT_TARGET}.x86_64"
+    OUTPUT_NAME "dhgodot.${DH_GODOT_PLATFORM}.${DH_GODOT_TARGET}.x86_64"
     CXX_VISIBILITY_PRESET hidden
 )
