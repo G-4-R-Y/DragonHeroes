@@ -1,3 +1,118 @@
+# Handoff — 2026-09-22: the build merge closes the cleanup arc
+
+**Read this first, then `docs/harness/README.md` → `10-systems-map.md` →
+`20-roadmap.md` (the one demand ledger) → `21-work-journal.md` (the evidence).**
+
+> **Everything dated before 2026-09-22 in this file is history, kept verbatim.**
+> In particular, any older section that tells you to run `tools/package_codex.py`,
+> `tools/smoke_codex.py`, `tools/profile_codex.py` or to look in `builds/codex/`
+> is **superseded by R77** — those paths no longer exist. The current commands
+> are in `docs/USAGE.md` §8.
+
+## Where the tree is
+
+`master` at **25f32f8**, working tree clean except two untracked notes of
+Ricardo's own (`prompts queue.txt`, `sprites prompt.md`). **54 commits are
+unpushed** — `origin/master` is still at `b622aa6` (2026-09-12). R17 (push
+everything, remote equality) is still open.
+
+Commits this session, newest first:
+
+| commit | what |
+|---|---|
+| `25f32f8` | **R77** — one packager, one build, the zips finally ship the real client |
+| `3fd8ed3` | **R75** — the repo stops committing its own build trees |
+| `871bcc6` | R60 — the console captures committed with the fix |
+| `53bbd1c` | **R76** — the banner loses its hallucinated dragon head |
+| `3ff7de7` | **R44/R61/R74** — bosses roam the open map, and up to three may share it |
+| `246a6a5` | the parallel session's living-world + residency tree lands |
+
+## What R77 changed that you will trip over
+
+1. **There is exactly one packager: `python3 tools/package_build.py all`**
+   (`linux | windows | all`). It was `package_codex.py`. It won because it passes
+   an explicit path to `--export-release`, which overrides the preset — the very
+   drift that had `builds/dragon-heroes-*.zip` shipping a **2026-09-12 client for
+   ten days**.
+2. `tools/package_game.sh` is a thin wrapper now; the old body is commented out,
+   not deleted. Its only remaining live job is
+   `DH_FETCH_TEMPLATES=1 tools/package_game.sh all` on a fresh machine (~1 GB of
+   export templates).
+3. Renames: `smoke_codex.py` → `smoke_package.py`, `profile_codex.py` →
+   `profile_client.py`, `--codex-smoke` → `--package-smoke`, `--codex-profile` →
+   `--client-profile`.
+4. **The save directory moved** from `Dragon Heroes Codex` to `Dragon Heroes`.
+   `game/tools/user_dir_migration.gd` is the FIRST autoload and copies the old
+   directory across additively — it never clobbers a file and never deletes the
+   old one. Verified against Ricardo's real saves (88 files copied, old dir
+   intact). If you add an autoload, it stays first.
+5. Binaries are `dragon-heroes.x86_64` / `dragon-heroes.exe`. `builds/codex/` and
+   `sim/build-codex-windows/` are gone (~365 MB). The **in-game CODEX** (the
+   effects/affix registry, canon §12.12) is untouched — same word, unrelated.
+6. The Windows helper resolver is `helper_candidates()`: a fresh cross-build
+   always outranks `builds/prebuilt/windows/dh-server.exe`. Never reverse that
+   order or the cache ships stale code.
+
+Last verified package run: EXIT=0, every gate OK, client dated 2026-09-22
+05:00/05:01, `lair journey fps=60.0 frame_cpu_ms=0.325`. Log:
+`genforge/candidates/packaging/r77-merge-build.log`.
+
+## Two findings logged, neither a regression, neither fixed
+
+- **Windows ships no GDExtension.** `game/addons/dh_godot/dh_godot.gdextension`
+  declares only `linux.debug.x86_64` / `linux.release.x86_64`, so Godot has
+  nothing to put in the Windows zip; `game/arena/neural_policy.gd` falls back to
+  GDScript, so Windows plays. Pre-existing platform gap, older than R77.
+- **The mingw tree emits a misnamed artifact**:
+  `sim/build-windows/libs/dh-godot/libdhgodot.linux.template_debug.x86_64.dll`
+  — says linux, says debug, is a `.dll`. Nothing consumes it today.
+- Also unexplained: the Windows export prints
+  `Project export for preset "Windows Desktop" completed with warnings. at:
+  _fs_changed (editor/editor_node.cpp:1353)`. Not investigated.
+
+## Where to pick up
+
+The ledger order in `20-roadmap.md` §2 NOW, unchanged:
+
+1. **R55 residual / R59** — port `creature.gd::_separate(delta)` into `sim/`
+   (the arena separates overlapping bodies, the sim does not — that is why
+   dh-env fights run ~1.8× longer at identical per-channel damage, and why
+   creatures stand on top of Ricardo where he cannot hit them). Then re-run the
+   parity matrix at **64 episodes** and retrain:
+   `STEPS=60000000 PLATEAU_UPDATES=80 PLATEAU_DELTA=0.02 PLATEAU_MIN_STEPS=20000000
+   CLONE=heuristic tools/train_all.sh --ppo`.
+2. **R57** — captured-species variety, then boss mini-pets that level with the
+   player (unblocks R65).
+3. **R62 → R71** — potion enchanting, skill design + cooldown cues, pet
+   levels/skills, item scaling, kill-streak sky chest, multi-boss events,
+   DRAGON COUNCIL, bot mercenaries, questline themes. Largest last.
+4. **R72(b)** — the boss fight as the Meshy→Blender→Unreal concept test; the
+   judgement is already written in `rebirth/docs/02-status.md` §3.1 (the real
+   gap is Blender, not Meshy or Unreal).
+5. **R58** (reproduce the potion HoT complaint in a real hunt before touching
+   it), **R51**, **R47**, **R48**, **R49**, **R46**.
+
+**Owed to Ricardo, still:** the `builds.json` kit-range unit mix (cinder_drake
+`bolt_volley range 10.0` and `field_cast 9.0` against bog_golem's `112.0` =
+`7.0 * TILE`; the 7–10 values were almost certainly meant as tiles) — that is a
+balance decision plus a full retrain, so it is his call, not the harness's.
+
+**Blocked, do not guess:** 13b, the local image-gen repo, which comes from
+Ricardo *after* the rest of the roadmap and is to be adapted behind the
+`ImageBackend` seam.
+
+## Standing rules that bit this session
+
+- Never `git add -A` across the tree; stage explicit paths and check
+  `git show --stat` after every commit.
+- Comment out superseded code with a provenance note; never delete it.
+- Kill Godot with `pkill -x godot`, never `pkill -f`. Never launch a Vulkan
+  window; headless, or windowed `opengl3` on `DISPLAY=:1`.
+- Docs update in the same change as the work. Canon first.
+- Another session may share this tree: check timestamps and
+  `git status --porcelain` before deleting anything you did not create. That
+  check is what made deleting `builds/codex/` safe.
+
 # Urgent playtest recovery — 2026-09-13
 
 ## 2026-09-19 (later) — R52 hifi sprite generator BUILT; R50 converged run DONE (2/7); R55 found
@@ -25,7 +140,18 @@
   same decode; measure per creature with ≥32 episodes before changing the
   trainer; raise gate episodes. Best-greedy checkpoint export still queued.
   Ledger row + context bullet in tech/39.
-- **Next:** R55 measurement harness; then best-greedy export + second run;
+- **R55 MEASURED** (`ml.eval.env_parity`, 32 eps, greedy, same seeds): on the
+  run's nets the win rate collapses dh-env → arena (cinder_drake vs native
+  0.875 → 0.03, mire_serpent 1.00 → 0.28, bog_golem vs scripted 0.91 → 0.375)
+  and the one common term is **damage TAKEN per second 1.7–2.3× higher in the
+  arena** while damage dealt/s mostly agrees. dh-env under-models what the
+  opponent does to the policy. Net-free baselines (scripted vs native, every
+  build) were launched to localize which bodies/kits diverge; results land in
+  tech/39 §2. Fix belongs in `sim/libs/dh-sim/src/arena.cpp` (effects the
+  Godot fighter applies that the sim does not), then retrain.
+- **R44/R45 diagnosed, not edited** (the other session owns `main.gd`,
+  `world_gen.gd`, `encounter_residency.gd`): roadmap rows carry the diagnosis.
+- **Next:** R55 localize + fix + retrain; then best-greedy export + second run;
   R52 real generation once the image model is confirmed; bench vs astra when
   astra's files arrive; R44/R45/R49/R51/R46 remain.
 
@@ -56,76 +182,329 @@ whether Option B (sample at serving) is ever built. Then R52 — the hi-fi
 dark-fantasy sprite generator; the brief is `sprites prompt.md` at the root
 (also recorded verbatim in roadmap R52).
 
-User authorizes finishing all queued 2D work, then Rebirth, committing/pushing
-master and regenerating Codex binaries. Do not stop at documentation alone.
-Remote fetch confirmed master/origin at e036a7c; the prior push succeeded. The
-quota rejection happened only on the next documentation command. Work inline
-(no subagents, CLAUDE explicit). Active demand ledger: docs/harness/20-roadmap.md
-R01–R26. Full prompts, including the earlier outage requests, are preserved in
-docs/harness/requests/2026-09-12-recovery.md. New direction is canon §12.47: permanent
-characters/power ceiling, weekly behavior enchantments, endless cosmetic XP;
-rarity-luck is bounded and needs supply simulation. Community/mod/anti-cheat/
-guilds/rating/bots plan in design/27, tech/36, business/33. New bot labels and
-financial pool rules are explicit proposals, not implemented live services.
+Latest request and quota follow-up are saved in full; roadmap R01–R40 is the
+single ledger. R34 performance and R35 Flask are Ricardo's current priority,
+followed by skills/runes, Arena navigation/Train All and boss/dungeon/art work.
+The approval service's credits rejection cleared on the read-only retry after
+reset; account balance and the original cause cannot be verified here.
 
-Uncommitted 2D code: new hero action clips locally baked with matched normal
-maps; finite fallback actions, real-distance locomotion, skill arc orientation
-and VFX uniform reset. Companion cards/nicknames persist; Haven returns to title
-with save; Session.login resets character data so new saves cannot clone gear.
-Six tab buttons in two rows replace overflowing arrows; visibility slider in
-main options and Hunt Esc, lifts ambient before grading; Flask has bottle button
-and independent charges (old charges overlapped Q). Existing click/flask/level-up
-pass; new renewal_probe passes actual animation/identity/save/navigation checks;
-115 Python tests pass with local runtime access. All 19 Godot outcomes now pass (spawn rechecked after fixing a test that
-confused normal pursuit with initial placement); native CTest 4/4 and validator
-pass. Stream 0.93 ms, recovery 2.15 ms worst apply, FX 2.99 ms/no node growth in the
-full run. Steady GL samples running; commits/packages remain.
+Current integrated HEAD is 4eb811f, preserving the other session's checkpoint/
+resume work. The old all-creatures sweep predates checkpoints: DO NOT kill it.
+All functional recovery gates passed, Python 127 passed, native CTest 4/4 passed;
+the streaming hard 4 ms gate STILL FAILS while the existing 20-job training sweep
+runs. Transition-row caching preserves terrain, but spikes moved to base painting;
+profile contention before claiming 60 FPS. A bounded, reversible CPU reservation
+for measurement is planned; no training affinity has been changed yet.
 
-Actual GL renewal_capture frames exist in game/prototype/tests/captures/renewal
-and were viewed. UI/portraits/settings fit; duplicate mount identity was removed;
-HUD and hero still need the stronger art pass. Capture timing sampled cold
-screens/readback stalls, so do NOT call those figures a steady 60 FPS proof.
-Use Engine.max_fps=60 and warmed sustained samples for the next capture run.
-New Haven scene image generated with built-in imagegen, viewed/copied to
- genforge/art_sources/haven-renewal/source.png (1672x941). Exact prompt/provenance are saved beside it; runtime integration remains. Original output under ~/.codex/generated_images/
-01a09445-0ed7-79b1-89ea-8280f42f2b8d/exec-0bccb45c-ed3c-4f4f-b376-4e77217751db.png.
+Completed residency/loot/projectile/story/quit-cleanup/icon changes remain
+uncommitted; builds/codex still contains b622aa6. Finish the urgent fixes and shared
+gates, then commit/push the integrated work and regenerate clean Codex packages.
+All-creature/player art, native five-biome exploration and the larger roadmap are
+still pending; do not confuse source candidates or written plans with shipped work.
 
-Icon clarification: PNG exists, executable is generic in file manager. Installer
-now writes app-menu and in-package desktop launchers, sets GIO custom-icon on
-ELF + trusted shortcut, supports --package/--quiet. Normal Linux exported title
-startup launches installer asynchronously; test args skip it. Package README
-updated. Test installer round-trip/desktop syntax passes; real local GIO icon
-installation and final packages remain pending. Existing binaries still e570acc.
+## 2026-09-13 (latest+1) — THE BOX REBOOTED; the sweep is gone. Resident workers landed.
 
-NEXT: complete small visual/persistence polish and full gates, then repair long
-Hunt world/hibernation and real biomes, strong reusable Orun-style all-creature/
-player/terrain/VFX pipeline, enchantments/classes/XP cosmetics/Haven mechanics.
-World audit: C++ generator has only four terrain types and no biomes. Stream
-recovery now implemented: periodic/apply reconciliation, discard stale loads,
-nearest-first painting, unfinished movement fence, helper retry, 49-chunk cap,
-worker-only bounded 7x7 SDF mask, scratch deletion. stream_recovery passes far
-negative travel/unload reversal/failure recovery/identical revisit at 1.07 ms worst
-apply (ordinary stream 1.10 ms). Distant creatures drop only beyond480tiles; bosses exempt,
-all count120cap. `_visited_chunks` grows forever and returns never respawn saved
-packs. Implement bounded active entities + per-Hunt chunk deltas, identity/HP/
-death preservation, canonical C++ biome metadata, recovery/long-travel tests.
+**!! THE 12-HOUR SWEEP IS LOST !!** The machine restarted around 18:58 (uptime
+was 1d05:00, then 28 min). `ml/runs/2026-09-13_0640__all-creatures__.../` reached
+**g582 of 1000 on key 1 of 7**, registered NOTHING (train_es only registers after
+the full loop), and has **no checkpoint** — that run predates the checkpointing
+landed earlier the same day by hours. Nothing is recoverable. A relaunch today
+would be checkpointed AND ~1.8x faster; Ricardo has not been asked yet.
 
-Warmed actual GL receipt: 300 gameplay frames at reported 60 FPS; frame median
-16.668 ms / p95 16.911 ms, CPU process median 3.813 ms / p95 4.218 ms. PNG readback stalls
-are excluded. Full captures and reproduction: docs/art/ui-renewal/README.md.
-This is a short desktop sample, not a sustained/mobile guarantee. First playable
-recovery milestone is being committed/pushed and packaged; all remaining R-items
-stay scheduled/in progress.
+Bright side for measurement: every number taken before the reboot was on a box
+saturated by that sweep, so absolutes were inflated ~4-5x. Everything below is
+from the idle box.
 
-Publication checkpoint 2026-09-13: recovery milestone 3f52b35 pushed to GitHub.
-Both initial Codex exports pass ZIP/hash/icon checks; Linux passes real menu,
-Hunt/resource refill, practice effects and saved lair→Hunt→rush journey. Windows
-has verified PE icons but no native Windows gameplay test. Staging changed only
-chapter.json's decoded texture count 7573376→8049280 for the larger hero sheet;
-initial manifests correctly flag dirty source. Commit this generated metadata
-and rebuild with new --require-clean so both final manifests identify one clean
-revision. Linux GIO/file-manager association still to verify, then resume R08/R09
-and the larger 2D backlog. New "resume work" prompt archived verbatim.
+**LANDED — resident arena workers** (`061487c`). `--serve` boots the arena once
+and takes matchups as JSON lines on stdin; `league.py` pools them, one per job,
+booted once per RUN instead of once per match. Steady state, pop 10 / 13
+episodes / 2 opponents / jobs 10, identical scores in all four rows:
+
+| configuration | s/gen | speedup |
+|---|---|---|
+| editor binary, engine per match (old) | 13.0 | 1.00x |
+| editor + resident | 9.3 | 1.39x |
+| release export, engine per match | 9.5 | 1.36x |
+| release export + resident | **7.1** | **1.83x** |
+
+1000-generation key: 3.6 h -> 2.0 h. `DH_ARENA_POOL=0` disables.
+
+**Three bugs worth remembering, all found by RUNNING it:**
+- `OS.read_string_from_stdin()` is line-oriented and strips the newline — code
+  waiting for a `"\n"` hangs on the first request.
+- Godot flushes stdout per print in debug but NOT release, so a release
+  trainer's `ARENA SERVE READY` sat in the C buffer and every worker timed out.
+  `run/flush_stdout_on_print=true`. The build check missed it by reading stdout
+  from a FILE after exit — it now probes through the real pool over a live pipe.
+- `close()` killed a wedged worker without reaping it, leaving a zombie.
+
+**CORRECTION to what I wrote earlier today:** I read load average 23-24 on 10
+physical cores as oversubscription and claimed more concurrency would hurt.
+Measured idle, `--jobs` does not plateau until 16: 4 -> 9.6 s/gen, 8 -> 7.4,
+10 -> 7.1, 12 -> 7.0, 16 -> 6.4, 20 -> 6.4. **`JOBS=$(nproc)` was right.**
+Parallel keys still buy nothing, but because one key at jobs=20 already
+saturates the box at ~3.1 matches/s — throughput, not contention. NOTE: the
+other session's `TRAIN_PROFILE=desktop` (half the CPUs) trades ~11-16% training
+throughput for desktop responsiveness. That is a real trade, not a bug fix.
+
+**DECIDED: 60 Hz stays.** Ricardo, "as to be fully capable". Recorded in
+`game/arena/README.md` so it is not reopened as an optimisation.
+
+**GPU physics: no.** Godot 2D physics is CPU-only (no CUDA backend), physics is
+~7% of the tick vs the forward pass's ~93%, and one match is a latency problem,
+not the throughput problem a GPU wins. The GPU-shaped version is `libdh-env` +
+PPO, already batched on the GPU.
+
+**Still the biggest win:** the forward pass in C++. Even flat it is ~3,100
+us/tick. Blocked on `sim/libs/dh-godot` being only a README.
+
+## 2026-09-13 (latest) — the arena tick, profiled: 93% GDScript, and no determinism
+
+Committed as `a193e5d`. Ricardo asked three throughput questions; two were
+already solved and the profile found a bug nobody was hunting.
+
+**THE ARENA WAS NEVER REPRODUCIBLE.** Godot randomises the GLOBAL random stream
+at startup; `arena.gd` seeded `_rng` and never that one, while gameplay draws
+from it (`creature.gd` wander, `hag.gd` retreat, `projectile.gd` desync). Same
+`--seed`, different fights. Winners stayed stable — that is why every win-rate
+check missed it — but fitness carries an hp term. Fitness sd over 4 identical
+runs: **0.0037 -> 0.0000**, vs a within-generation candidate sd of 0.0350, so
+~11% of ES's ranking signal was noise. Fixed by seeding the global stream per
+episode in `_start_episode`.
+
+**The neural forward pass was 93% of the tick** (~2,200 us per neural side, for
+7,744 MACs) because `_forward` used an `Array` of `Array` and `float(row[j]) *
+float(out[j])` — every element through a Variant. Flat `PackedFloat64Array`:
+**1.74x, bit-identical fights**.
+
+**!! BOTH ARE LIVE FOR THE RUNNING SWEEP !!** It spawns a fresh Godot per match
+and reads the `.gd` from disk, so generations from ~g536 use the new code. The
+MLP change is bit-identical (pure speedup). The seed fix DOES change the RNG
+stream, so the fitness landscape shifted slightly mid-run at g~526. Strictly an
+improvement (less noise), but it is a discontinuity in that experiment.
+
+**Measuring cost Ricardo throughput** while it ran: median s/generation went
+73.9 -> 93.2 during the benchmark window. Stopped; it should recover, and then
+beat the old baseline because of the 1.74x.
+
+**Not done, deliberately:** the arena runs physics at 60 Hz while canon
+specifies a 30 Hz sim. Matching canon halves the work but moves dodge windows
+and would invalidate every trained net and gate band. **Ricardo's call.**
+
+**Biggest remaining win:** move the forward pass to C++. Even flat it is
+~3,100 us/tick, ~1000x off C. Blocked on `sim/libs/dh-godot` being only a
+README — the GDExtension is not built or wired into `game/`.
+
+**COLLISION TO FLAG:** the other session is now editing `tools/train_run.sh`
+(adding `TRAIN_PROFILE=desktop` to stop `JOBS` taking every CPU — the same
+oversubscription I measured from the other end) and `game/arena/console.gd`.
+Both were mine. I staged only my own hunks of `docs/USAGE.md` and
+`game/project.godot` and left theirs dirty; `tools/train_run.sh` and
+`console.gd` I did not touch at all.
+
+## 2026-09-13 (later) — interruptible ES runs, and why a Godot episode costs what it does
+
+**Checkpoint + resume.** `train_es` registered its net only after the FULL
+generation loop, so the 1000-generation sweep running since 06:40 would have
+lost every hour if killed. Now `--checkpoint-every` (default 25 — protects even
+runs started without the flag) writes ONE `_ckpt_<key>.npz` into the run's
+own weights dir: theta, the next generation, and the RNG bit-generator state,
+temp-then-renamed so a kill cannot leave half a file. `--resume` restores all
+three, and the resumed run is bit-for-bit the run that would have happened —
+`ml/tests/test_league.py::test_resume_reproduces_the_uninterrupted_run` asserts
+that against a simulated mid-generation kill. `tools/train_run.sh --resume
+ml/runs/<run>` needs no other flags, because config.json now records the
+key/build pairs and the knobs — and the resume READS THEM BACK rather than
+trusting the environment, since knobs that disagree with the killed run would
+make the checkpoint inapplicable (a resume launched with deliberately wrong
+`GENERATIONS=999 POP=99 EPISODES=99` ignored all three).
+
+**Verified end to end 17:31**, not just in unit tests: a real 6-generation run,
+process group killed after the g4 checkpoint, then `--resume` ran g4 and g5
+ONLY, emitted `resumed g=4`, registered `fen_boar_alpha@v2`, and cleared its
+checkpoint. `ml/serving/` untouched. Committed as `4eb811f`.
+
+**The checkpoint is one file on purpose.** The first cut wrote theta and the
+metadata separately. Each rename was atomic, but the PAIR was not — a kill
+between them would leave weights from generation N beside metadata claiming
+N-k, and the resume would silently replay work it had already done. That is the
+kind of bug that never crashes and just quietly wastes hours, so both now ride
+in a single `.npz` and one rename commits the whole thing
+(`test_checkpoint_commits_in_a_single_rename` holds the line). The suspicion
+came from an earlier test that showed `resumed g=2` against a `checkpoint g4` —
+that particular reading turned out to be contamination from two interleaved
+test invocations sharing a run folder, but the race it pointed at was real.
+
+Two bugs the tests caught, worth remembering:
+- `np.savez_compressed` appends `.npz` unless the name already ends in it, so
+  the temp-then-rename had nothing to rename. Temp names must keep the suffix.
+- A `.replace()` on the shell script silently did nothing after an earlier
+  indentation change moved the anchor, so the new flags never reached the
+  trainer. Assert on every scripted edit; a no-op replace looks like success.
+
+**THE SWEEP IN FLIGHT HAS NO CHECKPOINT** — it predates this. Killing it still
+loses its hours.
+
+**Why an episode is slow** (Ricardo asked; measured, not guessed). Not
+rendering — `--headless` draws nothing. An episode simulates ~28.5 in-game
+seconds at 60 physics ticks/s (~1,700 frames of GDScript across every arena
+node) in a freshly booted engine. One at a time on a loaded box: 1 episode
+4.07 s, 4 episodes 7.74 s, 13 episodes 16.58 s — a straight line of ~3.0 s
+fixed engine startup per match plus ~1.04 s per episode. The sweep sees ~86 s
+per match because `--jobs 20` runs 20 engines on 20 cores. Same box, same
+moment: Godot arena 27.5x real time, `libdh-env` 6,076x — ~220x apart. The
+consequence worth acting on: the GATE must stay in Godot (it is the deployment
+environment), the SEARCH need not — moving ES onto dh-env the way PPO already
+is would be the next order-of-magnitude lever.
+
+# Recovery continuation — 2026-09-13 (loot, shots and connected stories)
+
+Latest full user prompt preserved verbatim; R27–R32 added before work, canon §12.48
+and design/28 added. Existing R01–R26 remain, 2D before Rebirth. Other session's
+0d075a8/ab14e32 are already on local master; origin/master was b622aa6 at fetch,
+no divergent upstream commits. Preserve the other session's benchmark receipt.
+
+Current uncommitted slice extends R08 to original ground-loot records and exactly-once
+collection (even full bag/creature cap). Projectiles continue finite flight offscreen,
+including after caster removal; live reachable targets stay awake. R27 ground_state
+probe passes. R32 water leak diagnosed as pending OFF-TREE water MMIs at quit; explicit
+cleanup passes forced-staging test plus 12/12 verbose real Hunt exits. Script/file
+notes in docs/reference/files; commands in USAGE. All earlier residency receipts
+below remain valid; updated integrated Godot/Python/native suite is running now.
+
+R28 authoring seam implemented: mandatory narrative schema with named visual
+archetypes, connected threads, factions, prospective event branches and meaningful
+cross-release links; original Fen Bells enriched. New drafts pin prior release
+SHA-256 and retain a marked continuation link. Local briefs include real prior
+stories; build hashes include pinned transitive sources. 35 narrative/living tests
+pass. Limit: dependency depth eight / 32 visits; reviewed history-anchor compaction
+still pending for long release chains. No world-event gameplay or official authority
+claimed. stage_living_preview already refreshed chapter.json/generated C++ stamp;
+native helpers rebuilt. Full suite still needed before commit/publication.
+
+Next: finish suite, commit/push ALL completed recovery work together with retained
+training commits/benchmark receipt, build clean-source Codex clients, verify final
+Linux executable icon after export. Then continue native five-biome exploration,
+modern player/ALL-creature local art, Haven and weekly enchanting/cosmetic XP;
+Rebirth remains after 2D. Do not stop at this documentation/persistence milestone.
+
+## 2026-09-13 — the ML cockpit, a themed terminal, and the PPO batch (Claude, session B)
+
+Four of Ricardo's demands, all logged in `docs/harness/20-roadmap.md` and closed there.
+
+**Training console = the cockpit** (`game/arena/console.gd`). The right pane is
+now a TabContainer: PROGRESS (as before, and it paints a best-of-N too), RUNS
+(every `ml/runs/` folder with its config + gate verdicts; OPEN tails that run's
+own feed, PROMOTE shells `train_run.sh --promote`), NETS (the registry — which
+version is the DEPLOYED pin, DEPLOY/RETIRE, SET A / SET B), VERSUS (best-of-N,
+verdicts accumulate in `ml/data/benchmarks/`). Two roster switches: **isolated
+run** routes TRAIN through `tools/train_run.sh --run-dir` (new flag — the
+console names the folder so it knows where to tail), **GPU (PPO)** runs the
+CUDA tier. `CONSOLE SELFTEST OK` now covers all of it against `user://`
+fixtures — the gate never touches the real registry, runs or benchmarks.
+
+**`league versus`** — the new best-of-N seam. Either side is `native`,
+`scripted`, a policy JSON, or `<key>[@v3|@deployed|@candidate]`. Schema
+`arena.versus.v1`. Caveat found while testing: a neural side makes rounds
+differ, two baselines do not (scripted vs native is bit-identical on every
+seed), so that pairing is a reference point, not a distribution.
+
+**The terminal.** `tools/dh_term.sh` (palette/banner/rules/bars, colour off for
+non-TTY), `tools/art/make_dragon.py` → `tools/art/dragon.txt` (the sigil is
+rasterised from Bezier outlines into half-blocks, not hand-pasted),
+`tools/dh_trainfmt.py` (live bar + sparkline + s/gen + ETA), and
+`tools/train_watch.py` (a read-only dashboard over any run). The actual cause
+of the old silence was `python3` without `-u` piped into `tail -2`; both are gone.
+
+**PPO batching.** `dh_env_step_many` / `dh_env_reset_many` in the dh-env C API
+(+ optional worker pool), `VecDhEnv` in Python, rollout rewritten. Under load
+20: 32 envs 56.6k → 352.6k env-steps/s, 128 envs 55.0k → 638.8k, bit-identical
+trajectories. That exposed the per-tick GPU launch as the real cost, so
+`--envs` is now 512 (5,834 → 56,288 steps/s end to end, flat past 512).
+
+**Watch out:** a `--all` sweep at `GENERATIONS=1000 POP=10 EPISODES=13` projects
+~155 h on this box — `tools/train_watch.py <run>` shows the sweep-wide ETA.
+
+# Active recovery — 2026-09-13
+
+Ricardo authorizes executing ALL recovered work, 2D first then Rebirth,
+committing/pushing master and rebuilding Codex binaries. Work INLINE per CLAUDE;
+no subagents. Single demand ledger: docs/harness/20-roadmap.md, R01–R26. Every
+prompt, including both September 13 reminders, is preserved verbatim in
+ docs/harness/requests/2026-09-12-recovery.md. Canon §12.47 + design/27 + tech/36 +
+business/33 record permanent characters/power ceiling, weekly behavioral item
+enchantments, endless cosmetic XP and community/mod/trust/guild/rating directions.
+Financial allocations and official-server systems are specifications/proposals,
+not deployed services. Do not stop after documenting or this small milestone.
+
+Published: 3f52b35 recovery UI/actions/stream repair and b622aa6 generated-budget
+record, both pushed to origin/master. Current Linux/Windows packages under
+builds/codex both identify clean b622aa6 and pass hash/ZIP/PE icons. Linux actual
+export passes menu/Hunt, level-up refill, practice and complete saved lair→same
+Hunt→rush journey. Windows gameplay remains untested natively. Current package
+does NOT include the newer residency/Snap correction described below.
+
+READY TO COMMIT (uncommitted): R08 encounter residency + Snap-aware Linux icon
+installer, latest prompt/plan archive and modern hunter source candidate. R03
+Haven return, R04 companion sprite/nickname cards, R07 saved world visibility and
+R15 actual host icon association are gated complete. Broader UI/art remains open.
+
+R08: game/prototype/encounter_residency.gd stores primitive snapshots in owned
+per-Hunt per-chunk files; dormant scene nodes are freed. Stable IDs, HP/maxHP,
+spawn-time stats/status/cooldowns, species/element and paired-boss linkage survive
+return. Sleep 1152px / wake 960px from EVERY hunter, one file/body per frame, paired
+wake reserves 2 slots; read only fully drawn terrain (flying creatures over water
+work). File claim before activation prevents repeated restores after death.
+Pets and short-lived summons remain their own lifecycle. Frontiers roll on
+approach with cap headroom; persistent chunk markers replace unbounded visited
+RAM. Spawners/hag summons respect the 120 cap. Positional RNG now uses the Hunt seed.
+F3 shows awake/sleeping counts. This is the existing LOCAL prototype harness,
+not official authoritative storage. Normal exit removes only owned scratch files;
+a crash may leave an orphan directory, uniquely named so new Hunts never load it.
+
+All 20 Godot outcomes now pass, including new residency_probe and the existing
+co-op/arena/stream/level-up gates. 116 Python tests pass. CTest 4/4 and validator
+46 defs/11 types / 5 registries + 1 candidate pass; whitespace gate passed. Actual GL
+residency_capture traveled 6 chunks away: 81 original actors dormant, 7 new frontier
+actors active; returned target kept exact HP. Final 66 active/22 dormant. 300 warmed
+frames report 60 FPS, process median 4.573 ms / p95 9.167 ms; residency worst 0.707 ms,
+stream worst 1.253 ms. PNGs in prototype/tests/captures/residency were viewed.
+These are short desktop samples, not sustained/mobile/slow-storage guarantees.
+Logs under genforge/candidates (residency-capture.log, residency-pytest.log and
+ game-gates/results.json). Full test runner helper remains ignored in candidates;
+all official individual gate commands are in docs/USAGE and harness/README.
+
+Linux icon: actual GIO metadata now points the raw ELF at
+/home/ricz/.local/share/icons/hicolor/512x512/apps/dragon-heroes-codex.png;
+host .desktop validates. VS Code Snap polluted GIO_MODULE_DIR and redirected
+XDG_DATA_HOME; installer sanitizes Snap library/module overrides for system
+subprocesses and uses the host application directory. All 3 renewal Python tests
+pass. Next Codex package must include this corrected install-launcher.py.
+
+Art sources: generated Haven courtyard remains under
+ genforge/art_sources/haven-renewal/ with exact prompt/provenance; not yet used.
+New modern hunter source-v1.png (1774×887 RGBA, 8×4 idle/run/cleave/cast) under
+ genforge/art_sources/hunter-renewal/, prompt/provenance saved. 32 separate major
+alpha-connected components; several weapon poses cross grid boundaries, and
+run frame 15 clips its sword at the right image edge. Needs component/pivot-aware
+local ingest and separate repair of the clipped pose before runtime use. A
+cleanup image was REJECTED for baked opaque checkerboard (alpha 255 everywhere);
+cleanup-prompt/rejection record saved, bad image retained only in imagegen default
+output. No runtime hero replacement from this candidate yet. Imagegen skill
+was read/announced; use built-in tool for source images, preserve originals.
+
+Recovery audit: old codex/modern-pixel-content-engine branch at d1dbc91 has zero
+commits missing from master. Its /tmp checkout directory is absent but history
+is safe. Stash 73d6dfa is earlier packaging work superseded by main equivalents;
+do not reapply/drop. Candidates/provenance/Rebirth work remains intact.
+
+NEXT: inspect final diff/receipts, commit and push this verified residency slice,
+then rebuild/install Codex packages (--require-clean; stage metadata before commit
+if needed). Continue real hero/ALL-creature Orun-standard local ingest and native
+five-biome generation/terrain art; then Haven NPC/stations/salvage/craft, weekly
+item enchantments/classes/skill synergies and cosmetic XP progression. Rebirth
+GPU-poor local 3D follows the 2D gates. C++ procgen still only 4 terrain types/no
+biomes. Rebirth UE remains uncompiled (no engine); local 6 GB GPU / CPU path intended.
 
 ---
 
@@ -146,6 +525,50 @@ and verify remote HEAD equality. No force push, other branches or stashes need
 changing. The prior statements that a push was not requested are historical.
 
 ---
+
+## 2026-09-13 (later) — training-run isolation + the ML reference (commit 0d075a8)
+- PyTorch tier MEASURED on this box: PPO end to end 32,343 steps/s at --envs 32
+  (VRAM-capped rollout 65,536, horizon 2048, device cuda); the C++ env alone
+  527,665 steps/s single-threaded. So ~16x is still on the table — the Python
+  per-env ctypes step loop is the bottleneck, not the GPU. Next optimisation:
+  a batched dh_env_step_many (or worker processes). ES side: a 4-episode Godot
+  match is 0.72 s, 16 concurrent 1.4 s, 20 concurrent 1.7 s, a gate 3.1 s —
+  tools/train_all.sh defaults are now ~4 MINUTES for all 7 keys, not 7 hours.
+- NEW: DH_SERVING_DIR (ml/serving_paths.py) + tools/train_run.sh — per-run
+  folders ml/runs/<date>__<keys>__<config>/ with config.json, their own
+  registry seeded from the deployed one (cumulative), weights/progress/logs/
+  summary.txt; --list, --promote (gate-passing nets only). ml/serving is only
+  touched by promote. Verified byte-identical registry after a smoke run.
+- NEW: docs/tech/37-ml-parameter-reference.md — every parameter and
+  hyperparameter, obs schemas, artifacts + consumers, gate bands, measured
+  numbers. ml/README.md and USAGE point at it; docs/README.md indexes it.
+- Roadmap demands logged (in 20-roadmap.md, UNCOMMITTED because that file
+  carries the other session's R08/R15 text): command ledger (done), run
+  isolation (done), ML documentation (done), plus the hunt exit-time RID leak
+  in the polish backlog.
+
+## 2026-09-13 — docs/USAGE.md is now the VERIFIED command reference
+- Ricardo: "document all commands: from arena starting to game starting — all
+  give them to me… there were several changes to the game." USAGE.md rewritten
+  end to end; every command re-run that day, gate table quotes the REAL pass
+  lines. Marked *not run here*: long training, packaging (~1 GB templates),
+  Nakama containers, tools/run_vulkan.sh (Ricardo-only).
+- All 20 gates GREEN on this tree, including the other session's new
+  residency_probe (RESIDENCY OK, worst_step_ms 0.514) and lair journey
+  (LAIR JOURNEY OK). ctest 4/4, pytest 116, content 0 problems, MP TEST OK.
+- New in the doc since the last version: the OPTIONS modal (menu_probe asserts
+  12 buttons + 2 volume sliders), the PPO/GPU tier (ml/.venv/bin/python — system
+  python3 has no torch), evolve.py, gpu_guard (DH_VRAM_FRACTION), dh-env +
+  ml.env.bench, dh-server --living-preview/--lair-profile/--dump-chunks/
+  --dump-window, dh-effect-lab, the Lairs & Legends tools, Codex packaging,
+  arena dump_specs, league round-robin, and the rebirth slices.
+- FOUND, not fixed (logged in the roadmap polish backlog): the hunt boot gate
+  leaks 5 RIDs at exit (MultiMesh+Mesh+Material+Shader) on ~1 run in 4; no
+  other scene does it. Exit-time only.
+- NOT COMMITTED in the parent repo: the tree is dirty with the other session's
+  in-flight R08 residency + R15 icon work (game/prototype/*, harness docs,
+  requests/). My changes sit in the working tree: docs/USAGE.md, the roadmap's
+  command-ledger entry (closed) + the leak item, and this block.
 
 ## Prior delivery (preserved)
 
