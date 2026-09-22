@@ -190,6 +190,49 @@ DH_API uint64_t dh_env_tick(const DhEnv* env);
  * drift: ml/eval/env_parity.py carried a 30 against the sim's 60 and reported
  * every dh-env duration at twice its real length (found 2026-09-14). */
 DH_API float dh_env_tick_hz(void);
+
+/* ---- arena.trace.v1 — WATCHING a dh-env match (R51) -------------------------
+ * dh-env is headless: there is no renderer here and there must not be one
+ * (sim/ never imports Godot, and this library does no I/O). So a match is made
+ * watchable the only honest way — the sim hands out what it DID, one frame per
+ * tick, and the Godot arena replays it: game/arena/trace_policy.gd feeds the
+ * recorded commands back into real bodies while game/arena/arena.gd draws the
+ * positions recorded here as ghosts on top. Where the ghost and the body come
+ * apart is exactly where the two runtimes disagree, which is the instrument the
+ * parity work (R55) needs and hp_frac alone could never be.
+ *
+ * FRAME LAYOUT, DH_ENV_TRACE_STRIDE floats, little more than a memcpy per tick:
+ *   [0]      tick
+ *   [1..11]  side A: pos x,y | aim x,y | hp_frac | windup_t | dodge_t |
+ *            last_commit (-1 refused) | move x,y | act (dodge bit included)
+ *   [12..22] side B, same eleven
+ * Side B's command slots carry what the INTERNAL mind chose (native/scripted/
+ * mlp) — that is the whole point: the opponent's decisions are otherwise
+ * unobservable from outside, and "the opponent did something different" is the
+ * single most common shape of a parity bug.
+ *
+ * Optional symbols, same discipline as the rest of this header: a library that
+ * predates them fails loudly on the lookup instead of handing back a buffer of
+ * garbage that would replay as a match that never happened. */
+#define DH_ENV_TRACE_SIDE_FIELDS 11
+#define DH_ENV_TRACE_STRIDE (1 + 2 * DH_ENV_TRACE_SIDE_FIELDS)
+/* Arm capture and record the CURRENT state as frame 0 (so the replay opens on
+ * the spawn positions, not on the first tick's outcome). `max_ticks` bounds the
+ * buffer — one allocation here, none per tick, so a traced run stays a sim run.
+ * Pass max_ticks <= 0 to disarm and release the buffer. Returns the number of
+ * frames the buffer can hold. Capture is per-env and OFF by default: untraced
+ * stepping is byte-for-byte the code it always was. */
+DH_API int32_t dh_env_trace_begin(DhEnv* env, int32_t max_ticks);
+/* Floats per frame, so a caller validates the layout it compiled against
+ * instead of assuming it. */
+DH_API int32_t dh_env_trace_stride(void);
+/* Frames captured so far (0 if never armed). Capture STOPS at max_ticks rather
+ * than wrapping: a ring would hand back a replay that starts in the middle. */
+DH_API int32_t dh_env_trace_len(const DhEnv* env);
+/* Copy frames out, newest last, into a caller buffer of `max_floats`. Returns
+ * the number of floats written. */
+DH_API int32_t dh_env_trace_read(const DhEnv* env, float* out, int32_t max_floats);
+
 DH_API void dh_env_destroy(DhEnv* env);
 
 #ifdef __cplusplus

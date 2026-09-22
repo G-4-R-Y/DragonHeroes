@@ -129,6 +129,43 @@ python3 -m ml.training.league train --key fen_boar --build core.arena.fen_boar_a
 python3 -m ml.training.league gate --key fen_boar --build core.arena.fen_boar_alpha
 ```
 
+## Watching a dh-env match (the trace)
+
+The arena has a window; **dh-env does not** — it is a headless C++ library, and
+that is the half of the stack the trainer actually lives in. So "watch a dh-env
+match" can only mean: record what it did, tick by tick, then have the arena act
+the recording out.
+
+```bash
+# Record one dh-env episode (policy: a net's game.json, or `heuristic`)
+python3 -m ml.eval.trace_match --build core.arena.cinder_drake \
+    --policy heuristic --opp scripted --seed 3 --out ml/runs/traces/drake.json
+
+# Watch it: real bodies driven by the recorded commands, recorded positions
+# drawn as ghosts on top
+godot --path game res://arena/arena.tscn -- --replay ml/runs/traces/drake.json --spectate
+```
+
+From the console, **REPLAY ENV** does both in one press (the seed advances every
+time, so every press is a different match and every one of them is reproducible).
+
+The trace is `arena.trace.v1`: 23 floats per tick — the tick, then 11 per side
+(position, aim, hp fraction, windup and dodge timers, the last committed action,
+and the move/act command that side's mind actually issued). Both sides carry
+their commands, so the replay drives BOTH fighters from the recording; nothing
+in the arena is left to decide anything.
+
+That makes it a **parity instrument**, not just a viewer. Identical commands fed
+into two runtimes should produce identical motion, so the distance between a body
+and its ghost is the environment error — localised to a tick and a body, which is
+something win rates and hp totals can never do. The verdict line prints the mean
+and peak drift per side, `break_tick_{a,b}` (the first tick a body crossed 20 px
+from its ghost, `-1` = never), and `gap_rec`/`gap_now` — the mean distance
+*between the two bodies*, recorded versus replayed, which says whether the two
+runtimes were even fighting the same fight.
+
+Gate: `bash tools/trace_replay_test.sh` (`TRACE REPLAY OK`).
+
 ## Cosmetics (GenForge pack, landed with the arena)
 
 The arena is where cosmetics are *worn* first: `ProtoCosmetics` attaches
@@ -153,3 +190,8 @@ presentation-only and never enter combat math (canon §2).
   them as hunt NPCs with their drops is a hunt-side feature on top of this data.
 - Balance is uncalibrated (numbers are the prototype's); fitness bands in the
   gate are proposals to tune once the league has real history.
+- Trace replay is faithful at RANGE and breaks at CONTACT: with identical
+  commands the arena's melee pair never closes (mean body gap 21.6 px recorded →
+  90.4 px replayed), so no strike lands. The recorded contact equilibrium comes
+  out of dh-sim's own windup/recover/separation state, which a command-only
+  replay cannot reproduce. Open as R55 (tech/25 §5.3.2).

@@ -207,6 +207,26 @@ class Arena {
     // that reads this is not playing the game the gate measures.
     void obs_now(float* out) const { build_obs(f_[0], f_[1], out); }
     int obs_dim() const { return squad_ ? kObsV2Dim : kObsDim; }
+
+    // WHERE THE BODIES ARE. Same standing as obs_now() above: probes, tests
+    // and REPLAY TRACES only (R51) — a mind that reads this is not playing the
+    // game the gate measures. dh-env is headless C++ with no renderer, so the
+    // only way to WATCH one of its matches is to dump this per tick and replay
+    // it in the Godot arena; it is also what tells the parity work WHERE two
+    // runtimes fed the same actions stopped agreeing, which hp_frac alone
+    // never could. The buddy body (squad mode) is deliberately not here: v1 of
+    // the trace draws the two principals, and a widened struct would silently
+    // change what a caller reading it by offset gets back.
+    struct BodyState {
+        math::Vec2 pos{}, aim{};
+        float hp_frac = 0.0f;
+        float windup_t = 0.0f;       // > 0: telegraphing a swing
+        float dodge_t = 0.0f;        // > 0: i-frames
+    };
+    BodyState body_state(int who) const {
+        const Fighter& f = f_[who & 1];
+        return BodyState{f.pos, f.aim, f.hp_frac(), f.windup_t, f.dodge_t};
+    }
     int winner() const;                  // -1 undecided/draw, 0 = A, 1 = B
     bool done() const { return winner_ != -2; }
     float hp_frac(int who) const;
@@ -235,6 +255,14 @@ class Arena {
     // that single action on 100.000% of ticks (measured 2026-09-14,
     // cinder_drake v6.0). Pay for effect, never for intent.
     int last_commit(int who) const { return last_commit_[who & 1]; }
+
+    // The COMMAND each side ran on the last step: the learner's exactly as it
+    // was handed in, the OPPONENT's as its internal mind chose it. Traces and
+    // probes only, like body_state(). The opponent's command is otherwise
+    // invisible from outside this class, and a replay that does not carry it
+    // cannot reproduce the match — it would put a Godot mind on side B and
+    // measure that instead (R51).
+    const Action& last_action(int who) const { return last_action_[who & 1]; }
 
     // arena.mask.v1 (R50, 2026-09-19; ml/env/dh_env.py::action_mask). Which of
     // the kActionLogits a policy may pick, from the obs it SEES plus two body
@@ -348,6 +376,7 @@ class Arena {
     float damage_taken_[2] = {0.0f, 0.0f};   // per-episode, reset() clears it
     float damage_by_source_[2][static_cast<int>(DmgSource::kSourceCount)] = {};
     int last_commit_[2] = {-1, -1};          // per-TICK, apply_action sets it
+    Action last_action_[2]{};                // per-TICK, apply_action sets it
     math::Pcg32 combat_rng_;
     math::Pcg32 policy_rng_;
     // scripted-policy state (per fighter, only index 1 used today)

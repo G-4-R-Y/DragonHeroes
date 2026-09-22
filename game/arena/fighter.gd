@@ -282,6 +282,12 @@ func setup(def: Dictionary, arena: Node, at: Vector2, policy_spec: String,
 		policy = ArenaStatuePolicy.new()          # the gate's floor (tech/25 §5.2.2)
 	elif spec == "heuristic":
 		policy = ArenaHeuristicPolicy.new()       # the gate's yardstick
+	elif spec == "trace":
+		# R51 replay: the commands come from a recorded dh-env match. It goes
+		# through the SPEC (not a post-setup swap) so bot_drive is set the same
+		# way every non-native mind sets it — a replay handed "native" would
+		# have the body's own AI driving alongside the recorded commands.
+		policy = ArenaTracePolicy.new()
 	else:
 		policy = ArenaNeuralPolicy.from_file(spec)
 

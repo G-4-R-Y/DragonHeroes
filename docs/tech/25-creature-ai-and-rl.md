@@ -647,6 +647,70 @@ episode at once, and `win_rate` reads 0.00 against 0.44 while every rate in the
 same cell agrees within 20%. The absolute terms are a tripwire; the ratios are
 the measurement.
 
+#### 5.3.2 The trace: a dh-env match, replayed in the arena (2026-09-22, R51)
+
+Every instrument above reports a **total** — a win rate, a health fraction, a
+damage rate. Totals prove a divergence exists; they cannot say *when* it started
+or *which body* started it, and two bugs that cancel each other read as parity.
+
+`arena.trace.v1` is the instrument that can. dh-env records every tick it
+simulates — 23 floats: the tick, then 11 per side (position, aim, hp fraction,
+windup and dodge timers, the last committed action, and the move/act **command**
+that side's mind issued) — through `dh_env_trace_enable/frames/stride/side_fields`
+in `sim/libs/dh-env`. `ml/eval/trace_match.py` writes that out as a JSON
+document; the arena loads it with `--replay <trace>`, seats real `ArenaFighter`
+bodies at the recorded frame-0 positions, and hands each one an
+`ArenaTracePolicy` (`game/arena/trace_policy.gd`) that returns the recorded
+command for the current tick instead of thinking. `game/arena/trace_ghosts.gd`
+draws the recorded positions as ghosts on top.
+
+Both sides' commands are in the trace — side B's slots carry what the sim's own
+internal mind chose — so the replay drives BOTH fighters from the recording and
+leaves the arena nothing to decide. What remains between a body and its ghost is
+therefore the **environment** error, and nothing else. The verdict line:
+
+```
+ARENA REPLAY drift_mean_a=0.46 drift_peak_a=5.63 drift_mean_b=0.87 drift_peak_b=5.56
+  break_tick_a=-1 break_tick_b=-1 gap_rec=28.8 gap_now=28.7
+  recorded_winner=a recorded_hp=0.170/0.000 replayed_winner=a replayed_hp=0.178/0.000
+  recorded_s=9.35 replayed_s=9.37
+```
+
+`break_tick_*` is the first tick that body crossed 20 px from its ghost (`-1` =
+never) — a divergence as an index straight back into the trace's frames.
+`gap_rec`/`gap_now` is the mean distance **between the two bodies**, recorded
+versus replayed: drift says the pair moved differently, the gap says whether they
+were even fighting the same fight. A melee that never closes deals no damage no
+matter how well each body steps.
+
+Gate: `bash tools/trace_replay_test.sh` → `TRACE REPLAY OK`. Console:
+**REPLAY ENV** records and opens the window in one press.
+
+**The first finding, and it is a real one.** Command-level replay is faithful for
+a duel fought at RANGE and breaks for one fought at CONTACT:
+
+| trace | gap recorded → replayed | first break | outcome |
+|---|---|---|---|
+| cinder_drake vs `scripted`, seed 3 | 28.8 → 28.7 px | never | kill → kill (0.170 → 0.178) |
+| cinder_drake vs `native`, seed 3 | 16.8 → 62.2 px | tick 205 | kill → both alive |
+| fen_boar_alpha vs `native`, seed 7 | 21.6 → 90.4 px | tick 372 | kill → **0.934/0.868** |
+
+The pattern is the *recorded* gap, not the creature: whenever dh-sim's fight sat
+at contact range, the arena's replay pulls apart and nothing lands. It is not the
+instrument — the ranged case replaying to 0.46 px proves the frame layout, the
+side stride, the dodge flag bit, the tick clock and the ghost cursor are all
+correct. Trace forensics on the boar show the recorded pair sitting at **15.6 px**
+with **unit-length move vectors** (median 1.00 over 1803 frames) and only
+**1.9 px/s** of net speed: a contact equilibrium dh-sim produces out of its own
+windup/recover/separation state, which a command-only replay cannot reproduce. At
+tick 377 side B begins a windup, its move drops to 0.00 — and it travels at
+49 px/s, pure separation push, no locomotion at all. The separation constants
+match on paper (`Arena::separate_bodies()` ↔ `creature.gd::_separate`,
+`SEPARATE_RATE 4.0` / `SEPARATE_RATE_PLAYER 12.0`), so the suspect is
+close-quarters locomotion state — which bodies count as `is_player`, and whether
+a `bot_drive` creature applies locomotion the same way in each runtime. That is
+R55's next lead, and this is the tool that will close it.
+
 ## 6. Fairness is baked into training, not patched at inference
 
 Canon §9 makes these training-time constraints, and the research history explains why post-hoc nerfs fail: OpenAI Five *had* a 217 ms average reaction time and still read as "programmable-mouse telepathy" because of coordination and precision; AlphaStar's APM caps were gamed by burst micro because they bound on averages ([AI Impacts analysis](https://aiimpacts.org/the-unexpected-difficulty-of-comparing-alphastar-to-humans/)). If the agent never experiences the constraints during training, it learns skills the constraints then break — or finds the gaps in them.

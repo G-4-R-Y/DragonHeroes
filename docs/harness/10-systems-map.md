@@ -1,4 +1,16 @@
-# Urgent playtest recovery — 2026-09-13
+# Current asset audit — 2026-09-22 (R81)
+
+The requested review/proposal is complete against `3c006ac`; see
+`../research/asset-audit-2026-09-22.md` and its evidence folder. Hifi's 23
+tests pass, but no hifi bundles are installed among Hunt's 10 actor bundles.
+Six real Orun pose samples fail processing; shared sequence scale/palette,
+full clips and runtime action selection remain open. No gameplay/art/shader
+implementation changed during this audit. R77 already unified packaging as
+`tools/package_build.py`. HEAD advanced to `f75f21d` (concurrent R49 work).
+The 2026-09-13 recovery note below is historical, including its HEAD,
+trainer/process assumptions and obsolete Codex paths.
+
+## Historical urgent playtest recovery — 2026-09-13
 
 Latest request and quota follow-up are saved in full; roadmap R01–R40 is the
 single ledger. R34 performance and R35 Flask are Ricardo's current priority,
@@ -310,6 +322,30 @@ pytest genforge/tests/test_hifi.py` + `python3 -m genforge.hifi selftest`
 (offline). No API called; model id is a knob awaiting Ricardo. Doc: tech/40.
 The R50 converged run finished the same day (tech/39 bullet): 2/7 deployed,
 and a dh-env→arena OUTCOME gap on the greedy decode is now roadmap R55.
+
+**2026-09-22 (R51 — the trace: a dh-env match, replayed in the arena):** the
+headless runtime is watchable now. dh-env records every tick
+(`dh_env_trace_*`; `arena.trace.v1`, 23 floats = tick + 11 per side: position,
+aim, hp fraction, windup/dodge timers, last committed action, and the move/act
+**command** that side's mind issued), `ml/eval/trace_match.py` writes the
+document, and the arena replays it with `--replay <trace>`:
+`game/arena/trace_policy.gd` feeds the recorded commands into real
+`ArenaFighter` bodies while `game/arena/trace_ghosts.gd` draws the recorded
+positions as ghosts on top. Both sides come from the trace, so nothing in the
+arena decides anything and the body↔ghost distance IS the environment error —
+localised to a tick and a body, which hp totals and win rates never can be.
+Verdict line adds `break_tick_{a,b}` (first tick past 20 px, `-1` = never) and
+`gap_rec`/`gap_now` (mean distance BETWEEN the two bodies, recorded vs
+replayed). Console: **REPLAY ENV** records and opens the window in one press,
+seed advancing per press. Gate: `bash tools/trace_replay_test.sh` (TRACE REPLAY
+OK). First finding: a duel at RANGE replays exactly (cinder_drake vs scripted,
+drift 0.46/0.87 px, no break, gap 28.8 → 28.7); a duel at CONTACT does not
+(fen_boar vs native: gap 21.6 → **90.4**, first break tick 372, replay ends
+0.934/0.868 where the recording ended in a kill) — the arena's pair never
+closes, so nothing lands. Not a trace bug: the recorded pair sits at 15.6 px
+with unit-length move vectors and 1.9 px/s of net speed, a contact equilibrium
+dh-sim produces from its own windup/recover/separation state. Feeds R55. Docs:
+tech/25 §5.3.2, design/23, canon §54.
 
 **2026-09-21 (R55-b — four divergences, and one clock):** damage is now booked
 **by source** in every runtime — contact / bolt / field — through

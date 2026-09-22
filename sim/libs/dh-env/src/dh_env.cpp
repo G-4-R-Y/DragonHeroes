@@ -134,12 +134,49 @@ Pool* pool_for(int n_threads) {
 
 struct DhEnv {
     dh::sim::Arena arena;
+    // arena.trace.v1 (R51). Empty unless dh_env_trace_begin() armed it, and the
+    // capture is one straight-line memcpy of numbers the arena already holds --
+    // an UNTRACED env never allocates, never branches beyond `cap == 0`, and so
+    // a training run costs exactly what it cost before this existed.
+    std::vector<float> trace;
+    int32_t trace_cap = 0;               // frames the buffer can hold
+    int32_t trace_len = 0;               // frames written; capture stops at cap
+
     DhEnv(DhFighterSpec a, DhFighterSpec b, int32_t opp, uint64_t seed)
         : arena(to_cpp(a), to_cpp(b), static_cast<dh::sim::OppPolicy>(opp), seed) {}
     DhEnv(DhFighterSpec a, DhFighterSpec ab, DhFighterSpec b, DhFighterSpec bb,
           int32_t opp, uint64_t seed)
         : arena(to_cpp(a), to_cpp(ab), to_cpp(b), to_cpp(bb),
                 static_cast<dh::sim::OppPolicy>(opp), seed) {}
+
+    // One frame: where both bodies ARE and what both minds just DID. Called
+    // after the step, so frame N is the outcome of tick N -- except frame 0,
+    // which trace_begin() takes before any stepping so a replay opens on the
+    // spawn positions instead of on the first tick's result.
+    void capture() {
+        if (trace_cap <= 0 || trace_len >= trace_cap) return;
+        float* fr = trace.data() + static_cast<size_t>(trace_len) * DH_ENV_TRACE_STRIDE;
+        fr[0] = static_cast<float>(arena.tick());
+        for (int who = 0; who < 2; ++who) {
+            const dh::sim::Arena::BodyState b = arena.body_state(who);
+            const dh::sim::Action& a = arena.last_action(who);
+            float* d = fr + 1 + who * DH_ENV_TRACE_SIDE_FIELDS;
+            d[0] = b.pos.x;
+            d[1] = b.pos.y;
+            d[2] = b.aim.x;
+            d[3] = b.aim.y;
+            d[4] = b.hp_frac;
+            d[5] = b.windup_t;
+            d[6] = b.dodge_t;
+            d[7] = static_cast<float>(arena.last_commit(who));
+            d[8] = a.move_x;
+            d[9] = a.move_y;
+            // re-encoded the way the C surface takes it, so a replay can hand
+            // the very same int straight back to dh_env_step()
+            d[10] = static_cast<float>(a.act | (a.dodge ? DH_ENV_ACT_DODGE : 0));
+        }
+        ++trace_len;
+    }
 };
 
 DhEnv* dh_env_create(DhFighterSpec a, DhFighterSpec b, int32_t opp_policy,
@@ -194,6 +231,10 @@ void dh_env_set_opp_weights_acts(DhEnv* env, const float* params,
 
 void dh_env_reset(DhEnv* env, uint64_t seed, float* out_obs31) {
     env->arena.reset(seed);
+    // A trace covers ONE episode: a reset rewinds it to the new spawn positions
+    // rather than splicing two matches into a replay that teleports (R51).
+    env->trace_len = 0;
+    env->capture();
     if (out_obs31 != nullptr) env->arena.obs(out_obs31);
 }
 
@@ -215,6 +256,7 @@ int dh_env_step(DhEnv* env, float move_x, float move_y, int32_t act,
                 float* out_obs31) {
     const dh::sim::Action a = decode_action(move_x, move_y, act);
     const bool done = env->arena.step(a);
+    env->capture();
     if (out_obs31 != nullptr) env->arena.obs(out_obs31);
     return done ? 1 : 0;
 }
@@ -240,6 +282,7 @@ int32_t dh_env_step_many_commit(DhEnv* const* envs, int32_t n, const float* move
         const dh::sim::Action a =
             decode_action(move_xy[2 * i], move_xy[2 * i + 1], acts[i]);
         const bool done = e->arena.step(a);
+        e->capture();
         if (out_obs != nullptr) e->arena.obs(out_obs + static_cast<size_t>(i) * stride);
         if (out_done != nullptr) out_done[i] = done ? 1 : 0;
         if (out_hp != nullptr) {
@@ -267,6 +310,8 @@ void dh_env_reset_many(DhEnv* const* envs, int32_t n, const uint64_t* seeds,
     const int stride = envs[0]->arena.obs_dim();
     for (int i = 0; i < n; ++i) {
         envs[i]->arena.reset(seeds[i]);
+        envs[i]->trace_len = 0;
+        envs[i]->capture();
         if (out_obs != nullptr) envs[i]->arena.obs(out_obs + static_cast<size_t>(i) * stride);
     }
 }
@@ -297,6 +342,39 @@ float dh_env_damage_by_source(const DhEnv* env, int32_t who, int32_t src) {
 }
 
 uint64_t dh_env_tick(const DhEnv* env) { return env->arena.tick(); }
+
+// ---- arena.trace.v1 ---------------------------------------------------------
+
+int32_t dh_env_trace_begin(DhEnv* env, int32_t max_ticks) {
+    if (env == nullptr) return 0;
+    if (max_ticks <= 0) {                       // disarm and give the memory back
+        env->trace = std::vector<float>();
+        env->trace_cap = 0;
+        env->trace_len = 0;
+        return 0;
+    }
+    // +1: frame 0 is the CURRENT state, so max_ticks steps still fit after it.
+    const int32_t frames = max_ticks + 1;
+    env->trace.assign(static_cast<size_t>(frames) * DH_ENV_TRACE_STRIDE, 0.0f);
+    env->trace_cap = frames;
+    env->trace_len = 0;
+    env->capture();                             // the spawn positions
+    return frames;
+}
+
+int32_t dh_env_trace_stride(void) { return DH_ENV_TRACE_STRIDE; }
+
+int32_t dh_env_trace_len(const DhEnv* env) {
+    return env == nullptr ? 0 : env->trace_len;
+}
+
+int32_t dh_env_trace_read(const DhEnv* env, float* out, int32_t max_floats) {
+    if (env == nullptr || out == nullptr || max_floats <= 0) return 0;
+    const int32_t have = env->trace_len * DH_ENV_TRACE_STRIDE;
+    const int32_t n = have < max_floats ? have : max_floats;
+    for (int32_t i = 0; i < n; ++i) out[i] = env->trace[static_cast<size_t>(i)];
+    return n;
+}
 
 float dh_env_tick_hz(void) { return 1.0f / dh::sim::kArenaDt; }
 

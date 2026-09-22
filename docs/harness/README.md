@@ -75,7 +75,9 @@ their own chassis/rig/kit, bosses bond as mini-pets, pets level with the hunter,
 the Spirit Essence faucet is unchanged) → `tests/bond_probe.tscn` (BOND OK —
 the R65 kit: every rolled id resolves, the bond track credits only the bonds
 that were there, and all 7 skill behaviors fire) → `bash tools/trainer_stop_test.sh`
-(TRAINER STOP OK) → `bash tools/mp_test.sh` (MP TEST OK) → `python3 -m pytest
+(TRAINER STOP OK) → `bash tools/trace_replay_test.sh` (TRACE REPLAY OK — one
+dh-env episode recorded and replayed in the arena; needs `libdh-env.so` built)
+→ `bash tools/mp_test.sh` (MP TEST OK) → `python3 -m pytest
 ml/tests genforge/tests -q` → `python3 tools/validate_content.py` (0 problems).
 Spawn placement gate now pauses enemy pursuit while checking initial spacing;
 the earlier eight-second live pursuit could falsely report a collapsed world.
@@ -98,6 +100,12 @@ the earlier eight-second live pursuit could falsely report a collapsed world.
   Version bumps live in commit titles (v0.3.0 is HEAD's era).
 
 ## Working doctrine (Ricardo's, distilled — also in the harness memory files)
+
+- **Art review baseline (R81, 2026-09-22):** read
+  `../research/asset-audit-2026-09-22.md` before mass hifi regeneration. A
+  per-image PASS is not animation approval; real Orun samples still fail,
+  sequence scale/palette/clip contracts need integration. The report has a
+  fresh GL capture, source-level findings and an ordered proposal.
 
 - Consult Ricardo on DIRECTIONAL decisions; execute freely inside them.
 - Reusable, decoupled, extensible code; registries/seams over coupling.

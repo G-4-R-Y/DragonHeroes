@@ -28,7 +28,7 @@ Ricardo's call) · SCHEDULED (decided, sequenced) · DESIGN (research first) ·
 BUDGET (blocked on money) · ANSWER (a question owed a reply, not a task) ·
 DONE.
 
-## 1. The demand table — every ask, R01 → R79
+## 1. The demand table — every ask, R01 → R81
 
 R01–R43 are the 2026-09-12 quota-outage recovery set, recorded verbatim then
 and unchanged since. R44–R55 came in 2026-09-13→19. R56–R71 arrived
@@ -87,7 +87,7 @@ search it by id.
 | R48 | **DONE 2026-09-14, ledger flipped 2026-09-22** | GenForge console cannot return to the main menu. | The BACK button existed, at the bottom of the RIGHT column under an expand-fill `TabContainer`, so any tab taller than the viewport pushed the only way out off the bottom edge. Moved to the title row (`console.gd::_build_ui`) and `ui_cancel` leaves too — there had been no input handler at all. Why the gate missed it: the layout probe set `_selftest = true`, which was the very flag that skipped building BACK. It is built under selftest now (inert) and the probe asserts BACK exists, is visible in tree and lies on-canvas on both axes, found by ROLE so moving it stays legal. Re-verified 2026-09-22: `GENFORGE LAYOUT OK — 7 canvases x 1204 controls … BACK visible and on-canvas throughout`. |
 | R49 | **DONE 2026-09-22** | Arena interface needs polishing to fit everything in. | The whole left column lived inside a `ScrollContainer`, and `console_layout_probe::_walk` deliberately refuses to descend into one (growing past the viewport is what a scroll is FOR) — so the gate printed OK while the run knobs sat below the fold. Measured once the probe could see it: **401 px of content in a 346 px viewport at 800x450**, the canvas `DhConsoleFit._fit_window` picks on a 1080p desktop. Fix is structural, not smaller numbers: the **roster is the only thing that scrolls**, everything the console is operated with (key, gens/pop/eps/jobs, speed, net, the parallelism hint, the mode toggles, the command echo) is pinned in `left_frame`; `TRAINING CONSOLE` moved into the 28 px band already reserved for BACK, buying the column a row; the two `ItemList`s dropped their fixed 88/72 heights for a 28 px FLOOR + `SIZE_EXPAND_FILL`, so the roster is what grows when the canvas does; the command echo is capped at two lines with the full line in its tooltip (`_set_cmd`). New gate `_check_roster` measures content-vs-viewport through the scroll and asserts a 72 px roster floor, exempting only `MIN_CANVAS` 640x360 (console_fit's own "fallback nobody chooses"). `_text_width` also stopped measuring every string with `ThemeDB.fallback_font` when the control overrides its font — it called the big-font title 105 px too wide. Green: `CONSOLE LAYOUT OK — 7 canvases x 5656 controls`; capture `ui_r49_fixed.png` vs the before shot `ui_r49_progress.png`. **R60 overlaps** (the no-wrap rule is respected at the moved title). |
 | R50 | BUILT + RUN 2026-09-19 (2/7 pass the gate; the run exposed R55) | Learn from SCRIPTS first, then self-play once reliably winning; then a train_all run with enough steps to converge. | tech/25 §4.2, `tools/train_all.sh`; a real curriculum + a converged run, not a smoke run. |
-| R51 | NOW with R50 | Watch a match from the console — current or last-best, for dh-env AND the arena, as a debugging tool. | design/23. Answered half-yes: the Godot arena is watchable today; dh-env is headless C++ with no renderer, so it needs a per-tick TRACE dump replayed in the arena. That trace is also the instrument the parity work needs. |
+| ~~R51~~ | DONE 2026-09-22 | Watch a match from the console — current or last-best, for dh-env AND the arena, as a debugging tool. | design/23 §Watching a dh-env match, tech/25 §5.3.2, canon §54. `arena.trace.v1`: dh-env records per tick, `ml/eval/trace_match.py` writes it, `--replay` acts it out in the arena with the recording drawn as ghosts; console **REPLAY ENV** does both in one press. Gate `bash tools/trace_replay_test.sh` (TRACE REPLAY OK). It is also the parity instrument: ranged replays at 0.46 px, contact does not close (gap 21.6 → 90.4) — R55's next lead. |
 | R52 | NOW / details received 2026-09-19 | A new asset generator: hi-fi dark-fantasy pixel-art SPRITES in the Dead Cells / Phantom Tower register — master prompt + mandatory negative prompt + five rendering pillars. Benchmarked against "astra". | genforge.hifi (built, commit ab2cd93); art/ style bible; Godot CanvasTexture normal/emissive. Open: real generation once Ricardo picks the image model, the astra bench, pose-by-pose animation, a lit capture, the 13b local backend. |
 | R53 | DONE 2026-09-19 | A brief `.md` in the REPO ROOT explaining the hyperparameter changes (masking, greedy eval/promotion, β + move-std annealing, reversible promotion, snapshot reservoir, plateau stop). | `TRAINING_HYPERPARAMETERS.md` at the root. |
 | R54 | NOW / standing | Document EVERY experiment with its hyperparameters — a ledger, not prose: run id, knobs, result, verdict, kept or not. Reconstruct past runs too. | `docs/tech/39-experiment-ledger.md`; `tools/train_run.sh` already writes `config.json` per run — the ledger indexes them. |
@@ -117,8 +117,7 @@ search it by id.
 | R78 | NEXT | Harness finding, 2026-09-22 (R17's push): `builds/dragon-heroes-windows.zip` is **56.82 MB** and GitHub warned on push — past its 50 MB recommendation, and it gained 13 MB in one merge. | The zips are committed on purpose (canon §10, `builds/README.md`: they ARE the game to anyone downloading), so the fix is not "stop committing them". Decide before the **100 MB per-file hard limit** forces it: Git LFS on `builds/*.zip`, or move the distributable to GitHub release assets and keep only `BUILD-INFO.json` in-tree. Recommendation: release assets — LFS quota is a recurring bill, releases are free and give download counts. Gate: a clean clone must still be able to build and run without the zips. |
 | R79 | NEXT | Harness findings, 2026-09-22 (found while proving R77): the Windows package ships **no GDExtension**, the mingw tree emits a misnamed artifact, and the Windows export prints an unexplained warning. | (a) `game/addons/dh_godot/dh_godot.gdextension` declares only `linux.debug.x86_64` / `linux.release.x86_64`, so Godot has nothing to put in the Windows zip; `game/arena/neural_policy.gd` falls back to GDScript, so Windows plays — a pre-existing platform gap, older than R77, not a regression. (b) The mingw tree emits `sim/build-windows/libs/dh-godot/libdhgodot.linux.template_debug.x86_64.dll` — says linux, says debug, is a `.dll`; nothing consumes it today. (c) `Project export for preset "Windows Desktop" completed with warnings. at: _fs_changed (editor/editor_node.cpp:1353)` — not investigated. Gate: `windows.release.x86_64` declared, built by the cross-build, present in the zip, and the arena reporting the native policy path on Windows. |
 | R80 | **DONE 2026-09-22** | Harness finding, 2026-09-22 (found running the full gate suite for R57): `residency_probe` — a USAGE §10 gate — was **red on master**, and red for two independent reasons, neither of them a game bug. Measured before the fix: HEAD baseline in-place `pass=0 fail=5`; the R57 tree `pass=1 fail=4`. Two failure strings, `RESIDENCY FAIL: water fixture missing` and `RESIDENCY FAIL: flying creature over drawn water did not return`. | (a) **No pinned seed.** `main.gd:176` calls `randomize()` and `world_gen.gd:126` rolls `_hunt_seed = forced_seed if forced_seed != 0 else randi()`, so the probe's water fixture existed only on lucky maps — a 28-seed scan found **3 seeds with no water at all** within ±35 tiles of spawn and several more out at ring 28–35. Now pinned to `41487` via `MpNet.pending_seed` before `add_child` (the same seat `stream_recovery.gd:48` and `residency_capture.gd:28` use), released immediately after; that seed leaves origin walkable, so `spawn_point()` is exactly `(0,0)`. (b) **The fixture search took the wrong tile.** It walked `y` from −35 upward and took the first hit in that row, i.e. the most NORTHERN water rather than the nearest — up to 560 px from spawn, past residency's 512 px `wake_distance()`, so the flyer *correctly* refused to wake and the probe called it a failure. It now rings outwards from spawn and never past `wake_distance()/TILE - 4`. Gate: `RESIDENCY OK`, **5/5 green**, `worst_step_ms` 0.50–0.87. Evidence and the debug line that located it (`dist=615.7 wake_d=512.0`): journal 2026-09-22. |
-
-| R81 | NOW — asset audit requested 2026-09-22 | Resume by reviewing the assets and newly distilled guidelines; identify and propose improvements with order-of-magnitude potential. Check what Claude already completed before proposing duplicate work. Preserve and evaluate the supplied Dead Cells / Phantom Tower brief. | design/26, tech/40, canon §7/§12.45; evidence-backed audit, inspected assets/runtime consumers, measured pipeline gates; journal R81 |
+| R81 | DONE — audit/proposal 2026-09-22; implementation remains on existing art rows | Review current assets and distilled guidelines; identify order-of-magnitude opportunities, accounting for Claude's completed work. Preserve the supplied Dead Cells / Phantom Tower brief. | research/asset-audit-2026-09-22.md; 23 hifi tests pass, real six-pose diagnostic rejects 6/6, shared-scale/duplicate-frame defects reproduced; fresh GL Hunt capture + 5s frame-time receipt. Proposed sequence links R01/R06/R09/R12/R26/R42/R52/R72; journal R81 |
 
 ## 2. NOW — in flight, and the strategy behind it (2026-09-21)
 
@@ -133,12 +132,12 @@ and his latest batch says bugs first. Order below is the order to work in.
 landed separation in all four runtimes, and the arena never ran it either
 (arena bodies are `bot_drive`), so it was never R55's divergence.
 
-1. **R51** — the last of the four NOW items that never moved; R47 (the reward
-   function's full version history), R48 (the GenForge console's missing Back
-   navigation) and R49 (the arena interface polish) are closed as of
-   2026-09-22. What is left is watching a match from the console: the Godot
-   arena is watchable today, dh-env is not — it needs the per-tick TRACE dump
-   replayed in the arena, which is also the instrument R55 needs.
+1. ~~**R51**~~ — **closed 2026-09-22**, with R47, R48 and R49; all four NOW
+   items that had never moved are now done. dh-env records `arena.trace.v1` per
+   tick and the arena replays it (`--replay`, or **REPLAY ENV** from the
+   console), with the recording drawn as ghosts over the real bodies. Gate:
+   `bash tools/trace_replay_test.sh`. It handed R55 its next lead on the way:
+   contact-range fights do not replay because the arena's pair never closes.
 2. **R55 residual** — instrument the endgame specifically (time-to-first-death
    vs time-from-first-death-to-episode-end), since the exchange agrees per
    channel and only the tail disagrees. Then re-run the parity matrix at 64
@@ -192,9 +191,9 @@ from Ricardo AFTER the rest of the roadmap, to be adapted behind the
 it have anyway of recovering any past logs from alternatio"* is ambiguous.
 Ask before acting on it.
 
-**Long-running, not blocking:** R02 (Rebirth, after the 2D gates), R51 (the
-dh-env trace dump + replay viewer). R47, R48 and R49 are done — the first two
-had landed and were never flipped, R49 landed 2026-09-22.
+**Long-running, not blocking:** R02 (Rebirth, after the 2D gates). R47, R48,
+R49 and R51 are done — the first two had landed and were never flipped, R49 and
+R51 landed 2026-09-22.
 
 ## 3. NEXT — queued, decided
 

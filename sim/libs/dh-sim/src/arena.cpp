@@ -769,6 +769,9 @@ void Arena::buddy_tick(int who) {
 void Arena::apply_action(int who, const Action& act) {
     Fighter& me = f_[who];
     Fighter& foe = f_[1 - who];
+    // Before the early return: what was COMMANDED is trace material whether or
+    // not the body was alive to spend it (R51).
+    last_action_[who & 1] = act;
     if (me.hp <= 0.0f) return;   // a fallen primary acts no more (buddy is autonomous)
     // MOVEMENT, and the two bodies spend a move command differently.
     // fighter.gd::pre_tick, verbatim:

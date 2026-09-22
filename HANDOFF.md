@@ -1,4 +1,51 @@
-# Handoff — 2026-09-22: the pets finally cast what they rolled, and the bond levels with them
+# Handoff — 2026-09-22: R51 landed (a dh-env match you can watch)
+
+**R51 is done.** dh-env is headless C++ and has no renderer, so "watch a dh-env
+match" became a RECORDING: `arena.trace.v1` (23 floats/tick — the tick, then 11
+per side including the move/act **command** each mind issued), written by
+`ml/eval/trace_match.py`, replayed in the arena with `--replay <trace>` —
+real bodies driven by the recorded commands, recorded positions drawn as ghosts
+on top. Console: **REPLAY ENV** records and opens the window in one press.
+Gate: `bash tools/trace_replay_test.sh` → `TRACE REPLAY OK` (now in the suite).
+
+Because both sides' commands are in the trace, the replay leaves the arena
+nothing to decide — so the body↔ghost distance IS the environment error,
+localised to a tick and a body. That is the instrument R55 never had, and it
+paid immediately: **replay is faithful at range and breaks at contact.**
+cinder_drake vs scripted reproduces to 0.46 px with the pair gap unchanged
+(28.8 → 28.7) and the same kill; fen_boar vs native pulls the pair from 21.6 px
+to **90.4 px** (first break tick 372) so nothing lands — the replay ends
+0.934/0.868 where the recording ended in a kill. Not a trace bug: the recorded
+pair sits at 15.6 px issuing unit-length move vectors at 1.9 px/s net, a contact
+equilibrium dh-sim makes out of its own windup/recover/separation state. Next
+suspect for R55 is close-quarters locomotion state (`is_player`, `bot_drive`),
+not the separation constants — those match. Full write-up:
+`docs/harness/21-work-journal.md` §R51; canon §54; tech/25 §5.3.2; design/23.
+
+## Previous handoff — R81 asset audit and proposal complete
+
+Latest request shifted this session to reviewing assets/new guidelines and
+proposing the largest gains. Report: `docs/research/asset-audit-2026-09-22.md`;
+full brief archived under `docs/harness/requests/2026-09-22-asset-pillars.md`.
+Evidence: `docs/art/asset-audit-2026-09-22/`. Baseline HEAD `3c006ac` includes
+R65; during the audit the other session committed R49 as `f75f21d`, including
+our initial R81 ledger/journal checkpoint. Its Arena work and Ricardo's root
+notes were preserved. Completed report/evidence and the final documentation
+updates remain local; this session did not create a commit or push.
+
+23 hifi tests pass; six sampled Orun poses all fail the real processing test.
+Independent fitting halves upright poses but not death; per-frame palettes
+vary; duplicate frames still yield a PASS bundle. No hifi actor is installed
+in Hunt; lair Orun still plays clip zero. Recommended first implementation:
+shared animation contract/compiler → Orun's six actions in the real fight →
+hero + ordinary-enemy visual benchmark → environment kit and local rig/bake
+pilot. Proposals are documented, not silently adopted as canon or staged art.
+Fresh short GL capture averages 60 FPS on Intel; see the report for percentile
+limits. No provider cost, runtime edit or binary rebuild in R81.
+The packager is already `tools/package_build.py`, per R77. R81 is DONE as an
+audit; its proposed implementations remain on existing art roadmap rows.
+
+## Previous handoff — pets cast their kits and bonds level with them
 
 **Read this first, then `docs/harness/README.md` → `10-systems-map.md` →
 `20-roadmap.md` (the one demand ledger) → `21-work-journal.md` (the evidence).**

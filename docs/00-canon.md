@@ -1375,3 +1375,34 @@ Still open:
    path §12(e) called "the output" was a hand-copy nothing rebuilds — the real
    output is `sim/build-windows/libs/dh-server/dh-server.exe`. Runbook: tech/34
    packaging section, USAGE §8.
+
+54. **A headless match you can watch (2026-09-22; R51).** Ricardo asked to watch
+   a match from the console "for dh-env AND the arena, as a debugging tool". The
+   arena has a window; dh-env is a headless C++ library and never will, so the
+   answer is a RECORDING: `arena.trace.v1`, 23 floats per tick (the tick, then 11
+   per side — position, aim, hp fraction, windup/dodge timers, last committed
+   action, and the move/act **command** that side's mind issued). dh-env writes
+   it (`dh_env_trace_*`), `ml/eval/trace_match.py` records an episode, and the
+   arena replays it (`--replay <trace>`): real `ArenaFighter` bodies driven by
+   the recorded commands (`game/arena/trace_policy.gd`) with the recorded
+   positions drawn as ghosts on top (`game/arena/trace_ghosts.gd`). The console's
+   **REPLAY ENV** button does both in one press. DECIDED: both sides' commands
+   live in the trace, so a replay leaves the arena nothing to decide — which
+   makes the body↔ghost distance the **environment** error and nothing else, and
+   promotes the viewer into the parity instrument §12.51 and R55 lacked: a
+   divergence localised to a tick and a body, where every earlier instrument
+   could only report a total. Verdict line carries per-side mean/peak drift,
+   `break_tick_{a,b}` (first tick past 20 px, -1 = never) and `gap_rec`/`gap_now`
+   (mean distance BETWEEN the bodies, recorded vs replayed — whether the two
+   runtimes were even fighting the same fight). Gate:
+   `bash tools/trace_replay_test.sh` (TRACE REPLAY OK), which asserts the RANGED
+   reference only and prints the contact case as INFO, because gating on a
+   known-bad number only cements it. First finding, and R55's next lead: replay
+   is faithful at range (cinder_drake vs scripted — drift 0.46/0.87 px, no break,
+   gap 28.8 → 28.7, same kill) and breaks at contact (fen_boar vs native — gap
+   21.6 → **90.4 px**, first break tick 372, the replay ending 0.934/0.868 where
+   the recording ended in a kill). The pattern follows the recorded GAP, not the
+   creature. Not an instrument bug: the recorded pair sits at 15.6 px with
+   unit-length move vectors and 1.9 px/s of net speed — a contact equilibrium
+   dh-sim produces out of its own windup/recover/separation state, which a
+   command-only replay cannot reproduce. Docs: design/23, tech/25 §5.3.2.

@@ -120,6 +120,10 @@ var _sweep_label: Label
 var _stop_btn: Button
 var _gate_btn: Button
 var _watch_btn: Button
+var _replay_btn: Button
+# R51: advanced on every press so two presses are two different matches, and
+# printed into the note so any of them can be recorded again exactly.
+var _replay_seed := 7
 var _cmd_label: Label
 # progress
 var _status: Label
@@ -446,7 +450,12 @@ func _build_ui() -> void:
 	left_frame.add_child(mode_row)
 
 	var btns := GridContainer.new()
-	btns.columns = 3
+	# Four columns, not three. Seven buttons over three columns is three ROWS,
+	# and the third row costs ~22 px that come straight out of the roster
+	# viewport — at 640x360 it took the lists from 74 px to 52, under the
+	# layout probe's ROSTER_MIN_VIEW floor. Four columns is two rows with one
+	# empty cell, and the widest label still fits the 236 px column.
+	btns.columns = 4
 	btns.add_theme_constant_override("h_separation", 4)
 	btns.add_theme_constant_override("v_separation", 3)
 	_train_btn = _button(btns, "TRAIN", _train)
@@ -460,6 +469,12 @@ func _build_ui() -> void:
 	_stop_btn = _button(btns, "STOP", _stop)
 	_gate_btn = _button(btns, "GATE", _gate)
 	_watch_btn = _button(btns, "WATCH", _watch)
+	_replay_btn = _button(btns, "REPLAY ENV", _replay_env)
+	_replay_btn.tooltip_text = ("Record one dh-env episode for the selected build and REPLAY it in "
+			+ "the arena: the trainer's own environment, acted out by real bodies with its recorded "
+			+ "positions drawn as ghosts on top. Where ghost and body come apart is where dh-env and "
+			+ "the arena disagree. The seed advances on every press, so this is a different match "
+			+ "each time and every one of them is reproducible.")
 	left_frame.add_child(btns)
 	left_frame.move_child(btns, 0)   # launch/stop actions stay above the scrolling roster
 
@@ -1323,6 +1338,56 @@ func _arena_window(a_build: String, b_build: String, pol_a: String, pol_b: Strin
 		argv.append_array(["--policy-b", pol_b])
 	var pid := OS.create_process(exe, argv)
 	_proc_note = note if pid > 0 else "could not spawn the arena window"
+	_refresh_ui()
+
+# R51: WATCH, but for the half of the stack that has no renderer. dh-env is a
+# headless C++ library, so "watch a dh-env match" can only mean: record what it
+# did per tick, then have the arena act the recording out. One press does both —
+# the recorder writes the trace, the arena opens on it — because a two-step
+# ritual is a debugging tool nobody reaches for mid-investigation.
+#
+# The policy is the SELECTED key's latest net, exactly as WATCH resolves it, so
+# the match you replay is the match the gate would have judged. With no net
+# registered it falls back to `heuristic` — the five-rule teacher — rather than
+# refusing: an env with no trained policy is still an env worth watching.
+func _replay_env() -> void:
+	if _repo == "":
+		_proc_note = DhRepoRoot.missing_note()
+		_refresh_ui()
+		return
+	var build := _selected_build()
+	if build == "":
+		_proc_note = "no build to record"
+		_refresh_ui()
+		return
+	var key := _key()
+	var policy := str(_latest_net(key).get("game_json", ""))
+	var shown := "net"
+	if policy == "":
+		policy = "heuristic"
+		shown = "heuristic"
+	var out := _repo.path_join("ml/runs/traces/console-%s.json" % key)
+	var log_path := _repo.path_join(_log_rel(key))
+	DirAccess.make_dir_recursive_absolute(_repo.path_join(LOG_DIR))
+	DirAccess.make_dir_recursive_absolute(_repo.path_join("ml/runs/traces"))
+	var exe := OS.get_executable_path()
+	if exe == "":
+		exe = "godot"
+	_replay_seed += 1
+	# && , not ; : a recorder that could not build or load dh-env must NOT open
+	# an arena window on a stale trace from a previous press. The note points at
+	# the log, which is where the failure will be.
+	var cmd := "cd %s && python3 -m ml.eval.trace_match --build %s --policy %s --seed %d --out %s >> %s 2>&1 && exec %s --path %s res://arena/arena.tscn -- --replay %s --spectate" % [
+			_sq(_repo), _sq(build), _sq(policy), _replay_seed, _sq(out), _sq(log_path),
+			_sq(exe), _sq(_repo.path_join("game")), _sq(out)]
+	var pid := OS.create_process("bash", ["-lc", cmd])
+	if pid > 0:
+		_proc_note = "recording dh-env (%s, seed %d) then replaying — log %s — [Q] closes the window" % [
+				shown, _replay_seed, _log_rel(key)]
+	else:
+		_proc_note = "could not spawn bash (OS.create_process failed)"
+	_set_cmd("python3 -m ml.eval.trace_match --build %s --policy %s --seed %d" % [
+			build, policy, _replay_seed])
 	_refresh_ui()
 
 # WATCH from the VERSUS tab: the exact pairing RUN BEST-OF-N would play, for the

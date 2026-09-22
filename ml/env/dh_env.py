@@ -154,6 +154,20 @@ def _load_lib() -> ctypes.CDLL:
         lib.dh_env_tick_hz.argtypes = []
     lib.dh_env_tick.restype = ctypes.c_uint64
     lib.dh_env_tick.argtypes = [ctypes.c_void_p]
+    # arena.trace.v1 (R51) — optional on purpose, like every symbol added after
+    # the first release of this header: a stale .so fails on the lookup instead
+    # of handing back a buffer of noise that would replay as a match nobody ran.
+    if hasattr(lib, "dh_env_trace_begin"):
+        lib.dh_env_trace_begin.restype = ctypes.c_int32
+        lib.dh_env_trace_begin.argtypes = [ctypes.c_void_p, ctypes.c_int32]
+        lib.dh_env_trace_stride.restype = ctypes.c_int32
+        lib.dh_env_trace_stride.argtypes = []
+        lib.dh_env_trace_len.restype = ctypes.c_int32
+        lib.dh_env_trace_len.argtypes = [ctypes.c_void_p]
+        lib.dh_env_trace_read.restype = ctypes.c_int32
+        lib.dh_env_trace_read.argtypes = [ctypes.c_void_p,
+                                          ctypes.POINTER(ctypes.c_float),
+                                          ctypes.c_int32]
     lib.dh_env_destroy.argtypes = [ctypes.c_void_p]
     # batched surface: one crossing per TICK instead of 3-4 per env per tick
     lib.dh_env_step_many.restype = ctypes.c_int32
@@ -445,6 +459,62 @@ class DhEnv:
                 "cmake --build sim/build --target dh-env")
         return {name: float(fn(self._handle, who, i))
                 for i, name in enumerate(self.SOURCES)}
+
+    # ---- arena.trace.v1 (R51): making a headless match WATCHABLE -----------
+    # dh-env has no renderer and must not grow one (sim/ never imports Godot).
+    # So the sim hands out what it DID, one row per tick, and the Godot arena
+    # replays it: game/arena/trace_policy.gd feeds the recorded commands into
+    # real bodies while arena.gd draws these positions as ghosts on top. Where
+    # ghost and body come apart is where the two runtimes disagree — the
+    # instrument the parity work needs, which hp_frac alone could never be.
+
+    TRACE_SIDE_FIELDS = 11
+    # names in frame order, so a reader never indexes by a bare number
+    TRACE_FIELDS = ("x", "y", "aim_x", "aim_y", "hp_frac", "windup_t",
+                    "dodge_t", "commit", "move_x", "move_y", "act")
+
+    def trace_begin(self, max_ticks: int) -> int:
+        """Arm per-tick capture and record the CURRENT state as frame 0.
+
+        One allocation here and none per tick, so a traced run is still a sim
+        run. Capture STOPS at max_ticks rather than wrapping — a ring buffer
+        would hand back a replay that starts in the middle of the fight. Pass
+        max_ticks <= 0 to disarm. Returns the frame capacity.
+        """
+        fn = getattr(lib(), "dh_env_trace_begin", None)
+        if fn is None:
+            raise RuntimeError(
+                "libdh-env.so predates dh_env_trace_begin — rebuild it: "
+                "cmake --build sim/build --target dh-env")
+        n = int(fn(self._handle, int(max_ticks)))
+        self._trace_cap = n
+        return n
+
+    def trace_frames(self) -> np.ndarray:
+        """Everything captured so far as (frames, stride) float32.
+
+        Column 0 is the tick; columns 1..11 are side A's TRACE_FIELDS and
+        12..22 side B's. Side B's command columns carry what the INTERNAL mind
+        (native/scripted/mlp) chose — otherwise unobservable from outside, and
+        "the opponent did something different" is the commonest parity bug.
+        """
+        l = lib()
+        if not hasattr(l, "dh_env_trace_len"):
+            raise RuntimeError(
+                "libdh-env.so predates dh_env_trace_len — rebuild it: "
+                "cmake --build sim/build --target dh-env")
+        stride = int(l.dh_env_trace_stride())
+        if stride != 1 + 2 * self.TRACE_SIDE_FIELDS:
+            raise RuntimeError(
+                f"arena.trace stride {stride} is not the "
+                f"{1 + 2 * self.TRACE_SIDE_FIELDS} this build expects — the .so "
+                "and ml/env/dh_env.py disagree about the frame layout")
+        n = int(l.dh_env_trace_len(self._handle))
+        if n <= 0:
+            return np.zeros((0, stride), dtype=np.float32)
+        buf = (ctypes.c_float * (n * stride))()
+        got = int(l.dh_env_trace_read(self._handle, buf, n * stride))
+        return np.array(buf[:got], dtype=np.float32).reshape(got // stride, stride)
 
     @property
     def tick(self) -> int:

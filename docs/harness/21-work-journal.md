@@ -1,4 +1,4 @@
-# Work journal — the roadmap's evidence trail (2026-09-10 → 2026-09-21)
+# Work journal — the roadmap's evidence trail (2026-09-10 → 2026-09-22)
 
 **This file is the ARCHIVE, not the ledger.** The ledger is
 `docs/harness/20-roadmap.md`: one row per demand, what is in flight, what is
@@ -4371,6 +4371,32 @@ consumer; inspect images, quantify animation/catalog coverage, run relevant
 offline gates, and compare the brief's rendering claims to primary sources.
 Separate measured faults, unverified hypotheses and proposed investments.
 
+**Completed audit:** `docs/research/asset-audit-2026-09-22.md`. The archived
+brief passes `spec.verify_against_source` against the implemented prompt
+constants; this is the existing R52 direction, not a different new style.
+23 hifi tests and the offline synthetic selftest pass. Real Orun v2 samples
+0/4/8/12/16/23 all reject: zero detected emission; five also fail silhouette
+fill. The inspected output retains pale matte patches. Upright samples shrink
+2×, death does not; a controlled 240→241px silhouette reproduces the abrupt
+2× reduction. The six frames get six independent palettes; a duplicated
+synthetic frame bundle still passes. Hunt has 10 bundles, zero hifi; Orun's
+renderer still selects clip zero. The report separates format checks from
+visual/animation approval and proposes a unified sequence compiler followed
+by a hero/Orun/ordinary-creature scene, biome kit, local rig/bake pilot and
+semantic VFX recipes. No production art or runtime was changed.
+
+Fresh 5s GL assisted-Hunt profile: 60.002 average FPS, interval p95 17.424ms,
+p99 17.786ms, max 18.307ms on Intel RPL-S, 57 peak creatures. Not a sustained
+or mobile guarantee. Evidence and reproduction driver are preserved in
+`docs/art/asset-audit-2026-09-22/`; no provider calls. The first sandboxed
+capture lacked display access; the approved desktop retry succeeded. Current
+Godot 4.6 documentation also supports a simpler Compatibility glow path, so
+the old universal Vulkan-only glow claim needs qualification; no renderer
+or glow settings were changed. R81 closes the requested audit, not the art
+implementation rows. Concurrent Arena edits remain untouched. During the
+audit the other session committed R49 as `f75f21d`, also carrying our initial
+R81 ledger/journal checkpoint; the completed report/evidence remain local.
+
 ## 2026-09-22 — R49: the arena cockpit fits, and the gate can finally see it
 
 Ricardo's demand, verbatim from the ledger: *"Arena interface needs polishing to
@@ -4482,3 +4508,144 @@ Capture: `game/prototype/tests/captures/ui_r49_fixed.png` (1600x900, 97 draw
 calls, 4.1 ms) beside the before shot `ui_r49_progress.png`. Before: a scrollbar
 down the whole column, the hint sliced, the mode row absent. After: both rosters
 full-height, every knob and toggle on screen, no scrollbar.
+
+---
+
+## R51 — watching a match that has no window (2026-09-22)
+
+The demand, verbatim from the ledger: *"Watch a match from the console — current
+or last-best, for dh-env AND the arena, as a debugging tool."* Half of it was
+already true: `godot --path game res://arena/arena.tscn` has always been
+watchable. The other half is not a UI problem. **dh-env has no renderer and
+should never have one** — it is the headless C++ environment the trainer steps
+millions of times, and a window in it would be a window in the hot loop.
+
+So the answer is a recording, not a viewer.
+
+### What is recorded
+
+`arena.trace.v1` — 23 floats per tick (`DH_ENV_TRACE_STRIDE = 1 + 2*11`): the
+tick, then eleven per side — position x/y, aim x/y, hp fraction, windup timer,
+dodge timer, the last committed action (`-1` = refused), and the **move x/y +
+act the side's mind actually issued that tick**. The commands are the point. A
+trace of positions is a movie; a trace of commands is an experiment you can
+re-run.
+
+Both sides carry theirs, including side B, whose slots hold what dh-sim's own
+internal mind chose. A replay therefore drives BOTH fighters from the recording
+and leaves the arena nothing to decide.
+
+Four C symbols (`dh_env_trace_enable/frames/stride/side_fields`), a recorder
+(`ml/eval/trace_match.py`), a replay mind (`game/arena/trace_policy.gd`, a real
+`ArenaPolicy` that returns the recorded command for the current tick instead of
+thinking), a ghost overlay (`game/arena/trace_ghosts.gd`), and `--replay` in
+`game/arena/arena.gd`, which seats the bodies at the recorded frame-0 positions
+because dh-env spawns on a random angle 200 px out and the arena spawns at ±150
+on x.
+
+Two gotchas cost time and are worth writing down. `DH_ENV_ACT_DODGE = 8` is a
+**flag bit**, not an action id — decode `pick = act & 0x7`, `dodge = act & 8`.
+And `fighter.gd` rewrites `"native"` to `"scripted"` for a `ProtoPlayer` and
+sets `bot_drive` for everything that is not `"native"`; a replay handed
+`"native"` would quietly be driven by the arena's own AI, which is exactly the
+thing being measured. Hence a distinct `"trace"` spec through the same match.
+
+### Why this is the parity instrument, not just a viewer
+
+Every earlier instrument reports a **total** — win rate, health fraction,
+damage per second, damage by source. Totals prove a divergence exists. They
+cannot say when it began or which body began it, and two bugs that cancel read
+as parity.
+
+With identical commands into two runtimes, the distance between a body and its
+ghost **is** the environment error. The verdict line says so directly:
+
+```
+ARENA REPLAY drift_mean_a=0.46 drift_peak_a=5.63 drift_mean_b=0.87 drift_peak_b=5.56
+  break_tick_a=-1 break_tick_b=-1 gap_rec=28.8 gap_now=28.7
+  recorded_winner=a recorded_hp=0.170/0.000 replayed_winner=a replayed_hp=0.178/0.000
+  recorded_s=9.35 replayed_s=9.37
+```
+
+`break_tick_*` — the first tick that body crossed 20 px from its ghost (further
+than a body is wide; `-1` = never) — is a divergence expressed as an index back
+into the trace's own frames. `gap_rec`/`gap_now` — the mean distance *between*
+the two bodies, recorded versus replayed — was added after the first run, and it
+is the one that found the bug: drift says the pair moved differently, the gap
+says whether they were fighting the same fight at all.
+
+### The finding
+
+| trace | gap recorded → replayed | first break | outcome |
+|---|---|---|---|
+| cinder_drake vs `scripted`, seed 3 | 28.8 → 28.7 px | never | kill → kill (0.170 → 0.178) |
+| cinder_drake vs `native`, seed 3 | 16.8 → 62.2 px | tick 205 | kill → both alive |
+| fen_boar_alpha vs `native`, seed 7 | 21.6 → 90.4 px | tick 372 | kill → **0.934/0.868** |
+
+Read the first column, not the creature names. **Command-level replay is
+faithful while the bodies are apart and breaks as soon as the recorded fight is
+at contact range.** The ranged drake against a scripted opponent is a standoff
+and reproduces to within half a pixel; the same drake against the native mind
+closes to 17 px and diverges exactly like the boar does. The instrument is fine —
+if the frame layout, the side stride, the dodge flag, the tick clock or the ghost
+cursor were wrong, the ranged case could not land at 0.46 px.
+
+What the arena cannot reproduce is a **contact equilibrium**. Trace forensics on
+the boar: the recorded pair sits at 15.6 px apart, issuing **unit-length move
+vectors** (median 1.00 across 1803 frames), and travels 1.9 px/s net. They are
+both pushing at full throttle and going nowhere, because dh-sim's own
+windup/recover/separation state is eating the motion. At tick 377 side B starts a
+windup, its move command drops to 0.00 — and it moves at 49 px/s, which is pure
+separation push with no locomotion behind it. Feed those same commands to the
+arena and the pair simply drifts to 90 px and swings at air.
+
+The separation constants match on paper (`Arena::separate_bodies()` was ported
+from `creature.gd::_separate` verbatim in rule and in constants, `SEPARATE_RATE`
+4.0 / `SEPARATE_RATE_PLAYER` 12.0), so the suspect is close-quarters locomotion
+state — which bodies count as `is_player`, and whether a `bot_drive` creature
+applies locomotion the same way in each runtime. That is R55's next lead, and it
+is the first time the parity work has had a tick number to start from.
+
+### The gate
+
+`bash tools/trace_replay_test.sh` → `TRACE REPLAY OK`. It asserts the **ranged**
+reference only: drift mean ≤ 3.0 px, peak ≤ 15.0, no break tick, the same winner,
+and the pair gap within ±15%. The contact case is recorded and replayed too, but
+printed as INFO — gating on a known-bad number only cements it, and the day it
+converges someone will notice the line.
+
+The pairing is deliberate: the reference is cinder_drake versus the **scripted**
+mind, because the same creature versus **native** closes to 17 px and exhibits
+the open bug. The gate's first run failed for exactly that reason — it recorded
+with the recorder's default `--opp native` while the reference measurement had
+used `--opp scripted`, two different matches (14.50 s vs 9.35 s), and it
+faithfully reported the melee divergence as a gate failure.
+
+### The console
+
+**REPLAY ENV**, beside WATCH: one press records a dh-env episode for the selected
+build with the selected key's latest net (falling back to `heuristic`, because an
+env with no trained policy is still an env worth watching) and opens the arena on
+the result. One `bash -lc` chained with `&&`, never `;` — a recorder that could
+not build or load dh-env must not open a window on a stale trace from the
+previous press. The seed advances on every press and is printed into the note, so
+every press is a different match and every one of them is reproducible.
+
+The seventh button cost 22 px. The action grid was three columns, and six
+buttons over three columns is two rows; the seventh opens a third, and that row
+comes out of the roster viewport — at 640x360 the lists went from the 74 px R49
+measured to 52, under the layout probe's `ROSTER_MIN_VIEW` floor of 72. The fix
+is the grid, not the button: four columns is two rows with one empty cell, and
+`TOURNAMENT` (the widest label) still fits a 236 px column. The probe is back to
+74 px and clean on both axes at all seven canvases — the floor caught a real
+regression the moment it happened, which is what it is for.
+
+### Verification
+
+```
+TRACE REPLAY OK
+ARENA REPLAY drift_mean_a=0.46 drift_peak_a=5.63 drift_mean_b=0.87 drift_peak_b=5.56 break_tick_a=-1 break_tick_b=-1 gap_rec=28.8 gap_now=28.7 recorded_winner=a recorded_hp=0.170/0.000 replayed_winner=a replayed_hp=0.178/0.000 recorded_s=9.35 replayed_s=9.37
+INFO (not gated — the known contact-range divergence): ARENA REPLAY drift_mean_a=53.21 ... gap_rec=21.6 gap_now=90.4 ...
+CONSOLE SELFTEST OK — 2 generations, 8/12 matches, ETA 1:20, chart draws 1
+CONSOLE LAYOUT OK — 7 canvases x 5796 controls (roster 74 px at 640x360, the R49 value)
+```

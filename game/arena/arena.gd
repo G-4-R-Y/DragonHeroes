@@ -15,6 +15,12 @@
 #   for ad-hoc fast/headless runs.
 # Spectate (windowed, no args): cycles the roster rotation; [N]ext, [R]ematch,
 # [1/2/3] speed, [Q]uit.
+# Replay a dh-env match (R51): --replay /abs/trace.json, where the trace comes
+#   from `python3 -m ml.eval.trace_match` (schema arena.trace.v1). Both sides are
+#   driven by the recorded COMMANDS (trace_policy.gd) while the recorded
+#   POSITIONS are drawn as ghosts (trace_ghosts.gd) — so dh-env becomes
+#   watchable, and the ghost-to-body gap localises any parity divergence to a
+#   body and a tick. Prints one "ARENA REPLAY ..." line at the end.
 extends Node2D
 
 const TILE := 16.0
@@ -76,6 +82,8 @@ var _rotation: Array = []
 var _rotation_idx := 0
 var _rng := RandomNumberGenerator.new()
 var _ended := false
+var _replay := {}                  # arena.trace.v1 doc, when --replay is given
+var _ghosts: ArenaTraceGhosts      # recorded positions drawn over the live ones
 
 func _ready() -> void:
 	add_to_group("main")
@@ -109,6 +117,17 @@ func _ready() -> void:
 		_apply_speed(str(_cfg.get("speed", "4")))
 	if _selftest:
 		_rotation = SELFTEST_MATCHES.map(func(m: Array) -> Array: return m)
+	elif _cfg.has("replay"):
+		_replay = _load_trace(str(_cfg.replay))
+		if _replay.is_empty():
+			get_tree().quit(1)
+			return
+		# Both sides replay: side B's commands were chosen by the sim's own
+		# internal mind, so the recorded match only reproduces if BOTH are fed
+		# back in. "trace" reaches ArenaTracePolicy through fighter.gd's spec.
+		_rotation = [[str(_replay.a), str(_replay.b), "trace", "trace"]]
+		_ghosts = ArenaTraceGhosts.new()
+		add_child(_ghosts)
 	elif _cfg.has("a"):
 		_rotation = [[str(_cfg.a), str(_cfg.get("b", _cfg.a)),
 				str(_cfg.get("policy_a", "")), str(_cfg.get("policy_b", ""))]]
@@ -116,6 +135,12 @@ func _ready() -> void:
 		_rotation = _spectate_rotation()
 	_episodes = int(_cfg.get("episodes", 2 if _selftest else 4))
 	_time_limit = float(_cfg.get("time_limit", 60.0 if _selftest else 90.0))
+	if not _replay.is_empty():
+		# A trace IS one episode; and the replay must be allowed to run the
+		# whole recording, so the time limit follows the recording's length
+		# rather than cutting it off at the arena's default 90 s.
+		_episodes = 1
+		_time_limit = float(_replay.get("seconds", 90.0)) + 2.0
 	_rec_dir = str(_cfg.get("record_dir", ""))
 	_rng.seed = int(_cfg.get("seed", 2026))
 	Session.level = int(_cfg.get("level", 20))
@@ -188,6 +213,60 @@ func _spectate_rotation() -> Array:
 			pairs.append([str(ids[0]), str(ids[1]), "", ""])
 	return pairs
 
+# ---- trace replay (R51) ------------------------------------------------------------------
+
+# Read an `arena.trace.v1` doc (ml/eval/trace_match.py). Everything it needs is
+# checked HERE: a replay that silently mis-reads its columns would draw ghosts
+# somewhere plausible and report a drift that means nothing.
+func _load_trace(path: String) -> Dictionary:
+	var f := FileAccess.open(path, FileAccess.READ)
+	if f == null:
+		push_error("arena: --replay cannot read %s" % path)
+		return {}
+	var parsed: Variant = JSON.parse_string(f.get_as_text())
+	f.close()
+	if not (parsed is Dictionary):
+		push_error("arena: --replay %s is not a JSON object" % path)
+		return {}
+	var doc: Dictionary = parsed
+	if str(doc.get("schema", "")) != "arena.trace.v1":
+		push_error("arena: --replay %s has schema '%s', expected arena.trace.v1" % [
+				path, doc.get("schema", "")])
+		return {}
+	var frames: Array = doc.get("frames", [])
+	if frames.is_empty():
+		push_error("arena: --replay %s has no frames" % path)
+		return {}
+	var want := 1 + 2 * int(doc.get("side_fields", 11))
+	if int(doc.get("stride", want)) != want or (frames[0] as Array).size() != want:
+		push_error("arena: --replay %s stride %d, rows of %d, expected %d" % [
+				path, int(doc.get("stride", -1)), (frames[0] as Array).size(), want])
+		return {}
+	print("ARENA REPLAY LOAD %s  %d frames  %.2fs  a=%s b=%s policy=%s opp=%s seed=%d" % [
+			path, frames.size(), float(doc.get("seconds", 0.0)),
+			doc.get("a", "?"), doc.get("b", "?"), doc.get("policy", "?"),
+			doc.get("opp", "?"), int(doc.get("seed", 0))])
+	return doc
+
+# Where dh-env's fighters stood on the recording's first frame. The arena spawns
+# on the x axis at +/-150 px and dh-env on a random angle at 200 px, so seating
+# the bodies on the recorded spawn removes a known, uninteresting divergence
+# that would otherwise swamp the drift readout from tick 0.
+func _trace_spawn(i: int) -> Vector2:
+	var frames: Array = _replay.get("frames", [])
+	if frames.is_empty():
+		return Vector2(-150.0 * (1 if i == 0 else -1), 0)
+	var row: Array = frames[0]
+	var base := 1 + i * int(_replay.get("side_fields", 11))
+	return Vector2(float(row[base]), float(row[base + 1]))
+
+func _trace_done() -> bool:
+	for f in _fighters:
+		if is_instance_valid(f) and f.policy is ArenaTracePolicy \
+				and not f.policy.finished():
+			return false
+	return true
+
 # ---- match / episode lifecycle ---------------------------------------------------------
 
 func _start_match() -> void:
@@ -238,14 +317,23 @@ func _start_episode() -> void:
 		var spec := str(m[2 + i])
 		if spec == "":
 			spec = str(defs[i].get("policy", "scripted" if defs[i].get("kind") == "player" else "native"))
-		f.setup(defs[i], self, Vector2(-150.0 * side * (1 if i == 0 else -1), 0),
-				spec, _rng.randi())
+		var at := Vector2(-150.0 * side * (1 if i == 0 else -1), 0)
+		if not _replay.is_empty():
+			at = _trace_spawn(i)
+		f.setup(defs[i], self, at, spec, _rng.randi())
 		_fighters.append(f)
 		add_child(f)
 	_fighters[0].enemy = _fighters[1]
 	_fighters[1].enemy = _fighters[0]
 	for i in 2:
 		_fighters[i].policy.setup(_fighters[i], _fighters[i].enemy, _rng.randi())
+	if not _replay.is_empty():
+		# after setup(): the policy's own clock starts at zero here, on the same
+		# frame the bodies are seated, so cursor() and the bodies share an origin
+		for i in 2:
+			(_fighters[i].policy as ArenaTracePolicy).load_trace(_replay, i)
+		_ghosts.fighters = _fighters
+		_ghosts.reset()
 	if _rec_dir != "":
 		_recorder.open_episode(_rec_dir, "%s_vs_%s" % [
 				_fighters[0].build_id.get_slice(".", 2), _fighters[1].build_id.get_slice(".", 2)],
@@ -310,6 +398,8 @@ func _finish_match() -> void:
 	var m := _current_match()
 	print("ARENA RESULT a=%s b=%s wins_a=%d wins_b=%d draws=%d" % [
 			m[0], m[1], _wins[0], _wins[1], _wins[2]])
+	if not _replay.is_empty():
+		_print_replay_verdict()
 	var out := str(_cfg.get("out", ""))
 	if out != "":
 		var f := FileAccess.open(out, FileAccess.WRITE)
@@ -334,6 +424,29 @@ func _finish_match() -> void:
 	else:
 		_rotation_idx += 1   # spectate: rotate to the next matchup forever
 		_start_match()
+
+# The R51 readout, one gate-parseable line: how far the live bodies wandered
+# from the recorded ones, and whether the two runtimes agreed on the outcome
+# they were both handed the same commands for. Drift is the localising signal
+# ml/eval/env_parity.py cannot give — it only ever sees the totals.
+func _print_replay_verdict() -> void:
+	var r: Dictionary = _results[0] if not _results.is_empty() else {}
+	var rec_hp: Array = _replay.get("hp", [0.0, 0.0])
+	var rec_w := int(_replay.get("winner", -2))
+	var rec_side := "draw" if rec_w < 0 else ("a" if rec_w == 0 else "b")
+	print(("ARENA REPLAY drift_mean_a=%.2f drift_peak_a=%.2f drift_mean_b=%.2f " \
+			+ "drift_peak_b=%.2f break_tick_a=%d break_tick_b=%d " \
+			+ "gap_rec=%.1f gap_now=%.1f " \
+			+ "recorded_winner=%s recorded_hp=%.3f/%.3f " \
+			+ "replayed_winner=%s replayed_hp=%.3f/%.3f recorded_s=%.2f replayed_s=%.2f") % [
+			_ghosts.mean_drift(0), _ghosts.drift_peak[0],
+			_ghosts.mean_drift(1), _ghosts.drift_peak[1],
+			_ghosts.first_break[0], _ghosts.first_break[1],
+			_ghosts.mean_gap_rec(), _ghosts.mean_gap_now(),
+			rec_side, float(rec_hp[0]), float(rec_hp[1]),
+			str(r.get("winner_side", "?")),
+			float(r.get("hp_a", 0.0)), float(r.get("hp_b", 0.0)),
+			float(_replay.get("seconds", 0.0)), float(r.get("duration_s", 0.0))])
 
 func _selftest_verdict() -> void:
 	var ok := true
@@ -442,11 +555,21 @@ func _physics_process(delta: float) -> void:
 		if is_instance_valid(f) and f.is_dead():
 			_end_episode(f.enemy)
 			return
+	# a replay ends when the RECORDING does: past the last frame there are no
+	# commands left, and letting the bodies fight on unrecorded would put motion
+	# on screen that dh-env never produced
+	if not _replay.is_empty() and _trace_done():
+		_end_episode(_hp_leader())
+		return
 	if _timer >= _time_limit:
-		var a: float = _fighters[0].hp_frac()
-		var b: float = _fighters[1].hp_frac()
-		_end_episode(null if absf(a - b) < 0.001 \
-				else (_fighters[0] if a > b else _fighters[1]))
+		_end_episode(_hp_leader())
+
+func _hp_leader() -> ArenaFighter:
+	var a: float = _fighters[0].hp_frac()
+	var b: float = _fighters[1].hp_frac()
+	if absf(a - b) < 0.001:
+		return null
+	return _fighters[0] if a > b else _fighters[1]
 
 # ---- serve mode ----------------------------------------------------------------------
 # Protocol, one JSON object per line each way:
@@ -540,9 +663,18 @@ func _process(delta: float) -> void:
 			"frac": fa.hp_frac(), "tint": Color("7fd8ff"), "side": 0},
 		{"name": fb.build_name, "policy": fb.policy.policy_id(),
 			"frac": fb.hp_frac(), "tint": Color("ff9a3c"), "side": 1}])
-	_hud.set_center("ARENA  ep %d/%d   %d : %d (%d draws)   %s" % [
+	var center := "ARENA  ep %d/%d   %d : %d (%d draws)   %s" % [
 			_episode + 1, _episodes, _wins[0], _wins[1], _wins[2],
-			"" if _state == "fight" else _state.to_upper()])
+			"" if _state == "fight" else _state.to_upper()]
+	if _ghosts != null:
+		# watching a recording: the ghosts ARE the point, so the drift they
+		# measure belongs on screen next to the score
+		center = "REPLAY %s  t %d/%d   %s" % [
+				str(_replay.get("policy", "?")).get_file(),
+				(_fighters[0].policy as ArenaTracePolicy).cursor(),
+				(_fighters[0].policy as ArenaTracePolicy).frame_count(),
+				_ghosts.summary()]
+	_hud.set_center(center)
 
 func _unhandled_input(event: InputEvent) -> void:
 	if not _spectate or not (event is InputEventKey) or not event.pressed:
