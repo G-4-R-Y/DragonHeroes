@@ -60,6 +60,13 @@ ml/.venv/
 # raw export dirs (100 MB GitHub limit) — the zips are the distributable
 builds/linux/
 builds/windows/
+# ...and since R78 (2026-09-22) the zips are not in the repository either: they
+# are GitHub release assets. Git cannot compress them and never forgets them,
+# so every package run used to add ~110 MB to every clone forever. What stays
+# in-tree is builds/BUILD-INFO.json — the index naming the release, the commit
+# it was built from, and each asset's sha256. See tools/publish_release.py.
+builds/dragon-heroes-linux.zip
+builds/dragon-heroes-windows.zip
 # tools/build_arena.sh — a 96 MB release export
 builds/trainer/
 # the Arena Console app (tools/build_console.sh) — binary + its GDExtension

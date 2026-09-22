@@ -350,7 +350,8 @@ dragon-heroes/
 ├── art/                   # source art: aseprite files, archetype rigs, palettes
 ├── tools/                 # content validator, atlas baker, balance sims, bot load-test
 ├── infra/                 # terraform, k8s/agones, docker, CI
-├── builds/                # distributable zips + builds/prebuilt/ (committed cross-build cache)
+├── builds/                # BUILD-INFO.json index + builds/prebuilt/ (committed cross-build cache);
+│                          # the zips themselves are GitHub release assets (§12.56)
 ├── rebirth/               # 3D engine experiments — NOT a direction change (§12.27)
 └── reference_repos/       # third-party checkouts read for reference; untracked, never imported
 ```

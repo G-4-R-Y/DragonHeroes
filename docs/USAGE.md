@@ -767,11 +767,24 @@ python3 tools/verify_package.py <package.zip>    # verifies contents incl. embed
 python3 tools/smoke_package.py <package.zip>     # exercise the exported PCK + native helper
 python3 tools/build_app_icon.py                  # regenerate PNG + Windows ICO sizes
 python3 tools/install_linux_launcher.py          # desktop launcher + icon association
+python3 tools/publish_release.py                 # upload the zips as GitHub release assets
 ```
 
 Output: `builds/dragon-heroes-<platform>.zip` — the game binary, `dh-server`, the
 offline content review and a LEIA-ME quickstart. Code is MIT, art CC BY-NC
 (business/32): sharing builds is explicitly fine.
+
+Those zips are **not committed** (R78, 2026-09-22). A ZIP is already compressed,
+so git stores every new one whole and never forgets it; 25 versions had put the
+clone at 697 MB and the Windows zip at 57 MB against GitHub's 100 MB hard
+per-file block. `tools/publish_release.py` uploads them as release assets
+instead and writes `builds/BUILD-INFO.json` — the in-tree index naming the
+release, the commit it was built from, and each asset's sha256, so a download
+can be checked against what this repository published. It refuses to publish a
+package built from a dirty tree; `--dry-run` shows what it would do and
+`--check` asks whether the index still matches the zips in `builds/`. A fresh
+clone has no zips and does not need them: sections 1–3 build and run from
+source.
 
 There is exactly **one** packager (R77, 2026-09-22 — the build merge). It exports
 to an explicit path instead of trusting `export_presets.cfg`, which is what let the

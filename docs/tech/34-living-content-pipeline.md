@@ -208,6 +208,10 @@ hash before making CRC-checked archives:
 - `builds/dragon-heroes-linux.zip`
 - `builds/dragon-heroes-windows.zip`
 
+Neither is committed (R78, 2026-09-22) — `tools/publish_release.py` uploads them
+as GitHub release assets and leaves `builds/BUILD-INFO.json` in-tree as the index
+(release tag and URL, source commit, per-asset size and sha256).
+
 The extracted directories sit beside those ZIPs (`builds/linux`, `builds/windows`).
 The primary executables are
 `dragon-heroes.x86_64` and `dragon-heroes.exe`; `dh-server(.exe)`

@@ -67,9 +67,22 @@ def export_environment():
 
 
 def source_info():
+    """Which source this package can be rebuilt from.
+
+    `working_tree_dirty` counts TRACKED modifications only. Untracked files are
+    reported separately and deliberately do not set the flag: a scratch note in
+    the repository root has no bearing on whether the commit rebuilds these
+    bytes, and counting it meant the flag was pinned true on any working
+    checkout -- which made it useless exactly where it matters, as the gate
+    tools/publish_release.py runs before publishing an asset.
+    """
     commit = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
-    dirty = bool(subprocess.check_output(["git", "status", "--porcelain"], cwd=ROOT, text=True).strip())
-    return {"base_commit": commit, "working_tree_dirty": dirty,
+    tracked = subprocess.check_output(
+        ["git", "status", "--porcelain", "--untracked-files=no"], cwd=ROOT, text=True).strip()
+    untracked = subprocess.check_output(
+        ["git", "ls-files", "--others", "--exclude-standard"], cwd=ROOT, text=True).split()
+    return {"base_commit": commit, "working_tree_dirty": bool(tracked),
+            "untracked_files": len(untracked),
             "branch": subprocess.check_output(["git", "branch", "--show-current"], cwd=ROOT, text=True).strip()}
 
 

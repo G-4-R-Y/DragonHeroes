@@ -19,6 +19,21 @@ via Pix.
 every decision — then [docs/README.md](docs/README.md) for the full design document
 set. Standing engineering guidelines: [CLAUDE.md](CLAUDE.md).
 
+## Download and play
+
+**[Latest build → Releases](https://github.com/G-4-R-Y/DragonHeroes/releases/latest)**
+— `dragon-heroes-linux.zip` and `dragon-heroes-windows.zip`. Extract anywhere and
+run the executable inside; no Godot, no build step. Controls and what to try
+first are in the `LEIA-ME.txt` that ships with it.
+
+The zips live there rather than in this repository because git stores a
+compressed archive whole and never forgets it — see
+[builds/README.md](builds/README.md). To check a download against what was
+published, compare its `sha256sum` with
+[builds/BUILD-INFO.json](builds/BUILD-INFO.json).
+
+Building it yourself instead: [docs/USAGE.md](docs/USAGE.md).
+
 ## Layout
 
 | Dir          | What it is                                                                                                                                                            |
