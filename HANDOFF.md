@@ -11,10 +11,16 @@
 
 ## Where the tree is
 
-`master` at **25f32f8**, working tree clean except two untracked notes of
-Ricardo's own (`prompts queue.txt`, `sprites prompt.md`). **54 commits are
-unpushed** — `origin/master` is still at `b622aa6` (2026-09-12). R17 (push
-everything, remote equality) is still open.
+`master` at **2ac37cf**, working tree clean except two untracked notes of
+Ricardo's own (`prompts queue.txt`, `sprites prompt.md`). **Pushed** — the 55
+commits that had been sitting locally since `b622aa6` (2026-09-12) are on
+`origin/master`, so R17's "GitHub remote equality" holds as of 2026-09-22 05:15.
+
+GitHub warned on the way: `builds/dragon-heroes-windows.zip` is **56.82 MB**,
+past its 50 MB recommendation and heading for the **100 MB hard limit** it grew
+13 MB in one merge. Committing the shipped zips is deliberate (they *are* the
+game for anyone downloading), so the next packaging decision is LFS or a release
+asset — not "shrink it later".
 
 Commits this session, newest first:
 

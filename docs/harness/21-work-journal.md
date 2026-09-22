@@ -3930,3 +3930,17 @@ build flavor.
 alone — the recovery history in `10-systems-map.md`, the older entries in this
 file and `genforge/candidates/packaging/recovery-*.log` still say `codex`,
 because that is what happened.
+
+### R17 addendum — the push that closed the 2026-09-12 backlog
+
+`origin/master` had been frozen at `b622aa6` since 2026-09-12: **55 commits**
+behind, everything from the living-world/residency merge through R77. Pushed
+2026-09-22 05:15, `b622aa6..2ac37cf`, fast-forward, no conflicts. R17 stays
+recurring, but the backlog is gone.
+
+GitHub's one complaint is worth scheduling: `builds/dragon-heroes-windows.zip` is
+**56.82 MB** — past the 50 MB recommendation, and it gained 13 MB in this single
+merge. The 100 MB per-file hard limit is now the real deadline. Committing the
+shipped zips is deliberate (canon §10, `builds/README.md`: they *are* the game to
+anyone downloading), so the choice when it arrives is Git LFS or GitHub release
+assets, decided before the limit forces it rather than after.
