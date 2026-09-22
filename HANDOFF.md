@@ -1,3 +1,62 @@
+# Handoff — 2026-09-22: R82 (three defects the captures found, one root cause)
+
+**Every one of the three was geometry decided by counting instead of measuring
+— and every one survived in English and broke in Portuguese.**
+
+**(a) Hotbar names ran together.** `main.gd` cut each name with `.left(8)` —
+eight *characters* — into a 32 px box on a 34 px pitch, while the shipping font
+needs ≈40 px for eight glyphs. `_fit_to_width` now asks
+`font.get_string_size(...).x` and trims until it fits, marking a cut word with
+one dot; the result is cached per slot on the raw word, so it runs on a name
+change or a language toggle, never per frame. Geometry is named:
+`SLOT_PITCH := 40.0` / `SLOT_NAME_W := 38.0` — a 2 px gutter, boxes at
+46/86/126/166, clear of the flask column and of the x=278 charge chip. Reads
+**Gash · Hurl. · Arte. · Eart.** (EN) and **Talho · Cute. · Temp. · Fend.** (PT).
+
+**(b) One English sentence in a Portuguese HUD.** `game/living/world_lairs.gd`
+never passed through `ProtoLang`. Nine keys added to `game/prototype/ui/lang.gd`
+— `lair_untitled`, `lair_enter`, `lair_solo_only`, `lair_compass`,
+`bearing_n/s/e/w` (PT: **L**este / **O**este, not E/W). EN values are
+byte-identical to the old literals because `click_test` asserts several
+verbatim. The lair entry stores an empty `title` and a new `_title(entry)`
+resolves it at draw time — translate when you render, never when you store.
+
+**(c) The hint lived under the vital plate.** Fixing (b) made it visible: the
+Label sat at `(145, 38)` size `(355, 30)`, centred, on `layer = 9`, while the
+opaque `vital_plate` (x 6–206) is on `layer = 10`. Every line long enough to
+push left of x=206 lost its first word — which in Portuguese is every line.
+Measured free space: plate ends x=206, boss bars end y=40, the charge label ends
+≈y53, the minimap starts at x=488. The hint moved to `(207, 56)` size
+`(280, 32)` with `AUTOWRAP_WORD_SMART`, `clip_text`, and a 1 px black shadow so
+it reads over bright canopy without a plate of its own. **Wrap, don't
+word-golf:** PT's enter-line-2 measures 322 px against EN's 245 — the box is the
+variable, the translation is not.
+
+**False alarm, recorded so it is not re-investigated:** a PIL rasterization
+suggested `PixelOperator8.ttf` drops uppercase accents. It does not — its cmap
+carries Á/Ã/Ç/É/Í/Ó/Ô/Ú and the 4× capture shows the acute over the A in
+SANTUÁRIO. No font defect, nothing reworded.
+
+**Captures** regenerated on `DISPLAY=:1` / `gl_compatibility` with the XDG dirs
+in the scratchpad. PT reads `Um sino distante chama S · SANTUÁRIO 51m` whole;
+EN reads `A distant bell calls E · SHRINE 56m`. EN 125 draw calls / 8.14 ms, PT
+88 / 6.90 ms, `cue_arcs` 8 in both. Caveat: this run's PT bearing is a single
+letter (`S`), so the committed PT frame does not demonstrate the L/O mapping —
+`SL` was seen in the previous run and is provable from the code.
+
+**Gates after the geometry change:** `cue_probe` → `CUE OK`, `click_test` →
+`CLICKTEST DONE — ALL PASS`.
+
+**Opened by (b):** `game/living/` is untranslated end to end — zero `ProtoLang`
+references, `trial.gd` alone with 16 `.text = "` sites, plus `lair_menu.gd`,
+`artifact_card.gd`, `journey.gd`. Logged as **R83**, next in the queue.
+
+Next: R83, then R62 → R71 largest last (R66 item scaling, R62 potion
+enchanting, R63 more skills, R67 kill-streak sky chest, R68 multi-boss events,
+R70 bot mercenaries, R71 questline themes, R69 DRAGON COUNCIL).
+
+---
+
 # Handoff — 2026-09-22: R64 + R43 (the cooldown cue at the hero's feet)
 
 **R43 asked for two things and had only ever received one.** The central

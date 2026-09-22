@@ -511,6 +511,22 @@ const S := {
 			"pt": "OUTRO SENHOR DA GUERRA ENTRA EM CAMPO!"},
 	"duo_label": {"en": "%s + %s — Legendary Duo", "pt": "%s + %s — Dupla Lendária"},
 
+	# ---- world lairs (game/living/world_lairs.gd) ---------------------------------------------------
+	# The bell you follow across the Hunt. Proper lair names come from the codex
+	# data and stay untranslated; only the words around them localize.
+	"lair_untitled": {"en": "Ancient lair", "pt": "Covil ancestral"},
+	"lair_enter": {"en": "G  ENTER: %s\nDefeat its guardian to unlock boss rush",
+			"pt": "G  ENTRAR: %s\nDerrote o guardião para liberar o desafio de chefes"},
+	"lair_solo_only": {"en": "Shrine lairs are available in solo Hunt",
+			"pt": "Os santuários só abrem na Caçada solo"},
+	"lair_compass": {"en": "A distant bell calls %s  ·  SHRINE %dm",
+			"pt": "Um sino distante chama %s  ·  SANTUÁRIO %dm"},
+	# compass letters — PT-BR reads Leste / Oeste, so E/W become L/O
+	"bearing_n": {"en": "N", "pt": "N"},
+	"bearing_s": {"en": "S", "pt": "S"},
+	"bearing_e": {"en": "E", "pt": "L"},
+	"bearing_w": {"en": "W", "pt": "O"},
+
 	# ---- keybind card (main.gd) --------------------------------------------------------------------
 	"kb_title": {"en": "KEYBINDS", "pt": "TECLAS"},
 	"kb_move_k": {"en": "WASD / arrows", "pt": "WASD / setas"},

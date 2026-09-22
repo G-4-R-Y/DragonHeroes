@@ -1,8 +1,8 @@
 {
   "cue_arcs": 8,
-  "draw_calls": 102.0,
-  "fps": 60.0,
-  "process_ms": 18.444,
+  "draw_calls": 88.0,
+  "fps": 1.0,
+  "process_ms": 6.897,
   "scene": "res://prototype/main.tscn",
   "viewport": [
     1280,

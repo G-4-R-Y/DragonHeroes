@@ -118,7 +118,10 @@ func _run(tag: String, wait: int) -> void:
 			var box: Rect2 = (chips[0] as Control).get_global_rect()
 			for c in chips:
 				box = box.merge((c as Control).get_global_rect())
-			_inset(img, box.grow(6.0), dir + "/ui_" + tag + "_hotbar.png", k)
+			# grown DOWN past the chips: the name row under them is half the
+			# readout, and R82a lives exactly there
+			_inset(img, box.grow_individual(6.0, 6.0, 6.0, 18.0),
+					dir + "/ui_" + tag + "_hotbar.png", k)
 	# Short desktop sample, not a sustained frame-budget assertion. Useful for
 	# comparing art passes at identical viewport/renderer/settings.
 	var metrics := {"fps": Engine.get_frames_per_second(),

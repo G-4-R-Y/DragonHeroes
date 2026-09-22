@@ -21,10 +21,22 @@ func _ready() -> void:
 	hint = Label.new()
 	hint.theme = ProtoTheme.get_theme()
 	hint.add_theme_font_size_override("font_size", ProtoTheme.SIZE_BODY)
-	hint.position = Vector2(145, 38)
-	hint.size = Vector2(355, 30)
+	# The clear band between the vital plate (x 6-206) and the minimap (x 488+),
+	# below the boss bars (y<=40) and the class-charge chip (y<=53). The old
+	# 355 px box started at x=145, so a long line — every Portuguese one — ran
+	# under the opaque plate and lost its first word (R82c). Wrapping, not
+	# overflowing, is how a translation twice the English length stays readable.
+	hint.position = Vector2(207, 56)
+	hint.size = Vector2(280, 32)
+	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	hint.clip_text = true
 	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	hint.add_theme_color_override("font_color", Color("b5e6d0"))
+	# no plate behind it: a one-pixel shadow keeps the line legible over bright
+	# canopy the same way the vital readout does
+	hint.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.8))
+	hint.add_theme_constant_override("shadow_offset_x", 1)
+	hint.add_theme_constant_override("shadow_offset_y", 1)
 	ui.add_child(hint)
 	if LairJourney.tour:
 		LairJourney.tour = false
@@ -40,7 +52,7 @@ func _refresh() -> void:
 	for key in main.world.entrances:
 		for record in main.world.entrances[key]:
 			var entry: Dictionary = record.duplicate()
-			entry.title = "Ancient lair"
+			entry.title = ""  # unnamed: ProtoLang resolves it in _title()
 			for lair in LairJourney.data().playable.lairs:
 				if lair.id == entry.id: entry.title = lair.name
 			entry.chunk = key
@@ -59,14 +71,21 @@ func _process(delta: float) -> void:
 	if nearest.is_empty():
 		hint.text = ""
 	elif distance < 48:
-		hint.text = "G  ENTER: " + str(nearest.title).to_upper() + "\nDefeat its guardian to unlock boss rush"
-		if MpNet.in_game: hint.text = "Shrine lairs are available in solo Hunt"
+		hint.text = ProtoLang.t("lair_enter") % _title(nearest).to_upper()
+		if MpNet.in_game: hint.text = ProtoLang.t("lair_solo_only")
 	else:
 		var direction: Vector2 = nearest.position - main.player.global_position
-		var bearing := ("S" if direction.y > 0 else "N") if absf(direction.y) > absf(direction.x)*0.5 else ""
-		if absf(direction.x) > absf(direction.y)*0.5: bearing += "E" if direction.x > 0 else "W"
-		hint.text = "A distant bell calls %s  ·  SHRINE %dm" % [bearing, int(distance/ProtoWorld.TILE)]
+		# bearing letters are chrome too — PT-BR reads L/O for east/west
+		var bearing := ProtoLang.t("bearing_s" if direction.y > 0 else "bearing_n") if absf(direction.y) > absf(direction.x)*0.5 else ""
+		if absf(direction.x) > absf(direction.y)*0.5: bearing += ProtoLang.t("bearing_e" if direction.x > 0 else "bearing_w")
+		hint.text = ProtoLang.t("lair_compass") % [bearing, int(distance/ProtoWorld.TILE)]
 	queue_redraw()
+
+# Codex lairs carry their own proper name; an unnamed entrance falls back to
+# localized chrome. Resolved per frame so a language toggle needs no refresh.
+func _title(entry: Dictionary) -> String:
+	var title := str(entry.get("title", ""))
+	return title if not title.is_empty() else ProtoLang.t("lair_untitled")
 
 func _unhandled_key_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo and event.physical_keycode == KEY_G:
@@ -104,7 +123,7 @@ func _draw() -> void:
 		for i in range(12):
 			var p := Vector2(sin(i*12.4+clock*0.4)*25, -fmod(clock*8+i*9,66))
 			draw_rect(Rect2(p.round(), Vector2.ONE), Color("9debc4"))
-		draw_string(font, Vector2(-90,23), str(entry.title).left(32).to_upper(), HORIZONTAL_ALIGNMENT_CENTER, 180, 8, Color("d8b875"))
+		draw_string(font, Vector2(-90,23), _title(entry).left(32).to_upper(), HORIZONTAL_ALIGNMENT_CENTER, 180, 8, Color("d8b875"))
 	draw_set_transform(Vector2.ZERO)
 	max_draw_us = maxi(max_draw_us, Time.get_ticks_usec()-started)
 

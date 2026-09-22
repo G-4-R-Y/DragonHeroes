@@ -5190,3 +5190,129 @@ and both deserve their own measured fix:
 ### Gates
 
 CUE (8 assertions) · FLASK · MENU · LEVEL UP — all OK.
+
+## R82 — three defects the cue captures found, and the measurement that fixed them (2026-09-22)
+
+R64's capture run ended with two logged defects. Fixing them found a third. All
+three are the same class of bug: **geometry decided by guessing instead of by
+measuring**, which survives in English and breaks in Portuguese.
+
+### (a) The hotbar names ran together — count vs measure
+
+`main.gd` filled each skill-name Label with `.left(8)` — eight *characters* —
+into a 32 px box on a 34 px chip pitch. At font size 8 the shipping font needs
+≈40 px for eight glyphs, so EN read `Gash Hurled Artery Earths` as one smear
+and PT was worse. Character counting is only a proxy for width in a monospace
+font, and `PixelOperator8.ttf` is not one.
+
+The fix is `_fit_to_width`: ask `font.get_string_size(s, HORIZONTAL_ALIGNMENT_LEFT,
+-1, 8).x` and trim until it fits, marking a cut word with a single dot. The
+result is cached per slot on the raw word (`slot["raw"]`/`slot["fit"]`), so the
+measure runs on a name change or a language toggle — never per frame.
+
+Geometry became named constants instead of literals: `SLOT_PITCH := 40.0`,
+`SLOT_NAME_W := 38.0`. That leaves a 2 px gutter between name boxes (they land
+at x 46/86/126/166), clears the flask column on the left and stops short of the
+class-charge chip at x=278. 48 px pitch would have fit six glyphs but the row
+stops reading as one hotbar at that spacing, so four-to-five glyphs plus a dot
+is the deliberate trade.
+
+Reads after the fix: EN **Gash · Hurl. · Arte. · Eart.**, PT **Talho · Cute. ·
+Temp. · Fend.**
+
+### (b) The one English sentence in a Portuguese HUD
+
+`game/living/world_lairs.gd` built its hint from hardcoded literals —
+`"A distant bell calls %s · SHRINE %dm"` — and never passed through `ProtoLang`,
+so the lair line stayed English in the PT frame. Nine keys added to
+`game/prototype/ui/lang.gd` before the keybind-card block: `lair_untitled`,
+`lair_enter`, `lair_solo_only`, `lair_compass`, and `bearing_n/s/e/w`. The
+Portuguese bearings are **L** (leste) and **O** (oeste), not E/W.
+
+Every EN value is byte-identical to the literal it replaced, because
+`click_test` asserts several of those strings verbatim. The lair entry's own
+`title` is now empty (`entry.title = ""`) and a new `_title(entry)` resolves it
+at render time — the same discipline the rest of the HUD already follows:
+translate when you draw, never when you store.
+
+### (c) The hint that lived under the vital plate
+
+Fixing (b) made the third defect visible: the Portuguese line was longer, and
+its first word vanished.
+
+The hint Label sat at `Vector2(145, 38)` size `Vector2(355, 30)`, centred, on
+the lair UI's `CanvasLayer.layer = 9`. The HUD's `vital_plate` — x 6→206,
+y 6→95, `Color("101a1ced")`, effectively opaque — is on `layer = 10`. Anything
+the centred line pushed left of x=206 was painted over. English usually stayed
+short enough to survive; Portuguese never did.
+
+Measuring the HUD for actual free space:
+
+| element | occupies |
+|---|---|
+| `vital_plate` (layer 10) | x 6–206, y 6–95 |
+| boss bars | x 230–534, y 18–40 |
+| class-charge label | x 278, font 8 → ends ≈ y 53 |
+| `minimap` (layer 12) | x 488–632, y 8–152 |
+
+The clear rectangle is **x 207–487, y ≥ 56**. The hint moved to
+`Vector2(207, 56)` size `Vector2(280, 32)` with `AUTOWRAP_WORD_SMART` and
+`clip_text`, plus a 1 px black shadow (`font_shadow_color` at 0.8 alpha) so it
+stays legible over bright canopy the way the vital readout does — no plate
+behind it, nothing new to occlude the world.
+
+**Wrap, don't word-golf.** Measured with the shipping font at size 8:
+
+| line | EN | PT |
+|---|---|---|
+| compass hint | 225 px | 270 px |
+| enter, line 2 | 245 px | **322 px** |
+| solo-only | 238 px | 238 px |
+
+A 280 px box plus word-smart autowrap fits all of them without touching a single
+translation. Shortening the Portuguese to fit one line would have been the wrong
+fix: the box is the variable, the language is not.
+
+### The accent false alarm
+
+A PIL rasterization of `SANTUÁRIO` at 8 px came back looking accent-less, which
+nearly produced a wording change and a bogus "the font cannot render uppercase
+diacritics" ledger row. Two checks killed it: `lang.gd` already keeps accents on
+uppercase everywhere (`FRASCO ÍGNEO`, `OPÇÕES`, `CÓDICE`, `BAÚ`), and the
+`cmap` of `PixelOperator8.ttf` carries Á/Ã/Ç/É/Í/Ó/Ô/Ú. The 4×-zoom capture then
+showed the acute over the A directly. **No font defect exists; nothing was
+logged and nothing was reworded.** PIL is not the renderer — only the capture
+is evidence.
+
+### Captures and gates
+
+Regenerated on `DISPLAY=:1` under `--rendering-method gl_compatibility`, with
+`XDG_DATA_HOME`/`XDG_CONFIG_HOME`/`XDG_CACHE_HOME` in the scratchpad so the run
+cannot touch a player's language, volume or saves. `UI_SCENE=res://prototype/main.tscn`
+is mandatory: omitting it silently captures the main menu and overwrites the
+committed reference frames.
+
+| | EN | PT |
+|---|---|---|
+| draw_calls | 125 | 88 |
+| process_ms | 8.14 | 6.90 |
+| cue_arcs | 8 | 8 |
+
+PT reads `Um sino distante chama S  ·  SANTUÁRIO 51m` whole, accent rendering
+correctly. EN reads `A distant bell calls E  ·  SHRINE 56m`.
+
+**Caveat, stated honestly:** this run's PT bearing happened to be a single
+letter (`S`), so the committed PT frame no longer demonstrates the L/O mapping.
+`SL` was observed in the previous run and is provable from `lang.gd` +
+`world_lairs.gd`; the next PT capture with an east/west lair will show it again.
+
+`cue_probe` → `CUE OK — one bloom per cooldown, silent on spawn/empty/grave,
+deny tick honours the 0.15 s buffer, draw work <= 12 arcs`. `click_test` →
+`CLICKTEST DONE — ALL PASS`. Both green **after** the geometry change.
+
+### What this opened
+
+Fixing (b) exposed that `game/living/` is untranslated end to end — zero
+`ProtoLang` references outside the file just fixed, with `trial.gd` alone
+carrying 16 `.text = "` sites. Logged as **R83**, not fixed inline: it is a
+separate sweep with its own gate.

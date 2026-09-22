@@ -38,6 +38,9 @@ const NIGHT_COLOR := Color(0.55, 0.62, 0.88)   # (proposal) sinusoidal ~3 min cy
 const DAY_CYCLE_S := 180.0
 const PIP_ON := Color("59d6e6")
 const PIP_OFF := Color(0.16, 0.28, 0.33, 0.7)
+# hotbar geometry (R82a): 26 px chip on a 40 px pitch, 38 px name box under it
+const SLOT_PITCH := 40.0
+const SLOT_NAME_W := 38.0
 
 const LEVEL_CAP := 100           # (proposal) fast 1→100: quick dings all the way
 const POINTS_PER_LEVEL := 5      # (proposal) attribute points per level-up
@@ -1721,23 +1724,26 @@ func _build_hud() -> void:
 	e_bar.size = Vector2(32, 4)
 	e_bg.add_child(e_bar)
 	# skill bar (1-4): class-tree actives — HudSkillChip tiles (icon glyph +
-	# cooldown sweep + numeric countdown + ready glow, roadmap 4b). 34 px pitch.
+	# cooldown sweep + numeric countdown + ready glow, roadmap 4b). 40 px pitch:
+	# the 26 px chip plus a 38 px name box under it with a 2 px gutter, so two
+	# names can never touch (R82a — a 32 px box on a 34 px pitch clipped every
+	# name mid-word and the four read as one run-on string).
 	var slots: Array = []
 	for i in 4:
-		var x := 46.0 + i * 34.0
+		var x := 52.0 + i * SLOT_PITCH
 		var chip := HudSkillChip.new()
 		chip.key_text = str(i + 1)
 		chip.position = Vector2(x, 40)
 		canvas.add_child(chip)
 		var s_name := Label.new()
-		s_name.position = Vector2(x, 67)
-		s_name.size = Vector2(32, 9)
+		s_name.position = Vector2(x + (HudSkillChip.SIZE - SLOT_NAME_W) * 0.5, 67)
+		s_name.size = Vector2(SLOT_NAME_W, 9)
 		s_name.clip_text = true
 		s_name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		s_name.add_theme_font_size_override("font_size", 8)
 		s_name.modulate = Color(1, 1, 1, 0.6)
 		canvas.add_child(s_name)
-		slots.append({"chip": chip, "name": s_name})
+		slots.append({"chip": chip, "name": s_name, "raw": "", "fit": ""})
 	# class charge chip (Veilblade Combo / Gloam Mage Attunement) — after slot 4
 	var charge := Label.new()
 	charge.position = Vector2(278, 43)
@@ -2031,8 +2037,8 @@ func _update_skill_slots(pulse: float) -> void:
 		var left: float = player.skill_cd_left(id)
 		var frac := 0.0 if total <= 0.0 else clampf(left / total, 0.0, 1.0)
 		slot.chip.set_state(str(def.get("kind", "")), frac, left, false, pulse, flash)
-		# localized skill name, first word only — the label clips at 32 px
-		slot.name.text = ProtoLang.pick(def, "name", "?").get_slice(" ", 0).left(8)
+		# localized skill name, first word only, trimmed to the REAL font width
+		slot.name.text = _fit_slot_name(slot, ProtoLang.pick(def, "name", "?").get_slice(" ", 0))
 	if player.charge_name == "" or player.charge_stacks <= 0:
 		_hud.charge.text = ""
 	else:
@@ -2040,6 +2046,31 @@ func _update_skill_slots(pulse: float) -> void:
 		_hud.charge.text = "◈ %s x%d" % [
 				ProtoLang.pick(Session.class_charge(), "name", player.charge_name),
 				player.charge_stacks]
+
+# Fit a skill name to its box by MEASURING the theme font, not by counting
+# characters: ".left(8)" assumed a glyph width no font has, so every name was
+# clipped mid-word (R82a). A trimmed name ends in a single dot so the player
+# can see the word was cut. Cached per slot — the measure runs on a name
+# change or a language toggle, never on all 60 frames of a second.
+func _fit_slot_name(slot: Dictionary, word: String) -> String:
+	if word == slot.raw:
+		return slot.fit
+	slot.raw = word
+	slot.fit = _fit_to_width(slot.name, word, SLOT_NAME_W - 2.0)
+	return slot.fit
+
+func _fit_to_width(label: Label, word: String, width: float) -> String:
+	var font := label.get_theme_font("font")
+	if font == null:
+		return word
+	var size := label.get_theme_font_size("font_size")
+	if font.get_string_size(word, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x <= width:
+		return word
+	var cut := word
+	while cut.length() > 1 and font.get_string_size(cut + ".",
+			HORIZONTAL_ALIGNMENT_LEFT, -1, size).x > width:
+		cut = cut.substr(0, cut.length() - 1)
+	return cut + "."
 
 # One soft "charged" blip for a slot coming back, mirroring the Q gauge. Four
 # skills returning on the same frame are still one sound, never a chord.

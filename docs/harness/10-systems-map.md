@@ -150,10 +150,14 @@ a water/shore transition pair is the open item.
 Pixel Operator 8/16, AA off, `SIZE_BODY/SIZE_TITLE/snap()`, fallback AND
 default-theme restamp), `ui/main_menu.gd` (name-chip class cards, CO-OP
 button), `ui/haven.gd`, `ui/character_panel.gd`, `ui/lang.gd` (EN/PT-BR),
-`ui/display.gd`, `damage_numbers.gd`. Gate: CLICKTEST (16 checks). Issue:
-skill-bar labels clip at fixed widths ("Lumenpie") — still open, now a ledger
-row (R82a) with the measurement: 32 px box on a 34 px pitch, `.left(8)` at font
-size 8 needs ≈40 px.
+`ui/display.gd`, `damage_numbers.gd`. Gate: CLICKTEST (16 checks).
+**Skill-bar labels: CLOSED 2026-09-22 (R82a).** They clipped because the code
+counted characters (`.left(8)`) instead of measuring the font; `main.gd`'s
+`_fit_to_width` now asks `get_string_size` and trims to a named geometry
+(`SLOT_PITCH` 40 / `SLOT_NAME_W` 38), marking a cut word with one dot. The
+measure is cached per slot, so it runs on a name change or a language toggle,
+never per frame. Open issue in the same file family: `game/living/` is
+untranslated end to end (R83).
 **2026-09-12 identity pass:** `ui/theme.gd`, `ui/world_frame.gd`,
 `ui/slider_rune.svg`, `living/lair_menu.gd` + `artifact_card.gd` share bronze,
 ivory and Lumen styling, cached shrine framing, visible focus and bounded lore
