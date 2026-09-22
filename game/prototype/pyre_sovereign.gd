@@ -22,8 +22,14 @@ func _ready() -> void:
 	attack_cd = 1.7
 	gold_min = 150
 	gold_max = 450
-	display_name = "PYRE SOVEREIGN — Legendary"
-	bar_color = Color("ff5a2e")
+	# setup_legendary's contract: "main owns display_name/bar_color". _ready
+	# runs at add_child, i.e. AFTER main named it, so the chassis identity is
+	# only a default — without this guard a pyre-chassis legendary went on the
+	# boss bar as "PYRE SOVEREIGN" instead of its catalog name (found by the
+	# R61 roaming-boss probe; the authored pack-12 legendary had it too).
+	if legendary_entry.is_empty():
+		display_name = "PYRE SOVEREIGN — Legendary"
+		bar_color = Color("ff5a2e")
 	_base_tint = Color(1.3, 0.78, 0.62)   # hotter cast over the winged rig
 	_scale = 1.35
 	_skill_cd = {"bolt": 2.0, "meteor": 4.0, "breath": 6.0, "gust": 3.0}

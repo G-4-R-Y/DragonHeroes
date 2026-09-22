@@ -67,6 +67,26 @@ const REPOP_CADENCE := 18.0       # seconds between spawn-pressure checks
 const REPOP_FLOOR := 10           # wanted living creatures within REPOP_NEAR
 const REPOP_NEAR := 45.0 * TILE   # "around the hunter" radius
 const REPOP_CAP := 120            # hard entity ceiling (60 FPS doctrine)
+# ROAMING BOSSES (R44/R61) — before this, a boss existed ONLY at the authored
+# packs 8/11/12/13 of the origin 5x5, so once you walked past that window you
+# never met another one: `_repopulate` and the frontier repop field only
+# `_ground_species`/`_caster_species`. A boss now rides the pressure roll as a
+# rare WARLORD leading a fresh horde. Gated three ways so it stays an event:
+# the distance ladder (never inside the authored window), a ceiling on how many
+# roam at once, and a cooldown so a kill is not answered by an instant heir.
+const ROAM_BOSS_MIN_DANGER := 1        # `danger` is chunks-from-origin / 4
+const ROAM_BOSS_BASE := 0.05           # per qualifying repop roll
+const ROAM_BOSS_PER_DANGER := 0.02     # walking farther IS walking into danger
+const ROAM_BOSS_MAX := 0.22            # ceiling: still a surprise at the rim
+const ROAM_BOSS_COOLDOWN := 45.0       # seconds after a warlord spawns
+# Ricardo, 2026-09-22: "Bosses spawning together and fighting multiple at once
+# is actually a pretty fun mechanic, with unexpected crossovers." So the cap is
+# NOT one — a warlord may prowl in while another is still alive, and two
+# chassis that never share an authored lair (Hag + Colossus, say) collide in
+# the open field. The ceiling is the frame budget, not the design: three boss
+# chassis plus their hordes is what fits under REPOP_CAP at 60 FPS.
+const ROAM_BOSS_MAX_ALIVE := 3         # concurrent warlords — the crossover cap
+const ROAM_BOSS_CROSSOVER := 1.35      # odds MULTIPLIER while one already roams
 const STREAM_DESPAWN_CADENCE := 2.0   # distance-despawn sweep period
 
 # Elemental fields (canon §4 tile field-interaction system, prototype stand-in).
@@ -143,6 +163,8 @@ var _origin_chunk := Vector2i.ZERO   # the player's boot chunk — origin of the
 var _residency: ProtoEncounterResidency  # bounded active nodes; dormant local Hunt records
 var _ground_species: Array = []      # hunt ground roster reused by frontier packs
 var _caster_species: Array = []      # wisp roster — repop packs get kiting support
+var _roam_bosses: Array = []         # live roaming bosses (pruned on each roll)
+var _roam_boss_cd := 0.0             # seconds until another may prowl in
 var _repop_t := 12.0                 # first spawn-pressure check 12 s into the hunt
 var _despawn_t := 0.0                # distance-despawn cadence accumulator
 
@@ -632,6 +654,11 @@ func _repopulate() -> void:
 		var anchor := world.random_walkable_in_ring(player.global_position,
 				30.0 * TILE, 45.0 * TILE)
 		var rng := RandomNumberGenerator.new()   # timed spawns: no revisit contract
+		# R44/R61: the rare warlord rides the horde in — it leads the pack that
+		# is arriving, it does not stand alone in a field. Rolled before the
+		# pack is built so the boss anchors it; the cooldown (45 s) outlasts the
+		# repop cadence (18 s), so the wave's second pack never also wins one.
+		_roll_roaming_boss(anchor, danger, rng)
 		# 60% curated horde preset (designed synergy), 40% free-mixed (wildness)
 		if rng.randf() < 0.6 and _build_preset_horde(anchor, rng):
 			continue
@@ -645,6 +672,73 @@ func _repopulate() -> void:
 				c.global_position = world.random_walkable_in_ring(anchor, 0.0, 3.0 * TILE)
 				c.pack_anchor = anchor
 				add_child(c)
+
+# The rare boss slot in the pressure roll (R44/R61). Ricardo: bosses should be
+# met OUT IN THE MAP, not only at authored lairs. Every gate is a refusal, so
+# read this as "all of these must hold": the hunt is live, the distance ladder
+# has been climbed, nothing else is wearing the crown, the cooldown has run out,
+# and there is room under the entity ceiling.
+func _roll_roaming_boss(anchor: Vector2, danger: int,
+		rng: RandomNumberGenerator) -> void:
+	if danger < ROAM_BOSS_MIN_DANGER or _roam_boss_cd > 0.0:
+		return
+	_roam_bosses = _roam_bosses.filter(func(b):
+		return is_instance_valid(b) and not b.dead)
+	if _roam_bosses.size() >= ROAM_BOSS_MAX_ALIVE:
+		return                                   # frame budget, not design
+	if get_tree().get_nodes_in_group("creatures").size() >= REPOP_CAP - 8:
+		return                                   # no room for a boss AND its horde
+	var odds := minf(ROAM_BOSS_BASE + danger * ROAM_BOSS_PER_DANGER, ROAM_BOSS_MAX)
+	if not _roam_bosses.is_empty():
+		odds *= ROAM_BOSS_CROSSOVER              # the crossover is the fun part
+	if rng.randf() >= odds:
+		return
+	_spawn_roaming_boss(anchor, danger, rng)
+
+# A warlord: a boss chassis riding a legendary entry when the hunt has a catalog,
+# so it inherits the entry's hp/dmg multipliers, tint and bundle exactly like the
+# authored pack-12 legendary does. It is NOT the hunt legendary — `legendary_boss`
+# stays whoever it was, the minimap keeps its one marker, and the warlord is found
+# by walking into it. Without a catalog the chassis is the Hag: the classic hunt
+# still gets roaming bosses, and hag.gd routes its death to the harmless
+# on_hag_died instead of on_boss_died (which crowns the Matriarch and grants her
+# mount — a roaming kill must never do that).
+func _spawn_roaming_boss(anchor: Vector2, danger: int,
+		rng: RandomNumberGenerator) -> void:
+	var pool := bestiary("legendary")
+	var leg: Variant                             # untyped: chassis classes differ
+	var entry: Dictionary = {}
+	if pool.is_empty():
+		leg = HagScene.new()
+	else:
+		entry = pool[rng.randi() % pool.size()]
+		match str(entry.get("base", "dragon")):
+			"colossus":
+				leg = ColossusScene.new()
+			"hag":
+				leg = HagScene.new()
+			_:
+				leg = BossScene.new()
+		leg.setup_legendary(entry)
+		var tint := ProtoCreature.tint_from(entry)
+		if tint != Color(1, 1, 1):
+			leg.bar_color = tint
+	leg.display_name = ProtoLang.t("warlord_suffix") % str(
+			entry.get("name", ProtoLang.t("warlord_nameless"))).to_upper()
+	leg.global_position = world.random_walkable_in_ring(anchor, 0.0, 2.0 * TILE, rng)
+	leg.pack_anchor = anchor
+	add_child(leg)
+	_bosses.append(leg)                          # so the boss bar finds it
+	_roam_bosses.append(leg)
+	_roam_boss_cd = ROAM_BOSS_COOLDOWN
+	# A second warlord arriving while the first still lives is the crossover, and
+	# it gets its own louder banner — the player has to know the field changed.
+	damage_number(player.global_position + Vector2(0, -64), 0, Color("ff9a3c"),
+			ProtoLang.t("msg_warlord_crossover") if _roam_bosses.size() > 1
+			else ProtoLang.t("msg_warlord_near"))
+	play_ui("victory", -12.0)                    # a horn, far off
+	print("[hunt] roaming boss: %s (danger %d, %d alive)" % [
+			str(leg.display_name), danger, _roam_bosses.size()])
 
 # Curated horde spawner (hordes.json): resolve each member's species against
 # THIS hunt's roster (bundle or id), substitute gracefully when absent, and
@@ -757,6 +851,7 @@ func _physics_process(delta: float) -> void:
 	if _despawn_t <= 0.0:
 		_despawn_t = STREAM_DESPAWN_CADENCE
 		_despawn_far_creatures()
+	_roam_boss_cd = maxf(_roam_boss_cd - delta, 0.0)
 	_repop_t -= delta
 	if _repop_t <= 0.0:
 		_repop_t = REPOP_CADENCE
@@ -1233,8 +1328,13 @@ func on_legendary_died(b) -> void:
 				ProtoLang.t("msg_snare_shower"))
 	damage_number(b.global_position + Vector2(0, -40), 0, Color("d84aff"),
 			ProtoLang.t("msg_leg_falls") % str(b.species_name).to_upper())
-	legendary_boss = null
-	_legendary_name = ""
+	# R44/R61: only the HUNT's legendary clears the hunt's legendary state. A
+	# roaming warlord also rides a legendary entry, so before this its death
+	# blanked `legendary_boss`/`_legendary_name` and the real pack-12 boss
+	# vanished from the minimap while still standing.
+	if b == legendary_boss:
+		legendary_boss = null
+		_legendary_name = ""
 	_hud.hint.text = ProtoLang.t("msg_victory_leg")
 
 # Runes (canon §4): guaranteed on the FIRST Elite kill, then 5% per Elite+ kill

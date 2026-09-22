@@ -23,8 +23,14 @@ func _ready() -> void:
 	attack_cd = 2.2
 	gold_min = 150
 	gold_max = 450
-	display_name = "TERRAVORE COLOSSUS — Legendary"
-	bar_color = Color("c9a05a")
+	# setup_legendary's contract: "main owns display_name/bar_color". _ready
+	# runs at add_child, i.e. AFTER main named it, so the chassis identity is
+	# only a default — without this guard a colossus-chassis legendary went on the
+	# boss bar as "TERRAVORE COLOSSUS" instead of its catalog name (found by the
+	# R61 roaming-boss probe; the authored pack-12 legendary had it too).
+	if legendary_entry.is_empty():
+		display_name = "TERRAVORE COLOSSUS — Legendary"
+		bar_color = Color("c9a05a")
 	_base_tint = Color(0.85, 0.78, 0.62)   # stone cast over the quadruped rig
 	_scale = 2.3
 	_skill_cd = {"quake": 5.0, "spikes": 3.0, "upheaval": 7.0, "boulder": 2.0}

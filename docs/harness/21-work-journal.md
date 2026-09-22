@@ -3497,3 +3497,79 @@ Final state: `CONSOLE LAYOUT OK — 7 canvases x 2996 controls, nothing leaves t
 canvas on EITHER axis and no caption collapsed` (640x360 → 1440x810, all five
 tabs); `CONSOLE SELFTEST OK` over 8 fixtures covering all four verdict kinds;
 `ui_console_versus.png` at 1600x900, 56 FPS, 122 draw calls.
+
+---
+
+## 2026-09-22 — R44/R61/R74: bosses roam, and they arrive together
+
+Ricardo, twice, months apart: bosses should be met **out in the map**, not only
+at the four authored lairs of the origin 5×5. The cause was never subtle —
+`main.gd::_spawn_packs` is the only place a boss chassis is ever constructed,
+and both restocking paths (`_repopulate`'s pressure roll and the frontier repop
+field) only ever field `_ground_species`/`_caster_species`. Walk past the
+authored window and the world has no bosses in it at all, forever.
+
+The fix is a rare WARLORD slot in the pressure roll: `_roll_roaming_boss` reads
+as a stack of refusals (hunt live, `danger >= 1` so the authored window keeps
+its own bosses, under `ROAM_BOSS_MAX_ALIVE`, cooldown elapsed, `REPOP_CAP - 8`
+headroom for the boss *and* its horde), and `_spawn_roaming_boss` rides a real
+`bestiary_legendary` entry onto the matching chassis so the warlord inherits the
+entry's hp/dmg multipliers, tint and bundle exactly like the authored pack-12
+legendary. Odds `0.05 + 0.02·danger`, ceiling `0.22`. It is rolled *before* the
+pack is built, so the warlord leads the horde that is arriving instead of
+standing alone in a field.
+
+**Mid-implementation, Ricardo reversed the design:** *"Bosses spawning together
+and fighting multiple at once is actually a pretty fun mechanic, with unexpected
+crossovers."* So the one-live-boss cap became `ROAM_BOSS_MAX_ALIVE = 3` and the
+odds are *multiplied* by `ROAM_BOSS_CROSSOVER = 1.35` while one already prowls —
+the crossover is encouraged, not tolerated. The cap that remains is the frame
+budget, not the design, and the second arrival gets its own louder banner
+(`msg_warlord_crossover`) because the player has to know the field changed.
+
+**Two latent bugs surfaced on the way, both older than this work.**
+
+1. `on_legendary_died` cleared `legendary_boss`/`_legendary_name`
+   unconditionally. A warlord also rides a legendary entry, so killing one out
+   in the field erased the *hunt's* legendary from the minimap while the real
+   pack-12 boss was still standing. Now identity-guarded (`if b ==
+   legendary_boss`).
+2. `terravore_colossus.gd` and `pyre_sovereign.gd` stamp `display_name` and
+   `bar_color` in `_ready()` — which Godot runs at `add_child`, i.e. *after* the
+   caller named the node. `setup_legendary`'s contract says main owns the name,
+   so the chassis was silently overwriting it: a colossus-chassis legendary went
+   on the boss bar as "TERRAVORE COLOSSUS" instead of `Syvzarr, Star-Eaten
+   Pillar` (its own boot log said so). Both chassis now treat their identity as
+   a default, applied only when `legendary_entry` is empty. The authored pack-12
+   legendary had this bug too.
+
+Death routing is the sharp edge here: `on_boss_died` is hunt-defining (Emberfang
+Blade + mount + the Matriarch banner) and must NEVER be reached by a roaming
+kill, so a no-catalog warlord uses the Hag chassis, whose `on_hag_died` is pure
+flourish.
+
+Gate: `game/prototype/tests/roam_boss_probe.tscn`, eight assertions with teeth —
+(a) no warlord in 200 waves at danger 0, (b) warlords arrive with hordes out in
+the band, (c) several alive at once, (d) never above the cap, (e) the cooldown
+blocks the roll, (f) on the boss-bar list but not the hunt legendary, (g) a
+roaming kill leaves hunt legendary state untouched, (h) it wears its catalog
+name. Verdict:
+
+```
+[hunt] roaming boss: GRUMANG, HALF-WOVEN COLOSSUS — Warlord (danger 2, 1 alive)
+[hunt] roaming boss: THAXVEIG, CRONE OF THE DEEP WEAVE — Warlord (danger 2, 2 alive)
+[hunt] roaming boss: BRYNROTH, PILLAR OF THE LAST KINDLING — Warlord (danger 2, 3 alive)
+ROAM BOSS OK — 3 warlords over 9 waves, 3 alive at the peak (cap 3); none in
+200 waves at danger 0; GRUMANG, HALF-WOVEN COLOSSUS — Warlord kept its catalog name
+```
+
+Three different chassis crossing over in one field: exactly what R74 asked for.
+`repop_probe`, `spawn_test` and `ground_state_probe` stayed green throughout.
+
+**A note on how this landed.** `main.gd` and `ui/lang.gd` held this work
+entangled with eight days of the parallel session's uncommitted residency/flask
+work in the same files. `git add -p` is unavailable in this harness, so the
+split was mechanical: save the final file, strip the known R61 blocks with a
+boundary-asserting helper, verify the intermediate still parses *and* passes
+`repop_probe`, commit the cold tree, restore the final file, commit this. Each
+side is reviewable on its own.

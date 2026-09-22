@@ -490,6 +490,13 @@ const S := {
 	"confirm_yes": {"en": "Yes", "pt": "Sim"},
 	"confirm_no": {"en": "No", "pt": "Não"},
 	"legendary_suffix": {"en": "%s — Legendary", "pt": "%s — Lendária"},
+	# roaming bosses (R44/R61): met out in the map, not at a lair
+	"warlord_suffix": {"en": "%s — Warlord", "pt": "%s — Senhor da Guerra"},
+	"warlord_nameless": {"en": "Fen Warlord", "pt": "Senhor do Pântano"},
+	"msg_warlord_near": {"en": "A WARLORD PROWLS NEAR!",
+			"pt": "UM SENHOR DA GUERRA RONDA!"},
+	"msg_warlord_crossover": {"en": "ANOTHER WARLORD JOINS THE FIELD!",
+			"pt": "OUTRO SENHOR DA GUERRA ENTRA EM CAMPO!"},
 	"duo_label": {"en": "%s + %s — Legendary Duo", "pt": "%s + %s — Dupla Lendária"},
 
 	# ---- keybind card (main.gd) --------------------------------------------------------------------
