@@ -5052,3 +5052,141 @@ definitions, 11 types, 5 registries, 0 problems. `pytest ml/tests
 genforge/tests`: 291 passed, 1 skipped; the 2 reported failures are
 `ModuleNotFoundError: torch` under the *system* python — all 7 pass under
 `ml/.venv/bin/python3`, which is where torch lives.
+
+---
+
+## R64 + R43 — the cooldown cue, and the two defects its captures found (2026-09-22)
+
+R43 asked for two things and had only ever received one. The CENTRAL readout
+landed earlier as `HudSkillChip` — a 26×26 tile with a procedural 1 px glyph per
+`kind`, a top-down cooldown sweep and a numeric countdown under 10 s. The
+sentence after the comma, *"peripheral visual cues so players need not
+constantly watch timers"*, was still open, and R64 ("visual cues for skill
+cooldowns") was the same demand arriving a second time. So R64 was built as
+R43's missing half rather than as a second, competing readout, and both rows
+close together.
+
+### Where a peripheral cue can live
+
+The constraint is that the eye is on the fight, not the corner. That rules out
+anything at the edge of the screen — which is where the existing chips already
+are — and it rules out anything that needs to be read, because reading is the
+attention cost R43 is complaining about. What is left is the one place the eye
+is already looking: **the ground under the hero**. The fan is four segments on a
+13 px radius spanning `PI*0.18 → PI*0.82`, the lower arc, under the body and
+away from the character art. Segments index *down* from `CUE_A1` so slot 0 sits
+leftmost — the same left-to-right 1→4 order the hotbar uses, because a cue that
+maps to the wrong key is worse than no cue.
+
+Colour is not chosen locally. Each segment is tinted from
+`HudSkillChip.KIND_TINT`, the dictionary the chips themselves read, so the fan
+and the hotbar are two renderings of one table. Two surfaces that agree by
+construction cannot drift.
+
+### One edge detector, two surfaces
+
+The interesting failure mode in cue work is the two displays disagreeing about
+the same skill — chip flashes, fan does not, or worse, the fan flashes twice
+because each surface found the transition on its own frame. `_update_cues` in
+`player.gd` therefore finds the cooldown→ready edge exactly once per cycle,
+guarded by `if ready and not _cue_ready[i] and was > 0.0:` — the `was > 0.0`
+term is what stops a slot that was never on cooldown (a freshly assigned skill,
+a respawn) from blooming at birth. The fan reads `_cue_bloom` directly;
+`main.gd` reads the same array through `skill_ready_flash(i)` and uses it to
+flash the chip frame and fire one soft blip. Four skills coming back on the same
+frame produce one sound, not a chord, for the same reason.
+
+### Motion is reserved for the transition
+
+A ready slot draws a calm, motionless bright arc. The ONLY animation in the
+whole system is the one-shot 0.35 s bloom on the edge. This is deliberate and it
+is precisely R43's "no false-ready/cue spam" acceptance term: if ready-ness
+pulsed, four ready skills would give a permanently churning fan at the hero's
+feet and the peripheral channel would become noise — the exact thing the demand
+asked to remove. Standing still is the feature.
+
+The one addition beyond ready/not-ready is the **denied press**. Pressing a slot
+whose cooldown is longer than the 0.15 s input buffer previously did nothing at
+all — no sound, no mark, indistinguishable from a dropped input. It now draws a
+short red tick just inside the arc for 0.25 s. `INPUT_BUFFER_S` itself is
+untouched: this answers the *feedback* half of the open buffer question without
+touching combat feel, so no design call is owed.
+
+Bots return early in both `_update_cues` and `_draw_skill_cues` on `bot_drive`,
+so arena and training frame cost is unchanged. The draw budget is asserted live
+rather than assumed: `cue_arcs ≤ 12`, measured 8.
+
+### The gate, and proving it has teeth
+
+`game/prototype/tests/cue_probe.tscn` runs 8 lettered assertions over a quiet
+start, a cast and return, an emptied slot, a denied press and a grave. A passing
+probe proves nothing by itself, so both guards were mutated:
+
+- dropping the `was > 0.0` edge guard → **4 failures**
+- widening the deny window from `> INPUT_BUFFER_S` to `> 0.0` → **exactly 1**
+
+Both restored after.
+
+### The capture, and the coordinate bug in it
+
+`UI_TAG=cue` in `tests/ui_capture.gd` seeds a throwaway `cue_capture` hunter —
+never `"Hunter"`, because `learn_node`/`assign_skill` both call `request_save()`
+and a capture must never edit a player's character — carrying four DIFFERENT
+skill kinds (`rv_gash` melee_arc, `rv_hurled_cleaver` projectile,
+`rv_artery_storm` nova, `rv_earthsplitter` field) so one frame shows four tints
+at once. `_stage_cue` then drives all four states through the SHIPPING path:
+real seconds written onto `skill_cds` (3.1 / 1.2 / 0.05 / 0.0) and a real
+`slot2` press, so slot 1 is deep in cooldown, slot 2 is nearly back AND freshly
+denied, slot 3 is caught inside its own genuine 0.35 s bloom and slot 4 is calm.
+Nothing is posed. The run printed
+`UI_CAPTURE CUE flash=0.857 deny=0.867 arcs=8`.
+
+640×360 of canvas cannot show a 13 px fan, so the tag also writes two
+nearest-neighbour insets at 4× the logical pixel: `_feet` and `_hotbar`. **The
+first attempt cropped the wrong region.** `project.godot` runs a 640×360
+viewport with `window_width_override=1280` and `stretch/scale_mode="integer"`,
+so `get_global_transform_with_canvas().origin` is in CANVAS space (640×360)
+while `get_viewport().get_texture().get_image()` returns the WINDOW (1280×720) —
+every rect was off by half. Fixed by computing
+`k := img.width / viewport.visible_rect.size.x` at the call site, scaling the
+rect by `k` inside `_inset`, and replacing the hard `× 4` magnification with
+`zoom := maxi(1, int(round(4.0 / k)))` so the inset stays 4× the *logical* pixel
+whatever the window override is. Pixel art must be magnified by whole pixels or
+the capture lies about what the renderer drew.
+
+Both languages captured on `DISPLAY=:1` under `--rendering-method
+gl_compatibility` at `--max-fps 60`, with `XDG_DATA_HOME`/`XDG_CONFIG_HOME`/
+`XDG_CACHE_HOME` pointed at the scratchpad so the run cannot alter a player's
+language, volume or saves:
+
+| | EN | PT |
+|---|---|---|
+| fps | 60.0 | 60.0 |
+| draw_calls | 97 | 102 |
+| process_ms | 16.2 | 18.4 |
+| cue_arcs | 8 | 8 |
+
+The feet inset reads left→right exactly as designed: pale-steel sliver deep in
+cooldown, cyan nearly full with the red deny tick *inside* toward the body, gold
+mid-bloom with its halo *outside*, calm green. The hotbar inset shows the same
+four kinds with matching glyphs and chip 3 carrying the ready flash.
+
+### Two defects the captures found, which are NOT R64's
+
+Logged as **R82** rather than fixed inline, because neither is the cue system
+and both deserve their own measured fix:
+
+1. **The hotbar names run together.** `main.gd:1734` gives each name Label a
+   32 px box on a 34 px chip pitch while `main.gd:2035` fills it with
+   `.left(8)` at font size 8 — 8 glyphs need ≈40 px. EN reads
+   `Gash Hurled Artery Earths` as one smear; PT is worse. This is the same
+   defect the systems map has carried as "skill-bar labels clip at fixed
+   widths (Lumenpie)" — now with the measurement attached.
+2. **`game/living/world_lairs.gd:68` is hardcoded English** and never passes
+   through `ProtoLang`, so `"A distant bell calls %s · SHRINE %dm"` stays
+   English in the PT frame — the one English sentence in an otherwise fully
+   Portuguese HUD, visible in `ui_cue_pt.png`.
+
+### Gates
+
+CUE (8 assertions) · FLASK · MENU · LEVEL UP — all OK.

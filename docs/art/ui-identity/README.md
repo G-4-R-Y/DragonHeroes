@@ -29,6 +29,15 @@ UI_WAIT=120 UI_TAG=identity_menu UI_LANG=en \
   res://prototype/tests/ui_capture.tscn
 ```
 
+`UI_TAG=cue*` (R64) stages the skill-cooldown cues: it logs a throwaway
+`cue_capture` hunter carrying four different skill kinds, puts all four slots in
+different cue states through the shipping path (one deep in cooldown, one
+denied, one mid-bloom, one calm) and writes the frame plus two
+nearest-neighbour insets at 4x the logical pixel — `_feet` (the ground fan) and
+`_hotbar` (the chips it must agree with). The insets cross canvas coordinates
+into window space by the integer stretch factor first, so they stay correct
+whatever `window_width_override` is. The JSON carries `cue_arcs` (budget: 12).
+
 Use `UI_LANG=pt` for Portuguese, `UI_OPTIONS=1` for the options modal,
 `UI_SCENE=res://living/lair_menu.tscn` for the collection, or
 `UI_SCENE=res://prototype/ui/haven.tscn UI_TAG=haven_identity` for Haven.

@@ -23,6 +23,7 @@ var cd_frac := 0.0        # 0 = ready, 1 = just cast
 var cd_left := 0.0        # seconds (numeric countdown under 10)
 var pulse := 0.0
 var empty := true
+var flash := 0.0          # R64: 1 on the cooldown->ready edge, decaying to 0
 
 var _cd_label: Label
 
@@ -38,11 +39,18 @@ func _init() -> void:
 	add_child(_cd_label)
 
 func set_state(p_kind: String, p_cd_frac: float, p_left: float,
-		p_empty: bool, p_pulse: float) -> void:
-	if p_kind == kind and is_equal_approx(p_cd_frac, cd_frac) \
-			and p_empty == empty and is_equal_approx(p_left, cd_left):
+		p_empty: bool, p_pulse: float, p_flash := 0.0) -> void:
+	var same := p_kind == kind and is_equal_approx(p_cd_frac, cd_frac) \
+			and p_empty == empty and is_equal_approx(p_left, cd_left)
+	if same and is_equal_approx(p_flash, flash):
 		pulse = p_pulse   # cheap early-out: redraws only on change
 		return
+	if same:              # R64: the ready bloom is the one thing that animates
+		flash = p_flash   # in place — it fades out and the chip goes still again
+		pulse = p_pulse
+		queue_redraw()
+		return
+	flash = p_flash
 	kind = p_kind
 	cd_frac = clampf(p_cd_frac, 0.0, 1.0)
 	cd_left = p_left
@@ -65,8 +73,13 @@ func _draw() -> void:
 	# frame: ember breathing when ready
 	var f := FRAME
 	if cd_frac <= 0.0:
-		f = FRAME_READY.lerp(Color.WHITE, 0.35 * pulse)
+		f = FRAME_READY.lerp(Color.WHITE, maxf(0.35 * pulse, flash))
 	draw_rect(r, f, false, 1.0)
+	# R64: a halo that blooms outward once, on the frame the skill came back —
+	# the same edge player.gd blooms the feet fan on
+	if flash > 0.0:
+		draw_rect(r.grow(1.0 + 2.0 * (1.0 - flash)),
+				Color(FRAME_READY, 0.6 * flash), false, 1.0)
 	# keybind corner digit
 	if key_text != "":
 		draw_string(ProtoTheme.font_small(), Vector2(SIZE - 9, SIZE - 3), key_text,

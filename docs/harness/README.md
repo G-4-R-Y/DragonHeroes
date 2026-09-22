@@ -36,7 +36,11 @@ through item 38). Nothing here duplicates a law doc — it points at it.
   every system.
 - **The capture loop** (§12.28): visual work is verified on FRAMES —
   `tests/vfx_showcase.tscn` (hunt), `tests/ui_capture.tscn` (any scene:
-  `UI_SCENE/UI_TAG/UI_WAIT`), PNGs land in `game/prototype/tests/captures/`.
+  `UI_SCENE/UI_TAG/UI_WAIT/UI_LANG/UI_TAB`), PNGs land in
+  `game/prototype/tests/captures/`. A crop of a capture must cross CANVAS
+  coordinates into WINDOW space by the integer stretch factor first (640x360
+  viewport, 1280x720 window override) and magnify by WHOLE pixels — see
+  `ui_capture.gd::_inset`.
   Windowed GL only (no xvfb here). Lab sheets validate effects, captures
   validate frames — review the composite after every visual change.
 - **Light registry** (§12.30): one gather in darkness.gd → shader globals

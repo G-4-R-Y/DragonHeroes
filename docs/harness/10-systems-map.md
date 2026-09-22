@@ -151,7 +151,9 @@ Pixel Operator 8/16, AA off, `SIZE_BODY/SIZE_TITLE/snap()`, fallback AND
 default-theme restamp), `ui/main_menu.gd` (name-chip class cards, CO-OP
 button), `ui/haven.gd`, `ui/character_panel.gd`, `ui/lang.gd` (EN/PT-BR),
 `ui/display.gd`, `damage_numbers.gd`. Gate: CLICKTEST (16 checks). Issue:
-skill-bar labels clip at fixed widths ("Lumenpie").
+skill-bar labels clip at fixed widths ("Lumenpie") — still open, now a ledger
+row (R82a) with the measurement: 32 px box on a 34 px pitch, `.left(8)` at font
+size 8 needs ≈40 px.
 **2026-09-12 identity pass:** `ui/theme.gd`, `ui/world_frame.gd`,
 `ui/slider_rune.svg`, `living/lair_menu.gd` + `artifact_card.gd` share bronze,
 ivory and Lumen styling, cached shrine framing, visible focus and bounded lore
@@ -161,6 +163,32 @@ flows. Actual GL frames + metrics: `docs/art/ui-identity/`; capture tool accepts
 class sigils, bestiary and full gear-card migration remain scheduled.
 Approved Codex source is now on `master` (70e8b4f); fresh verified Linux/Windows
 Codex archives live in the original workspace under `builds/codex/`.
+
+**Skill-cooldown cues (R64 + R43, 2026-09-22).** Law: design/10/11/17/26.
+Two surfaces, ONE edge detector. `player.gd::_update_cues` runs once per
+physics tick over the four hotbar slots and owns every cue timer
+(`_cue_frac/_cue_left/_cue_ready/_cue_bloom/_cue_deny`, `CUE_BLOOM_S 0.35`,
+`CUE_DENY_S 0.25`); the cooldown→ready EDGE is found there and nowhere else.
+`player.gd::_draw_skill_cues` paints the PERIPHERAL half — a four-segment fan
+on the ground at the hero's feet (`CUE_R 13.0`, `PI*0.18→PI*0.82`), one segment
+per slot in the HUD's own 1→4 order, tinted from `HudSkillChip.KIND_TINT` so
+the fan and the chips can never disagree. `main.gd::_update_skill_slots` paints
+the CENTRAL half through `skill_ready_flash(i)`, which also fires one soft blip
+— four skills returning on the same frame are one sound, not a chord. Motion is
+reserved for the transition: a ready slot is a calm, motionless arc, which is
+R43's no-cue-spam term. A press the 0.15 s input buffer cannot save answers with
+a short red tick (`skill_deny_flash`) instead of silence; `INPUT_BUFFER_S` is
+unchanged. Bots return early in both the update and the draw (`bot_drive`), so
+arena frame cost is untouched. Draw budget asserted live: `cue_arcs ≤ 12`,
+measured 8. Gate: `game/prototype/tests/cue_probe.tscn` (8 assertions, teeth
+proven by mutation — removing the `was > 0.0` edge guard emits 4 failures,
+widening the deny window emits exactly 1). Captures: `UI_TAG=cue` in
+`tests/ui_capture.gd` seeds a throwaway `cue_capture` hunter carrying four
+different skill kinds, stages all four states in one frame through the shipping
+path, and writes the frame plus two nearest-neighbour insets (`_feet`,
+`_hotbar`) at 4× the LOGICAL pixel — canvas rects cross into window space by the
+integer stretch factor first (640×360 canvas, 1280×720 window). Evidence:
+`tests/captures/ui_cue_{en,pt}*`, 60 FPS, 97–102 draw calls.
 
 ## Hunt progression sustain
 **Level-up refresh (2026-09-12).** Law: canon §12.46, design/24.
@@ -511,7 +539,7 @@ port) remains the strategic production step.
 
 ## Tests & captures
 `game/prototype/tests/` — vfx_showcase, vfx_iso, ui_capture, stream_test,
-spawn_probe, click_test, fx_stress (+ captures/), `game/arena/tests/`,
+spawn_probe, click_test, cue_probe, fx_stress (+ captures/), `game/arena/tests/`,
 `game/mp/tests/`, `genforge/tests/`, `ml/tests/`, `tools/mp_test.sh`.
 Reference frames: `docs/media/v1-vs-v2.png`, `captures/03_firefield_burning.png`,
 `captures/ui_hunt_far.png`, `captures/ui_3d.png`.

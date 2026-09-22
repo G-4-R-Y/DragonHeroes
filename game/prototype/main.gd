@@ -144,6 +144,10 @@ var _kb_overlay: CanvasLayer     # K — keybind reference card
 var _prev_dodge_charges := ProtoPlayer.DODGE_CHARGES_MAX
 var _pip_flash := 0.0            # white flash when a dodge charge completes
 var _q_flash := 0.0              # white flash when Shadow Rend comes off cooldown
+# R64: the bloom player.gd raised on each slot's cooldown->ready edge, as seen
+# last frame — a RISE means the edge just happened (the bloom only ever decays
+# otherwise), so the blip fires exactly once per cooldown and never per frame.
+var _slot_flash_prev := [0.0, 0.0, 0.0, 0.0]
 var _q_was_ready := true
 var _chip_t := 0.0               # pet-chip refresh accumulator (4 Hz)
 var _char_panel: ProtoCharacterPanel
@@ -2009,19 +2013,24 @@ func _update_gauges(delta: float) -> void:
 # Skill bar chips (1-4): cooldown fill per assigned class-tree active + the
 # class charge counter (Combo/Attunement). Same treatment as the Q/E gauges.
 func _update_skill_slots(pulse: float) -> void:
+	var blipped := false
 	for i in 4:
 		var slot: Dictionary = _hud.slots[i]
 		var id := str(Session.skill_loadout[i])
 		var def: Dictionary = Session.skill_def(id) if id != "" else {}
+		var flash: float = player.skill_ready_flash(i)
+		if flash > float(_slot_flash_prev[i]):
+			blipped = blipped or _slot_blip()   # at most one blip a frame
+		_slot_flash_prev[i] = flash
 		if def.is_empty() or not Session.node_learned(id):
-			slot.chip.set_state("", 0.0, 0.0, true, pulse)
+			slot.chip.set_state("", 0.0, 0.0, true, pulse, 0.0)
 			slot.name.text = ""
 			continue
 		var total: float = float((def.get("params", {}) as Dictionary).get("cd", 6.0)) \
 				* player.cdr_mult
 		var left: float = player.skill_cd_left(id)
 		var frac := 0.0 if total <= 0.0 else clampf(left / total, 0.0, 1.0)
-		slot.chip.set_state(str(def.get("kind", "")), frac, left, false, pulse)
+		slot.chip.set_state(str(def.get("kind", "")), frac, left, false, pulse, flash)
 		# localized skill name, first word only — the label clips at 32 px
 		slot.name.text = ProtoLang.pick(def, "name", "?").get_slice(" ", 0).left(8)
 	if player.charge_name == "" or player.charge_stacks <= 0:
@@ -2031,6 +2040,12 @@ func _update_skill_slots(pulse: float) -> void:
 		_hud.charge.text = "◈ %s x%d" % [
 				ProtoLang.pick(Session.class_charge(), "name", player.charge_name),
 				player.charge_stacks]
+
+# One soft "charged" blip for a slot coming back, mirroring the Q gauge. Four
+# skills returning on the same frame are still one sound, never a chord.
+func _slot_blip() -> bool:
+	play_ui("pickup", -24.0)
+	return true
 
 func _update_pet_chips() -> void:
 	for i in _hud.pet_chips.size():

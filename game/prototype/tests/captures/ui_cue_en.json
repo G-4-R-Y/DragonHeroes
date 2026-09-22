@@ -1,0 +1,11 @@
+{
+  "cue_arcs": 8,
+  "draw_calls": 97.0,
+  "fps": 60.0,
+  "process_ms": 16.215,
+  "scene": "res://prototype/main.tscn",
+  "viewport": [
+    1280,
+    720
+  ]
+}

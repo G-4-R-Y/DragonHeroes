@@ -861,6 +861,8 @@ godot --headless --path game res://prototype/tests/mem_soak.tscn --quit-after 30
 godot --path game res://prototype/tests/vfx_showcase.tscn        # windowed VFX catalog
 godot --path game res://prototype/tests/vfx_iso.tscn             # one effect in isolation
 godot --path game res://prototype/tests/ui_capture.tscn          # UI reference frames
+# UI_SCENE / UI_TAG / UI_WAIT / UI_LANG / UI_TAB drive it; UI_TAG=cue* stages the
+# skill-cooldown cues and also writes _feet / _hotbar insets (docs/art/ui-identity/)
 godot --path game res://prototype/tests/residency_capture.tscn   # distant-encounter captures
 godot --path game res://prototype/tests/renewal_capture.tscn     # renewal captures
 ```

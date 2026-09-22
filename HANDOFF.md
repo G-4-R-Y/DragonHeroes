@@ -1,3 +1,63 @@
+# Handoff — 2026-09-22: R64 + R43 (the cooldown cue at the hero's feet)
+
+**R43 asked for two things and had only ever received one.** The central
+readout shipped as `HudSkillChip`; the clause after the comma — *peripheral
+visual cues so players need not constantly watch timers* — was still open, and
+R64 was that same demand arriving a second time. So R64 was built as R43's
+missing half, and both rows close together as **DONE 2026-09-22**.
+
+The cue is **a four-segment fan on the ground at the hero's feet** — the one
+place the eye is already looking during a fight. One segment per hotbar slot in
+the HUD's own 1→4 order, tinted from `HudSkillChip.KIND_TINT`, the dictionary
+the chips themselves read, so the two surfaces are two renderings of one table
+and cannot drift.
+
+**One edge detector, two surfaces.** `player.gd::_update_cues` finds the
+cooldown→ready edge once per cycle (`if ready and not _cue_ready[i] and
+was > 0.0` — the `was > 0.0` term stops a freshly assigned skill from blooming
+at birth). The fan reads `_cue_bloom` directly; `main.gd` reads the same array
+through `skill_ready_flash(i)` to flash the chip and fire one soft blip, so four
+skills returning on the same frame are one sound, not a chord.
+
+**Motion is reserved for the transition.** A ready slot is a calm, motionless
+arc; the only animation is the one-shot 0.35 s bloom on the edge. That is
+literally R43's no-cue-spam term — a pulsing ready state would turn the
+peripheral channel into the noise the demand asked to remove. The one addition
+is the **denied press**: a press the 0.15 s buffer cannot save now draws a short
+red tick for 0.25 s instead of being silently swallowed. `INPUT_BUFFER_S` is
+untouched, so combat feel is unchanged and no design call is owed.
+
+Bots return early in both the update and the draw (`bot_drive`), so arena and
+training frame cost is unchanged. Draw budget asserted live: `cue_arcs ≤ 12`,
+measured 8.
+
+**Gate with proven teeth:** `game/prototype/tests/cue_probe.tscn`, 8 assertions;
+removing the edge guard emits 4 failures, widening the deny window emits exactly
+1. Both restored.
+
+**Captures:** new `UI_TAG=cue` path in `tests/ui_capture.gd` — a throwaway
+`cue_capture` hunter (never `"Hunter"`: `learn_node`/`assign_skill` write a
+save), four different skill kinds for four tints in one frame, every state
+driven through the shipping path. EN and PT on `DISPLAY=:1`,
+`gl_compatibility`, 60 FPS, 97–102 draw calls, `cue_arcs=8`, plus `_feet` and
+`_hotbar` insets at 4× the logical pixel. The insets first cropped the wrong
+region — canvas is 640×360, the saved frame is the 1280×720 window — fixed by
+crossing every rect by the integer stretch factor `k` and magnifying by
+`round(4.0 / k)` so the zoom stays whole-pixel.
+
+**Two defects the captures found, logged as R82, not fixed here:** the hotbar
+name labels don't fit (32 px box, 34 px pitch, `.left(8)` at font size 8 needs
+≈40 px — the four names read as one smear in both languages), and
+`game/living/world_lairs.gd:68` builds its shrine compass line as an English
+literal that never passes through `ProtoLang`, so it stays English in the PT
+frame.
+
+Next: R62 → R71, largest last (R66 item scaling, R62 potion enchanting, R63 more
+skills, R67 kill-streak sky chest, R68 multi-boss events, R70 bot mercenaries,
+R71 questline themes, R69 DRAGON COUNCIL) — plus R82 now in the queue.
+
+---
+
 # Handoff — 2026-09-22: R55-c (the loser could not slide along the wall)
 
 **The dh-env↔arena parity residual had a cause, and it was the arena's.** R55

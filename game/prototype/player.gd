@@ -79,6 +79,23 @@ var _buf_skill2 := 0.0
 var _buf_bestial := 0.0
 var _buf_slots := [0.0, 0.0, 0.0, 0.0]
 
+# R64/R43 — PERIPHERAL cooldown cues. hud_chip.gd is the CENTRAL readout; this
+# is the one at the hero's feet, so an eye locked on the fight still knows what
+# is ready. Per slot: the burn fraction the fan draws, the seconds left (a press
+# is only "denied" when the wait outlasts the input buffer), a one-shot bloom
+# fired on the cooldown->ready EDGE, and a short tick on a denied press.
+# The bloom is the ONLY moving part: a ready slot sits still, so four ready
+# skills never pulse at the player (R43: "no false-ready/cue spam").
+const CUE_BLOOM_S := 0.35
+const CUE_DENY_S := 0.25
+var _cue_kind := ["", "", "", ""]        # KIND_TINT key; "" = empty/unlearned
+var _cue_frac := [0.0, 0.0, 0.0, 0.0]    # 1 = just cast, 0 = ready
+var _cue_left := [0.0, 0.0, 0.0, 0.0]    # seconds left
+var _cue_ready := [false, false, false, false]
+var _cue_bloom := [0.0, 0.0, 0.0, 0.0]   # one-shot, seconds left
+var _cue_deny := [0.0, 0.0, 0.0, 0.0]
+var cue_arcs := 0                        # arcs the last _draw laid down (gate)
+
 # Mounts (Ricardo, proposals): M rides the active mount. Walking respects
 # terrain; FLYING crosses water/rock. Combat or damage dismounts.
 var mounted := false
@@ -232,6 +249,7 @@ func _physics_process(delta: float) -> void:
 	# class-tree skill cooldowns + timed buffs (both tiny dicts/arrays)
 	for k in skill_cds:
 		skill_cds[k] = maxf(float(skill_cds[k]) - delta, 0.0)
+	_update_cues(delta)
 	if not _buffs.is_empty():
 		var now := Time.get_ticks_msec() / 1000.0
 		_buffs = _buffs.filter(func(b: Dictionary) -> bool: return now <= float(b.until))
@@ -330,6 +348,9 @@ func _physics_process(delta: float) -> void:
 			for i in 4:
 				if Input.is_action_just_pressed("slot%d" % (i + 1)):
 					_buf_slots[i] = INPUT_BUFFER_S
+					# a press the buffer cannot save is answered, not swallowed
+					if float(_cue_left[i]) > INPUT_BUFFER_S:
+						_cue_deny[i] = CUE_DENY_S
 				if _buf_slots[i] > 0.0:
 					var sid := str(Session.skill_loadout[i]) if i < Session.skill_loadout.size() else ""
 					if sid != "" and Session.node_learned(sid) and skill_cd_left(sid) <= 0.0:
@@ -763,6 +784,52 @@ func _cast_slot(i: int) -> void:
 
 func skill_cd_left(id: String) -> float:
 	return float(skill_cds.get(id, 0.0))
+
+# R64: one pass over the four hotbar slots per frame — no allocation, no node
+# work. Bots skip it: the arena has no HUD, no Session loadout, and no eye to
+# serve. The ready EDGE is detected here once and read by BOTH cues (the feet
+# fan below and the HUD chip via skill_ready_flash), so they cannot disagree.
+func _update_cues(delta: float) -> void:
+	if bot_drive:
+		return
+	for i in 4:
+		_cue_bloom[i] = maxf(float(_cue_bloom[i]) - delta, 0.0)
+		_cue_deny[i] = maxf(float(_cue_deny[i]) - delta, 0.0)
+		var id := str(Session.skill_loadout[i]) if i < Session.skill_loadout.size() else ""
+		var def: Dictionary = Session.skill_def(id) if id != "" else {}
+		if def.is_empty() or not Session.node_learned(id):
+			_cue_kind[i] = ""          # an empty slot draws nothing and never blooms
+			_cue_frac[i] = 0.0
+			_cue_left[i] = 0.0
+			_cue_ready[i] = false
+			_cue_bloom[i] = 0.0
+			continue
+		_cue_kind[i] = str(def.get("kind", ""))
+		var total := float((def.get("params", {}) as Dictionary).get("cd", 6.0)) * cdr_mult
+		var left := skill_cd_left(id)
+		var was := float(_cue_frac[i])
+		_cue_left[i] = left
+		_cue_frac[i] = 0.0 if total <= 0.0 else clampf(left / total, 0.0, 1.0)
+		var ready := left <= 0.0
+		# the bloom needs a cooldown to have BURNED: spawning, learning or
+		# assigning a ready skill is not a transition, so it stays silent
+		if ready and not _cue_ready[i] and was > 0.0:
+			_cue_bloom[i] = CUE_BLOOM_S
+		_cue_ready[i] = ready
+
+# HUD feed (main.gd _update_skill_slots): 1 on the frame slot i came off
+# cooldown, decaying to 0 over CUE_BLOOM_S. The chip flashes on the SAME edge
+# the feet fan blooms on.
+func skill_ready_flash(i: int) -> float:
+	if i < 0 or i >= 4:
+		return 0.0
+	return clampf(float(_cue_bloom[i]) / CUE_BLOOM_S, 0.0, 1.0)
+
+# Probe hook (tests/cue_probe.gd) — a denied press is state, not just a pixel.
+func skill_deny_flash(i: int) -> float:
+	if i < 0 or i >= 4:
+		return 0.0
+	return clampf(float(_cue_deny[i]) / CUE_DENY_S, 0.0, 1.0)
 
 func use_skill(def: Dictionary) -> bool:
 	if dead or mounted:
@@ -1354,6 +1421,11 @@ func respawn(at: Vector2) -> void:
 	_buf_bestial = 0.0
 	for i in 4:
 		_buf_slots[i] = 0.0
+		_cue_frac[i] = 0.0
+		_cue_left[i] = 0.0
+		_cue_ready[i] = false
+		_cue_bloom[i] = 0.0   # nobody respawns to a bloom for a cast they lost
+		_cue_deny[i] = 0.0
 	_reset_pose()
 	sprite.play("idle")
 
@@ -1391,3 +1463,56 @@ func _draw() -> void:
 		var r := 1.5 * TILE * (1.4 - _gale_t * 0.4)
 		draw_arc(at, r, 0, TAU, 24, Color(0.73, 0.95, 1.0, _gale_t * 0.7), 2.0)
 		draw_arc(at, r * 0.6, 0, TAU, 18, Color(0.85, 1.0, 1.0, _gale_t * 0.4), 1.5)
+	_draw_skill_cues()
+
+# R64/R43 — the peripheral cue: a four-segment fan on the ground at the hero's
+# feet, one segment per hotbar slot (1-4 left to right, the HUD's own order),
+# tinted from HudSkillChip.KIND_TINT so the two surfaces can never say different
+# things about the same skill.
+#   burning -> a dark track with a tint fill that GROWS back toward full,
+#   ready   -> one calm, bright, MOTIONLESS arc,
+#   edge    -> a single 0.35 s halo blooming outward (the only animation here),
+#   denied  -> a short red tick under the segment that was pressed too early.
+# Cost: at most 12 draw_arc calls on a canvas that already redraws every
+# physics frame (see queue_redraw above) — no new invalidation, no allocation.
+const CUE_R := 13.0
+const CUE_A0 := PI * 0.18       # the fan spans the lower arc, under the body
+const CUE_A1 := PI * 0.82
+const CUE_GAP := 0.07           # radians of dark between neighbouring segments
+const CUE_TRACK := Color(0.07, 0.08, 0.12, 0.7)
+const CUE_DENY_COL := Color(1.0, 0.36, 0.3)
+
+func _draw_skill_cues() -> void:
+	cue_arcs = 0
+	if bot_drive or mounted or dead:
+		return
+	var origin := Vector2(0, -2.0)
+	var span := (CUE_A1 - CUE_A0) / 4.0
+	for i in 4:
+		if str(_cue_kind[i]) == "":
+			continue                     # unassigned slot: no cue, no false ready
+		# slot 0 sits leftmost: angles grow from +X (right) toward -X (left)
+		var a0: float = CUE_A1 - span * (i + 1) + CUE_GAP * 0.5
+		var a1: float = CUE_A1 - span * i - CUE_GAP * 0.5
+		var tint: Color = HudSkillChip.KIND_TINT.get(str(_cue_kind[i]), Color("c9d4e8"))
+		var frac := float(_cue_frac[i])
+		if frac > 0.0:
+			draw_arc(origin, CUE_R, a0, a1, 6, CUE_TRACK, 1.0)
+			cue_arcs += 1
+			var lit: float = a0 + (a1 - a0) * (1.0 - frac)
+			if lit > a0:
+				draw_arc(origin, CUE_R, a0, lit, 6, Color(tint, 0.6), 2.0)
+				cue_arcs += 1
+		else:
+			var bloom := float(_cue_bloom[i]) / CUE_BLOOM_S
+			draw_arc(origin, CUE_R, a0, a1, 6, Color(tint, 0.85), 2.0)
+			cue_arcs += 1
+			if bloom > 0.0:   # the one-shot: it leaves, and the cue goes still
+				draw_arc(origin, CUE_R + 2.0 + 4.0 * (1.0 - bloom), a0, a1, 6,
+						Color(tint, 0.55 * bloom), 1.0)
+				cue_arcs += 1
+		var deny := float(_cue_deny[i]) / CUE_DENY_S
+		if deny > 0.0:
+			draw_arc(origin, CUE_R - 3.5, a0, a1, 5,
+					Color(CUE_DENY_COL, 0.85 * deny), 1.0)
+			cue_arcs += 1
