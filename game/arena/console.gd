@@ -155,6 +155,12 @@ var _bench_root := ""
 
 # the tracked child (train | gate); watch windows are fire-and-forget
 var _pid := -1
+# R56: the trainer's PROCESS GROUP id, resolved once while it runs and kept
+# after it exits so stragglers can still be reaped. Only ever set when it
+# equals _pid — that equality is the proof that `setsid` gave us a group of our
+# own. Godot's own children inherit GODOT'S group, so group-killing a group we
+# did not create would kill the editor running this console.
+var _pgid := -1
 var _pid_kind := ""
 var _proc_note := ""
 
@@ -197,9 +203,17 @@ func _process(delta: float) -> void:
 	if _poll_accum < POLL_S:
 		return
 	_poll_accum = 0.0
+	if _pid > 0 and _pgid <= 0:
+		_resolve_pgid()
 	if _pid > 0 and not OS.is_process_running(_pid):
+		# R56: the leader is gone, but a crashed or SIGKILLed trainer orphans its
+		# godot workers to init, where nothing ever reaps them. Sweep the group.
+		var stragglers := _reap_group()
 		_proc_note = "%s finished — log %s" % [_pid_kind, _log_rel(_key())]
+		if stragglers:
+			_proc_note += " (orphaned workers reaped)"
 		_pid = -1
+		_pgid = -1
 		_pid_kind = ""
 	_poll_progress()
 	_sweep_scan()
@@ -1003,10 +1017,18 @@ func _spawn_league(args: String, kind: String, key: String) -> void:
 	DirAccess.make_dir_recursive_absolute(_repo.path_join(LOG_DIR))
 	DirAccess.make_dir_recursive_absolute(_repo.path_join(PROGRESS_DIR))
 	# exec: the pid we track IS python's — through `&&` alone python would be a
-	# grandchild of the bash we hold, out of Stop's reach
-	var cmd := "cd %s && exec python3 -m ml.training.league %s >> %s 2>&1" % [
+	# grandchild of the bash we hold, out of Stop's reach.
+	# R56 (2026-09-21): `setsid` in front of it puts the trainer in a NEW session,
+	# so its process group contains the trainer and every descendant it will ever
+	# spawn — the headless godot workers today, anything nested tomorrow — and
+	# NOTHING of ours. Without it the trainer inherits Godot's own group and Stop
+	# can only reach one generation (`pkill -P`), which is why a killed run could
+	# leave workers holding the card. setsid execs in place when the caller is not
+	# already a group leader, so the pid we track is still python's.
+	var cmd := "cd %s && exec setsid python3 -m ml.training.league %s >> %s 2>&1" % [
 			_sq(_repo), args, _sq(_repo.path_join(_log_rel(key)))]
 	_pid = OS.create_process("bash", ["-lc", cmd])
+	_pgid = -1
 	if _pid <= 0:
 		_pid = -1
 		_proc_note = "could not spawn bash (OS.create_process failed)"
@@ -1082,17 +1104,57 @@ func _gate() -> void:
 	_spawn_league("gate --key %s --build %s --episodes %d" % [
 			_sq(key), _sq(build), int(_eps.value)], "gate", key)
 
+# R56. Read the tracked trainer's process group ONCE, and accept it only when it
+# equals the pid — i.e. when the process is its own group leader, which is what
+# `setsid` guarantees and what makes a group kill provably ours. Any other value
+# means setsid did not take (it forks when the caller is already a leader, and
+# some environments have no setsid at all); we then leave _pgid at -1 and Stop
+# falls back to the old one-generation reap rather than signalling a group that
+# may contain the editor.
+func _resolve_pgid() -> void:
+	var out: Array = []
+	if OS.execute("bash", ["-lc", "ps -o pgid= -p %d" % _pid], out) != 0:
+		return
+	var text := "" if out.is_empty() else str(out[0]).strip_edges()
+	if not text.is_valid_int():
+		return
+	var group := int(text)
+	_pgid = group if group == _pid else -1
+
+# Kill whatever is left of the trainer's group. Returns true if anything was
+# still alive — `kill -0 -PGID` succeeds only while the group has a member.
+func _reap_group() -> bool:
+	if _pgid <= 0 or _pgid != _pid:
+		return false
+	var out: Array = []
+	var alive := OS.execute("bash", ["-lc", "kill -0 -%d 2>/dev/null" % _pgid], out) == 0
+	if alive:
+		OS.execute("bash", ["-lc", "kill -KILL -%d 2>/dev/null" % _pgid], out)
+	return alive
+
 func _stop() -> void:
 	if _pid <= 0:
 		return
+	if _pgid <= 0:
+		_resolve_pgid()
 	# freeze the trainer so it spawns nothing more, take its headless godot
 	# workers with it (a lone SIGKILL would orphan one until its match times out),
-	# then kill it
-	OS.execute("bash", ["-lc", "kill -STOP %d; pkill -KILL -P %d; kill -KILL %d" % [
-			_pid, _pid, _pid]])
-	OS.kill(_pid)
+	# then kill it.
+	# R56: when we own the group (setsid worked), STOP and KILL the whole GROUP —
+	# `-PGID` — instead of one generation of children. `pkill -KILL -P` reached
+	# only the trainer's direct children, so anything spawned one level deeper
+	# survived holding the card. The fallback below is the old behaviour, used
+	# only when we could not prove the group is ours.
+	if _pgid == _pid:
+		OS.execute("bash", ["-lc", "kill -STOP -%d 2>/dev/null; kill -KILL -%d 2>/dev/null" % [
+				_pgid, _pgid]])
+	else:
+		OS.execute("bash", ["-lc", "kill -STOP %d; pkill -KILL -P %d; kill -KILL %d" % [
+				_pid, _pid, _pid]])
+		OS.kill(_pid)
 	_proc_note = "%s stopped (pid %d)" % [_pid_kind, _pid]
 	_pid = -1
+	_pgid = -1
 	_pid_kind = ""
 	_refresh_ui()
 

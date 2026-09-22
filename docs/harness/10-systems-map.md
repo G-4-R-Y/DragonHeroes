@@ -204,8 +204,15 @@ bit-identical results; 16 workers ≈ 870× real time aggregate on the 20-core b
 tier. Training workers never build camera/HUD (only `--selftest` does, to gate
 that path). Gates: ARENA SELFTEST, CONSOLE SELFTEST (`console.tscn --
 --selftest`, headless), CONSOLE LAYOUT (`console_layout_probe.tscn` — 7 canvases
-x 5 tabs), COSMETICS, pytest ml (98). Rule: LOCAL GPUs only
-(§12.38). Issues: scripted baseline beats native AI — L1 data-driven AI profiles
+x 5 tabs), TRAINER STOP (`bash tools/trainer_stop_test.sh`), COSMETICS,
+pytest ml (98). Rule: LOCAL GPUs only
+(§12.38). **R56 (2026-09-21):** the console launches the trainer under `setsid`
+and STOP kills the whole PROCESS GROUP. The old `pkill -KILL -P <pid>` reached
+one generation only, so anything spawned a level deeper survived Stop holding
+the card; the group kill is safe only because setsid gives the trainer a session
+of its own — Godot's own children inherit GODOT'S group, and `console.gd`
+requires `pgid == pid` before it ever signals `-PGID`. A crashed trainer's
+orphans are swept on the next poll too, not just on Stop. Issues: scripted baseline beats native AI — L1 data-driven AI profiles
 is the unlock; fen_boar candidates take 0 wins vs native every match (fitness
 moves on hp margin only) — opponent curriculum/shaping next (design/25 §5).
 

@@ -67,7 +67,10 @@ been aborting the menu's `_build` for 9 days behind "no errors" boot checks)
 → `tests/fx_stress.tscn --quit-after 260` (FXSTRESS OK) → `arena/arena.tscn
 -- --selftest` (ARENA SELFTEST OK) → `arena/console.tscn -- --selftest`
 (CONSOLE SELFTEST OK) → `arena/tests/cosmetics_test.tscn`
-(COSMETICS OK) → `tests/level_up_probe.tscn` (LEVEL UP OK) → `bash tools/mp_test.sh` (MP TEST OK) → `python3 -m pytest
+(COSMETICS OK) → `tests/ground_state_probe.tscn` (GROUND STATE OK)
+→ `tests/residency_probe.tscn` (RESIDENCY OK)
+→ `tests/level_up_probe.tscn` (LEVEL UP OK) → `bash tools/trainer_stop_test.sh`
+(TRAINER STOP OK) → `bash tools/mp_test.sh` (MP TEST OK) → `python3 -m pytest
 ml/tests genforge/tests -q` → `python3 tools/validate_content.py` (0 problems).
 Spawn placement gate now pauses enemy pursuit while checking initial spacing;
 the earlier eight-second live pursuit could falsely report a collapsed world.
