@@ -1,0 +1,10 @@
+{
+  "draw_calls": 122.0,
+  "fps": 56.0,
+  "process_ms": 2.349,
+  "scene": "res://arena/console.tscn",
+  "viewport": [
+    1600,
+    900
+  ]
+}
