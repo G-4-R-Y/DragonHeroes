@@ -4,7 +4,7 @@ extends Node2D
 const EXPECTED_FLOATS := 452
 const GOLD := Color("d8b875")
 const TEAL := Color("7ed4ba")
-const RARITIES := ["LEGENDARY", "RELIC", "MYTHIC", "DIVINE"]
+const RARITIES := ["LEGENDARY", "RELIC", "MYTHIC", "DIVINE"]  # order of record; the shown words come from _tier()
 const COLORS := [Color("efcf95"), Color("7ed4ba"), Color("c4a4ef"), Color("f4e8c1")]
 const EFFECT_KIND_ACTION := {1: "echo", 2: "chain", 3: "resource", 4: "ward"}
 var _peer := PacketPeerUDP.new()
@@ -83,14 +83,14 @@ func _ready() -> void:
 
 func _start_host() -> void:
 	if _peer.bind(0, "127.0.0.1") != OK:
-		_status.text = "Could not open the local trial connection. ESC returns to menu."
+		_status.text = ProtoLang.t("tr_no_socket")
 		return
 	_token = int(randi() & 0x7fffffff) + 1
 	var helper := ProjectSettings.globalize_path("res://../sim/build/libs/dh-server/dh-server")
 	if not OS.has_feature("editor"):
 		helper = OS.get_executable_path().get_base_dir().path_join("dh-server.exe" if OS.has_feature("windows") else "dh-server")
 	if not FileAccess.file_exists(helper):
-		_status.text = "Trial helper missing. Keep dh-server beside the game. ESC: menu."
+		_status.text = ProtoLang.t("tr_no_helper")
 		return
 	if LairJourney.lair_id.is_empty():
 		LairJourney.lair_id = str(_chapter.playable.lairs[0].id)
@@ -99,7 +99,7 @@ func _start_host() -> void:
 		"--seed", str(LairJourney.seed), "--entrance-chunk", LairJourney.entrance_chunk]
 	_pid = OS.create_process(helper, args)
 	if _pid < 0:
-		_status.text = "Trial could not start. Check executable permissions. ESC: menu."
+		_status.text = ProtoLang.t("tr_no_start")
 
 func _exit_tree() -> void:
 	if _port > 0:
@@ -126,15 +126,15 @@ func _build_ui() -> void:
 	_status = Label.new()
 	_status.position = Vector2(16, 33)
 	_status.add_theme_font_size_override("font_size", ProtoTheme.SIZE_BODY)
-	_status.text = "Opening the bell shrine..."
+	_status.text = ProtoLang.t("tr_opening")
 	root.add_child(_status)
-	_button(root, "LORE [L]", Vector2(452, 9), Vector2(74, 20), _toggle_lore)
-	_exit_button = _button(root, "RETURN [ESC]", Vector2(534, 9), Vector2(96, 20), _menu)
-	_next_button = _button(root, "CONTINUE [ENTER]", Vector2(225, 202), Vector2(190, 23), func() -> void: _extra_buttons |= 512)
+	_button(root, ProtoLang.t("tr_lore_btn"), Vector2(452, 9), Vector2(74, 20), _toggle_lore)
+	_exit_button = _button(root, ProtoLang.t("tr_return_btn"), Vector2(534, 9), Vector2(96, 20), _menu)
+	_next_button = _button(root, ProtoLang.t("tr_continue_btn"), Vector2(225, 202), Vector2(190, 23), func() -> void: _extra_buttons |= 512)
 	_next_button.hide()
 	for i in range(4):
 		var pick := i
-		var button := _button(root, "%d  %s" % [i + 1, RARITIES[i]], Vector2(10+i*157, 286), Vector2(150, 21), func() -> void:
+		var button := _button(root, "%d  %s" % [i + 1, _tier(i)], Vector2(10+i*157, 286), Vector2(150, 21), func() -> void:
 			_artifact = pick
 			_refresh_lore())
 		button.tooltip_text = _artifacts[i].name + "\n" + _artifacts[i].signature
@@ -143,7 +143,8 @@ func _build_ui() -> void:
 	_feedback.position = Vector2(12, 309)
 	_feedback.add_theme_font_size_override("font_size", ProtoTheme.SIZE_BODY)
 	root.add_child(_feedback)
-	var labels := ["LMB / SPACE  CUT", "SHIFT  REED STEP", "Q  MIRE CHIME", "E  STORM TOLL", "R  COMPANION"]
+	var labels := [ProtoLang.t("tr_cast_cut"), ProtoLang.t("tr_cast_step"), ProtoLang.t("tr_cast_chime"),
+			ProtoLang.t("tr_cast_toll"), ProtoLang.t("tr_cast_companion")]
 	var bits := [1, 2, 4, 8, 16]
 	for i in range(5):
 		var bit: int = bits[i]
@@ -179,12 +180,14 @@ func _refresh_lore() -> void:
 	var story := ""
 	for lore in _chapter.release.lore:
 		if lore.id == item.lore:
-			story = lore.story + "\n\nDISCOVERY\n" + lore.discovery
+			story = ProtoLang.pick(lore, "story", "") + "\n\n" + ProtoLang.t("tr_lore_discovery") \
+					+ "\n" + ProtoLang.pick(lore, "discovery", "")
 	var boss_story := ""
 	for lore in _chapter.release.lore:
-		if lore.id == _creature.lore: boss_story = lore.story
-	_lore_text.text = "%s — %s\n\n%s\n\n%s\n\n%s\n\nCLASS CONNECTIONS: %s\n\n%s\n%s\n\nTrial controls: WASD move, aim with mouse, LMB/Space cut, Shift/RMB dodge, Q Wet field, E Storm, R companion. Q then E spends Wet for chains on Mythic/Divine; R grants the Divine ward. ENTER restarts; F bonds the guardian after victory.\n\nThe new sprite currently has an idle loop. Footwork and attacks use motion and telegraphs while action animation awaits review. Scroll to read; L closes and resumes." % [
-		item.name, RARITIES[_artifact], item.signature, item.tradeoff, story, ", ".join(item.class_hooks), str(_creature.name).to_upper(), boss_story]
+		if lore.id == _creature.lore: boss_story = ProtoLang.pick(lore, "story", "")
+	_lore_text.text = ProtoLang.t("tr_lore_body") % [
+		item.name, _tier(_artifact), ProtoLang.pick(item, "signature", ""), ProtoLang.pick(item, "tradeoff", ""),
+		story, ", ".join(item.class_hooks), str(_creature.name).to_upper(), boss_story]
 
 func _toggle_lore() -> void:
 	_lore_open = not _lore_open
@@ -266,7 +269,7 @@ func _process(delta: float) -> void:
 		if bytes.size() != 20+EXPECTED_FLOATS*4 or bytes.decode_u32(0) != 0x32534c44 or bytes.decode_u32(4) != _token:
 			continue
 		if bytes.decode_u32(16) != int(_chapter.simulation_stamp):
-			_status.text = "Trial data and helper versions differ. Re-extract the full package."
+			_status.text = ProtoLang.t("tr_stamp_mismatch")
 			continue
 		if _peer.get_packet_ip() != "127.0.0.1":
 			continue
@@ -294,7 +297,7 @@ func _process(delta: float) -> void:
 		_send_time = 0
 		_send()
 	if _elapsed - _last_received > 3.0:
-		_status.text = "Trial connection interrupted. ESC returns to menu."
+		_status.text = ProtoLang.t("tr_dropped")
 	queue_redraw()
 	if _test_mode:
 		_test_frames += 1
@@ -336,27 +339,28 @@ func _select_lair(index: int) -> void:
 
 func _refresh_status() -> void:
 	var skill: Dictionary = _skills[_chapter.playable.lairs[_lair_index].phases[int(_state[5])].skill]
-	_status.text = "%s  ·  %s  ·  WASD move / mouse aim" % ["PAUSED" if _lore_open else "BELL SHRINE", skill.name]
-	_feedback.text = "%s  |  Echo %d  Chain %d  Resolve %d  Ward %d" % [_artifacts[_artifact].name, int(_state[24]), int(_state[25]), int(_state[27]), int(_state[28])]
+	_status.text = ProtoLang.t("tr_status") % [ProtoLang.t("tr_paused") if _lore_open else ProtoLang.t("tr_shrine"), skill.name]
+	_feedback.text = ProtoLang.t("tr_feedback") % [_artifacts[_artifact].name, int(_state[24]), int(_state[25]), int(_state[27]), int(_state[28])]
 	if _state[440] == 2:
-		_status.text = "BOSS RUSH  ·  ROUND %d  ·  %s" % [int(_state[441]), skill.name]
+		_status.text = ProtoLang.t("tr_status_rush") % [int(_state[441]), skill.name]
 	elif _state[440] == 0:
-		_status.text = "PRACTICE  ·  %s  ·  All artifacts available" % skill.name
+		_status.text = ProtoLang.t("tr_status_practice") % skill.name
 	if _state[442] > 0:
-		_status.text = "Defeat this guardian in its world lair to unlock boss rush. ESC: return."
+		_status.text = ProtoLang.t("tr_locked_hint")
 	if _state[442] == 2:
-		_status.text = "This doorway is not present in this world. ESC: return."
+		_status.text = ProtoLang.t("tr_absent_hint")
 	if _state[445] > 0:
-		_status.text = "Collection could not be saved. Keep this fight open to retry."
+		_status.text = ProtoLang.t("tr_save_failed")
 	if _state[442] == 3:
-		_status.text = "Collection is busy or unreadable; its save is preserved. ESC: return."
+		_status.text = ProtoLang.t("tr_save_busy")
 	if _state[440] != 0 and _artifact > 0 and _state[446+_artifact] == 0:
 		_artifact = int(_state[2])
 	_next_button.visible = _state[3] == 1 and _state[4] == 0
 	_next_button.disabled = _state[445] > 0
 	for i in range(4):
 		_artifact_buttons[i].disabled = _state[440] != 0 and i != 0 and _state[446+i] == 0
-		_artifact_buttons[i].text = "%d  %s%s" % [i+1, RARITIES[i], " ×%d" % int(_state[446+i]) if _state[440] != 0 else ""]
+		_artifact_buttons[i].text = "%d  %s%s" % [i+1, _tier(i),
+				ProtoLang.t("tr_count_suffix") % int(_state[446+i]) if _state[440] != 0 else ""]
 		_artifact_buttons[i].modulate = COLORS[i] if i == int(_state[2]) else Color(0.65, 0.65, 0.65)
 	for i in range(5):
 		_cast_buttons[i].modulate = TEAL if _state[19+i] == 0 else Color(0.55, 0.6, 0.65)
@@ -367,6 +371,18 @@ func _position_at(index: int) -> Vector2:
 
 func _text(at: Vector2, text: String, tint := Color("d9d4c7"), large := false) -> void:
 	draw_string(_big if large else _small, at, text, HORIZONTAL_ALIGNMENT_LEFT, -1, 16 if large else 8, tint)
+
+# Centred overlay lines measure the glyphs they are about to draw. Hardcoding
+# the x of a centred string is the R82 defect: it holds in English and breaks
+# the moment a translation is a different width.
+func _text_centered(middle: float, y: float, text: String, tint := Color("d9d4c7"), large := false) -> void:
+	var font := _big if large else _small
+	var size := 16 if large else 8
+	_text(Vector2(middle - font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x*0.5, y), text, tint, large)
+
+# Artifact tier names: the trial's own ladder, localized but indexed by RARITIES.
+func _tier(index: int) -> String:
+	return ProtoLang.t("tr_tier_%d" % index)
 
 func _bar(at: Vector2, width: float, amount: float, maximum: float, tint: Color) -> void:
 	draw_rect(Rect2(at, Vector2(width, 4)), Color("101820"))
@@ -382,7 +398,7 @@ func _draw() -> void:
 		var y := 56.0+float((i*37)%220)
 		var alpha := 0.15+0.12*sin(_elapsed*1.3+i)
 		draw_circle(Vector2(x,y), 1.0, Color(0.45, 0.95, 0.8, alpha))
-	_text(Vector2(12,21), "BELL SHRINE" if _lair_index < 0 else str(_chapter.playable.lairs[_lair_index].name).to_upper(), GOLD, true)
+	_text(Vector2(12,21), ProtoLang.t("tr_shrine") if _lair_index < 0 else str(_chapter.playable.lairs[_lair_index].name).to_upper(), GOLD, true)
 	if not _connected:
 		return
 	for n in range(12):
@@ -429,21 +445,22 @@ func _draw() -> void:
 		_draw_actor(actor.kind, actor.pos)
 	var hp := _state[37]
 	_bar(Vector2(208,51), 224, hp, _state[38], GOLD)
-	_text(Vector2(220,65), "BONDED COMPANION" if _state[4] > 0 else str(_creature.name).to_upper(), GOLD)
+	_text(Vector2(220,65), ProtoLang.t("tr_bonded") if _state[4] > 0 else str(_creature.name).to_upper(), GOLD)
 	_bar(Vector2(12,273), 130, _state[12], _state[13], Color("ec867e"))
 	_bar(Vector2(149,273), 110, _state[9], 100, TEAL)
-	_text(Vector2(268,278), "HP %d  LUMEN %d  WARD %d%s" % [int(_state[12]),int(_state[9]),int(_state[14]),"  WET" if _state[16] > 0 else ""])
+	_text(Vector2(268,278), ProtoLang.t("tr_vitals") % [int(_state[12]), int(_state[9]), int(_state[14]),
+			ProtoLang.t("tr_wet_suffix") if _state[16] > 0 else ""])
 	if _state[3] > 0 and _state[4] == 0:
 		draw_rect(Rect2(82,109,476,122), Color(0.025,0.05,0.07,0.95))
-		_text(Vector2(154,140), "THE BELL REMEMBERS" if _state[3] == 1 else "THE FEN CLAIMS YOU", GOLD, true)
+		_text_centered(320, 140, ProtoLang.t("tr_win") if _state[3] == 1 else ProtoLang.t("tr_lose"), GOLD, true)
 		if _state[3] == 1:
 			var earned := int(_state[443])
-			_text(Vector2(110,163), "EARNED: " + str(_artifacts[earned].name) if earned < 4 else "Practice complete. Find this guardian in the world.", TEAL)
-			_text(Vector2(110,182), "Boss rush unlocked  ·  F: bond guardian  ·  ESC: return" if _state[440] == 1 else "ENTER: next encounter  ·  ESC: collection", GOLD)
+			_text_centered(320, 163, ProtoLang.t("tr_earned") % str(_artifacts[earned].name) if earned < 4 else ProtoLang.t("tr_practice_done"), TEAL)
+			_text_centered(320, 182, ProtoLang.t("tr_rush_unlocked") if _state[440] == 1 else ProtoLang.t("tr_next_round"), GOLD)
 		else:
-			_text(Vector2(157,162), "ENTER: retry   1-4: change artifact")
+			_text_centered(320, 162, ProtoLang.t("tr_retry"))
 	elif _state[4] > 0:
-		_text(Vector2(193,92), "Your guardian follows. ENTER: continue", TEAL)
+		_text_centered(320, 92, ProtoLang.t("tr_follows"), TEAL)
 	_max_draw_us = maxi(_max_draw_us, Time.get_ticks_usec()-started)
 
 func _draw_actor(kind: int, pos: Vector2) -> void:
@@ -476,4 +493,4 @@ func _draw_actor(kind: int, pos: Vector2) -> void:
 		if kind > 0: _bar(pos+Vector2(-16,5),32,_state[index+2],_state[index+3],Color("a8b4c8"))
 		if _state[index+5] > 0:
 			draw_arc(pos, 18, 0, TAU, 20, TEAL, 1)
-			_text(pos+Vector2(-10,18), "WET", TEAL)
+			_text(pos+Vector2(-10,18), ProtoLang.t("tr_wet_tag"), TEAL)

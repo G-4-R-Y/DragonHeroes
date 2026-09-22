@@ -543,10 +543,29 @@ port) remains the strategic production step.
 
 ## Tests & captures
 `game/prototype/tests/` — vfx_showcase, vfx_iso, ui_capture, stream_test,
-spawn_probe, click_test, cue_probe, fx_stress (+ captures/), `game/arena/tests/`,
+spawn_probe, click_test, cue_probe, text_fit, fx_stress (+ captures/), `game/arena/tests/`,
 `game/mp/tests/`, `genforge/tests/`, `ml/tests/`, `tools/mp_test.sh`.
 Reference frames: `docs/media/v1-vs-v2.png`, `captures/03_firefield_burning.png`,
 `captures/ui_hunt_far.png`, `captures/ui_3d.png`.
+
+**`text_fit` — the typography gate (R83, 2026-09-22).**
+`godot --headless --path game prototype/tests/text_fit.tscn`. Measures every
+string that must fit a box it cannot resize, in **en AND pt**, with the shipping
+fonts at the shipping sizes (`BTN_PAD := 12.0` for `ProtoTheme._box`'s 6 px
+margins), pulling data strings from the real `chapter.json` via `_longest(rows,
+field)` so the budget tracks content growth instead of freezing today's longest
+name. Prints `TEXT FIT OK · %d strings measured in en + pt` or one `TEXT FIT
+FAIL:` line per overflow. It caught 3 of 116 on its first run, all PT, all in the
+cast row — which tiles the full 640 px screen (`8 + 5*126 = 638`) and therefore
+cannot grow, so the text had to shrink, not the box. Add a key here whenever a
+new string lands in a fixed box.
+
+**Stateful gates (R83, 2026-09-22).** `--lairs-selftest` persists its earned
+collection to `user://lair-collection-v1.txt`; a rerun fails `first kill must
+grant an item` until `$XDG_DATA_HOME/Dragon Heroes/lair-collection-v1.txt*` is
+deleted. Set the language headlessly by writing `{"lang":"pt"}` to
+`$XDG_DATA_HOME/Dragon Heroes/settings.json`. `ui_capture` without `UI_SCENE`
+silently shoots the main menu and overwrites committed reference frames.
 
 **Probe discipline (R80, 2026-09-22).** A probe that builds its own world
 fixture must (a) pin the seed — `MpNet.pending_seed = <seed>` before

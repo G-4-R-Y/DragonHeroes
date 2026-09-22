@@ -26,12 +26,12 @@ func profile() -> String:
 func collection() -> Dictionary:
 	var output: Array = []
 	if not FileAccess.file_exists(helper()):
-		return {"error": "Keep dh-server beside the game to open your collection."}
+		return {"error": ProtoLang.t("lm_no_helper")}
 	var code := OS.execute(helper(), ["--lair-profile", profile()], output)
 	var result = JSON.parse_string("".join(output))
 	if result is Dictionary:
 		return result
-	return {"error": "The lair collection could not be read (%d)." % code}
+	return {"error": ProtoLang.t("lm_unreadable") % code}
 
 func practice() -> void:
 	mode_name = "practice"

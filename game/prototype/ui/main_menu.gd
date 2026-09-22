@@ -187,7 +187,7 @@ func _build() -> void:
 	if not saves_for_quick.is_empty():
 		_name_edit.text = str(saves_for_quick[0].name)
 	var living := Button.new()
-	living.text = "PLAY NEW CONTENT: LAIRS & LEGENDS"
+	living.text = ProtoLang.t("lm_menu_entry")
 	living.custom_minimum_size = Vector2(310, 22)
 	living.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	ProtoTheme.accent_button(living, ProtoTheme.LUMEN)

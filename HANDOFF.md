@@ -1,3 +1,82 @@
+# Handoff — 2026-09-22: R83 (`game/living/` speaks Portuguese, and a gate to keep it that way)
+
+**R82's lesson applied before the bug, not after it.** R82 closed on geometry
+decided by *counting characters* instead of measuring glyphs — holds in English,
+breaks in Portuguese. `game/living/` had **zero** `ProtoLang` references, so it
+was swept with that lesson up front.
+
+**The sweep.** 60 keys into `game/prototype/ui/lang.gd` — `lm_*` (lair menu,
+journey helper) and `tr_*` (trial). EN values are **byte-identical** to the
+literals they replace, because `click_test` asserts several verbatim; that is
+the tripwire, not an accident. `living/trial.gd`, `lair_menu.gd`, `journey.gd`
+and the `main_menu.gd:190` doorway now resolve every user-facing line at render
+time. Pack copy — lore `story`/`discovery`, artifact `signature`/`tradeoff`,
+tooltips — goes through `ProtoLang.pick(d, field)`, which prefers `<field>_pt`;
+nothing in `chapter.json` has one yet, so it renders English today and localizes
+with **no code change** the day the pipeline emits them.
+
+**`_text_centered()`.** The victory panel centred its lines by hardcoding each
+one's x — measured once, in English, baked in. R82's defect verbatim, one file
+over, waiting for a longer word. Overlay text now measures what it is about to
+draw.
+
+**The new gate: `prototype/tests/text_fit.gd`.** Measuring after the fact only
+catches what someone thought to look at. This measures every string that must
+fit a box it cannot resize, in **both** languages, with the shipping fonts, and
+pulls data strings from the real `chapter.json` so the budget tracks content
+growth. **It failed 3 of 116 on its first run** — all PT, all in the cast row,
+which tiles the whole 640 px screen (`8 + 5*126 = 638`) and therefore cannot
+grow: `tr_cast_cut` 121 px, `tr_cast_step` 133 px, `tr_cast_toll` 144 px, in a
+110 px box.
+
+**The fix was a rule, not a thesaurus.** `MIRE CHIME` / `STORM TOLL` /
+`REED STEP` are skill names out of `chapter.json`, and the codex renders them
+untranslated. Hand-translating them on a button would make the button disagree
+with the lore and collide the day the pack emits `name_pt` — so the buttons
+spell them the pack's way (101 / 84 / 82 px). `CUT` and `COMPANION` are just
+words, so they localize: `LMB/ESPAÇO CORTE`, **109 px in a 110 px box**. Then
+`TEXT FIT OK · 116 strings measured in en + pt`.
+
+**Evidence.** `text_fit` 116/116 · `click_test` 12/12 · `menu_probe`,
+`esc_probe`, `cue_probe` OK · `--lairs-selftest` OK in **both** languages
+(`earned_artifacts: 2`, `rush_round: 2.0`, `world_return_preserved: true`).
+Captures: `ui_trial_pt.png` (85 draw calls, 5.6 ms CPU, 60 fps),
+`ui_lairs_pt.png` / `ui_lairs_en.png` (27 draw calls). The PT trial frame reads
+whole — `TREINO · Reed Step · Todos os artefatos disponíveis`,
+`PV 140  LUMEN 6  ÉGIDE 33`, `MOLHADO`, `1 LENDÁRIO / 2 RELÍQUIA / 3 MÍTICO /
+4 DIVINO` — with pack names in English **by design**.
+
+**Traps, written down so the next session does not re-find them.**
+`--lairs-selftest` is **stateful**: `LairJourney.profile()` persists to
+`user://lair-collection-v1.txt`, so a rerun fails `first kill must grant an item`
+until `$XDG_DATA_HOME/Dragon Heroes/lair-collection-v1.txt*` is deleted. Set the
+language headlessly by writing `{"lang":"pt"}` to
+`$XDG_DATA_HOME/Dragon Heroes/settings.json` (the user dir is
+`$XDG_DATA_HOME/Dragon Heroes/`, **not** `app_userdata/`). `ui_capture` without
+`UI_SCENE` silently shoots the main menu and **overwrites committed reference
+frames**. And `--check-only --script` is not a parse gate for autoload-dependent
+scripts — it reports `Identifier not found: LairJourney`.
+
+**What the PT captures found next — R84, and what it is NOT.** The tagline reads
+`Lembre-se da caÇada`: lowercase **ç drawn at capital height**. `cat -A` cleared
+the string (clean UTF-8 `C3 A7`), so it is the font. In `PixelOperator8.ttf`
+(800 upem, cap 700, x-height 500) `ccedilla` has yMax **700** where a lowercase
+bowl must stop at 500; the 16 px face proves intent, with `ccedilla` yMax 700
+equal to its own lowercase `c` and `Ccedilla` at 900.
+
+**This does not reopen the false alarm below.** That killed row claimed the font
+*drops uppercase accents* — it does not, and the `SANTUÁRIO` crop still shows
+the acute. R84 is a different claim about a different glyph. The accented
+CAPITALS were re-checked here and are again **not** a defect: `Á`/`Ã`/`Í` share
+plain `A`/`I`'s yMax 700 because an 8 px face with a 7 px cap has nowhere above
+it to put an accent, and the `COLEÇÃO CONQUISTADA` crop reads correctly. Nor are
+the 39 accented lowercase glyphs whose bounds match their capital's — `á`
+reaches 700 legitimately via the accent above the x-height. **`ç` is the only
+glyph whose height has no accent to explain it**, and the render, not the
+metrics, is what confirmed it.
+
+---
+
 # Handoff — 2026-09-22: R82 (three defects the captures found, one root cause)
 
 **Every one of the three was geometry decided by counting instead of measuring

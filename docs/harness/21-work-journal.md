@@ -5316,3 +5316,117 @@ Fixing (b) exposed that `game/living/` is untranslated end to end — zero
 `ProtoLang` references outside the file just fixed, with `trial.gd` alone
 carrying 16 `.text = "` sites. Logged as **R83**, not fixed inline: it is a
 separate sweep with its own gate.
+
+---
+
+## R83 — `game/living/` learns Portuguese, and the gate that will keep it (2026-09-22)
+
+R82 closed on a defect whose cause was worth more than the fix: the hotbar
+decided how much room a skill name needed by **counting characters** instead of
+measuring glyphs. That holds in English by luck and breaks the moment a word
+gets longer. R83 is the same subsystem-wide sweep — `game/living/` had **zero**
+`ProtoLang` references before R82 brushed `world_lairs.gd` — so it was done with
+that lesson applied up front rather than discovered again.
+
+### What changed
+
+60 keys into `lang.gd`: `lm_*` for the lair menu and the journey helper, `tr_*`
+for the trial. EN values are **byte-identical** to the literals they replace —
+`click_test` asserts several of them verbatim, so any drift there is a test
+failure, which is exactly the tripwire wanted. `trial.gd`, `lair_menu.gd`,
+`journey.gd` and the `main_menu.gd:190` doorway now resolve every user-facing
+line at render time.
+
+Pack content — lore `story`/`discovery`, artifact `signature`/`tradeoff`,
+tooltips — goes through `ProtoLang.pick(d, field)`, which prefers `<field>_pt`
+and falls back to the English field. Nothing in `chapter.json` has a `_pt`
+sibling yet, so today it renders English; the day the content pipeline emits
+one, it localizes with no code change.
+
+Two structural fixes came with the sweep:
+
+**`_text_centered()`.** The victory panel centred its lines by hardcoding the x
+of each one — measured once, in English, and baked in. That is R82's defect
+verbatim, one file over, waiting for a longer word. Overlay text now measures
+the string it is about to draw and centres on the result.
+
+**`prototype/tests/text_fit.gd` — a new durable gate.** Measuring after the fact
+only catches what someone thought to look at. This measures every string that
+has to fit a box it cannot resize, in **both** languages, with the shipping
+fonts at the shipping sizes, and pulls the data strings from the real
+`chapter.json` (`_longest(rows, field)`) so the budget stays honest as content
+grows rather than freezing today's longest name into the test.
+
+### The gate earned itself on the first run
+
+`TEXT FIT FAIL` ×3, all Portuguese, all in the cast row:
+
+| key | PT, before | width | box |
+|---|---|---|---|
+| `tr_cast_cut` | `BOTÃO ESQ / ESPAÇO  CORTAR` | 121 px | 110 px |
+| `tr_cast_step` | `SHIFT  PASSO DE JUNCO` | 133 px | 110 px |
+| `tr_cast_toll` | `E  DOBRE DA TEMPESTADE` | 144 px | 110 px |
+
+The five cast buttons sit at `Vector2(8 + i*126, 332)`, size `Vector2(122, 20)`
+— `8 + 5×126 = 638` of 640 px. **The row already tiles the whole screen**, so
+the box cannot grow by even one button's worth. Widening was never an option;
+the text had to change.
+
+The fix came from a rule rather than a thesaurus. `MIRE CHIME`, `STORM TOLL` and
+`REED STEP` are **skill names out of `chapter.json`**, and the codex and the lore
+render them through `ProtoLang.pick` — untranslated, because the pack has no
+`name_pt`. Hand-translating them on the button would make the button say one
+thing and the lore another, and would collide the day the pipeline *does* emit
+`name_pt`. So they revert to the pack spelling (101 / 84 / 82 px, comfortably
+inside). `CUT` and `COMPANION` are not pack skills, just words, so they localize:
+`tr_cast_cut` → `LMB/ESPAÇO CORTE`, **109 px in a 110 px box**.
+
+Then: `TEXT FIT OK  ·  116 strings measured in en + pt`.
+
+### Evidence
+
+`text_fit` 116/116 · `click_test` 12/12 · `menu_probe`, `esc_probe`, `cue_probe`
+OK · `--lairs-selftest` OK in **both** languages (`earned_artifacts: 2`,
+`rush_round: 2.0`, `world_return_preserved: true`).
+
+Captures on `DISPLAY=:1` under `--rendering-method gl_compatibility`:
+`ui_trial_pt.png` (85 draw calls, 5.6 ms CPU, 60 fps), `ui_lairs_pt.png` and
+`ui_lairs_en.png` (27 draw calls). The PT trial frame reads whole — `LENDA [L]`,
+`VOLTAR [ESC]`, `TREINO · Reed Step · Todos os artefatos disponíveis`,
+`PV 140  LUMEN 6  ÉGIDE 33`, `MOLHADO`, `1 LENDÁRIO / 2 RELÍQUIA / 3 MÍTICO /
+4 DIVINO` — with pack names (`The Bell Beneath the Fen`, `Widow's Refrain`,
+`Pilgrim's Bell`) in English **by design**.
+
+### A trap worth writing down
+
+**The lairs selftest is stateful.** `LairJourney.profile()` persists to
+`user://lair-collection-v1.txt`, so a second run fails with `LAIR PLAYTEST FAIL:
+first kill must grant an item and unlock guardian` — not a regression, just the
+collection already earned. Delete `$XDG_DATA_HOME/Dragon Heroes/lair-collection-v1.txt*`
+before each run. (The user dir is `$XDG_DATA_HOME/Dragon Heroes/`, *not*
+`app_userdata/`.) Related: omitting `UI_SCENE` makes `ui_capture` silently shoot
+the main menu and overwrite committed reference frames.
+
+### What the PT captures then found — R84
+
+Zooming the PT tagline showed `Lembre-se da caÇada`: the lowercase **ç drawn at
+capital height**. `cat -A` cleared the string first (clean UTF-8 `C3 A7`), so
+this is the font.
+
+The measurement, and the care it needed. In `PixelOperator8.ttf` (800 upem, cap
+700, x-height 500) `ccedilla` has yMax **700**. That number alone proves nothing
+for most accented glyphs — `á` also reaches 700, legitimately, because the acute
+lives in the 500–700 band above the x-height; 39 accented lowercase glyphs share
+their capital's bounds for exactly that innocent reason. **`ç` is the one glyph
+where the height has no accent to explain it**: nothing sits above a cedilla, so
+a correct lowercase bowl must stop at 500. The 16 px face confirms the intent —
+there `ccedilla` yMax 700 *equals its own lowercase* `c`, while `Ccedilla` is 900.
+
+And the accented-capital half of the first guess was **wrong and was dropped**.
+`Á`/`Ã`/`Í` share plain `A`/`I`'s yMax 700 because an 8 px face with a 7 px cap
+has nowhere above the cap to put an accent — that is a design constraint, not a
+defect. The crop of `COLEÇÃO CONQUISTADA` reads correctly, and the earlier PIL
+investigation in this same journal had already killed a bogus "cannot render
+uppercase diacritics" row on the same evidence. Logged as **R84**, narrowed to
+the one glyph, with the render — not the metrics — as the proof, per this file's
+own standing rule: *PIL is not the renderer; only the capture is evidence.*

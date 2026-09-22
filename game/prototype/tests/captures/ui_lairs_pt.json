@@ -1,0 +1,10 @@
+{
+  "draw_calls": 27.0,
+  "fps": 34.0,
+  "process_ms": 5.529,
+  "scene": "res://living/lair_menu.tscn",
+  "viewport": [
+    1280,
+    720
+  ]
+}
