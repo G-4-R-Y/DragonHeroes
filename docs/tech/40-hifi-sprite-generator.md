@@ -5,6 +5,15 @@
 **Brief:** `sprites prompt.md` at the repo root (Ricardo's; verbatim). The
 roadmap's R52 block is its index. **Benchmark opponent:** "astra".
 
+**2026-09-22 audit (R81):** the 23 tests pass, but the six sampled real Orun
+poses fail. Sequence fitting/palettes, animation export and runtime coverage
+remain gaps; the findings and proposed fixes are in
+[the asset audit](../research/asset-audit-2026-09-22.md). Treat the scorecard
+as technical conformance, not artistic or animation approval. Its current
+native-grid check is dimension-based. Godot 4.6 also has a simpler Compatibility
+glow path; the Vulkan-only wording below describes this project's current
+HDR branch, not all glow the installed engine can support.
+
 ## 1. What it is
 
 Ricardo's brief names five rendering pillars of the Dead Cells / Phantom Tower

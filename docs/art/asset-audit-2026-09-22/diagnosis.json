@@ -1,0 +1,2464 @@
+{
+  "purpose": "Diagnostic only. No art approval, staging or provider calls.",
+  "source": "genforge/art_sources/bellwether/source-v2.png",
+  "sampled_cells": [
+    {
+      "frame": 0,
+      "pose": "idle",
+      "before": {
+        "schema": "dragon-heroes.hifi-scorecard.v1",
+        "verdict": "FAIL",
+        "score": 61.4,
+        "failures": [
+          "transparent_bg: border band opaque 1.00; checkerboard 0.68",
+          "isolated_fill: fill 1.00 (want 0.12-0.9); touches border",
+          "indexed_palette: 25721 colours vs budget 49 (ink + 6x8)",
+          "ink_hold_perimeter: ink on 0.014 of the perimeter, 1006 gaps, 2 loop(s) for 1 silhouette(s)"
+        ],
+        "checks": [
+          {
+            "name": "transparent_bg",
+            "passed": false,
+            "hard": true,
+            "detail": "border band opaque 1.00; checkerboard 0.68",
+            "value": 1.0
+          },
+          {
+            "name": "binary_alpha",
+            "passed": true,
+            "hard": true,
+            "detail": "0 semi-transparent px",
+            "value": 0
+          },
+          {
+            "name": "native_grid",
+            "passed": true,
+            "hard": true,
+            "detail": "256x256 native grid",
+            "value": 1.0
+          },
+          {
+            "name": "isolated_fill",
+            "passed": false,
+            "hard": true,
+            "detail": "fill 1.00 (want 0.12-0.9); touches border",
+            "value": 1.0
+          },
+          {
+            "name": "indexed_palette",
+            "passed": false,
+            "hard": true,
+            "detail": "25721 colours vs budget 49 (ink + 6x8)",
+            "value": 25721
+          },
+          {
+            "name": "deep_ramps",
+            "passed": true,
+            "hard": true,
+            "detail": "6 ramps use >= 6 shades [8, 8, 8, 8, 8, 8]",
+            "value": 6
+          },
+          {
+            "name": "rich_ramps",
+            "passed": true,
+            "hard": false,
+            "detail": "6 deep ramps (want >= 3)",
+            "value": 6
+          },
+          {
+            "name": "hue_shift",
+            "passed": true,
+            "hard": false,
+            "detail": "shadow->highlight hue delta 15.89 deg",
+            "value": 15.89
+          },
+          {
+            "name": "no_dithering",
+            "passed": true,
+            "hard": true,
+            "detail": "checker 2x2 share 0.005",
+            "value": 0.005
+          },
+          {
+            "name": "ink_hold_perimeter",
+            "passed": false,
+            "hard": true,
+            "detail": "ink on 0.014 of the perimeter, 1006 gaps, 2 loop(s) for 1 silhouette(s)",
+            "value": 0.0137
+          },
+          {
+            "name": "emissive_core",
+            "passed": true,
+            "hard": true,
+            "detail": "143 px (0.002 of silhouette) at hue 195.0",
+            "value": 143
+          },
+          {
+            "name": "no_pillow_shading",
+            "passed": true,
+            "hard": false,
+            "detail": "lightness~depth correlation 0.00",
+            "value": 0.0
+          },
+          {
+            "name": "directional_shading",
+            "passed": false,
+            "hard": false,
+            "detail": "gradient agreement 0.01, key light 122.9 deg",
+            "value": 0.0072
+          }
+        ],
+        "metrics": {
+          "size": [
+            256,
+            256
+          ],
+          "background": {
+            "checkerboard": 0.683,
+            "solid_backdrop": 0.3999,
+            "band_opaque": 1.0
+          },
+          "semi_alpha_px": 0,
+          "grid": {
+            "pitch": 1,
+            "conformity": 1.0,
+            "native": true
+          },
+          "fill": 1.0,
+          "touches_border": true,
+          "colors": 25721,
+          "palette_budget": 49,
+          "shades_per_ramp": [
+            8,
+            8,
+            8,
+            8,
+            8,
+            8
+          ],
+          "hue_shift_deg": 15.89,
+          "dither": 0.005,
+          "outline": {
+            "ring_px": 1020,
+            "ink_px": 14,
+            "coverage": 0.0137,
+            "gaps": 1006,
+            "silhouettes": 1,
+            "ink_loops": 2,
+            "continuous": false,
+            "width2_coverage": 0.0148
+          },
+          "emissive": {
+            "expected": true,
+            "hue_deg": 195.0,
+            "pixels": 143,
+            "fraction": 0.0022,
+            "components": 2,
+            "bbox": [
+              97,
+              83,
+              166,
+              167
+            ]
+          },
+          "pillow": 0.0,
+          "directional": 0.0072,
+          "light_deg": 122.9
+        }
+      },
+      "after": {
+        "schema": "dragon-heroes.hifi-scorecard.v1",
+        "verdict": "FAIL",
+        "score": 76.9,
+        "failures": [
+          "isolated_fill: fill 0.10 (want 0.12-0.9); clear margin",
+          "emissive_core: 0 px (0.000 of silhouette) at hue 195.0"
+        ],
+        "checks": [
+          {
+            "name": "transparent_bg",
+            "passed": true,
+            "hard": true,
+            "detail": "border band opaque 0.01; checkerboard 0.00",
+            "value": 0.01313969571230982
+          },
+          {
+            "name": "binary_alpha",
+            "passed": true,
+            "hard": true,
+            "detail": "0 semi-transparent px",
+            "value": 0
+          },
+          {
+            "name": "native_grid",
+            "passed": true,
+            "hard": true,
+            "detail": "256x256 native grid",
+            "value": 1.0
+          },
+          {
+            "name": "isolated_fill",
+            "passed": false,
+            "hard": true,
+            "detail": "fill 0.10 (want 0.12-0.9); clear margin",
+            "value": 0.101043701171875
+          },
+          {
+            "name": "indexed_palette",
+            "passed": true,
+            "hard": true,
+            "detail": "47 colours vs budget 49 (ink + 6x8)",
+            "value": 47
+          },
+          {
+            "name": "deep_ramps",
+            "passed": true,
+            "hard": true,
+            "detail": "6 ramps use >= 6 shades [8, 8, 7, 8, 7, 8]",
+            "value": 6
+          },
+          {
+            "name": "rich_ramps",
+            "passed": true,
+            "hard": false,
+            "detail": "6 deep ramps (want >= 3)",
+            "value": 6
+          },
+          {
+            "name": "hue_shift",
+            "passed": true,
+            "hard": false,
+            "detail": "shadow->highlight hue delta 14.53 deg",
+            "value": 14.53
+          },
+          {
+            "name": "no_dithering",
+            "passed": true,
+            "hard": true,
+            "detail": "checker 2x2 share 0.000",
+            "value": 0.0003
+          },
+          {
+            "name": "ink_hold_perimeter",
+            "passed": true,
+            "hard": true,
+            "detail": "ink on 1.000 of the perimeter, 0 gaps, 2 loop(s) for 2 silhouette(s)",
+            "value": 1.0
+          },
+          {
+            "name": "emissive_core",
+            "passed": false,
+            "hard": true,
+            "detail": "0 px (0.000 of silhouette) at hue 195.0",
+            "value": 0
+          },
+          {
+            "name": "no_pillow_shading",
+            "passed": true,
+            "hard": false,
+            "detail": "lightness~depth correlation 0.10",
+            "value": 0.0993
+          },
+          {
+            "name": "directional_shading",
+            "passed": false,
+            "hard": false,
+            "detail": "gradient agreement 0.02, key light 139.4 deg",
+            "value": 0.0222
+          }
+        ],
+        "metrics": {
+          "size": [
+            256,
+            256
+          ],
+          "background": {
+            "checkerboard": 0.0,
+            "solid_backdrop": 0.0,
+            "band_opaque": 0.01313969571230982
+          },
+          "semi_alpha_px": 0,
+          "grid": {
+            "pitch": 1,
+            "conformity": 1.0,
+            "native": true
+          },
+          "fill": 0.101,
+          "touches_border": false,
+          "colors": 47,
+          "palette_budget": 49,
+          "shades_per_ramp": [
+            8,
+            8,
+            7,
+            8,
+            7,
+            8
+          ],
+          "hue_shift_deg": 14.53,
+          "dither": 0.0003,
+          "outline": {
+            "ring_px": 595,
+            "ink_px": 595,
+            "coverage": 1.0,
+            "gaps": 0,
+            "silhouettes": 2,
+            "ink_loops": 2,
+            "continuous": true,
+            "width2_coverage": 0.6894
+          },
+          "emissive": {
+            "expected": true,
+            "hue_deg": 195.0,
+            "pixels": 0,
+            "fraction": 0.0,
+            "components": 0,
+            "bbox": null
+          },
+          "pillow": 0.0993,
+          "directional": 0.0222,
+          "light_deg": 139.4,
+          "input_grid_conformity": 1.0,
+          "outline_painted_px": 106,
+          "background_mode": "checkerboard"
+        }
+      },
+      "steps": {
+        "alpha": {
+          "background_mode": "checkerboard",
+          "checkerboard_score": 0.683,
+          "solid_backdrop": 0.3999,
+          "cleared_px": 39442,
+          "halo_px": 0,
+          "specks_removed": 0,
+          "speck_px": 0,
+          "fringe_px": 335
+        },
+        "grid": {
+          "pitch": 1,
+          "phase_x": 0,
+          "phase_y": 0,
+          "conformity": 1.0,
+          "requested_pitch": 1,
+          "cells": [
+            256,
+            256
+          ],
+          "margin_px": 8,
+          "reduced_by": 2,
+          "sprite_px": [
+            90,
+            124
+          ],
+          "anchor": [
+            128,
+            248
+          ]
+        },
+        "palette": {
+          "mean_oklab_error": 0.028,
+          "max_oklab_error": 0.1614,
+          "colors_used": 49,
+          "ramps": 6,
+          "colors": 49
+        },
+        "emissive": {
+          "expected": true,
+          "hue_deg": 195.0,
+          "pixels": 0,
+          "fraction": 0.0,
+          "components": 0,
+          "bbox": null,
+          "extracted_before_repair": 0
+        },
+        "dedither": {
+          "dither_before": 0.0098,
+          "dither_after": 0.0003,
+          "pixels_changed": 2317
+        },
+        "outline": {
+          "before": {
+            "ring_px": 595,
+            "ink_px": 489,
+            "coverage": 0.8218,
+            "gaps": 106,
+            "silhouettes": 2,
+            "ink_loops": 44,
+            "continuous": false,
+            "width2_coverage": 0.6894
+          },
+          "painted_px": 106,
+          "after": {
+            "ring_px": 595,
+            "ink_px": 595,
+            "coverage": 1.0,
+            "gaps": 0,
+            "silhouettes": 2,
+            "ink_loops": 2,
+            "continuous": true,
+            "width2_coverage": 0.6894
+          },
+          "width": 1
+        }
+      }
+    },
+    {
+      "frame": 4,
+      "pose": "move",
+      "before": {
+        "schema": "dragon-heroes.hifi-scorecard.v1",
+        "verdict": "FAIL",
+        "score": 61.4,
+        "failures": [
+          "transparent_bg: border band opaque 1.00; checkerboard 0.68",
+          "isolated_fill: fill 1.00 (want 0.12-0.9); touches border",
+          "indexed_palette: 27035 colours vs budget 49 (ink + 6x8)",
+          "ink_hold_perimeter: ink on 0.024 of the perimeter, 996 gaps, 5 loop(s) for 1 silhouette(s)"
+        ],
+        "checks": [
+          {
+            "name": "transparent_bg",
+            "passed": false,
+            "hard": true,
+            "detail": "border band opaque 1.00; checkerboard 0.68",
+            "value": 1.0
+          },
+          {
+            "name": "binary_alpha",
+            "passed": true,
+            "hard": true,
+            "detail": "0 semi-transparent px",
+            "value": 0
+          },
+          {
+            "name": "native_grid",
+            "passed": true,
+            "hard": true,
+            "detail": "256x256 native grid",
+            "value": 1.0
+          },
+          {
+            "name": "isolated_fill",
+            "passed": false,
+            "hard": true,
+            "detail": "fill 1.00 (want 0.12-0.9); touches border",
+            "value": 1.0
+          },
+          {
+            "name": "indexed_palette",
+            "passed": false,
+            "hard": true,
+            "detail": "27035 colours vs budget 49 (ink + 6x8)",
+            "value": 27035
+          },
+          {
+            "name": "deep_ramps",
+            "passed": true,
+            "hard": true,
+            "detail": "6 ramps use >= 6 shades [8, 8, 8, 8, 8, 8]",
+            "value": 6
+          },
+          {
+            "name": "rich_ramps",
+            "passed": true,
+            "hard": false,
+            "detail": "6 deep ramps (want >= 3)",
+            "value": 6
+          },
+          {
+            "name": "hue_shift",
+            "passed": true,
+            "hard": false,
+            "detail": "shadow->highlight hue delta 16.0 deg",
+            "value": 16.0
+          },
+          {
+            "name": "no_dithering",
+            "passed": true,
+            "hard": true,
+            "detail": "checker 2x2 share 0.005",
+            "value": 0.0049
+          },
+          {
+            "name": "ink_hold_perimeter",
+            "passed": false,
+            "hard": true,
+            "detail": "ink on 0.024 of the perimeter, 996 gaps, 5 loop(s) for 1 silhouette(s)",
+            "value": 0.0235
+          },
+          {
+            "name": "emissive_core",
+            "passed": true,
+            "hard": true,
+            "detail": "134 px (0.002 of silhouette) at hue 195.0",
+            "value": 134
+          },
+          {
+            "name": "no_pillow_shading",
+            "passed": true,
+            "hard": false,
+            "detail": "lightness~depth correlation 0.00",
+            "value": 0.0
+          },
+          {
+            "name": "directional_shading",
+            "passed": false,
+            "hard": false,
+            "detail": "gradient agreement 0.01, key light 147.5 deg",
+            "value": 0.0093
+          }
+        ],
+        "metrics": {
+          "size": [
+            256,
+            256
+          ],
+          "background": {
+            "checkerboard": 0.6834,
+            "solid_backdrop": 0.4055,
+            "band_opaque": 1.0
+          },
+          "semi_alpha_px": 0,
+          "grid": {
+            "pitch": 1,
+            "conformity": 1.0,
+            "native": true
+          },
+          "fill": 1.0,
+          "touches_border": true,
+          "colors": 27035,
+          "palette_budget": 49,
+          "shades_per_ramp": [
+            8,
+            8,
+            8,
+            8,
+            8,
+            8
+          ],
+          "hue_shift_deg": 16.0,
+          "dither": 0.0049,
+          "outline": {
+            "ring_px": 1020,
+            "ink_px": 24,
+            "coverage": 0.0235,
+            "gaps": 996,
+            "silhouettes": 1,
+            "ink_loops": 5,
+            "continuous": false,
+            "width2_coverage": 0.0208
+          },
+          "emissive": {
+            "expected": true,
+            "hue_deg": 195.0,
+            "pixels": 134,
+            "fraction": 0.002,
+            "components": 1,
+            "bbox": [
+              96,
+              145,
+              111,
+              165
+            ]
+          },
+          "pillow": 0.0,
+          "directional": 0.0093,
+          "light_deg": 147.5
+        }
+      },
+      "after": {
+        "schema": "dragon-heroes.hifi-scorecard.v1",
+        "verdict": "FAIL",
+        "score": 76.9,
+        "failures": [
+          "isolated_fill: fill 0.11 (want 0.12-0.9); clear margin",
+          "emissive_core: 0 px (0.000 of silhouette) at hue 195.0"
+        ],
+        "checks": [
+          {
+            "name": "transparent_bg",
+            "passed": true,
+            "hard": true,
+            "detail": "border band opaque 0.01; checkerboard 0.00",
+            "value": 0.007814661134163209
+          },
+          {
+            "name": "binary_alpha",
+            "passed": true,
+            "hard": true,
+            "detail": "0 semi-transparent px",
+            "value": 0
+          },
+          {
+            "name": "native_grid",
+            "passed": true,
+            "hard": true,
+            "detail": "256x256 native grid",
+            "value": 1.0
+          },
+          {
+            "name": "isolated_fill",
+            "passed": false,
+            "hard": true,
+            "detail": "fill 0.11 (want 0.12-0.9); clear margin",
+            "value": 0.1059722900390625
+          },
+          {
+            "name": "indexed_palette",
+            "passed": true,
+            "hard": true,
+            "detail": "48 colours vs budget 49 (ink + 6x8)",
+            "value": 48
+          },
+          {
+            "name": "deep_ramps",
+            "passed": true,
+            "hard": true,
+            "detail": "6 ramps use >= 6 shades [8, 8, 8, 8, 8, 7]",
+            "value": 6
+          },
+          {
+            "name": "rich_ramps",
+            "passed": true,
+            "hard": false,
+            "detail": "6 deep ramps (want >= 3)",
+            "value": 6
+          },
+          {
+            "name": "hue_shift",
+            "passed": true,
+            "hard": false,
+            "detail": "shadow->highlight hue delta 16.54 deg",
+            "value": 16.54
+          },
+          {
+            "name": "no_dithering",
+            "passed": true,
+            "hard": true,
+            "detail": "checker 2x2 share 0.001",
+            "value": 0.0006
+          },
+          {
+            "name": "ink_hold_perimeter",
+            "passed": true,
+            "hard": true,
+            "detail": "ink on 1.000 of the perimeter, 0 gaps, 2 loop(s) for 2 silhouette(s)",
+            "value": 1.0
+          },
+          {
+            "name": "emissive_core",
+            "passed": false,
+            "hard": true,
+            "detail": "0 px (0.000 of silhouette) at hue 195.0",
+            "value": 0
+          },
+          {
+            "name": "no_pillow_shading",
+            "passed": true,
+            "hard": false,
+            "detail": "lightness~depth correlation 0.14",
+            "value": 0.1415
+          },
+          {
+            "name": "directional_shading",
+            "passed": false,
+            "hard": false,
+            "detail": "gradient agreement 0.04, key light 165.5 deg",
+            "value": 0.037
+          }
+        ],
+        "metrics": {
+          "size": [
+            256,
+            256
+          ],
+          "background": {
+            "checkerboard": 0.0,
+            "solid_backdrop": 0.0,
+            "band_opaque": 0.007814661134163209
+          },
+          "semi_alpha_px": 0,
+          "grid": {
+            "pitch": 1,
+            "conformity": 1.0,
+            "native": true
+          },
+          "fill": 0.106,
+          "touches_border": false,
+          "colors": 48,
+          "palette_budget": 49,
+          "shades_per_ramp": [
+            8,
+            8,
+            8,
+            8,
+            8,
+            7
+          ],
+          "hue_shift_deg": 16.54,
+          "dither": 0.0006,
+          "outline": {
+            "ring_px": 699,
+            "ink_px": 699,
+            "coverage": 1.0,
+            "gaps": 0,
+            "silhouettes": 2,
+            "ink_loops": 2,
+            "continuous": true,
+            "width2_coverage": 0.6924
+          },
+          "emissive": {
+            "expected": true,
+            "hue_deg": 195.0,
+            "pixels": 0,
+            "fraction": 0.0,
+            "components": 0,
+            "bbox": null
+          },
+          "pillow": 0.1415,
+          "directional": 0.037,
+          "light_deg": 165.5,
+          "input_grid_conformity": 1.0,
+          "outline_painted_px": 118,
+          "background_mode": "checkerboard"
+        }
+      },
+      "steps": {
+        "alpha": {
+          "background_mode": "checkerboard",
+          "checkerboard_score": 0.6834,
+          "solid_backdrop": 0.4055,
+          "cleared_px": 38240,
+          "halo_px": 0,
+          "specks_removed": 0,
+          "speck_px": 0,
+          "fringe_px": 352
+        },
+        "grid": {
+          "pitch": 1,
+          "phase_x": 0,
+          "phase_y": 0,
+          "conformity": 1.0,
+          "requested_pitch": 1,
+          "cells": [
+            256,
+            256
+          ],
+          "margin_px": 8,
+          "reduced_by": 2,
+          "sprite_px": [
+            100,
+            128
+          ],
+          "anchor": [
+            128,
+            248
+          ]
+        },
+        "palette": {
+          "mean_oklab_error": 0.0276,
+          "max_oklab_error": 0.1614,
+          "colors_used": 49,
+          "ramps": 6,
+          "colors": 49
+        },
+        "emissive": {
+          "expected": true,
+          "hue_deg": 195.0,
+          "pixels": 0,
+          "fraction": 0.0,
+          "components": 0,
+          "bbox": null,
+          "extracted_before_repair": 0
+        },
+        "dedither": {
+          "dither_before": 0.0067,
+          "dither_after": 0.0006,
+          "pixels_changed": 2562
+        },
+        "outline": {
+          "before": {
+            "ring_px": 699,
+            "ink_px": 581,
+            "coverage": 0.8312,
+            "gaps": 118,
+            "silhouettes": 2,
+            "ink_loops": 49,
+            "continuous": false,
+            "width2_coverage": 0.6924
+          },
+          "painted_px": 118,
+          "after": {
+            "ring_px": 699,
+            "ink_px": 699,
+            "coverage": 1.0,
+            "gaps": 0,
+            "silhouettes": 2,
+            "ink_loops": 2,
+            "continuous": true,
+            "width2_coverage": 0.6924
+          },
+          "width": 1
+        }
+      }
+    },
+    {
+      "frame": 8,
+      "pose": "anticipation",
+      "before": {
+        "schema": "dragon-heroes.hifi-scorecard.v1",
+        "verdict": "FAIL",
+        "score": 61.4,
+        "failures": [
+          "transparent_bg: border band opaque 1.00; checkerboard 0.73",
+          "isolated_fill: fill 1.00 (want 0.12-0.9); touches border",
+          "indexed_palette: 26762 colours vs budget 49 (ink + 6x8)",
+          "ink_hold_perimeter: ink on 0.021 of the perimeter, 999 gaps, 4 loop(s) for 1 silhouette(s)"
+        ],
+        "checks": [
+          {
+            "name": "transparent_bg",
+            "passed": false,
+            "hard": true,
+            "detail": "border band opaque 1.00; checkerboard 0.73",
+            "value": 1.0
+          },
+          {
+            "name": "binary_alpha",
+            "passed": true,
+            "hard": true,
+            "detail": "0 semi-transparent px",
+            "value": 0
+          },
+          {
+            "name": "native_grid",
+            "passed": true,
+            "hard": true,
+            "detail": "256x256 native grid",
+            "value": 1.0
+          },
+          {
+            "name": "isolated_fill",
+            "passed": false,
+            "hard": true,
+            "detail": "fill 1.00 (want 0.12-0.9); touches border",
+            "value": 1.0
+          },
+          {
+            "name": "indexed_palette",
+            "passed": false,
+            "hard": true,
+            "detail": "26762 colours vs budget 49 (ink + 6x8)",
+            "value": 26762
+          },
+          {
+            "name": "deep_ramps",
+            "passed": true,
+            "hard": true,
+            "detail": "6 ramps use >= 6 shades [8, 8, 8, 8, 8, 8]",
+            "value": 6
+          },
+          {
+            "name": "rich_ramps",
+            "passed": true,
+            "hard": false,
+            "detail": "6 deep ramps (want >= 3)",
+            "value": 6
+          },
+          {
+            "name": "hue_shift",
+            "passed": true,
+            "hard": false,
+            "detail": "shadow->highlight hue delta 15.37 deg",
+            "value": 15.37
+          },
+          {
+            "name": "no_dithering",
+            "passed": true,
+            "hard": true,
+            "detail": "checker 2x2 share 0.005",
+            "value": 0.0055
+          },
+          {
+            "name": "ink_hold_perimeter",
+            "passed": false,
+            "hard": true,
+            "detail": "ink on 0.021 of the perimeter, 999 gaps, 4 loop(s) for 1 silhouette(s)",
+            "value": 0.0206
+          },
+          {
+            "name": "emissive_core",
+            "passed": true,
+            "hard": true,
+            "detail": "135 px (0.002 of silhouette) at hue 195.0",
+            "value": 135
+          },
+          {
+            "name": "no_pillow_shading",
+            "passed": true,
+            "hard": false,
+            "detail": "lightness~depth correlation 0.00",
+            "value": 0.0
+          },
+          {
+            "name": "directional_shading",
+            "passed": false,
+            "hard": false,
+            "detail": "gradient agreement 0.01, key light 145.5 deg",
+            "value": 0.0086
+          }
+        ],
+        "metrics": {
+          "size": [
+            256,
+            256
+          ],
+          "background": {
+            "checkerboard": 0.7324,
+            "solid_backdrop": 0.4185,
+            "band_opaque": 1.0
+          },
+          "semi_alpha_px": 0,
+          "grid": {
+            "pitch": 1,
+            "conformity": 1.0,
+            "native": true
+          },
+          "fill": 1.0,
+          "touches_border": true,
+          "colors": 26762,
+          "palette_budget": 49,
+          "shades_per_ramp": [
+            8,
+            8,
+            8,
+            8,
+            8,
+            8
+          ],
+          "hue_shift_deg": 15.37,
+          "dither": 0.0055,
+          "outline": {
+            "ring_px": 1020,
+            "ink_px": 21,
+            "coverage": 0.0206,
+            "gaps": 999,
+            "silhouettes": 1,
+            "ink_loops": 4,
+            "continuous": false,
+            "width2_coverage": 0.0227
+          },
+          "emissive": {
+            "expected": true,
+            "hue_deg": 195.0,
+            "pixels": 135,
+            "fraction": 0.0021,
+            "components": 1,
+            "bbox": [
+              98,
+              146,
+              114,
+              165
+            ]
+          },
+          "pillow": 0.0,
+          "directional": 0.0086,
+          "light_deg": 145.5
+        }
+      },
+      "after": {
+        "schema": "dragon-heroes.hifi-scorecard.v1",
+        "verdict": "FAIL",
+        "score": 76.9,
+        "failures": [
+          "isolated_fill: fill 0.10 (want 0.12-0.9); clear margin",
+          "emissive_core: 0 px (0.000 of silhouette) at hue 195.0"
+        ],
+        "checks": [
+          {
+            "name": "transparent_bg",
+            "passed": true,
+            "hard": true,
+            "detail": "border band opaque 0.01; checkerboard 0.00",
+            "value": 0.0056016597510373444
+          },
+          {
+            "name": "binary_alpha",
+            "passed": true,
+            "hard": true,
+            "detail": "0 semi-transparent px",
+            "value": 0
+          },
+          {
+            "name": "native_grid",
+            "passed": true,
+            "hard": true,
+            "detail": "256x256 native grid",
+            "value": 1.0
+          },
+          {
+            "name": "isolated_fill",
+            "passed": false,
+            "hard": true,
+            "detail": "fill 0.10 (want 0.12-0.9); clear margin",
+            "value": 0.104705810546875
+          },
+          {
+            "name": "indexed_palette",
+            "passed": true,
+            "hard": true,
+            "detail": "48 colours vs budget 49 (ink + 6x8)",
+            "value": 48
+          },
+          {
+            "name": "deep_ramps",
+            "passed": true,
+            "hard": true,
+            "detail": "6 ramps use >= 6 shades [8, 8, 8, 8, 8, 7]",
+            "value": 6
+          },
+          {
+            "name": "rich_ramps",
+            "passed": true,
+            "hard": false,
+            "detail": "6 deep ramps (want >= 3)",
+            "value": 6
+          },
+          {
+            "name": "hue_shift",
+            "passed": true,
+            "hard": false,
+            "detail": "shadow->highlight hue delta 16.58 deg",
+            "value": 16.58
+          },
+          {
+            "name": "no_dithering",
+            "passed": true,
+            "hard": true,
+            "detail": "checker 2x2 share 0.001",
+            "value": 0.0014
+          },
+          {
+            "name": "ink_hold_perimeter",
+            "passed": true,
+            "hard": true,
+            "detail": "ink on 1.000 of the perimeter, 0 gaps, 2 loop(s) for 2 silhouette(s)",
+            "value": 1.0
+          },
+          {
+            "name": "emissive_core",
+            "passed": false,
+            "hard": true,
+            "detail": "0 px (0.000 of silhouette) at hue 195.0",
+            "value": 0
+          },
+          {
+            "name": "no_pillow_shading",
+            "passed": true,
+            "hard": false,
+            "detail": "lightness~depth correlation 0.13",
+            "value": 0.1284
+          },
+          {
+            "name": "directional_shading",
+            "passed": false,
+            "hard": false,
+            "detail": "gradient agreement 0.03, key light 138.4 deg",
+            "value": 0.0325
+          }
+        ],
+        "metrics": {
+          "size": [
+            256,
+            256
+          ],
+          "background": {
+            "checkerboard": 0.0,
+            "solid_backdrop": 0.0,
+            "band_opaque": 0.0056016597510373444
+          },
+          "semi_alpha_px": 0,
+          "grid": {
+            "pitch": 1,
+            "conformity": 1.0,
+            "native": true
+          },
+          "fill": 0.1047,
+          "touches_border": false,
+          "colors": 48,
+          "palette_budget": 49,
+          "shades_per_ramp": [
+            8,
+            8,
+            8,
+            8,
+            8,
+            7
+          ],
+          "hue_shift_deg": 16.58,
+          "dither": 0.0014,
+          "outline": {
+            "ring_px": 668,
+            "ink_px": 668,
+            "coverage": 1.0,
+            "gaps": 0,
+            "silhouettes": 2,
+            "ink_loops": 2,
+            "continuous": true,
+            "width2_coverage": 0.6724
+          },
+          "emissive": {
+            "expected": true,
+            "hue_deg": 195.0,
+            "pixels": 0,
+            "fraction": 0.0,
+            "components": 0,
+            "bbox": null
+          },
+          "pillow": 0.1284,
+          "directional": 0.0325,
+          "light_deg": 138.4,
+          "input_grid_conformity": 1.0,
+          "outline_painted_px": 149,
+          "background_mode": "checkerboard"
+        }
+      },
+      "steps": {
+        "alpha": {
+          "background_mode": "checkerboard",
+          "checkerboard_score": 0.7324,
+          "solid_backdrop": 0.4185,
+          "cleared_px": 38519,
+          "halo_px": 0,
+          "specks_removed": 0,
+          "speck_px": 0,
+          "fringe_px": 353
+        },
+        "grid": {
+          "pitch": 1,
+          "phase_x": 0,
+          "phase_y": 0,
+          "conformity": 1.0,
+          "requested_pitch": 1,
+          "cells": [
+            256,
+            256
+          ],
+          "margin_px": 8,
+          "reduced_by": 2,
+          "sprite_px": [
+            105,
+            128
+          ],
+          "anchor": [
+            128,
+            248
+          ]
+        },
+        "palette": {
+          "mean_oklab_error": 0.0274,
+          "max_oklab_error": 0.1614,
+          "colors_used": 49,
+          "ramps": 6,
+          "colors": 49
+        },
+        "emissive": {
+          "expected": true,
+          "hue_deg": 195.0,
+          "pixels": 0,
+          "fraction": 0.0,
+          "components": 0,
+          "bbox": null,
+          "extracted_before_repair": 0
+        },
+        "dedither": {
+          "dither_before": 0.0105,
+          "dither_after": 0.0013,
+          "pixels_changed": 2587
+        },
+        "outline": {
+          "before": {
+            "ring_px": 668,
+            "ink_px": 519,
+            "coverage": 0.7769,
+            "gaps": 149,
+            "silhouettes": 2,
+            "ink_loops": 62,
+            "continuous": false,
+            "width2_coverage": 0.6724
+          },
+          "painted_px": 149,
+          "after": {
+            "ring_px": 668,
+            "ink_px": 668,
+            "coverage": 1.0,
+            "gaps": 0,
+            "silhouettes": 2,
+            "ink_loops": 2,
+            "continuous": true,
+            "width2_coverage": 0.6724
+          },
+          "width": 1
+        }
+      }
+    },
+    {
+      "frame": 12,
+      "pose": "attack",
+      "before": {
+        "schema": "dragon-heroes.hifi-scorecard.v1",
+        "verdict": "FAIL",
+        "score": 61.4,
+        "failures": [
+          "transparent_bg: border band opaque 1.00; checkerboard 0.68",
+          "isolated_fill: fill 1.00 (want 0.12-0.9); touches border",
+          "indexed_palette: 27164 colours vs budget 49 (ink + 6x8)",
+          "ink_hold_perimeter: ink on 0.000 of the perimeter, 1020 gaps, 0 loop(s) for 1 silhouette(s)"
+        ],
+        "checks": [
+          {
+            "name": "transparent_bg",
+            "passed": false,
+            "hard": true,
+            "detail": "border band opaque 1.00; checkerboard 0.68",
+            "value": 1.0
+          },
+          {
+            "name": "binary_alpha",
+            "passed": true,
+            "hard": true,
+            "detail": "0 semi-transparent px",
+            "value": 0
+          },
+          {
+            "name": "native_grid",
+            "passed": true,
+            "hard": true,
+            "detail": "256x256 native grid",
+            "value": 1.0
+          },
+          {
+            "name": "isolated_fill",
+            "passed": false,
+            "hard": true,
+            "detail": "fill 1.00 (want 0.12-0.9); touches border",
+            "value": 1.0
+          },
+          {
+            "name": "indexed_palette",
+            "passed": false,
+            "hard": true,
+            "detail": "27164 colours vs budget 49 (ink + 6x8)",
+            "value": 27164
+          },
+          {
+            "name": "deep_ramps",
+            "passed": true,
+            "hard": true,
+            "detail": "6 ramps use >= 6 shades [8, 8, 8, 8, 8, 8]",
+            "value": 6
+          },
+          {
+            "name": "rich_ramps",
+            "passed": true,
+            "hard": false,
+            "detail": "6 deep ramps (want >= 3)",
+            "value": 6
+          },
+          {
+            "name": "hue_shift",
+            "passed": true,
+            "hard": false,
+            "detail": "shadow->highlight hue delta 16.09 deg",
+            "value": 16.09
+          },
+          {
+            "name": "no_dithering",
+            "passed": true,
+            "hard": true,
+            "detail": "checker 2x2 share 0.006",
+            "value": 0.006
+          },
+          {
+            "name": "ink_hold_perimeter",
+            "passed": false,
+            "hard": true,
+            "detail": "ink on 0.000 of the perimeter, 1020 gaps, 0 loop(s) for 1 silhouette(s)",
+            "value": 0.0
+          },
+          {
+            "name": "emissive_core",
+            "passed": true,
+            "hard": true,
+            "detail": "168 px (0.003 of silhouette) at hue 195.0",
+            "value": 168
+          },
+          {
+            "name": "no_pillow_shading",
+            "passed": true,
+            "hard": false,
+            "detail": "lightness~depth correlation 0.00",
+            "value": 0.0
+          },
+          {
+            "name": "directional_shading",
+            "passed": false,
+            "hard": false,
+            "detail": "gradient agreement 0.01, key light 141.8 deg",
+            "value": 0.0124
+          }
+        ],
+        "metrics": {
+          "size": [
+            256,
+            256
+          ],
+          "background": {
+            "checkerboard": 0.6765,
+            "solid_backdrop": 0.412,
+            "band_opaque": 1.0
+          },
+          "semi_alpha_px": 0,
+          "grid": {
+            "pitch": 1,
+            "conformity": 1.0,
+            "native": true
+          },
+          "fill": 1.0,
+          "touches_border": true,
+          "colors": 27164,
+          "palette_budget": 49,
+          "shades_per_ramp": [
+            8,
+            8,
+            8,
+            8,
+            8,
+            8
+          ],
+          "hue_shift_deg": 16.09,
+          "dither": 0.006,
+          "outline": {
+            "ring_px": 1020,
+            "ink_px": 0,
+            "coverage": 0.0,
+            "gaps": 1020,
+            "silhouettes": 1,
+            "ink_loops": 0,
+            "continuous": false,
+            "width2_coverage": 0.004
+          },
+          "emissive": {
+            "expected": true,
+            "hue_deg": 195.0,
+            "pixels": 168,
+            "fraction": 0.0026,
+            "components": 2,
+            "bbox": [
+              85,
+              74,
+              148,
+              145
+            ]
+          },
+          "pillow": 0.0,
+          "directional": 0.0124,
+          "light_deg": 141.8
+        }
+      },
+      "after": {
+        "schema": "dragon-heroes.hifi-scorecard.v1",
+        "verdict": "FAIL",
+        "score": 76.9,
+        "failures": [
+          "isolated_fill: fill 0.11 (want 0.12-0.9); clear margin",
+          "emissive_core: 0 px (0.000 of silhouette) at hue 195.0"
+        ],
+        "checks": [
+          {
+            "name": "transparent_bg",
+            "passed": true,
+            "hard": true,
+            "detail": "border band opaque 0.01; checkerboard 0.00",
+            "value": 0.00933609958506224
+          },
+          {
+            "name": "binary_alpha",
+            "passed": true,
+            "hard": true,
+            "detail": "0 semi-transparent px",
+            "value": 0
+          },
+          {
+            "name": "native_grid",
+            "passed": true,
+            "hard": true,
+            "detail": "256x256 native grid",
+            "value": 1.0
+          },
+          {
+            "name": "isolated_fill",
+            "passed": false,
+            "hard": true,
+            "detail": "fill 0.11 (want 0.12-0.9); clear margin",
+            "value": 0.1050567626953125
+          },
+          {
+            "name": "indexed_palette",
+            "passed": true,
+            "hard": true,
+            "detail": "49 colours vs budget 49 (ink + 6x8)",
+            "value": 49
+          },
+          {
+            "name": "deep_ramps",
+            "passed": true,
+            "hard": true,
+            "detail": "6 ramps use >= 6 shades [8, 8, 8, 8, 8, 8]",
+            "value": 6
+          },
+          {
+            "name": "rich_ramps",
+            "passed": true,
+            "hard": false,
+            "detail": "6 deep ramps (want >= 3)",
+            "value": 6
+          },
+          {
+            "name": "hue_shift",
+            "passed": true,
+            "hard": false,
+            "detail": "shadow->highlight hue delta 17.17 deg",
+            "value": 17.17
+          },
+          {
+            "name": "no_dithering",
+            "passed": true,
+            "hard": true,
+            "detail": "checker 2x2 share 0.001",
+            "value": 0.0014
+          },
+          {
+            "name": "ink_hold_perimeter",
+            "passed": true,
+            "hard": true,
+            "detail": "ink on 1.000 of the perimeter, 0 gaps, 1 loop(s) for 1 silhouette(s)",
+            "value": 1.0
+          },
+          {
+            "name": "emissive_core",
+            "passed": false,
+            "hard": true,
+            "detail": "0 px (0.000 of silhouette) at hue 195.0",
+            "value": 0
+          },
+          {
+            "name": "no_pillow_shading",
+            "passed": true,
+            "hard": false,
+            "detail": "lightness~depth correlation 0.11",
+            "value": 0.1116
+          },
+          {
+            "name": "directional_shading",
+            "passed": false,
+            "hard": false,
+            "detail": "gradient agreement 0.04, key light 160.2 deg",
+            "value": 0.041
+          }
+        ],
+        "metrics": {
+          "size": [
+            256,
+            256
+          ],
+          "background": {
+            "checkerboard": 0.0,
+            "solid_backdrop": 0.0,
+            "band_opaque": 0.00933609958506224
+          },
+          "semi_alpha_px": 0,
+          "grid": {
+            "pitch": 1,
+            "conformity": 1.0,
+            "native": true
+          },
+          "fill": 0.1051,
+          "touches_border": false,
+          "colors": 49,
+          "palette_budget": 49,
+          "shades_per_ramp": [
+            8,
+            8,
+            8,
+            8,
+            8,
+            8
+          ],
+          "hue_shift_deg": 17.17,
+          "dither": 0.0014,
+          "outline": {
+            "ring_px": 736,
+            "ink_px": 736,
+            "coverage": 1.0,
+            "gaps": 0,
+            "silhouettes": 1,
+            "ink_loops": 1,
+            "continuous": true,
+            "width2_coverage": 0.6914
+          },
+          "emissive": {
+            "expected": true,
+            "hue_deg": 195.0,
+            "pixels": 0,
+            "fraction": 0.0,
+            "components": 0,
+            "bbox": null
+          },
+          "pillow": 0.1116,
+          "directional": 0.041,
+          "light_deg": 160.2,
+          "input_grid_conformity": 1.0,
+          "outline_painted_px": 134,
+          "background_mode": "checkerboard"
+        }
+      },
+      "steps": {
+        "alpha": {
+          "background_mode": "checkerboard",
+          "checkerboard_score": 0.6765,
+          "solid_backdrop": 0.412,
+          "cleared_px": 38464,
+          "halo_px": 0,
+          "specks_removed": 0,
+          "speck_px": 0,
+          "fringe_px": 473
+        },
+        "grid": {
+          "pitch": 1,
+          "phase_x": 0,
+          "phase_y": 0,
+          "conformity": 1.0,
+          "requested_pitch": 1,
+          "cells": [
+            256,
+            256
+          ],
+          "margin_px": 8,
+          "reduced_by": 2,
+          "sprite_px": [
+            102,
+            126
+          ],
+          "anchor": [
+            128,
+            248
+          ]
+        },
+        "palette": {
+          "mean_oklab_error": 0.0273,
+          "max_oklab_error": 0.1614,
+          "colors_used": 49,
+          "ramps": 6,
+          "colors": 49
+        },
+        "emissive": {
+          "expected": true,
+          "hue_deg": 195.0,
+          "pixels": 0,
+          "fraction": 0.0,
+          "components": 0,
+          "bbox": null,
+          "extracted_before_repair": 0
+        },
+        "dedither": {
+          "dither_before": 0.0096,
+          "dither_after": 0.0013,
+          "pixels_changed": 2484
+        },
+        "outline": {
+          "before": {
+            "ring_px": 736,
+            "ink_px": 602,
+            "coverage": 0.8179,
+            "gaps": 134,
+            "silhouettes": 1,
+            "ink_loops": 63,
+            "continuous": false,
+            "width2_coverage": 0.6914
+          },
+          "painted_px": 134,
+          "after": {
+            "ring_px": 736,
+            "ink_px": 736,
+            "coverage": 1.0,
+            "gaps": 0,
+            "silhouettes": 1,
+            "ink_loops": 1,
+            "continuous": true,
+            "width2_coverage": 0.6914
+          },
+          "width": 1
+        }
+      }
+    },
+    {
+      "frame": 16,
+      "pose": "hit",
+      "before": {
+        "schema": "dragon-heroes.hifi-scorecard.v1",
+        "verdict": "FAIL",
+        "score": 61.4,
+        "failures": [
+          "transparent_bg: border band opaque 1.00; checkerboard 0.73",
+          "isolated_fill: fill 1.00 (want 0.12-0.9); touches border",
+          "indexed_palette: 27170 colours vs budget 49 (ink + 6x8)",
+          "ink_hold_perimeter: ink on 0.014 of the perimeter, 1006 gaps, 2 loop(s) for 1 silhouette(s)"
+        ],
+        "checks": [
+          {
+            "name": "transparent_bg",
+            "passed": false,
+            "hard": true,
+            "detail": "border band opaque 1.00; checkerboard 0.73",
+            "value": 1.0
+          },
+          {
+            "name": "binary_alpha",
+            "passed": true,
+            "hard": true,
+            "detail": "0 semi-transparent px",
+            "value": 0
+          },
+          {
+            "name": "native_grid",
+            "passed": true,
+            "hard": true,
+            "detail": "256x256 native grid",
+            "value": 1.0
+          },
+          {
+            "name": "isolated_fill",
+            "passed": false,
+            "hard": true,
+            "detail": "fill 1.00 (want 0.12-0.9); touches border",
+            "value": 1.0
+          },
+          {
+            "name": "indexed_palette",
+            "passed": false,
+            "hard": true,
+            "detail": "27170 colours vs budget 49 (ink + 6x8)",
+            "value": 27170
+          },
+          {
+            "name": "deep_ramps",
+            "passed": true,
+            "hard": true,
+            "detail": "6 ramps use >= 6 shades [8, 8, 8, 8, 8, 8]",
+            "value": 6
+          },
+          {
+            "name": "rich_ramps",
+            "passed": true,
+            "hard": false,
+            "detail": "6 deep ramps (want >= 3)",
+            "value": 6
+          },
+          {
+            "name": "hue_shift",
+            "passed": true,
+            "hard": false,
+            "detail": "shadow->highlight hue delta 15.79 deg",
+            "value": 15.79
+          },
+          {
+            "name": "no_dithering",
+            "passed": true,
+            "hard": true,
+            "detail": "checker 2x2 share 0.006",
+            "value": 0.0063
+          },
+          {
+            "name": "ink_hold_perimeter",
+            "passed": false,
+            "hard": true,
+            "detail": "ink on 0.014 of the perimeter, 1006 gaps, 2 loop(s) for 1 silhouette(s)",
+            "value": 0.0137
+          },
+          {
+            "name": "emissive_core",
+            "passed": true,
+            "hard": true,
+            "detail": "211 px (0.003 of silhouette) at hue 195.0",
+            "value": 211
+          },
+          {
+            "name": "no_pillow_shading",
+            "passed": true,
+            "hard": false,
+            "detail": "lightness~depth correlation 0.00",
+            "value": 0.0
+          },
+          {
+            "name": "directional_shading",
+            "passed": false,
+            "hard": false,
+            "detail": "gradient agreement 0.01, key light 128.0 deg",
+            "value": 0.0111
+          }
+        ],
+        "metrics": {
+          "size": [
+            256,
+            256
+          ],
+          "background": {
+            "checkerboard": 0.7315,
+            "solid_backdrop": 0.4107,
+            "band_opaque": 1.0
+          },
+          "semi_alpha_px": 0,
+          "grid": {
+            "pitch": 1,
+            "conformity": 1.0,
+            "native": true
+          },
+          "fill": 1.0,
+          "touches_border": true,
+          "colors": 27170,
+          "palette_budget": 49,
+          "shades_per_ramp": [
+            8,
+            8,
+            8,
+            8,
+            8,
+            8
+          ],
+          "hue_shift_deg": 15.79,
+          "dither": 0.0063,
+          "outline": {
+            "ring_px": 1020,
+            "ink_px": 14,
+            "coverage": 0.0137,
+            "gaps": 1006,
+            "silhouettes": 1,
+            "ink_loops": 2,
+            "continuous": false,
+            "width2_coverage": 0.0128
+          },
+          "emissive": {
+            "expected": true,
+            "hue_deg": 195.0,
+            "pixels": 211,
+            "fraction": 0.0032,
+            "components": 1,
+            "bbox": [
+              87,
+              131,
+              105,
+              155
+            ]
+          },
+          "pillow": 0.0,
+          "directional": 0.0111,
+          "light_deg": 128.0
+        }
+      },
+      "after": {
+        "schema": "dragon-heroes.hifi-scorecard.v1",
+        "verdict": "FAIL",
+        "score": 76.9,
+        "failures": [
+          "isolated_fill: fill 0.10 (want 0.12-0.9); clear margin",
+          "emissive_core: 0 px (0.000 of silhouette) at hue 195.0"
+        ],
+        "checks": [
+          {
+            "name": "transparent_bg",
+            "passed": true,
+            "hard": true,
+            "detail": "border band opaque 0.01; checkerboard 0.00",
+            "value": 0.008575380359612726
+          },
+          {
+            "name": "binary_alpha",
+            "passed": true,
+            "hard": true,
+            "detail": "0 semi-transparent px",
+            "value": 0
+          },
+          {
+            "name": "native_grid",
+            "passed": true,
+            "hard": true,
+            "detail": "256x256 native grid",
+            "value": 1.0
+          },
+          {
+            "name": "isolated_fill",
+            "passed": false,
+            "hard": true,
+            "detail": "fill 0.10 (want 0.12-0.9); clear margin",
+            "value": 0.1043701171875
+          },
+          {
+            "name": "indexed_palette",
+            "passed": true,
+            "hard": true,
+            "detail": "49 colours vs budget 49 (ink + 6x8)",
+            "value": 49
+          },
+          {
+            "name": "deep_ramps",
+            "passed": true,
+            "hard": true,
+            "detail": "6 ramps use >= 6 shades [8, 8, 8, 8, 8, 8]",
+            "value": 6
+          },
+          {
+            "name": "rich_ramps",
+            "passed": true,
+            "hard": false,
+            "detail": "6 deep ramps (want >= 3)",
+            "value": 6
+          },
+          {
+            "name": "hue_shift",
+            "passed": true,
+            "hard": false,
+            "detail": "shadow->highlight hue delta 16.62 deg",
+            "value": 16.62
+          },
+          {
+            "name": "no_dithering",
+            "passed": true,
+            "hard": true,
+            "detail": "checker 2x2 share 0.001",
+            "value": 0.0006
+          },
+          {
+            "name": "ink_hold_perimeter",
+            "passed": true,
+            "hard": true,
+            "detail": "ink on 1.000 of the perimeter, 0 gaps, 1 loop(s) for 1 silhouette(s)",
+            "value": 1.0
+          },
+          {
+            "name": "emissive_core",
+            "passed": false,
+            "hard": true,
+            "detail": "0 px (0.000 of silhouette) at hue 195.0",
+            "value": 0
+          },
+          {
+            "name": "no_pillow_shading",
+            "passed": true,
+            "hard": false,
+            "detail": "lightness~depth correlation 0.14",
+            "value": 0.1358
+          },
+          {
+            "name": "directional_shading",
+            "passed": false,
+            "hard": false,
+            "detail": "gradient agreement 0.04, key light 136.3 deg",
+            "value": 0.0435
+          }
+        ],
+        "metrics": {
+          "size": [
+            256,
+            256
+          ],
+          "background": {
+            "checkerboard": 0.0,
+            "solid_backdrop": 0.0,
+            "band_opaque": 0.008575380359612726
+          },
+          "semi_alpha_px": 0,
+          "grid": {
+            "pitch": 1,
+            "conformity": 1.0,
+            "native": true
+          },
+          "fill": 0.1044,
+          "touches_border": false,
+          "colors": 49,
+          "palette_budget": 49,
+          "shades_per_ramp": [
+            8,
+            8,
+            8,
+            8,
+            8,
+            8
+          ],
+          "hue_shift_deg": 16.62,
+          "dither": 0.0006,
+          "outline": {
+            "ring_px": 705,
+            "ink_px": 705,
+            "coverage": 1.0,
+            "gaps": 0,
+            "silhouettes": 1,
+            "ink_loops": 1,
+            "continuous": true,
+            "width2_coverage": 0.6487
+          },
+          "emissive": {
+            "expected": true,
+            "hue_deg": 195.0,
+            "pixels": 0,
+            "fraction": 0.0,
+            "components": 0,
+            "bbox": null
+          },
+          "pillow": 0.1358,
+          "directional": 0.0435,
+          "light_deg": 136.3,
+          "input_grid_conformity": 1.0,
+          "outline_painted_px": 160,
+          "background_mode": "checkerboard"
+        }
+      },
+      "steps": {
+        "alpha": {
+          "background_mode": "checkerboard",
+          "checkerboard_score": 0.7315,
+          "solid_backdrop": 0.4107,
+          "cleared_px": 38634,
+          "halo_px": 0,
+          "specks_removed": 0,
+          "speck_px": 0,
+          "fringe_px": 392
+        },
+        "grid": {
+          "pitch": 1,
+          "phase_x": 0,
+          "phase_y": 0,
+          "conformity": 1.0,
+          "requested_pitch": 1,
+          "cells": [
+            256,
+            256
+          ],
+          "margin_px": 8,
+          "reduced_by": 2,
+          "sprite_px": [
+            90,
+            128
+          ],
+          "anchor": [
+            128,
+            248
+          ]
+        },
+        "palette": {
+          "mean_oklab_error": 0.027,
+          "max_oklab_error": 0.1614,
+          "colors_used": 49,
+          "ramps": 6,
+          "colors": 49
+        },
+        "emissive": {
+          "expected": true,
+          "hue_deg": 195.0,
+          "pixels": 0,
+          "fraction": 0.0,
+          "components": 0,
+          "bbox": null,
+          "extracted_before_repair": 0
+        },
+        "dedither": {
+          "dither_before": 0.0095,
+          "dither_after": 0.0006,
+          "pixels_changed": 2575
+        },
+        "outline": {
+          "before": {
+            "ring_px": 705,
+            "ink_px": 545,
+            "coverage": 0.773,
+            "gaps": 160,
+            "silhouettes": 1,
+            "ink_loops": 59,
+            "continuous": false,
+            "width2_coverage": 0.6487
+          },
+          "painted_px": 160,
+          "after": {
+            "ring_px": 705,
+            "ink_px": 705,
+            "coverage": 1.0,
+            "gaps": 0,
+            "silhouettes": 1,
+            "ink_loops": 1,
+            "continuous": true,
+            "width2_coverage": 0.6487
+          },
+          "width": 1
+        }
+      }
+    },
+    {
+      "frame": 23,
+      "pose": "death",
+      "before": {
+        "schema": "dragon-heroes.hifi-scorecard.v1",
+        "verdict": "FAIL",
+        "score": 61.4,
+        "failures": [
+          "transparent_bg: border band opaque 1.00; checkerboard 0.70",
+          "isolated_fill: fill 1.00 (want 0.12-0.9); touches border",
+          "indexed_palette: 16017 colours vs budget 49 (ink + 6x8)",
+          "ink_hold_perimeter: ink on 0.000 of the perimeter, 1020 gaps, 0 loop(s) for 1 silhouette(s)"
+        ],
+        "checks": [
+          {
+            "name": "transparent_bg",
+            "passed": false,
+            "hard": true,
+            "detail": "border band opaque 1.00; checkerboard 0.70",
+            "value": 1.0
+          },
+          {
+            "name": "binary_alpha",
+            "passed": true,
+            "hard": true,
+            "detail": "0 semi-transparent px",
+            "value": 0
+          },
+          {
+            "name": "native_grid",
+            "passed": true,
+            "hard": true,
+            "detail": "256x256 native grid",
+            "value": 1.0
+          },
+          {
+            "name": "isolated_fill",
+            "passed": false,
+            "hard": true,
+            "detail": "fill 1.00 (want 0.12-0.9); touches border",
+            "value": 1.0
+          },
+          {
+            "name": "indexed_palette",
+            "passed": false,
+            "hard": true,
+            "detail": "16017 colours vs budget 49 (ink + 6x8)",
+            "value": 16017
+          },
+          {
+            "name": "deep_ramps",
+            "passed": true,
+            "hard": true,
+            "detail": "6 ramps use >= 6 shades [8, 8, 8, 8, 8, 8]",
+            "value": 6
+          },
+          {
+            "name": "rich_ramps",
+            "passed": true,
+            "hard": false,
+            "detail": "6 deep ramps (want >= 3)",
+            "value": 6
+          },
+          {
+            "name": "hue_shift",
+            "passed": true,
+            "hard": false,
+            "detail": "shadow->highlight hue delta 16.38 deg",
+            "value": 16.38
+          },
+          {
+            "name": "no_dithering",
+            "passed": true,
+            "hard": true,
+            "detail": "checker 2x2 share 0.003",
+            "value": 0.0032
+          },
+          {
+            "name": "ink_hold_perimeter",
+            "passed": false,
+            "hard": true,
+            "detail": "ink on 0.000 of the perimeter, 1020 gaps, 0 loop(s) for 1 silhouette(s)",
+            "value": 0.0
+          },
+          {
+            "name": "emissive_core",
+            "passed": true,
+            "hard": true,
+            "detail": "39 px (0.001 of silhouette) at hue 195.0",
+            "value": 39
+          },
+          {
+            "name": "no_pillow_shading",
+            "passed": true,
+            "hard": false,
+            "detail": "lightness~depth correlation 0.00",
+            "value": 0.0
+          },
+          {
+            "name": "directional_shading",
+            "passed": false,
+            "hard": false,
+            "detail": "gradient agreement 0.01, key light 79.2 deg",
+            "value": 0.0143
+          }
+        ],
+        "metrics": {
+          "size": [
+            256,
+            256
+          ],
+          "background": {
+            "checkerboard": 0.7036,
+            "solid_backdrop": 0.425,
+            "band_opaque": 1.0
+          },
+          "semi_alpha_px": 0,
+          "grid": {
+            "pitch": 1,
+            "conformity": 1.0,
+            "native": true
+          },
+          "fill": 1.0,
+          "touches_border": true,
+          "colors": 16017,
+          "palette_budget": 49,
+          "shades_per_ramp": [
+            8,
+            8,
+            8,
+            8,
+            8,
+            8
+          ],
+          "hue_shift_deg": 16.38,
+          "dither": 0.0032,
+          "outline": {
+            "ring_px": 1020,
+            "ink_px": 0,
+            "coverage": 0.0,
+            "gaps": 1020,
+            "silhouettes": 1,
+            "ink_loops": 0,
+            "continuous": false,
+            "width2_coverage": 0.0
+          },
+          "emissive": {
+            "expected": true,
+            "hue_deg": 195.0,
+            "pixels": 39,
+            "fraction": 0.0006,
+            "components": 3,
+            "bbox": [
+              24,
+              201,
+              119,
+              227
+            ]
+          },
+          "pillow": 0.0,
+          "directional": 0.0143,
+          "light_deg": 79.2
+        }
+      },
+      "after": {
+        "schema": "dragon-heroes.hifi-scorecard.v1",
+        "verdict": "FAIL",
+        "score": 84.7,
+        "failures": [
+          "emissive_core: 0 px (0.000 of silhouette) at hue 195.0"
+        ],
+        "checks": [
+          {
+            "name": "transparent_bg",
+            "passed": true,
+            "hard": true,
+            "detail": "border band opaque 0.03; checkerboard 0.00",
+            "value": 0.02565698478561549
+          },
+          {
+            "name": "binary_alpha",
+            "passed": true,
+            "hard": true,
+            "detail": "0 semi-transparent px",
+            "value": 0
+          },
+          {
+            "name": "native_grid",
+            "passed": true,
+            "hard": true,
+            "detail": "256x256 native grid",
+            "value": 1.0
+          },
+          {
+            "name": "isolated_fill",
+            "passed": true,
+            "hard": true,
+            "detail": "fill 0.22 (want 0.12-0.9); clear margin",
+            "value": 0.223602294921875
+          },
+          {
+            "name": "indexed_palette",
+            "passed": true,
+            "hard": true,
+            "detail": "49 colours vs budget 49 (ink + 6x8)",
+            "value": 49
+          },
+          {
+            "name": "deep_ramps",
+            "passed": true,
+            "hard": true,
+            "detail": "6 ramps use >= 6 shades [8, 8, 8, 8, 8, 8]",
+            "value": 6
+          },
+          {
+            "name": "rich_ramps",
+            "passed": true,
+            "hard": false,
+            "detail": "6 deep ramps (want >= 3)",
+            "value": 6
+          },
+          {
+            "name": "hue_shift",
+            "passed": true,
+            "hard": false,
+            "detail": "shadow->highlight hue delta 15.52 deg",
+            "value": 15.52
+          },
+          {
+            "name": "no_dithering",
+            "passed": true,
+            "hard": true,
+            "detail": "checker 2x2 share 0.001",
+            "value": 0.0006
+          },
+          {
+            "name": "ink_hold_perimeter",
+            "passed": true,
+            "hard": true,
+            "detail": "ink on 1.000 of the perimeter, 0 gaps, 2 loop(s) for 2 silhouette(s)",
+            "value": 1.0
+          },
+          {
+            "name": "emissive_core",
+            "passed": false,
+            "hard": true,
+            "detail": "0 px (0.000 of silhouette) at hue 195.0",
+            "value": 0
+          },
+          {
+            "name": "no_pillow_shading",
+            "passed": true,
+            "hard": false,
+            "detail": "lightness~depth correlation 0.00",
+            "value": 0.0
+          },
+          {
+            "name": "directional_shading",
+            "passed": false,
+            "hard": false,
+            "detail": "gradient agreement 0.04, key light 84.7 deg",
+            "value": 0.0369
+          }
+        ],
+        "metrics": {
+          "size": [
+            256,
+            256
+          ],
+          "background": {
+            "checkerboard": 0.0,
+            "solid_backdrop": 0.0,
+            "band_opaque": 0.02565698478561549
+          },
+          "semi_alpha_px": 0,
+          "grid": {
+            "pitch": 1,
+            "conformity": 1.0,
+            "native": true
+          },
+          "fill": 0.2236,
+          "touches_border": false,
+          "colors": 49,
+          "palette_budget": 49,
+          "shades_per_ramp": [
+            8,
+            8,
+            8,
+            8,
+            8,
+            8
+          ],
+          "hue_shift_deg": 15.52,
+          "dither": 0.0006,
+          "outline": {
+            "ring_px": 824,
+            "ink_px": 824,
+            "coverage": 1.0,
+            "gaps": 0,
+            "silhouettes": 2,
+            "ink_loops": 2,
+            "continuous": true,
+            "width2_coverage": 0.6403
+          },
+          "emissive": {
+            "expected": true,
+            "hue_deg": 195.0,
+            "pixels": 0,
+            "fraction": 0.0,
+            "components": 0,
+            "bbox": null
+          },
+          "pillow": 0.0,
+          "directional": 0.0369,
+          "light_deg": 84.7,
+          "input_grid_conformity": 1.0,
+          "outline_painted_px": 451,
+          "background_mode": "checkerboard"
+        }
+      },
+      "steps": {
+        "alpha": {
+          "background_mode": "checkerboard",
+          "checkerboard_score": 0.7036,
+          "solid_backdrop": 0.425,
+          "cleared_px": 50880,
+          "halo_px": 0,
+          "specks_removed": 0,
+          "speck_px": 0,
+          "fringe_px": 259
+        },
+        "grid": {
+          "pitch": 1,
+          "phase_x": 0,
+          "phase_y": 0,
+          "conformity": 1.0,
+          "requested_pitch": 1,
+          "cells": [
+            256,
+            256
+          ],
+          "margin_px": 8,
+          "reduced_by": 1,
+          "sprite_px": [
+            236,
+            100
+          ],
+          "anchor": [
+            128,
+            248
+          ]
+        },
+        "palette": {
+          "mean_oklab_error": 0.0279,
+          "max_oklab_error": 0.1614,
+          "colors_used": 49,
+          "ramps": 6,
+          "colors": 49
+        },
+        "emissive": {
+          "expected": true,
+          "hue_deg": 195.0,
+          "pixels": 0,
+          "fraction": 0.0,
+          "components": 0,
+          "bbox": null,
+          "extracted_before_repair": 0
+        },
+        "dedither": {
+          "dither_before": 0.0086,
+          "dither_after": 0.0006,
+          "pixels_changed": 5378
+        },
+        "outline": {
+          "before": {
+            "ring_px": 824,
+            "ink_px": 373,
+            "coverage": 0.4527,
+            "gaps": 451,
+            "silhouettes": 2,
+            "ink_loops": 141,
+            "continuous": false,
+            "width2_coverage": 0.6403
+          },
+          "painted_px": 451,
+          "after": {
+            "ring_px": 824,
+            "ink_px": 824,
+            "coverage": 1.0,
+            "gaps": 0,
+            "silhouettes": 2,
+            "ink_loops": 2,
+            "continuous": true,
+            "width2_coverage": 0.6403
+          },
+          "width": 1
+        }
+      }
+    }
+  ],
+  "sample_bundle": {
+    "out": "/home/ricz/Ricz/Projetos/IntelliGames/Dragon Heroes/genforge/candidates/r81/six-pose-diagnostic",
+    "verdict": "FAIL",
+    "frames": 6,
+    "files": [
+      "atlas.json",
+      "palette.json",
+      "provenance.json",
+      "review.html",
+      "scorecard.json",
+      "sheet.png",
+      "sheet_e.png",
+      "sheet_n.png"
+    ]
+  },
+  "sample_palette_count": 6,
+  "canvas_threshold": [
+    {
+      "input_width": 240,
+      "margin_px": 8,
+      "reduced_by": 1,
+      "sprite_px": [
+        240,
+        100
+      ],
+      "anchor": [
+        128,
+        248
+      ]
+    },
+    {
+      "input_width": 241,
+      "margin_px": 8,
+      "reduced_by": 2,
+      "sprite_px": [
+        120,
+        50
+      ],
+      "anchor": [
+        128,
+        248
+      ]
+    }
+  ],
+  "duplicate_bundle": {
+    "out": "/home/ricz/Ricz/Projetos/IntelliGames/Dragon Heroes/genforge/candidates/r81/duplicate-diagnostic",
+    "verdict": "PASS",
+    "frames": 2,
+    "files": [
+      "atlas.json",
+      "palette.json",
+      "provenance.json",
+      "review.html",
+      "scorecard.json",
+      "sheet.png",
+      "sheet_e.png",
+      "sheet_n.png"
+    ]
+  }
+}

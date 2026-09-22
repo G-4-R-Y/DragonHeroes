@@ -69,6 +69,10 @@
 
 ## Research digests
 
+Current asset/pipeline review: [2026-09-22 asset audit](research/asset-audit-2026-09-22.md)
+— real-frame failures, runtime coverage, guideline corrections and the proposed
+sequence for the largest gains (R81), with captured gameplay and reproducible diagnostics.
+
 The July 2026 web-research pass that grounds these docs (facts, laws, versions,
 precedents, sources) lives in [research/](research/):
 [rl-creature-ai](research/rl-creature-ai.md) ·
