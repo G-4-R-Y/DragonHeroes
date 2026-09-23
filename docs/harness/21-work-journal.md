@@ -5430,3 +5430,73 @@ investigation in this same journal had already killed a bogus "cannot render
 uppercase diacritics" row on the same evidence. Logged as **R84**, narrowed to
 the one glyph, with the render — not the metrics — as the proof, per this file's
 own standing rule: *PIL is not the renderer; only the capture is evidence.*
+
+### R84 fixed — the glyph, and two traps worth more than the glyph
+
+**2026-09-22.** One glyph changed. Getting there produced two harness findings
+that will outlive it.
+
+**The fix is a script, not a binary edit.** `tools/fix_font_cedilla.py` rebuilds
+`ccedilla` out of the font's own parts: the `c` outline verbatim, plus the one
+contour of the old `ccedilla` that lies entirely at or below the baseline — the
+cedilla hook. Nothing is invented, nothing is scaled, so the result is
+pixel-grid exact by construction, and the next person can read the patch instead
+of trusting a blob. `--check` reports whether the patch is still needed and the
+tool is a no-op once applied, so it doubles as the regression check if the font
+is ever re-sourced. The one line that needed care is the last one:
+
+```python
+advance_before = font["hmtx"][GLYPH]
+glyf[GLYPH] = pen.glyph()
+glyf[GLYPH].recalcBounds(glyf)
+font["hmtx"][GLYPH] = advance_before        # explicitly unchanged
+```
+
+`recalcBounds` is what makes yMax honest; restoring `hmtx` afterwards is what
+keeps `text_fit` honest. The ledger's gate said it outright — *a glyph-height
+fix must not move advance widths* — because every budget in that gate is
+measured in advances. `ccedilla` yMax **700 → 500**, yMin −100, advance **700**.
+
+**Minimality, proven rather than asserted.** A table-by-table diff against HEAD:
+across 241 glyphs only `ccedilla`'s outline changed; **zero** `hmtx` changes;
+`hhea`, `OS/2`, `post`, `cmap` and `name` byte-identical; `head` differs only in
+`checkSumAdjustment` and `modified`. Even the font bbox is unchanged, because
+`Ccedilla` and the standalone `cedilla` already reached −100.
+
+**Trap 1 — an asset edit is invisible until you reimport.** The first
+post-patch capture still showed the tall `Ç`. The font was correct on disk; the
+capture was not rendering it. A non-editor `godot --path game <scene>` run loads
+`game/.godot/imported/<name>-<hash>.fontdata`, and its sibling `.md5` still
+recorded the **pre-patch** `source_md5`, so Godot saw no reason to re-import.
+This is the worst class of harness bug: it looks exactly like a failed fix, and
+it would just as happily look like a *passing* one. **Any asset edit must be
+followed by `godot --headless --path game --import` before any capture.**
+
+**Trap 2 — `ui_capture.gd` already prefixes `UI_TAG` with `ui_`.**
+`UI_TAG=lairs_pt` writes `ui_lairs_pt.png`. `UI_TAG=ui_lairs_pt` writes
+`ui_ui_lairs_pt.png`, silently, next to the real one.
+
+**What was deliberately NOT re-shot.** `ui_trial_pt.png` regenerated
+**pixel-identical** to HEAD — the trial screen carries no lowercase ç, which is
+the gate's "regenerates clean" satisfied rather than skipped. The six `ui_cue_*`
+files are live gameplay frames: their PT chrome (`Um sino distante chama S ·
+SANTUÁRIO 51m`, `Nv 1 · 0 ouro · Bolsa 0/40`, `Talho / Cute. / Temp. / Fend.`,
+`LMB cutilada · Shift esquiva x3 · Q rasgo · E redemoinho …`) contains no
+lowercase ç, and re-shooting them would have written ~2 MB of unreviewable churn
+into an already 698 MB `.git` for zero R84 signal. They were reverted to HEAD.
+
+**A number not to trust, written down so it never raises a false alarm.** The
+`fps` field in `captures/ui_lairs_*.json` is shared-GPU noise on this box: three
+runs of the same static menu recorded 34, 13 and 12. `draw_calls` is the real
+invariant and stayed **27** across every run. The same goes double for
+`ui_cue_*.json`, where back-to-back runs recorded 159 draws/42 fps and 107
+draws/1 fps against R64's committed 97/60 — a font edit cannot change draw
+calls. `cue_arcs ≤ 12` (measured 8) is the only assertion in that frame worth
+gating on.
+
+**Evidence committed:** `captures/ui_r84_cedilla.png`, a 4× before/after strip of
+three real bands of `ui_lairs_pt.png` — `caÇada` / `coleÇão da provaÇão` /
+`coleÇão` above `caçada` / `coleção da provação` / `coleção`. The `ã` is
+identical in both rows, which is the control: its tilde legitimately reaches cap
+height, exactly as the narrowed scope predicted. 46 PT strings in `lang.gd`
+carry a lowercase ç.

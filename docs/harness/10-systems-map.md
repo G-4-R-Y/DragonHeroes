@@ -156,8 +156,24 @@ counted characters (`.left(8)`) instead of measuring the font; `main.gd`'s
 `_fit_to_width` now asks `get_string_size` and trims to a named geometry
 (`SLOT_PITCH` 40 / `SLOT_NAME_W` 38), marking a cut word with one dot. The
 measure is cached per slot, so it runs on a name change or a language toggle,
-never per frame. Open issue in the same file family: `game/living/` is
-untranslated end to end (R83).
+never per frame. The same file family's follow-ups are now closed too:
+`game/living/` speaks Portuguese (R83) and `text_fit.gd` holds every
+fixed-box string to its box in both languages.
+**The 8 px face was patched: CLOSED 2026-09-22 (R84).**
+`ui/fonts/PixelOperator8.ttf` drew lowercase `ccedilla` with a CAP-height bowl
+(yMax 700 where x-height is 500), so every PT ç read as a Ç —
+`Lembre-se da caÇada`. `tools/fix_font_cedilla.py` rebuilds the glyph from the
+font's own `c` outline plus its own below-baseline cedilla hook (nothing
+invented, nothing scaled, so it stays pixel-grid exact) and restores `hmtx`
+explicitly afterwards — **a glyph-height fix must never move advance widths**,
+because `text_fit` budgets are measured in advances. Run it with `--check` to
+test whether a re-sourced font needs the patch again. Font is PixelOperator
+(Jayvee Enaguas, **CC0**), so patching is permitted. Before/after evidence:
+`prototype/tests/captures/ui_r84_cedilla.png`. **Accented capitals are NOT a
+defect** — `Á`/`Ã`/`Í` share `A`/`I`'s yMax because an 8 px face with a 7 px cap
+has nowhere above the cap; same for the 39 accented lowercase glyphs, whose
+accents legitimately reach cap height. `ç` was the only glyph whose height had
+no accent to explain it.
 **2026-09-12 identity pass:** `ui/theme.gd`, `ui/world_frame.gd`,
 `ui/slider_rune.svg`, `living/lair_menu.gd` + `artifact_card.gd` share bronze,
 ivory and Lumen styling, cached shrine framing, visible focus and bounded lore
@@ -565,7 +581,26 @@ collection to `user://lair-collection-v1.txt`; a rerun fails `first kill must
 grant an item` until `$XDG_DATA_HOME/Dragon Heroes/lair-collection-v1.txt*` is
 deleted. Set the language headlessly by writing `{"lang":"pt"}` to
 `$XDG_DATA_HOME/Dragon Heroes/settings.json`. `ui_capture` without `UI_SCENE`
-silently shoots the main menu and overwrites committed reference frames.
+silently shoots the main menu and overwrites committed reference frames, and
+`ui_capture.gd` already prefixes `UI_TAG` with `ui_` — `UI_TAG=lairs_pt` writes
+`ui_lairs_pt.png`, while `UI_TAG=ui_lairs_pt` writes `ui_ui_lairs_pt.png`.
+
+**An asset edit is invisible to a capture until you reimport (R84, 2026-09-22).**
+A non-editor `godot --path game <scene>` run loads
+`game/.godot/imported/<name>-<hash>.fontdata` (or `.ctex`, `.sample`, …), and its
+sibling `.md5` still records the **pre-edit** `source_md5`, so Godot sees no
+reason to re-import. R84's first post-patch capture rendered the stale font and
+read exactly like a failed fix — and would just as happily have read like a
+passing one. **Run `godot --headless --path game --import` between any asset
+edit and any capture**, or the capture is false evidence.
+
+**Capture metrics that are noise, not budgets (R84, 2026-09-22).** The `fps`
+field in `captures/ui_lairs_*.json` recorded 34, 13 and 12 across identical runs
+of the same static menu on this shared GPU; `draw_calls` (27) is the invariant.
+`ui_cue_*` frames are live gameplay and not byte-reproducible at all — an
+old-vs-new diff touches every row and column, and back-to-back runs recorded
+159 draws/42 fps and 107 draws/1 fps against R64's committed 97/60. Only
+`cue_arcs <= 12` (measured 8) is worth gating on there.
 
 **Probe discipline (R80, 2026-09-22).** A probe that builds its own world
 fixture must (a) pin the seed — `MpNet.pending_seed = <seed>` before

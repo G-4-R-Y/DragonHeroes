@@ -1,3 +1,85 @@
+# Handoff — 2026-09-22: R84 (one glyph, and two traps worth more than the glyph)
+
+**The bug queue is empty.** R84 was the last open defect; R62 → R71 (content and
+events, largest last) is what comes next.
+
+**What was wrong.** `game/prototype/ui/fonts/PixelOperator8.ttf` drew lowercase
+`ccedilla` with a **cap-height** bowl — yMax 700 in a face whose x-height is 500 —
+so every Portuguese ç rendered as a Ç: `Lembre-se da caÇada`, `coleÇão`,
+`provaÇão`. Its top three contours were byte-identical to `C`'s. 46 PT strings in
+`lang.gd` carry a lowercase ç, so this was on nearly every PT screen, and it
+predates R83 — no capture had ever zoomed a PT lowercase ç.
+
+**How it was fixed, and why as a script.** `tools/fix_font_cedilla.py` rebuilds
+the glyph from the font's **own parts**: the `c` outline verbatim, plus the one
+contour of the old `ccedilla` that lies entirely at or below the baseline (the
+cedilla hook). Nothing invented, nothing scaled — pixel-grid exact by
+construction, and reviewable, which a binary blob is not. `--check` reports
+whether the patch is still needed, so it doubles as the regression check if the
+font is ever re-sourced. PixelOperator is Jayvee Enaguas's **CC0** font, so
+patching is permitted.
+
+The line that needed care is the last one:
+
+```python
+advance_before = font["hmtx"][GLYPH]
+glyf[GLYPH] = pen.glyph()
+glyf[GLYPH].recalcBounds(glyf)
+font["hmtx"][GLYPH] = advance_before        # explicitly unchanged
+```
+
+`recalcBounds` makes yMax honest; restoring `hmtx` keeps `text_fit` honest. The
+gate said it outright — *a glyph-height fix must not move advance widths* —
+because every budget in that gate is measured in advances. Result: yMax
+**700 → 500**, yMin −100, **advance 700**. A table-by-table diff against HEAD
+proves the minimality: across 241 glyphs only `ccedilla`'s outline changed, zero
+`hmtx` changes, `hhea`/`OS/2`/`post`/`cmap`/`name` byte-identical, `head`
+differing only in `checkSumAdjustment` and `modified`.
+
+## Two traps this cost — read these before your next capture
+
+**1. An asset edit is invisible to a capture until you reimport.** The first
+post-patch capture still showed the tall `Ç`. The font was right on disk; the
+capture was not rendering it. A non-editor `godot --path game <scene>` run loads
+`game/.godot/imported/<name>-<hash>.fontdata`, and its sibling `.md5` still held
+the **pre-patch** `source_md5`, so Godot saw no reason to re-import. This is the
+worst class of harness bug: it looks exactly like a failed fix, and it would just
+as happily look like a passing one.
+
+    godot --headless --path game --import    # between ANY asset edit and ANY capture
+
+**2. `ui_capture.gd` already prefixes `UI_TAG` with `ui_`.** `UI_TAG=lairs_pt`
+writes `ui_lairs_pt.png`. `UI_TAG=ui_lairs_pt` writes `ui_ui_lairs_pt.png`,
+silently, next to the real one. (Captures live at
+`game/prototype/tests/captures/`, not a top-level `captures/`.)
+
+## What was deliberately not re-shot
+
+`ui_trial_pt.png` regenerated **pixel-identical** — the trial screen carries no
+lowercase ç. That is the gate's "regenerates clean" satisfied, not skipped. The
+six `ui_cue_*` files are live gameplay frames whose PT chrome has no lowercase ç
+either (`Um sino distante chama S · SANTUÁRIO 51m`, `Nv 1 · 0 ouro · Bolsa 0/40`,
+`Talho / Cute. / Temp. / Fend.`), and they are not byte-reproducible: an
+old-vs-new diff touches every row and column. Re-shooting them would have written
+~2 MB of unreviewable churn into an already 698 MB `.git` for zero R84 signal, so
+they were reverted to HEAD.
+
+**A number not to trust.** `fps` in `captures/ui_lairs_*.json` recorded 34, 13 and
+12 across identical runs of the same static menu on this shared GPU. `draw_calls`
+(27) is the invariant. Same for `ui_cue_*.json`: back-to-back runs gave 159
+draws/42 fps and 107 draws/1 fps against R64's committed 97/60 — a font edit
+cannot change draw calls. Only `cue_arcs <= 12` (measured 8) is worth gating on
+there.
+
+**Evidence:** `game/prototype/tests/captures/ui_r84_cedilla.png` — a 4× before/after
+strip of three real bands of `ui_lairs_pt.png`, `caÇada` / `coleÇão da provaÇão` /
+`coleÇão` above `caçada` / `coleção da provação` / `coleção`. The `ã` is identical
+in both rows: the control, and exactly what the narrowed scope predicted, since
+its tilde legitimately reaches cap height. Gate: **`TEXT FIT OK · 116 strings
+measured in en + pt`**, unchanged.
+
+---
+
 # Handoff — 2026-09-22: R83 (`game/living/` speaks Portuguese, and a gate to keep it that way)
 
 **R82's lesson applied before the bug, not after it.** R82 closed on geometry
