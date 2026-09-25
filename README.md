@@ -19,7 +19,7 @@ via Pix.
 every decision — then [docs/README.md](docs/README.md) for the full design document
 set. Standing engineering guidelines: [CLAUDE.md](CLAUDE.md).
 
-
+\n
 
 ## Download and play
 
@@ -36,7 +36,7 @@ published, compare its `sha256sum` with
 
 Building it yourself instead: [docs/USAGE.md](docs/USAGE.md).
 
-
+\n
 
 ## Layout
 
@@ -53,7 +53,7 @@ Building it yourself instead: [docs/USAGE.md](docs/USAGE.md).
 | `tools/`   | Content validator, pipeline tooling                                                                                                                                   |
 | `infra/`   | Docker, Kubernetes/Agones, Terraform                                                                                                                                  |
 
-
+\n
 
 ## Quickstart (today's M0 state)
 
@@ -73,7 +73,7 @@ python3 tools/validate_content.py
 The Godot client (`game/`) opens with Godot 4.6+ (not vendored). Go 1.22+ builds
 `backend/economy-core` when it grows past its stub.
 
-
+\n
 
 ## Non-negotiables
 
