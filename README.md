@@ -19,6 +19,8 @@ via Pix.
 every decision — then [docs/README.md](docs/README.md) for the full design document
 set. Standing engineering guidelines: [CLAUDE.md](CLAUDE.md).
 
+
+
 ## Download and play
 
 **[Latest build → Releases](https://github.com/G-4-R-Y/DragonHeroes/releases/latest)**
@@ -34,6 +36,8 @@ published, compare its `sha256sum` with
 
 Building it yourself instead: [docs/USAGE.md](docs/USAGE.md).
 
+
+
 ## Layout
 
 | Dir          | What it is                                                                                                                                                            |
@@ -48,6 +52,8 @@ Building it yourself instead: [docs/USAGE.md](docs/USAGE.md).
 | `art/`     | Source art: Aseprite files, archetype rigs, palettes                                                                                                                  |
 | `tools/`   | Content validator, pipeline tooling                                                                                                                                   |
 | `infra/`   | Docker, Kubernetes/Agones, Terraform                                                                                                                                  |
+
+
 
 ## Quickstart (today's M0 state)
 
@@ -66,6 +72,8 @@ python3 tools/validate_content.py
 
 The Godot client (`game/`) opens with Godot 4.6+ (not vendored). Go 1.22+ builds
 `backend/economy-core` when it grows past its stub.
+
+
 
 ## Non-negotiables
 
