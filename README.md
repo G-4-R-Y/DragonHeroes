@@ -1,4 +1,4 @@
-![Dragon Heroes — gold title over a luminous ruined marsh kingdom at blue hour: three caped adventurers and a spectral wolf set out along a lantern-lit causeway, the keepers' bell tower still lit on the far bank, a distant wyrm on the high mist](docs/art/readme-banner/dragon-heroes-banner.png)
+![Dragon Heroes — a lone hunter faces an antlered marsh dragon on the flooded steps of Gloamfen.](docs/art/readme-banner/gloamfen-crossing-title.webp)
 
 # Dragon Heroes
 
